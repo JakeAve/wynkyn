@@ -192,8 +192,9 @@ export function parse(source: string): BmlDocument {
     }
   };
 
-  const popImplicitBlocks = () => {
+  const popImplicitBlocks = (line: number) => {
     while (blockStack.length && !blockStack[blockStack.length - 1]!.explicit) {
+      checkColumnsDividers(blockStack[blockStack.length - 1]!, line);
       blockStack.pop();
     }
   };
@@ -268,21 +269,25 @@ export function parse(source: string): BmlDocument {
     blockStack.push(ob);
   };
 
+  const checkColumnsDividers = (b: OpenBlock, line: number) => {
+    if (
+      b.node.kind === "columns" && b.node.mode === "parallel" &&
+      b.node.columns.length !== b.node.count
+    ) {
+      diag(
+        line,
+        `{columns: ${b.node.count}} has ${b.node.columns.length - 1} {col} dividers; expected ${b.node.count - 1} (§3.6.5)`,
+      );
+    }
+  };
+
   const closeBlock = (tag: SentinelTag, line: number) => {
     const matches = (b: OpenBlock) =>
       b.name === tag.name && (tag.name !== "is" || b.className === tag.slug);
     const top = blockStack[blockStack.length - 1];
     if (top && matches(top)) {
       blockStack.pop();
-      if (
-        top.node.kind === "columns" && top.node.mode === "parallel" &&
-        top.node.columns.length !== top.node.count
-      ) {
-        diag(
-          line,
-          `{columns: ${top.node.count}} has ${top.node.columns.length - 1} {col} dividers; expected ${top.node.count - 1} (§3.6.5)`,
-        );
-      }
+      checkColumnsDividers(top, line);
       return;
     }
     let idx = -1;
@@ -297,10 +302,12 @@ export function parse(source: string): BmlDocument {
       return;
     }
     diag(line, `{/${tag.name}} closes a block that is not the innermost open block (§3.2.3 rule 1)`);
+    for (let j = blockStack.length - 1; j >= idx; j--) checkColumnsDividers(blockStack[j]!, line);
     blockStack.length = idx; // recovery: force-close it and everything inside it
   };
 
   const openStructural = (tag: SentinelTag, line: number) => {
+    for (const b of blockStack) checkColumnsDividers(b, line);
     blockStack.length = 0;
     if (zone === "back" && tag.name !== "matter") {
       diag(line, `{${tag.name}:} after back matter began — body cannot resume (§3.3)`);
@@ -386,13 +393,13 @@ export function parse(source: string): BmlDocument {
     if (trimmed.startsWith("%%")) continue; // comment: invisible, paragraph continues
     if (trimmed === "") {
       flushParagraph();
-      popImplicitBlocks();
+      popImplicitBlocks(line);
       continue;
     }
     const tag = parseSentinelLine(trimmed);
     if (tag) {
       flushParagraph();
-      popImplicitBlocks();
+      popImplicitBlocks(line);
       handleTag(tag, line);
       continue;
     }
@@ -400,6 +407,6 @@ export function parse(source: string): BmlDocument {
     paraLines.push(trimmed);
   }
   flushParagraph();
-  popImplicitBlocks();
+  popImplicitBlocks(lines.length);
   return doc;
 }

@@ -503,3 +503,33 @@ Deno.test("mixed prose and dash lines stay one paragraph", () => {
   const doc = parse("{chapter: one}\nShe said\n- or seemed to say -\nnothing at all.");
   assertEquals((doc.body[0] as Chapter).children[0]!.kind, "paragraph");
 });
+
+// NOTE: an implicit (never explicitly closed) `{columns:}` block is evicted by
+// popImplicitBlocks() at the very next sentinel line it sees — including its own
+// {col} divider — before that {col} can flip it into parallel mode (§3.2.3's
+// "forgotten close tag" rule applies to {col} just like every other sentinel;
+// see "implicit block ends at the next sentinel, even with no content" above).
+// So a `columns` block can only ever reach mode "parallel" if it survives long
+// enough to see a real {col}, which requires hasExplicitClose() to have found a
+// matching {/columns} — and that in turn guarantees the block is removed via
+// closeBlock (top-of-stack match or LIFO-mismatch recovery), never via
+// popImplicitBlocks or openStructural's force-close. checkColumnsDividers is
+// still wired into all four sites for defensive consistency (and in case that
+// invariant changes later), but only the two closeBlock paths are reachable
+// today. These two tests pin down the actual (verified) behavior instead.
+Deno.test("columns divider check does not false-fire via popImplicitBlocks when {col} evicts the implicit block first", () => {
+  const doc = parse("{chapter: one}\n{columns: 3}\na\n{col}\nb\n\nOutside now.");
+  assert(!doc.diagnostics.some((d) => d.message.includes("divider")));
+  assert(doc.diagnostics.some((d) => d.message.includes("{col} outside a {columns:} block")));
+});
+
+Deno.test("columns divider check does not false-fire via openStructural when the block was already evicted by {col}", () => {
+  const doc = parse("{chapter: one}\n{columns: 3}\na\n{col}\nb\n{chapter: two}\nc");
+  assert(!doc.diagnostics.some((d) => d.message.includes("divider")));
+  assert(doc.diagnostics.some((d) => d.message.includes("{col} outside a {columns:} block")));
+});
+
+Deno.test("parallel columns divider mismatch is diagnosed when a LIFO close-order violation discards it", () => {
+  const doc = parse("{chapter: one}\n{columns: 3}\na\n{col}\nb\n{sidebar}\nc\n{/columns}\n{/sidebar}");
+  assert(doc.diagnostics.some((d) => d.message.includes("divider")));
+});
