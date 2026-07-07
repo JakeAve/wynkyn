@@ -1,6 +1,7 @@
 {
   "tasks": {
-    "test": "deno test --allow-read"
+    "test": "deno test --allow-read --allow-write --allow-net",
+    "dev": "deno run --allow-read --allow-write --allow-net server/dev-server.ts"
   },
   "compilerOptions": {
     "strict": true,
