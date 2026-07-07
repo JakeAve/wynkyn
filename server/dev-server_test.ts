@@ -143,6 +143,68 @@ Deno.test("save: rapid posts coalesce to one write, broadcast tagged with origin
   }
 });
 
+Deno.test("save: failed debounced write doesn't leak a stale recentWrites entry", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 150 });
+  const base = `http://localhost:${server.port}`;
+  try {
+    // Accepted synchronously, but the actual write happens after the debounce.
+    const post = await fetch(`${base}/api/books/demo-book/manuscript`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "won't land", clientId: "editor-1" }),
+    });
+    assertEquals(post.status, 200);
+    await post.body?.cancel();
+
+    // Yank the book out from under the pending write before the debounce
+    // timer fires, forcing Deno.writeTextFile to reject (ENOENT). This must
+    // not crash the server, and must not leave "editor-1" sitting in
+    // recentWrites for demo-book forever.
+    await Deno.remove(`${root}/demo-book`, { recursive: true });
+    await new Promise((r) => setTimeout(r, 400)); // let the debounced write fail
+
+    // Server must still be alive and serving other requests.
+    const books = await (await fetch(`${base}/api/books`)).json();
+    assertEquals(books, { books: [] });
+
+    // Recreate the book out-of-band (not via the save API) and let an
+    // unrelated, later change to manuscript.md broadcast normally.
+    await Deno.mkdir(`${root}/demo-book/images`, { recursive: true });
+    const src = new URL("./testdata/demo-book/", import.meta.url);
+    for (const f of ["manuscript.md", "metadata.json"]) {
+      await Deno.copyFile(new URL(f, src), `${root}/demo-book/${f}`);
+    }
+    await Deno.copyFile(
+      new URL("images/ornament.svg", src),
+      `${root}/demo-book/images/ornament.svg`,
+    );
+    await new Promise((r) => setTimeout(r, 500)); // let the watcher settle after recreation
+
+    const ws = new WebSocket(`ws://localhost:${server.port}/ws?book=demo-book&client=observer`);
+    try {
+      const first = await nextMessage(ws);
+      assertEquals(first.type, "update");
+
+      const pushed = nextMessage(ws);
+      const manuscript = `${root}/demo-book/manuscript.md`;
+      const text = await Deno.readTextFile(manuscript);
+      await Deno.writeTextFile(manuscript, text.replace("Chapter One", "Chapter Won"));
+
+      const msg = await pushed;
+      assertEquals(msg.type, "update");
+      // If the failed save's clientId had leaked in recentWrites, this
+      // unrelated change would incorrectly be tagged "editor-1".
+      assertEquals(msg.origin, null);
+    } finally {
+      ws.close();
+    }
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true }).catch(() => {});
+  }
+});
+
 Deno.test("save: unknown book is a 404", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });

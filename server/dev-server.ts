@@ -85,8 +85,19 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     pending.timer = setTimeout(async () => {
       pendingSaves.delete(book);
       recentWrites.set(book, pending.clientId);
-      await Deno.writeTextFile(`${booksRoot}/${book}/manuscript.md`, pending.text);
-      // The watcher sees this write and broadcasts, tagged via recentWrites.
+      try {
+        await Deno.writeTextFile(`${booksRoot}/${book}/manuscript.md`, pending.text);
+        // The watcher sees this write and broadcasts, tagged via recentWrites.
+      } catch (err) {
+        // No write means no filesystem event, so nothing will ever consume
+        // (and clear) the recentWrites entry above — drop it ourselves so it
+        // doesn't get misattributed to a later, unrelated broadcast for this
+        // book. There's no open HTTP response left to report this on (the
+        // {ok:true} response already went out), and per Global Constraints
+        // the server must never die on bad state, so just log it.
+        recentWrites.delete(book);
+        console.error(`save failed for book "${book}":`, err);
+      }
     }, saveDebounceMs);
     pendingSaves.set(book, pending);
     return Response.json({ ok: true });
