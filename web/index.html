@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Book Editor — Preview</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #52555a; }
+  #toolbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 36px; z-index: 10;
+    background: #23252a; color: #e8e8e8; font-size: 13px;
+    display: flex; align-items: center; gap: 12px; padding: 0 12px;
+  }
+  #diagnostics { color: #f2b263; }
+  #status { margin-left: auto; }
+  #preview { padding: 56px 20px 40px; }
+  /* Spread layout (spec §7.6 direction): two book pages per row, page 1 recto-alone. */
+  .pagedjs_pages { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 8px; }
+  .pagedjs_page { background: white; box-shadow: 0 2px 8px rgba(0, 0, 0, .4); margin-bottom: 16px; }
+  .pagedjs_pages .pagedjs_page:first-child { margin-left: calc(var(--pagedjs-width) + 8px); }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <strong id="book-title">loading…</strong>
+  <span id="diagnostics"></span>
+  <span id="status">connecting…</span>
+</div>
+<div id="preview"></div>
+<script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.js"></script>
+<script src="/web/main.js"></script>
+</body>
+</html>
