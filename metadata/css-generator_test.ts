@@ -131,7 +131,7 @@ Deno.test("running content vocabulary: page-number, none, literal (§4.8)", () =
 
 Deno.test("TOC and ref target-counter rules always emitted (§4.11)", () => {
   const css = generatePagedCSS({});
-  assertStringIncludes(css, ".toc a.entry::after { content: leader('.') target-counter(attr(href url), page); }");
+  assertStringIncludes(css, ".toc a.entry::after { content: target-counter(attr(href url), page); }");
   assertStringIncludes(css, "a.ref::after { content: target-counter(attr(href url), page); }");
 });
 

@@ -152,7 +152,7 @@ export function generatePagedCSS(
   emitEntries(":left", metadata.running?.even);
 
   // 4. TOC + cross-reference page numbers (§4.11 items 9–10)
-  out.push(`.toc a.entry::after { content: leader('.') target-counter(attr(href url), page); }\n`);
+  out.push(`.toc a.entry::after { content: target-counter(attr(href url), page); }\n`);
   out.push(`a.ref::after { content: target-counter(attr(href url), page); }\n`);
 
   // 5. Footnote placement (§4.10)
