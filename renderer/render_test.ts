@@ -191,3 +191,14 @@ Deno.test("poem, quote, epigraph, sidebar, pullquote, is, list, break markup", (
   assertStringIncludes(html, "<ul><li>one</li><li>two</li></ul>");
   assertStringIncludes(html, '<div class="break break-passage-of-years"></div>');
 });
+
+Deno.test("slug with a double-quote character is escaped in id/href attributes, not corrupted", () => {
+  const html = render(parse('{chapter: a"b}\nx'));
+  assertStringIncludes(html, 'id="a&quot;b"');
+  assert(!html.includes('id="a"b"'));
+});
+
+Deno.test("ref target slug with a quote character is escaped in the href", () => {
+  const html = render(parse('{chapter: safe}\nSee {ref: a"b}.'));
+  assertStringIncludes(html, 'href="#a&quot;b"');
+});

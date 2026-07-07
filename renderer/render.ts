@@ -97,17 +97,19 @@ function renderInlines(inlines: Inline[], ctx: NoteCtx): string {
         out += "<br>";
         break;
       case "ref":
-        out += `<a class="ref" href="#${i.slug}"></a>`;
+        out += `<a class="ref" href="#${escapeHtml(i.slug)}"></a>`;
         break;
       case "footnote": {
         ctx.used.push(i.slug);
         const n = ctx.used.length;
         const note = ctx.notes.get(i.slug);
         if (ctx.placement === "footnote" && note) {
-          out += `<sup class="footnote-anchor" id="fnref-${i.slug}">${n}</sup>` +
-            `<span class="note" id="note-${i.slug}">${renderInlines(note.inlines, ctx)}</span>`;
+          out += `<sup class="footnote-anchor" id="fnref-${escapeHtml(i.slug)}">${n}</sup>` +
+            `<span class="note" id="note-${escapeHtml(i.slug)}">${renderInlines(note.inlines, ctx)}</span>`;
         } else {
-          out += `<sup class="footnote-anchor" id="fnref-${i.slug}"><a href="#note-${i.slug}">${n}</a></sup>`;
+          out += `<sup class="footnote-anchor" id="fnref-${escapeHtml(i.slug)}"><a href="#note-${
+            escapeHtml(i.slug)
+          }">${n}</a></sup>`;
         }
         break;
       }
@@ -186,11 +188,11 @@ function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): st
     case "heading": {
       const tag = node.level === 1 ? "h3" : "h4";
       const cls = node.level === 1 ? "heading" : "subheading";
-      const id = node.slug ? ` id="${node.slug}"` : "";
+      const id = node.slug ? ` id="${escapeHtml(node.slug)}"` : "";
       return `<${tag} class="${cls}"${id}>${renderInlines(node.inlines, ctx)}</${tag}>`;
     }
     case "break":
-      return `<div class="break${node.slug ? ` break-${node.slug}` : ""}"></div>`;
+      return `<div class="break${node.slug ? ` break-${escapeHtml(node.slug)}` : ""}"></div>`;
     case "epigraph":
     case "quote": {
       const inner = node.children.map((c) =>
@@ -218,7 +220,7 @@ function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): st
           ? `<p class="verse"><span class="number">${node.start + i}</span> ${renderInlines(v.inlines, ctx)}</p>`
           : ""
       ).join("");
-      return `<div class="verses" id="${node.slug}">${verses}</div>`;
+      return `<div class="verses" id="${escapeHtml(node.slug)}">${verses}</div>`;
     }
     case "columns": {
       if (node.mode === "flow") {
@@ -231,7 +233,9 @@ function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): st
       return `<div class="columns columns-parallel" style="grid-template-columns: repeat(${node.count}, 1fr)">${cols}</div>`;
     }
     case "is":
-      return `<div class="is-${node.className}">${node.children.map((c) => renderContent(c, ctx, opts)).join("")}</div>`;
+      return `<div class="is-${
+        escapeHtml(node.className)
+      }">${node.children.map((c) => renderContent(c, ctx, opts)).join("")}</div>`;
     case "illustration": {
       const cls = `illustration${node.placement ? ` placement-${node.placement}` : ""}`;
       const captionText = node.caption ? inlinePlainText(node.caption) : "";
@@ -242,7 +246,7 @@ function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): st
       const cap = node.caption
         ? `<figcaption class="caption">${renderInlines(node.caption, ctx)}</figcaption>`
         : "";
-      return `<figure class="${cls}" id="${node.slug}">${media}${cap}</figure>`;
+      return `<figure class="${cls}" id="${escapeHtml(node.slug)}">${media}${cap}</figure>`;
     }
     case "list": {
       const items = node.items.map((it) => `<li>${renderInlines(it, ctx)}</li>`).join("");
@@ -280,7 +284,9 @@ function renderBlockWithNotes(
       const rendered = slugs
         .filter((s, i) => slugs.indexOf(s) === i && ctx.notes.has(s))
         .map((s, i) =>
-          `<div class="note" id="note-${s}"><sup>${i + 1}</sup> ${renderInlines(ctx.notes.get(s)!.inlines, ctx)}</div>`
+          `<div class="note" id="note-${escapeHtml(s)}"><sup>${
+            i + 1
+          }</sup> ${renderInlines(ctx.notes.get(s)!.inlines, ctx)}</div>`
         ).join("");
       if (rendered) html += `<aside class="notes">${rendered}</aside>`;
     }
@@ -299,13 +305,17 @@ function numberDiv(
 function renderChapter(ch: Chapter, n: number, opts: RenderOptions): string {
   return renderBlockWithNotes(ch.children, opts, (ctx) => {
     const inner = ch.children.map((c) => renderContent(c, ctx, opts)).join("");
-    return `<section class="chapter" id="${ch.slug}">${numberDiv(n, opts.numbering?.chapters)}${inner}</section>`;
+    return `<section class="chapter" id="${
+      escapeHtml(ch.slug)
+    }">${numberDiv(n, opts.numbering?.chapters)}${inner}</section>`;
   });
 }
 
 function renderMatter(m: MatterBlock, doc: BmlDocument, opts: RenderOptions): string {
-  const id = `matter-${m.type}${m.label ? `-${m.label.toLowerCase()}` : ""}`;
-  const open = `<section class="matter matter-${m.type}" id="${id}">`;
+  const id = `matter-${escapeHtml(m.type)}${
+    m.label ? `-${escapeHtml(m.label.toLowerCase())}` : ""
+  }`;
+  const open = `<section class="matter matter-${escapeHtml(m.type)}" id="${id}">`;
   if (m.type === "toc") {
     const onlyTitles = m.children.every((c) => c.kind === "component" && c.name === "title");
     if (onlyTitles) {
@@ -324,7 +334,11 @@ function renderMatter(m: MatterBlock, doc: BmlDocument, opts: RenderOptions): st
 function generateToc(doc: BmlDocument): string {
   const rows: string[] = [];
   const row = (href: string, label: string, cls: string) =>
-    rows.push(`<div class="entry-row ${cls}"><a class="entry" href="#${href}">${escapeHtml(label)}</a></div>`);
+    rows.push(
+      `<div class="entry-row ${cls}"><a class="entry" href="#${escapeHtml(href)}">${
+        escapeHtml(label)
+      }</a></div>`,
+    );
   for (const b of doc.body) {
     if (b.kind === "part") {
       row(b.slug, titleOf(b.children) ?? b.slug, "toc-part");
@@ -350,7 +364,9 @@ function renderPart(part: Part, partNo: number, chapterNo: { n: number }, opts: 
     .filter((c): c is Chapter => c.kind === "chapter")
     .map((ch) => renderChapter(ch, ++chapterNo.n, opts))
     .join("");
-  return `<section class="part" id="${part.slug}">${numberDiv(partNo, opts.numbering?.parts)}${head}${chapters}</section>`;
+  return `<section class="part" id="${
+    escapeHtml(part.slug)
+  }">${numberDiv(partNo, opts.numbering?.parts)}${head}${chapters}</section>`;
 }
 
 export function render(doc: BmlDocument, opts: RenderOptions = {}): string {

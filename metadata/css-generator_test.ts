@@ -160,3 +160,9 @@ Deno.test("font links: one css2 stylesheet link with all families and default va
 Deno.test("no fonts → empty string", () => {
   assertEquals(generateFontLinks({}), "");
 });
+
+Deno.test("generateFontLinks percent-encodes special characters in family names", () => {
+  const html = generateFontLinks({ fonts: { body: 'My "Weird" Font' } });
+  assertStringIncludes(html, encodeURIComponent('My "Weird" Font').replace(/%20/g, "+"));
+  assert(!html.includes('"Weird"'));
+});

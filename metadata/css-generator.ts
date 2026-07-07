@@ -19,7 +19,7 @@ function selectorFor(key: string): string {
 }
 
 function resolveFontValue(value: string, fonts: Record<string, string> | undefined): string {
-  if (fonts && value in fonts) return `"${fonts[value]}"`;
+  if (fonts && Object.hasOwn(fonts, value)) return `"${fonts[value]}"`;
   return value;
 }
 
@@ -167,7 +167,7 @@ export function generateFontLinks(metadata: Metadata): string {
   const families = Object.values(metadata.fonts ?? {});
   if (!families.length) return "";
   const params = families
-    .map((f) => `family=${f.replace(/ /g, "+")}:ital,wght@0,400;0,700;1,400;1,700`)
+    .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, "+")}:ital,wght@0,400;0,700;1,400;1,700`)
     .join("&");
   return [
     `<link rel="preconnect" href="https://fonts.googleapis.com">`,
