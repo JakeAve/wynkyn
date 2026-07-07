@@ -3,14 +3,35 @@ import { parseSentinelLine, type SentinelTag } from "./sentinel.ts";
 import { parseInlines } from "./inline.ts";
 import type {
   BmlDocument,
+  Break,
   Chapter,
+  Component,
+  ComponentName,
   ContentNode,
+  DropcapParagraph,
+  Heading,
+  Illustration,
+  Inline,
   MatterBlock,
+  Note,
   Paragraph,
   Part,
 } from "./types.ts";
 
 const STRUCTURAL = new Set(["matter", "part", "chapter"]);
+
+const COMPONENT_NAMES = new Set<string>([
+  "title", "subtitle", "author", "editor", "translator", "publisher",
+  "publisher-location", "year", "edition", "series", "series-number",
+  "copyright-line", "rights", "isbn", "printer", "typeface", "paper",
+  "binding", "attribution",
+]);
+
+const PARAGRAPH_CLOSE = new Set<string>([
+  ...COMPONENT_NAMES, "dropcap", "heading", "subheading", "illustration", "note",
+]);
+
+const PLACEMENTS = new Set(["inline", "half-page", "full-page", "full-spread", "margin"]);
 
 export function parse(source: string): BmlDocument {
   const lines = source.split(/\r?\n/);
@@ -23,6 +44,7 @@ export function parse(source: string): BmlDocument {
 
   let paraLines: string[] = [];
   let paraStart = 0;
+  let pending: { tag: SentinelTag; line: number } | null = null;
 
   const diag = (line: number, message: string) => doc.diagnostics.push({ line, message });
 
@@ -41,6 +63,14 @@ export function parse(source: string): BmlDocument {
   const container = (line: number): ContentNode[] => structuralChildren(line);
 
   const flushParagraph = () => {
+    if (pending) {
+      const inlines = paraLines.length ? parseInlines(paraLines) : [];
+      const p = pending;
+      pending = null;
+      paraLines = [];
+      finalizePending(p.tag, p.line, inlines);
+      return;
+    }
     if (!paraLines.length) return;
     const node: Paragraph = {
       kind: "paragraph",
@@ -49,6 +79,68 @@ export function parse(source: string): BmlDocument {
     };
     container(paraStart).push(node);
     paraLines = [];
+  };
+
+  const finalizePending = (tag: SentinelTag, line: number, inlines: Inline[]) => {
+    const c = container(line);
+    if (COMPONENT_NAMES.has(tag.name)) {
+      const comp: Component = { kind: "component", name: tag.name as ComponentName, inlines, line };
+      if (tag.name === "attribution") {
+        const prev = c[c.length - 1];
+        if (
+          prev &&
+          (prev.kind === "epigraph" || prev.kind === "quote" ||
+            prev.kind === "poem" || prev.kind === "pullquote")
+        ) {
+          prev.attribution = comp;
+          return;
+        }
+        diag(line, "{attribution} has no preceding epigraph, quote, poem, or pullquote to bind to");
+      }
+      c.push(comp);
+      return;
+    }
+    switch (tag.name) {
+      case "dropcap": {
+        if (!inlines.length) diag(line, "{dropcap} has no following paragraph");
+        const d: DropcapParagraph = { kind: "dropcap", inlines, line };
+        if (tag.params["image"]) d.image = tag.params["image"];
+        c.push(d);
+        return;
+      }
+      case "heading":
+      case "subheading": {
+        const h: Heading = {
+          kind: "heading",
+          level: tag.name === "heading" ? 1 : 2,
+          inlines,
+          line,
+        };
+        if (tag.slug) h.slug = tag.slug;
+        c.push(h);
+        return;
+      }
+      case "illustration": {
+        const il: Illustration = { kind: "illustration", slug: tag.slug ?? "", line };
+        if (!tag.slug) diag(line, "{illustration:} requires a slug");
+        const placement = tag.params["placement"];
+        if (placement) {
+          if (PLACEMENTS.has(placement)) {
+            il.placement = placement as Illustration["placement"];
+          } else {
+            diag(line, `invalid illustration placement "${placement}"`);
+          }
+        }
+        if (inlines.length) il.caption = inlines;
+        c.push(il);
+        return;
+      }
+      case "note": {
+        if (!tag.slug) diag(line, "{note:} requires a slug");
+        c.push({ kind: "note", slug: tag.slug ?? "", inlines, line });
+        return;
+      }
+    }
   };
 
   const openStructural = (tag: SentinelTag, line: number) => {
@@ -84,10 +176,20 @@ export function parse(source: string): BmlDocument {
     else doc.body.push(curChapter);
   };
 
-  // Tasks 4–6 extend this dispatch.
+  // Tasks 5–6 extend this dispatch.
   const handleTag = (tag: SentinelTag, line: number) => {
     if (!tag.closing && STRUCTURAL.has(tag.name)) {
       openStructural(tag, line);
+      return;
+    }
+    if (!tag.closing && tag.name === "break") {
+      const b: Break = { kind: "break", line };
+      if (tag.slug) b.slug = tag.slug;
+      container(line).push(b);
+      return;
+    }
+    if (!tag.closing && PARAGRAPH_CLOSE.has(tag.name)) {
+      pending = { tag, line };
       return;
     }
     diag(line, `unhandled sentinel {${tag.closing ? "/" : ""}${tag.name}}`);
