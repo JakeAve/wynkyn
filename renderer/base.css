@@ -1,0 +1,77 @@
+/* renderer/base.css — structural defaults, independent of any book's metadata.json */
+.bml {
+  line-height: 1.5;
+  font-family: serif;
+}
+.bml p {
+  margin: 0;
+  text-indent: 1.5em;
+}
+.bml p.has-dropcap,
+.bml h1 + p,
+.bml .break + p,
+.bml blockquote p,
+.bml .stanza,
+.bml .verse {
+  text-indent: 0;
+}
+.bml .dropcap {
+  float: left;
+  padding-right: 0.05em;
+}
+.bml .chapter,
+.bml .part,
+.bml .matter {
+  break-before: page;
+}
+.bml .title,
+.bml .number {
+  text-indent: 0;
+}
+.bml blockquote {
+  margin: 1em 2em;
+}
+.bml .break {
+  text-align: center;
+  margin: 1em 0;
+}
+.bml .poem,
+.bml .verses {
+  margin: 1em 0;
+}
+.bml figure {
+  margin: 1em 0;
+  text-align: center;
+}
+.bml figure img {
+  max-width: 100%;
+}
+.bml .illustration-placeholder {
+  border: 1px dashed #999;
+  padding: 2em;
+  text-align: center;
+  color: #777;
+}
+.bml .toc .entry-row {
+  display: flex;
+}
+.bml .toc a.entry {
+  text-decoration: none;
+  color: inherit;
+  width: 100%;
+}
+.bml .toc .toc-chapter {
+  margin-left: 1.5em;
+}
+.bml aside.notes {
+  margin-top: 2em;
+  border-top: 1px solid #999;
+  padding-top: 0.5em;
+}
+.bml .columns-parallel {
+  display: grid;
+  gap: 1em;
+}
+.bml a.ref {
+  color: inherit;
+}
