@@ -2,6 +2,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { parse } from "./parser.ts";
 import type { Chapter, Paragraph, Part } from "./types.ts";
 import type { Break, Component, DropcapParagraph, Heading, Illustration, Inline, Note } from "./types.ts";
+import type { Epigraph, IsBlock, Poem, Quote, Sidebar } from "./types.ts";
 
 function inlineText(inlines: Inline[]): string {
   return inlines.map((i) => (i.kind === "text" ? i.text : "")).join("");
@@ -239,4 +240,159 @@ Deno.test("attribution with nothing to bind to: diagnostic, kept as component", 
   const ch = doc.body[0] as Chapter;
   assertEquals((ch.children[0] as Component).name, "attribution");
   assert(doc.diagnostics.some((d) => d.message.includes("attribution")));
+});
+
+Deno.test("single-paragraph sidebar closes implicitly (§3.6.2)", () => {
+  const doc = parse("{chapter: one}\n{sidebar}\nA brief aside.\n\nBack to prose.");
+  const ch = doc.body[0] as Chapter;
+  const sb = ch.children[0] as Sidebar;
+  assertEquals(sb.kind, "sidebar");
+  assertEquals(sb.children.length, 1);
+  assertEquals(ch.children[1]!.kind, "paragraph"); // "Back to prose." is outside
+  assertEquals(doc.diagnostics, []);
+});
+
+Deno.test("explicit sidebar spans multiple paragraphs (§3.6.2)", () => {
+  const doc = parse("{chapter: one}\n{sidebar}\nFirst.\n\nSecond.\n{/sidebar}\n\nOutside.");
+  const ch = doc.body[0] as Chapter;
+  const sb = ch.children[0] as Sidebar;
+  assertEquals(sb.children.length, 2);
+  assertEquals(ch.children.length, 2);
+});
+
+Deno.test("unclosed block: content after first paragraph falls outside (§3.2.3)", () => {
+  const doc = parse("{chapter: one}\n{sidebar}\nInside.\n\nOutside now.");
+  const ch = doc.body[0] as Chapter;
+  assertEquals((ch.children[0] as Sidebar).children.length, 1);
+  assertEquals(ch.children[1]!.kind, "paragraph");
+  assertEquals(doc.diagnostics, []); // a forgotten close tag is not an error
+});
+
+Deno.test("implicit block ends at the next sentinel, even with no content", () => {
+  const doc = parse("{chapter: one}\n{sidebar}\n{break}\nProse.");
+  const ch = doc.body[0] as Chapter;
+  assertEquals(ch.children.map((c) => c.kind), ["sidebar", "break", "paragraph"]);
+  assertEquals((ch.children[0] as Sidebar).children.length, 0);
+});
+
+Deno.test("epigraph with attribution binding (§3.5.5)", () => {
+  const doc = parse([
+    "{chapter: river}",
+    "{epigraph}",
+    "The water does not ask where it is going.",
+    "{attribution}",
+    "— Old Voronin proverb",
+  ].join("\n"));
+  const ep = (doc.body[0] as Chapter).children[0] as Epigraph;
+  assertEquals(ep.kind, "epigraph");
+  assertEquals(ep.children.length, 1);
+  assertEquals(inlineText(ep.attribution!.inlines), "— Old Voronin proverb");
+  assertEquals(doc.diagnostics, []);
+});
+
+Deno.test("multi-paragraph quote, attribution after the close (§3.6.4)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{quote}",
+    "First paragraph of extract.",
+    "",
+    "Second paragraph.",
+    "{/quote}",
+    "{attribution}",
+    "— Declaration of Independence",
+  ].join("\n"));
+  const q = (doc.body[0] as Chapter).children[0] as Quote;
+  assertEquals(q.children.length, 2);
+  assertEquals(inlineText(q.attribution!.inlines), "— Declaration of Independence");
+});
+
+Deno.test("poem: paragraphs are stanzas, hard breaks are lines, attribution binds (§3.5.8)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{poem}",
+    "The apples fall\\",
+    "in ordered rows.",
+    "",
+    "The winter comes\\",
+    "to count them all.",
+    "{/poem}",
+    "{attribution}",
+    "— from Anna's notebook",
+  ].join("\n"));
+  const poem = (doc.body[0] as Chapter).children[0] as Poem;
+  assertEquals(poem.stanzas.length, 2);
+  assert(poem.stanzas[0]!.inlines.some((i) => i.kind === "linebreak"));
+  assertEquals(inlineText(poem.attribution!.inlines), "— from Anna's notebook");
+});
+
+Deno.test("component sentinels are not allowed inside a poem: diagnostic", () => {
+  const doc = parse("{chapter: one}\n{poem}\nStanza.\n\n{title}\nNope\n{/poem}");
+  assert(doc.diagnostics.some((d) => d.message.includes("poem")));
+});
+
+Deno.test("pullquote (§3.6.3)", () => {
+  const doc = parse("{chapter: one}\n{pullquote}\nThe orchard remembers what the house has forgotten.");
+  assertEquals((doc.body[0] as Chapter).children[0]!.kind, "pullquote");
+});
+
+Deno.test("is block: explicit close names its class, other sentinels nest inside (§3.6.6)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{is: telegram}",
+    "{dropcap}",
+    "ARRIVED SAFELY STOP",
+    "{/is: telegram}",
+  ].join("\n"));
+  const is = (doc.body[0] as Chapter).children[0] as IsBlock;
+  assertEquals(is.className, "telegram");
+  assertEquals(is.children[0]!.kind, "dropcap");
+  assertEquals(doc.diagnostics, []);
+});
+
+Deno.test("is blocks of different classes nest (§3.2.3 rule 2)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{is: letter}",
+    "Dear friend,",
+    "",
+    "{is: postscript}",
+    "P.S. Write soon.",
+    "{/is: postscript}",
+    "{/is: letter}",
+  ].join("\n"));
+  const outer = (doc.body[0] as Chapter).children[0] as IsBlock;
+  assertEquals(outer.className, "letter");
+  const inner = outer.children[1] as IsBlock;
+  assertEquals(inner.className, "postscript");
+  assertEquals(doc.diagnostics, []);
+});
+
+Deno.test("overlapping blocks: diagnostic and recovery (§3.2.3 rule 1)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{sidebar}",
+    "{quote}",
+    "text",
+    "{/sidebar}",
+    "{/quote}",
+  ].join("\n"));
+  assert(doc.diagnostics.length > 0); // LIFO violation reported, parse continues
+});
+
+Deno.test("structural sentinel force-closes open blocks (§3.2.3 rule 3)", () => {
+  // The {/quote} exists but a {chapter:} intervenes, so lookahead resolves the
+  // quote as implicit; the late {/quote} is diagnosed as stray. Either way the
+  // chapter's prose must land in the chapter, never the quote.
+  const doc = parse([
+    "{chapter: one}",
+    "{quote}",
+    "Inside quote.",
+    "",
+    "{chapter: two}",
+    "New chapter prose.",
+    "{/quote}",
+  ].join("\n"));
+  assertEquals(doc.body.length, 2);
+  const ch2 = doc.body[1] as Chapter;
+  assertEquals(ch2.children[0]!.kind, "paragraph"); // prose went to the chapter, not the quote
 });
