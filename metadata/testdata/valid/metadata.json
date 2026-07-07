@@ -1,0 +1,13 @@
+{
+  "page": {
+    "size": "5.5in 8.5in",
+    "margins": { "top": "18mm", "bottom": "22mm", "inside": "22mm", "outside": "16mm" }
+  },
+  "fonts": { "body": "EB Garamond", "display": "Playfair Display" },
+  "elements": { "body": { "font-family": "body", "font-size": "11pt" } },
+  "is": { "telegram": { "font-family": "mono" } },
+  "numbering": { "chapters": { "style": "roman-upper", "show": true, "prefix": "", "suffix": "." } },
+  "running": { "odd": [{ "content": "book-title", "area": "top-right", "font-size": "8pt" }] },
+  "print": { "sheet-size": "legal", "folios-per-signature": 4 },
+  "notes": { "placement": "footnote" }
+}
