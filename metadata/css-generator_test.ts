@@ -143,3 +143,20 @@ Deno.test("footnote float only when placement is footnote (§4.10)", () => {
   assert(!generatePagedCSS({ notes: { placement: "endnote" } }).includes("float: footnote"));
   assert(!generatePagedCSS({}).includes("float: footnote"));
 });
+
+import { generateFontLinks } from "./css-generator.ts";
+
+Deno.test("font links: one css2 stylesheet link with all families and default variants", () => {
+  const html = generateFontLinks({
+    fonts: { body: "EB Garamond", display: "Playfair Display" },
+  });
+  assertStringIncludes(html, '<link rel="preconnect" href="https://fonts.googleapis.com">');
+  assertStringIncludes(html, "family=EB+Garamond:ital,wght@0,400;0,700;1,400;1,700");
+  assertStringIncludes(html, "family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700");
+  assertStringIncludes(html, "display=swap");
+  assertEquals((html.match(/rel="stylesheet"/g) ?? []).length, 1);
+});
+
+Deno.test("no fonts → empty string", () => {
+  assertEquals(generateFontLinks({}), "");
+});

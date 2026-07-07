@@ -162,3 +162,16 @@ export function generatePagedCSS(
 
   return out.join("");
 }
+
+export function generateFontLinks(metadata: Metadata): string {
+  const families = Object.values(metadata.fonts ?? {});
+  if (!families.length) return "";
+  const params = families
+    .map((f) => `family=${f.replace(/ /g, "+")}:ital,wght@0,400;0,700;1,400;1,700`)
+    .join("&");
+  return [
+    `<link rel="preconnect" href="https://fonts.googleapis.com">`,
+    `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`,
+    `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?${params}&display=swap">`,
+  ].join("\n");
+}
