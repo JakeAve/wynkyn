@@ -95,3 +95,70 @@ Deno.test("websocket: initial build on connect, rebuild pushed on file change", 
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("save: rapid posts coalesce to one write, broadcast tagged with origin", async () => {
+  const root = await makeBooksRoot();
+  // Debounce long enough that two sequential local fetches land inside one window.
+  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 200 });
+  const base = `http://localhost:${server.port}`;
+  const ws = new WebSocket(`ws://localhost:${server.port}/ws?book=demo-book&client=observer`);
+  try {
+    await nextMessage(ws); // initial build
+    await new Promise((r) => setTimeout(r, 300)); // let the watch warm up
+    const pushed = nextMessage(ws);
+
+    const post = (text: string) =>
+      fetch(`${base}/api/books/demo-book/manuscript`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, clientId: "editor-1" }),
+      });
+
+    const draftA = "{chapter: draft}\n{title}\nDraft A\n";
+    const draftB = "{chapter: draft}\n{title}\nDraft B\n";
+    const r1 = await post(draftA);
+    assertEquals(r1.status, 200);
+    await r1.body?.cancel();
+    const r2 = await post(draftB);
+    assertEquals(r2.status, 200);
+    await r2.body?.cancel();
+
+    const msg = await pushed;
+    assertEquals(msg.type, "update");
+    assertEquals(msg.origin, "editor-1"); // spec §6: originating editor can ignore this
+    assert((msg.html as string).includes("Draft B"));
+    // Only the LAST text hit the disk — the debounce swallowed Draft A.
+    assertEquals(await Deno.readTextFile(`${root}/demo-book/manuscript.md`), draftB);
+
+    const bad = await fetch(`${base}/api/books/demo-book/manuscript`, {
+      method: "POST",
+      body: "not json",
+    });
+    assertEquals(bad.status, 400);
+    await bad.body?.cancel();
+  } finally {
+    ws.close();
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("save: unknown book is a 404", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
+  try {
+    const res = await fetch(
+      `http://localhost:${server.port}/api/books/no-such-book/manuscript`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: "x", clientId: "c" }),
+      },
+    );
+    assertEquals(res.status, 404);
+    await res.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});

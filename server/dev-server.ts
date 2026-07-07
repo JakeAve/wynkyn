@@ -38,6 +38,12 @@ interface Client {
   clientId: string;
 }
 
+interface PendingSave {
+  text: string;
+  clientId: string | null;
+  timer: number;
+}
+
 export async function startServer(opts: ServerOptions = {}): Promise<RunningServer> {
   const booksRoot = opts.booksRoot ?? "books";
   await Deno.stat(booksRoot); // fail fast at startup if the root is missing
@@ -50,6 +56,41 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   // book → clientId of the latest server-side write, so the originating editor
   // can ignore its own echo (spec §6). Written by the save endpoint (Task 5).
   const recentWrites = new Map<string, string | null>();
+
+  const saveDebounceMs = opts.saveDebounceMs ?? 250;
+  const pendingSaves = new Map<string, PendingSave>();
+
+  async function handleSave(book: string, req: Request): Promise<Response> {
+    if (!safeName(book)) return new Response("bad path", { status: 400 });
+    let body: { text?: unknown; clientId?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response("invalid JSON body", { status: 400 });
+    }
+    if (typeof body.text !== "string") {
+      return new Response("body must be { text: string, clientId?: string }", {
+        status: 400,
+      });
+    }
+    try {
+      await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
+    } catch {
+      return new Response("book not found", { status: 404 });
+    }
+    const clientId = typeof body.clientId === "string" ? body.clientId : null;
+    const existing = pendingSaves.get(book);
+    if (existing) clearTimeout(existing.timer);
+    const pending: PendingSave = { text: body.text, clientId, timer: 0 };
+    pending.timer = setTimeout(async () => {
+      pendingSaves.delete(book);
+      recentWrites.set(book, pending.clientId);
+      await Deno.writeTextFile(`${booksRoot}/${book}/manuscript.md`, pending.text);
+      // The watcher sees this write and broadcasts, tagged via recentWrites.
+    }, saveDebounceMs);
+    pendingSaves.set(book, pending);
+    return Response.json({ ok: true });
+  }
 
   async function buildMessage(book: string, origin: string | null): Promise<string> {
     try {
@@ -146,6 +187,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       }
     }
 
+    const saveApi = path.match(/^\/api\/books\/([^/]+)\/manuscript$/);
+    if (saveApi && req.method === "POST") return handleSave(saveApi[1]!, req);
+
     const image = path.match(/^\/books\/([^/]+)\/images\/([^/]+)$/);
     if (image && req.method === "GET") {
       const [, book, file] = image;
@@ -162,6 +206,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     port: server.addr.port,
     async stop() {
       watcher.stop();
+      for (const p of pendingSaves.values()) clearTimeout(p.timer);
       for (const c of clients) {
         try {
           c.socket.close();
