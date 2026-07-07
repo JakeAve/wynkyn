@@ -3,6 +3,7 @@ import { parse } from "./parser.ts";
 import type { Chapter, Paragraph, Part } from "./types.ts";
 import type { Break, Component, DropcapParagraph, Heading, Illustration, Inline, Note } from "./types.ts";
 import type { Epigraph, IsBlock, Poem, Quote, Sidebar } from "./types.ts";
+import type { Columns, List, Verses } from "./types.ts";
 
 function inlineText(inlines: Inline[]): string {
   return inlines.map((i) => (i.kind === "text" ? i.text : "")).join("");
@@ -395,4 +396,110 @@ Deno.test("structural sentinel force-closes open blocks (§3.2.3 rule 3)", () =>
   assertEquals(doc.body.length, 2);
   const ch2 = doc.body[1] as Chapter;
   assertEquals(ch2.children[0]!.kind, "paragraph"); // prose went to the chapter, not the quote
+});
+
+Deno.test("verses: one verse per paragraph, default start 1 (§3.5.7)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{verses: genesis-1}",
+    "In the beginning God created the heaven and the earth.",
+    "",
+    "And the earth was without form, and void.",
+    "",
+    "And God said, Let there be light.",
+    "{/verses}",
+  ].join("\n"));
+  const v = (doc.body[0] as Chapter).children[0] as Verses;
+  assertEquals(v.slug, "genesis-1");
+  assertEquals(v.start, 1);
+  assertEquals(v.verses.length, 3);
+  assertEquals(doc.diagnostics, []);
+});
+
+Deno.test("verses with start param (§3.5.7)", () => {
+  const doc = parse("{chapter: one}\n{verses: genesis-1 | start: 3}\nAnd God said.\n{/verses}");
+  const v = (doc.body[0] as Chapter).children[0] as Verses;
+  assertEquals(v.start, 3);
+});
+
+Deno.test("verses nest inside columns (§3.2.3 example)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{columns: 2}",
+    "{verses: psalm-19}",
+    "The heavens declare the glory of God.",
+    "{/verses}",
+    "{/columns}",
+  ].join("\n"));
+  const cols = (doc.body[0] as Chapter).children[0] as Columns;
+  assertEquals(cols.columns[0]![0]!.kind, "verses");
+  assertEquals(doc.diagnostics, []);
+});
+
+Deno.test("columns flow mode: no {col}, single stream (§3.6.5)", () => {
+  const doc = parse("{chapter: one}\n{columns: 2}\nA long passage of prose.\n{/columns}");
+  const cols = (doc.body[0] as Chapter).children[0] as Columns;
+  assertEquals(cols.count, 2);
+  assertEquals(cols.mode, "flow");
+  assertEquals(cols.columns.length, 1);
+});
+
+Deno.test("columns parallel mode: {col} divides content (§3.6.5)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{columns: 2}",
+    "The heavens declare the glory of God;",
+    "{col}",
+    "Die Himmel erzählen die Ehre Gottes,",
+    "{/columns}",
+  ].join("\n"));
+  const cols = (doc.body[0] as Chapter).children[0] as Columns;
+  assertEquals(cols.mode, "parallel");
+  assertEquals(cols.columns.length, 2);
+  assertEquals(cols.columns[0]!.length, 1);
+  assertEquals(cols.columns[1]!.length, 1);
+  assertEquals(doc.diagnostics, []);
+});
+
+Deno.test("parallel mode divider-count mismatch: diagnostic (§3.6.5)", () => {
+  const doc = parse("{chapter: one}\n{columns: 3}\na\n{col}\nb\n{/columns}");
+  assert(doc.diagnostics.some((d) => d.message.includes("divider")));
+});
+
+Deno.test("{col} outside {columns:}: diagnostic", () => {
+  const doc = parse("{chapter: one}\n{col}");
+  assert(doc.diagnostics.some((d) => d.message.includes("col")));
+});
+
+Deno.test("invalid columns count: diagnostic", () => {
+  const doc = parse("{chapter: one}\n{columns: zero}\nx\n{/columns}");
+  assert(doc.diagnostics.some((d) => d.message.includes("column")));
+});
+
+Deno.test("unordered list (§3.6.7)", () => {
+  const doc = parse("{chapter: one}\n- First item\n- Second item\n- Third item");
+  const l = (doc.body[0] as Chapter).children[0] as List;
+  assertEquals(l.ordered, false);
+  assertEquals(l.items.length, 3);
+  assertEquals(inlineText(l.items[0]!), "First item");
+});
+
+Deno.test("ordered list records its start number (§3.6.7)", () => {
+  const doc = parse("{chapter: one}\n4. Step four\n5. Step five");
+  const l = (doc.body[0] as Chapter).children[0] as List;
+  assertEquals(l.ordered, true);
+  assertEquals(l.start, 4);
+  assertEquals(inlineText(l.items[1]!), "Step five");
+});
+
+Deno.test("escaped leading dash is prose, not a list (§3.2.8)", () => {
+  const doc = parse("{chapter: one}\n\\- not a list item");
+  const p = (doc.body[0] as Chapter).children[0] as Paragraph;
+  assertEquals(p.kind, "paragraph");
+  assertEquals(text(p), "- not a list item");
+});
+
+Deno.test("mixed prose and dash lines stay one paragraph", () => {
+  const doc = parse("{chapter: one}\nShe said\n- or seemed to say -\nnothing at all.");
+  assertEquals((doc.body[0] as Chapter).children[0]!.kind, "paragraph");
 });

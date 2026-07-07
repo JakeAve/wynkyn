@@ -2,9 +2,9 @@
 import { parseSentinelLine, type SentinelTag } from "./sentinel.ts";
 import { parseInlines } from "./inline.ts";
 import type {
-  BmlDocument, Break, Chapter, Component, ComponentName, ContentNode,
-  DropcapParagraph, Epigraph, Heading, Illustration, Inline, IsBlock,
-  MatterBlock, Note, Paragraph, Part, Poem, Pullquote, Quote, Sidebar,
+  BmlDocument, Break, Chapter, Columns, Component, ComponentName, ContentNode,
+  DropcapParagraph, Epigraph, Heading, Illustration, Inline, IsBlock, List,
+  MatterBlock, Note, Paragraph, Part, Poem, Pullquote, Quote, Sidebar, Verses,
 } from "./types.ts";
 
 const STRUCTURAL = new Set(["matter", "part", "chapter"]);
@@ -22,7 +22,12 @@ const PARAGRAPH_CLOSE = new Set<string>([
 
 const PLACEMENTS = new Set(["inline", "half-page", "full-page", "full-spread", "margin"]);
 
-const BLOCK_NAMES = new Set(["epigraph", "quote", "poem", "pullquote", "sidebar", "is"]);
+const BLOCK_NAMES = new Set([
+  "epigraph", "quote", "poem", "pullquote", "sidebar", "is", "verses", "columns",
+]);
+
+const UL_RE = /^-\s+(.*)$/;
+const OL_RE = /^(\d+)\.\s+(.*)$/;
 
 interface OpenBlock {
   name: string;
@@ -71,6 +76,10 @@ export function parse(source: string): BmlDocument {
         return n.children;
       case "poem":
         return n.stanzas as ContentNode[];
+      case "verses":
+        return n.verses as ContentNode[];
+      case "columns":
+        return n.columns[n.columns.length - 1]!;
       default:
         return structuralChildren(line);
     }
@@ -86,7 +95,7 @@ export function parse(source: string): BmlDocument {
       return;
     }
     if (!paraLines.length) return;
-    const node: Paragraph = {
+    const node: ContentNode = tryList(paraLines, paraStart) ?? {
       kind: "paragraph",
       inlines: parseInlines(paraLines),
       line: paraStart,
@@ -95,10 +104,31 @@ export function parse(source: string): BmlDocument {
     paraLines = [];
   };
 
+  const tryList = (rawLines: string[], line: number): List | null => {
+    if (rawLines.every((l) => UL_RE.test(l))) {
+      return {
+        kind: "list",
+        ordered: false,
+        items: rawLines.map((l) => parseInlines([l.match(UL_RE)![1]!])),
+        line,
+      };
+    }
+    if (rawLines.every((l) => OL_RE.test(l))) {
+      return {
+        kind: "list",
+        ordered: true,
+        start: parseInt(rawLines[0]!.match(OL_RE)![1]!, 10),
+        items: rawLines.map((l) => parseInlines([l.match(OL_RE)![2]!])),
+        line,
+      };
+    }
+    return null;
+  };
+
   const finalizePending = (tag: SentinelTag, line: number, inlines: Inline[]) => {
     const topBlock = blockStack[blockStack.length - 1];
-    if (topBlock && topBlock.node.kind === "poem") {
-      diag(line, `{${tag.name}} is not allowed inside {poem}`);
+    if (topBlock && (topBlock.node.kind === "poem" || topBlock.node.kind === "verses")) {
+      diag(line, `{${tag.name}} is not allowed inside {${topBlock.node.kind}}`);
       return;
     }
     const c = container(line);
@@ -202,6 +232,32 @@ export function parse(source: string): BmlDocument {
       case "sidebar":
         node = { kind: "sidebar", children: [], line };
         break;
+      case "verses": {
+        if (!tag.slug) diag(line, "{verses:} requires a slug");
+        const start = parseInt(tag.params["start"] ?? "1", 10);
+        node = {
+          kind: "verses",
+          slug: tag.slug ?? "",
+          start: Number.isFinite(start) && start >= 1 ? start : 1,
+          verses: [],
+          line,
+        };
+        break;
+      }
+      case "columns": {
+        const count = parseInt(tag.slug ?? "", 10);
+        if (!Number.isFinite(count) || count < 1) {
+          diag(line, `{columns:} requires a positive integer column count`);
+        }
+        node = {
+          kind: "columns",
+          count: Number.isFinite(count) && count >= 1 ? count : 1,
+          mode: "flow",
+          columns: [[]],
+          line,
+        };
+        break;
+      }
       default: // is
         if (!tag.slug) diag(line, "{is:} requires a class name");
         node = { kind: "is", className: tag.slug ?? "", children: [], line };
@@ -218,6 +274,15 @@ export function parse(source: string): BmlDocument {
     const top = blockStack[blockStack.length - 1];
     if (top && matches(top)) {
       blockStack.pop();
+      if (
+        top.node.kind === "columns" && top.node.mode === "parallel" &&
+        top.node.columns.length !== top.node.count
+      ) {
+        diag(
+          line,
+          `{columns: ${top.node.count}} has ${top.node.columns.length - 1} {col} dividers; expected ${top.node.count - 1} (§3.6.5)`,
+        );
+      }
       return;
     }
     let idx = -1;
@@ -280,10 +345,20 @@ export function parse(source: string): BmlDocument {
       else openBlock(tag, line);
       return;
     }
+    if (!tag.closing && tag.name === "col") {
+      const topBlock = blockStack[blockStack.length - 1];
+      if (topBlock && topBlock.node.kind === "columns") {
+        topBlock.node.mode = "parallel";
+        topBlock.node.columns.push([]);
+      } else {
+        diag(line, "{col} outside a {columns:} block");
+      }
+      return;
+    }
     if (!tag.closing && tag.name === "break") {
       const topBlock = blockStack[blockStack.length - 1];
-      if (topBlock && topBlock.node.kind === "poem") {
-        diag(line, "{break} is not allowed inside {poem}");
+      if (topBlock && (topBlock.node.kind === "poem" || topBlock.node.kind === "verses")) {
+        diag(line, `{break} is not allowed inside {${topBlock.node.kind}}`);
         return;
       }
       const b: Break = { kind: "break", line };
