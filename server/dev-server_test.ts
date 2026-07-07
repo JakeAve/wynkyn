@@ -51,3 +51,47 @@ Deno.test("http: shell, book list, build json, images, 404s", async () => {
     await Deno.remove(root, { recursive: true });
   }
 });
+
+function nextMessage(
+  ws: WebSocket,
+  timeoutMs = 5000,
+): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error("timed out waiting for a ws message")),
+      timeoutMs,
+    );
+    ws.addEventListener("message", (e) => {
+      clearTimeout(t);
+      resolve(JSON.parse((e as MessageEvent).data));
+    }, { once: true });
+  });
+}
+
+Deno.test("websocket: initial build on connect, rebuild pushed on file change", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const ws = new WebSocket(`ws://localhost:${server.port}/ws?book=demo-book&client=t1`);
+  try {
+    const first = await nextMessage(ws);
+    assertEquals(first.type, "update");
+    assertEquals(first.origin, null);
+    assert((first.html as string).includes("Chapter One"));
+
+    // Give the fresh FSEvents watch a beat before the write it must see.
+    await new Promise((r) => setTimeout(r, 300));
+    const pushed = nextMessage(ws);
+    const manuscript = `${root}/demo-book/manuscript.md`;
+    const src = await Deno.readTextFile(manuscript);
+    await Deno.writeTextFile(manuscript, src.replace("Chapter One", "Chapter Won"));
+
+    const msg = await pushed;
+    assertEquals(msg.type, "update");
+    assertEquals(msg.origin, null);
+    assert((msg.html as string).includes("Chapter Won"));
+  } finally {
+    ws.close();
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
