@@ -126,6 +126,30 @@ function inlinePlainText(inlines: Inline[]): string {
   return out;
 }
 
+function splitFirstChar(inlines: Inline[]): { head: string; rest: Inline[] } {
+  if (!inlines.length) return { head: "", rest: inlines };
+  const first = inlines[0]!;
+  const others = inlines.slice(1);
+  if (first.kind === "text") {
+    if (!first.text.length) {
+      return splitFirstChar(others);
+    }
+    const head = first.text.charAt(0);
+    const restText = first.text.slice(1);
+    const rest: Inline[] = restText ? [{ kind: "text", text: restText }, ...others] : others;
+    return { head, rest };
+  }
+  if (first.kind === "em") {
+    const sub = splitFirstChar(first.children);
+    const rest: Inline[] = sub.rest.length
+      ? [{ kind: "em", children: sub.rest }, ...others]
+      : others;
+    return { head: sub.head, rest };
+  }
+  // linebreak/footnote/ref as the very first inline: no text to split off.
+  return { head: "", rest: inlines };
+}
+
 function titleOf(children: (ContentNode | Chapter)[]): string | null {
   for (const c of children) {
     if (c.kind === "component" && c.name === "title") return inlinePlainText(c.inlines);
@@ -143,15 +167,21 @@ function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): st
       return `<p class="${node.name}">${renderInlines(node.inlines, ctx)}</p>`;
     }
     case "dropcap": {
-      const body = renderInlines(node.inlines, ctx);
+      const { head, rest } = splitFirstChar(node.inlines);
       if (node.image) {
         const src = opts.images?.[node.image];
-        const img = src
-          ? `<img class="dropcap" src="${src}" alt="">`
-          : `<span class="dropcap">${escapeHtml(body.charAt(0))}</span>`;
-        return `<p class="has-dropcap">${img}${src ? body : body.slice(1)}</p>`;
+        if (src) {
+          return `<p class="has-dropcap"><img class="dropcap" src="${src}" alt="">${
+            renderInlines(node.inlines, ctx)
+          }</p>`;
+        }
+        return `<p class="has-dropcap"><span class="dropcap">${escapeHtml(head)}</span>${
+          renderInlines(rest, ctx)
+        }</p>`;
       }
-      return `<p class="has-dropcap"><span class="dropcap">${body.charAt(0)}</span>${body.slice(1)}</p>`;
+      return `<p class="has-dropcap"><span class="dropcap">${escapeHtml(head)}</span>${
+        renderInlines(rest, ctx)
+      }</p>`;
     }
     case "heading": {
       const tag = node.level === 1 ? "h3" : "h4";

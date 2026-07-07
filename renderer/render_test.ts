@@ -63,6 +63,16 @@ Deno.test("dropcap wraps first letter in a span", () => {
   assertStringIncludes(html, '<p class="has-dropcap"><span class="dropcap">T</span>he morning came.</p>');
 });
 
+Deno.test("dropcap correctly splits when the first inline is emphasized", () => {
+  const html = render(parse("{chapter: a}\n{dropcap}\n{em}The{/em} morning came."));
+  assertStringIncludes(html, '<p class="has-dropcap"><span class="dropcap">T</span><em>he</em> morning came.</p>');
+});
+
+Deno.test("dropcap correctly escapes a first character that needs HTML escaping", () => {
+  const html = render(parse("{chapter: a}\n{dropcap}\n& so it began."));
+  assertStringIncludes(html, '<p class="has-dropcap"><span class="dropcap">&amp;</span> so it began.</p>');
+});
+
 Deno.test("verses render numbers from start (§3.5.7)", () => {
   const html = render(parse("{chapter: a}\n{verses: gen-1 | start: 3}\nAnd God said.\n{/verses}"));
   assertStringIncludes(html, '<div class="verses" id="gen-1">');
