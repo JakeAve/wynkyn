@@ -7,6 +7,8 @@ import { applyDiagnostics, createEditor, replaceBuffer, scrollEditorToLine } fro
 import { applySnippet, SNIPPETS } from "./snippets.ts";
 import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
+import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
+import type { Metadata } from "../../metadata/types.ts";
 
 const PARSE_DEBOUNCE_MS = 250;
 const SAVE_DEBOUNCE_MS = 600;
@@ -27,6 +29,9 @@ let saveInFlight = false;
 let queuedSaveText: string | null = null;
 let dirty = false; // local edits newer than the last completed save
 let remoteFetchGen = 0;
+let configPanel: ConfigPanel | null = null;
+let metaSaveInFlight = false;
+let queuedMetaSections: Partial<Metadata> | null = null;
 
 function onDocChanged(text: string): void {
   dirty = true;
@@ -103,6 +108,60 @@ async function doSave(text: string): Promise<void> {
   }
 }
 
+function saveMetadataSections(sections: Partial<Metadata>): void {
+  if (metaSaveInFlight) {
+    queuedMetaSections = { ...queuedMetaSections, ...sections };
+    return;
+  }
+  metaSaveInFlight = true;
+  doMetadataSave(sections);
+}
+
+async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
+  try {
+    const res = await fetch(`/api/books/${encodeURIComponent(book)}/metadata`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sections, clientId }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    setStatus("live");
+  } catch (err) {
+    setStatus(`config save failed: ${err}`);
+  } finally {
+    metaSaveInFlight = false;
+    if (queuedMetaSections !== null) {
+      const next = queuedMetaSections;
+      queuedMetaSections = null;
+      // fire-and-forget: same intentional non-blocking dispatch as doSave.
+      metaSaveInFlight = true;
+      doMetadataSave(next);
+    }
+  }
+}
+
+async function fetchMetadata(): Promise<Metadata> {
+  const res = await fetch(`/api/books/${encodeURIComponent(book)}/metadata`);
+  if (!res.ok) throw new Error(`metadata load failed: ${res.status} ${await res.text()}`);
+  return ((await res.json()) as { metadata: Metadata }).metadata;
+}
+
+async function toggleConfigPanel(): Promise<void> {
+  if (!configPanel) {
+    try {
+      configPanel = createConfigPanel({
+        overlay: $("config-overlay"),
+        metadata: await fetchMetadata(),
+        saveSections: saveMetadataSections,
+      });
+    } catch (err) {
+      setStatus(String(err)); // e.g. 409 corrupt metadata.json — fix on disk
+      return;
+    }
+  }
+  configPanel.toggle();
+}
+
 async function fetchManuscript(name: string): Promise<string> {
   const res = await fetch(`/api/books/${encodeURIComponent(name)}/manuscript`);
   if (!res.ok) throw new Error(`manuscript load failed: ${res.status}`);
@@ -150,6 +209,9 @@ async function main(): Promise<void> {
   editor = createEditor({ parent: $("editor"), text, onDocChanged });
   reparse(text);
   buildSnippetToolbar();
+  $("config-button").onclick = () => {
+    toggleConfigPanel();
+  };
 
   const previewEl = $("preview");
   const ws = new WebSocket(

@@ -47,11 +47,39 @@
   .pagedjs_pages { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 8px; }
   .pagedjs_page { background: white; box-shadow: 0 2px 8px rgba(0, 0, 0, .4); margin-bottom: 16px; }
   .pagedjs_pages .pagedjs_page:first-child { margin-left: calc(var(--pagedjs-width) + 8px); }
+  #config-button {
+    background: #34363c; color: #cfd2d8; border: 1px solid #4a4d55;
+    border-radius: 4px; padding: 2px 7px; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  #config-button:hover { background: #3f424a; }
+  #config-overlay {
+    position: fixed; top: 40px; right: 0; bottom: 0; width: 400px;
+    background: #2b2d31; color: #d8d8d8; overflow-y: auto; padding: 12px;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, .4); font-size: 13px; z-index: 10;
+  }
+  #config-overlay fieldset { border: 1px solid #4a4d55; border-radius: 4px; margin: 0 0 12px; padding: 8px 10px; }
+  #config-overlay legend { padding: 0 4px; color: #9aa0ab; text-transform: uppercase; font-size: 11px; letter-spacing: .05em; }
+  #config-overlay button {
+    background: #34363c; color: #cfd2d8; border: 1px solid #4a4d55;
+    border-radius: 4px; padding: 2px 7px; cursor: pointer;
+  }
+  .cfg-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .cfg-field { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .cfg-label { width: 110px; flex: none; color: #9aa0ab; }
+  .cfg-field input[type=text], .cfg-field select, .cfg-field textarea {
+    flex: 1; min-width: 0; background: #34363c; color: #e8e8e8;
+    border: 1px solid #4a4d55; border-radius: 4px; padding: 3px 6px; font: inherit;
+  }
+  .cfg-row { display: flex; flex: 1; min-width: 0; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .cfg-inline { display: inline-flex; align-items: center; gap: 3px; flex: none; color: #9aa0ab; }
+  .cfg-error { color: #e77; font-size: 12px; flex-basis: 100%; }
+  .cfg-entry { border-top: 1px dashed #4a4d55; padding-top: 6px; margin-top: 6px; }
 </style>
 </head>
 <body>
 <div id="toolbar">
   <select id="book-switcher"></select>
+  <button id="config-button" title="document configuration">⚙ configure</button>
   <span id="snippet-buttons"></span>
   <span id="diagnostics"></span>
   <span id="status">connecting…</span>
@@ -61,6 +89,7 @@
   <div id="editor"></div>
   <div id="preview"></div>
 </div>
+<div id="config-overlay" hidden></div>
 <script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.js"></script>
 <script type="module" src="/web/app.js"></script>
 </body>
