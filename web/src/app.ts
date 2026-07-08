@@ -95,6 +95,8 @@ async function doSave(text: string): Promise<void> {
     if (queuedSaveText !== null) {
       const next = queuedSaveText;
       queuedSaveText = null;
+      // fire-and-forget: intentional non-blocking dispatch, not a missing await —
+      // doSave's own finally will run again when this one settles.
       saveInFlight = true;
       doSave(next); // catch-up save, no debounce — the debounce already happened once
     }
