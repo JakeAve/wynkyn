@@ -24,7 +24,7 @@ export const SNIPPETS: Snippet[] = [
   { label: "break", kind: "block", text: "{break}" },
   { label: "epigraph", kind: "block", text: "{epigraph}\nQuotation\n{attribution}\n— Source", placeholder: "Quotation" },
   { label: "quote", kind: "block", text: "{quote}\nQuotation\n{/quote}", placeholder: "Quotation" },
-  { label: "pullquote", kind: "block", text: "{pullquote}\nPulled phrase", placeholder: "Pulled phrase" },
+  { label: "pullquote", kind: "block", text: "{pullquote}\nPulled phrase\n{/pullquote}", placeholder: "Pulled phrase" },
   { label: "sidebar", kind: "block", text: "{sidebar}\nAside text\n{/sidebar}", placeholder: "Aside text" },
   { label: "poem", kind: "block", text: "{poem}\nFirst line\\\nsecond line.\n{/poem}", placeholder: "First line" },
   { label: "verses", kind: "block", text: "{verses: slug}\nFirst verse.\n{/verses}", placeholder: "slug" },
