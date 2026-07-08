@@ -3,6 +3,7 @@ import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import { renderPreview, type UpdateMessage } from "./preview.ts";
 import { applyDiagnostics, createEditor, replaceBuffer } from "./editor.ts";
+import { applySnippet, SNIPPETS } from "./snippets.ts";
 
 const PARSE_DEBOUNCE_MS = 250;
 const SAVE_DEBOUNCE_MS = 600;
@@ -97,6 +98,20 @@ async function refreshFromRemote(): Promise<void> {
   reparse(text);
 }
 
+function buildSnippetToolbar(): void {
+  const bar = $("snippet-buttons");
+  for (const s of SNIPPETS) {
+    const b = document.createElement("button");
+    b.textContent = s.label;
+    b.title = `insert ${s.label}`;
+    b.onclick = () => {
+      editor.dispatch(applySnippet(editor.state, s));
+      editor.focus();
+    };
+    bar.appendChild(b);
+  }
+}
+
 async function main(): Promise<void> {
   const res = await fetch("/api/books");
   const { books } = (await res.json()) as { books: string[] };
@@ -112,7 +127,7 @@ async function main(): Promise<void> {
   const text = await fetchManuscript(book);
   editor = createEditor({ parent: $("editor"), text, onDocChanged });
   reparse(text);
-  // Task 5 adds: buildSnippetToolbar()
+  buildSnippetToolbar();
 
   const previewEl = $("preview");
   const ws = new WebSocket(
