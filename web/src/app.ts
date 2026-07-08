@@ -1,5 +1,11 @@
-// web/src/app.ts — client orchestrator: book selection, WebSocket, panes.
+// web/src/app.ts — client orchestrator: book selection, editor, WebSocket, panes.
+import { parse } from "../../parser/parser.ts";
+import type { EditorView } from "@codemirror/view";
 import { renderPreview, type UpdateMessage } from "./preview.ts";
+import { applyDiagnostics, createEditor, replaceBuffer } from "./editor.ts";
+
+const PARSE_DEBOUNCE_MS = 250;
+const SAVE_DEBOUNCE_MS = 600;
 
 const clientId = crypto.randomUUID();
 const params = new URLSearchParams(location.search);
@@ -7,6 +13,68 @@ const $ = (id: string) => document.getElementById(id)!;
 
 function setStatus(text: string): void {
   $("status").textContent = text;
+}
+
+let editor: EditorView;
+let book: string;
+let parseTimer = 0;
+let saveTimer = 0;
+let saveInFlight = false;
+let dirty = false; // local edits newer than the last completed save
+let remoteFetchGen = 0;
+
+function onDocChanged(text: string): void {
+  dirty = true;
+  clearTimeout(parseTimer);
+  parseTimer = setTimeout(() => reparse(text), PARSE_DEBOUNCE_MS);
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => save(text), SAVE_DEBOUNCE_MS);
+}
+
+function reparse(text: string): void {
+  const doc = parse(text);
+  applyDiagnostics(editor, doc.diagnostics);
+  $("diagnostics").textContent = doc.diagnostics.length
+    ? `${doc.diagnostics.length} parse note(s) — line ${doc.diagnostics[0]!.line}: ${
+      doc.diagnostics[0]!.message
+    }`
+    : "";
+  // Task 6 adds: refreshTree(doc)
+}
+
+async function save(text: string): Promise<void> {
+  saveInFlight = true;
+  try {
+    const res = await fetch(`/api/books/${encodeURIComponent(book)}/manuscript`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, clientId }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    if (editor.state.doc.toString() === text) dirty = false;
+    setStatus("live");
+  } catch (err) {
+    setStatus(`save failed: ${err}`);
+  } finally {
+    saveInFlight = false;
+  }
+}
+
+async function fetchManuscript(name: string): Promise<string> {
+  const res = await fetch(`/api/books/${encodeURIComponent(name)}/manuscript`);
+  if (!res.ok) throw new Error(`manuscript load failed: ${res.status}`);
+  return ((await res.json()) as { text: string }).text;
+}
+
+// A foreign-origin update means the file changed outside this editor — pull
+// the new source, but never over unsaved local edits (they win; the next
+// save round-trip reconciles).
+async function refreshFromRemote(): Promise<void> {
+  const gen = ++remoteFetchGen;
+  const text = await fetchManuscript(book);
+  if (gen !== remoteFetchGen || dirty || saveInFlight) return;
+  replaceBuffer(editor, text);
+  reparse(text);
 }
 
 async function main(): Promise<void> {
@@ -17,8 +85,14 @@ async function main(): Promise<void> {
     return;
   }
   const requested = params.get("book");
-  const book = requested && books.includes(requested) ? requested : books[0]!;
+  book = requested && books.includes(requested) ? requested : books[0]!;
   document.title = `Book Editor — ${book}`;
+  // Task 6 adds: populateSwitcher(books, book)
+
+  const text = await fetchManuscript(book);
+  editor = createEditor({ parent: $("editor"), text, onDocChanged });
+  reparse(text);
+  // Task 5 adds: buildSnippetToolbar()
 
   const previewEl = $("preview");
   const ws = new WebSocket(
@@ -38,9 +112,9 @@ async function main(): Promise<void> {
       return;
     }
     setStatus("live");
-    // Own-origin updates still re-render the preview; §6's echo suppression
-    // protects the editor buffer (Task 4), not the preview.
+    // Own-origin: preview only — never the buffer (spec §6 echo suppression).
     renderPreview(msg, previewEl);
+    if (msg.origin !== clientId) refreshFromRemote();
   };
 }
 
