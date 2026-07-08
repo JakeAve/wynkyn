@@ -1,8 +1,15 @@
 // web/src/config-panel.ts — document configuration panel (spec §7.5): a form
 // UI over metadata.json's book-wide sections, one builder per section. DOM
 // assembly only — reusable transforms live in config-data.ts with tests.
-import type { Metadata, NumberingStyle, PageConfig, RunningEntry } from "../../metadata/types.ts";
+import type {
+  Metadata,
+  NumberingStyle,
+  PageConfig,
+  PrintConfig,
+  RunningEntry,
+} from "../../metadata/types.ts";
 import {
+  isValidFolios,
   isValidSize,
   makeRunningEntry,
   MARGIN_AREAS,
@@ -66,7 +73,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       buildFontsSection(meta, queueSave),
       buildNumberingSection(meta, queueSave),
       buildRunningSection(meta, queueSave),
-      // Task 7 appends print here.
+      buildPrintSection(meta, queueSave),
       buildNotesSection(meta, queueSave),
     );
   }
@@ -457,6 +464,40 @@ function buildRunningSection(meta: Metadata, queueSave: QueueSave): HTMLElement 
     render();
     box.append(head, list);
   }
+  return box;
+}
+
+function buildPrintSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
+  const box = sectionBox("Print (export only)");
+  const print: PrintConfig = meta.print ??= {};
+  box.appendChild(
+    field(
+      "sheet size",
+      sizeControl(print["sheet-size"], (v) => {
+        print["sheet-size"] = v;
+        queueSave("print");
+      }),
+    ),
+  );
+  const error = document.createElement("span");
+  error.className = "cfg-error";
+  const folios = textInput(String(print["folios-per-signature"] ?? ""), (v) => {
+    if (isValidFolios(v)) {
+      error.textContent = "";
+      print["folios-per-signature"] = Number(v);
+      queueSave("print");
+    } else {
+      error.textContent = v ? "must be a positive integer" : "";
+    }
+  });
+  folios.placeholder = "4";
+  box.appendChild(field("folios/signature", folios, error));
+  const note = document.createElement("p");
+  note.style.color = "#9aa0ab";
+  note.style.margin = "6px 0 0";
+  note.textContent =
+    "Consumed by print export (Plan 5) — changing these does not affect the preview.";
+  box.appendChild(note);
   return box;
 }
 

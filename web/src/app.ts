@@ -179,6 +179,18 @@ async function refreshFromRemote(): Promise<void> {
   reparse(text);
 }
 
+// A foreign-origin update may mean metadata.json changed outside this client.
+// Refresh an open panel only when it has nothing unsaved — local edits win,
+// same policy as the editor buffer.
+async function refreshConfigFromRemote(): Promise<void> {
+  if (!configPanel || configPanel.isDirty() || metaSaveInFlight) return;
+  try {
+    configPanel.refresh(await fetchMetadata());
+  } catch {
+    // 409/network — leave the panel as-is; the user can close and reopen.
+  }
+}
+
 function buildSnippetToolbar(): void {
   const bar = $("snippet-buttons");
   for (const s of SNIPPETS) {
@@ -233,7 +245,10 @@ async function main(): Promise<void> {
     setStatus("live");
     // Own-origin: preview only — never the buffer (spec §6 echo suppression).
     renderPreview(msg, previewEl);
-    if (msg.origin !== clientId) refreshFromRemote();
+    if (msg.origin !== clientId) {
+      refreshFromRemote();
+      refreshConfigFromRemote();
+    }
   };
 }
 
