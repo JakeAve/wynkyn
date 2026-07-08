@@ -20,6 +20,7 @@ let book: string;
 let parseTimer = 0;
 let saveTimer = 0;
 let saveInFlight = false;
+let queuedSaveText: string | null = null;
 let dirty = false; // local edits newer than the last completed save
 let remoteFetchGen = 0;
 
@@ -42,8 +43,21 @@ function reparse(text: string): void {
   // Task 6 adds: refreshTree(doc)
 }
 
-async function save(text: string): Promise<void> {
+// Never let two save requests be in flight at once (Task 4 fix): a second
+// save while one is pending would race the first over the network, and
+// whichever POST body the server sees last wins — an older in-flight save
+// could clobber a newer one on disk. Instead, queue the latest text and
+// fire it immediately when the in-flight request finishes.
+function save(text: string): void {
+  if (saveInFlight) {
+    queuedSaveText = text; // supersede any earlier queued text — only the latest matters
+    return;
+  }
   saveInFlight = true;
+  doSave(text);
+}
+
+async function doSave(text: string): Promise<void> {
   try {
     const res = await fetch(`/api/books/${encodeURIComponent(book)}/manuscript`, {
       method: "POST",
@@ -57,6 +71,12 @@ async function save(text: string): Promise<void> {
     setStatus(`save failed: ${err}`);
   } finally {
     saveInFlight = false;
+    if (queuedSaveText !== null) {
+      const next = queuedSaveText;
+      queuedSaveText = null;
+      saveInFlight = true;
+      doSave(next); // catch-up save, no debounce — the debounce already happened once
+    }
   }
 }
 
