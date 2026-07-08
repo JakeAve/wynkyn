@@ -1,9 +1,12 @@
 // web/src/app.ts — client orchestrator: book selection, editor, WebSocket, panes.
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
-import { renderPreview, type UpdateMessage } from "./preview.ts";
-import { applyDiagnostics, createEditor, replaceBuffer } from "./editor.ts";
+import type { BmlDocument } from "../../parser/types.ts";
+import { renderPreview, type UpdateMessage, scrollPreviewTo } from "./preview.ts";
+import { applyDiagnostics, createEditor, replaceBuffer, scrollEditorToLine } from "./editor.ts";
 import { applySnippet, SNIPPETS } from "./snippets.ts";
+import { buildTree } from "./tree-data.ts";
+import { renderTree } from "./tree-view.ts";
 
 const PARSE_DEBOUNCE_MS = 250;
 const SAVE_DEBOUNCE_MS = 600;
@@ -41,7 +44,24 @@ function reparse(text: string): void {
       doc.diagnostics[0]!.message
     }`
     : "";
-  // Task 6 adds: refreshTree(doc)
+  refreshTree(doc);
+}
+
+function refreshTree(doc: BmlDocument): void {
+  renderTree($("tree"), buildTree(doc), (node) => {
+    scrollEditorToLine(editor, node.line);
+    scrollPreviewTo(node.anchorId, $("preview"));
+  });
+}
+
+function populateSwitcher(books: string[], active: string): void {
+  const sel = $("book-switcher") as HTMLSelectElement;
+  sel.innerHTML = "";
+  for (const b of books) sel.appendChild(new Option(b, b, false, b === active));
+  sel.onchange = () => {
+    // Full navigation, not in-place teardown: clean WS/editor/tree state.
+    location.search = `?book=${encodeURIComponent(sel.value)}`;
+  };
 }
 
 // Never let two save requests be in flight at once (Task 4 fix): a second
@@ -122,7 +142,7 @@ async function main(): Promise<void> {
   const requested = params.get("book");
   book = requested && books.includes(requested) ? requested : books[0]!;
   document.title = `Book Editor — ${book}`;
-  // Task 6 adds: populateSwitcher(books, book)
+  populateSwitcher(books, book);
 
   const text = await fetchManuscript(book);
   editor = createEditor({ parent: $("editor"), text, onDocChanged });
