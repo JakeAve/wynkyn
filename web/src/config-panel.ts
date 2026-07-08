@@ -1,8 +1,18 @@
 // web/src/config-panel.ts — document configuration panel (spec §7.5): a form
 // UI over metadata.json's book-wide sections, one builder per section. DOM
 // assembly only — reusable transforms live in config-data.ts with tests.
-import type { Metadata, NumberingStyle, PageConfig } from "../../metadata/types.ts";
-import { isValidSize, NUMBERING_STYLES, PAGE_SIZE_PRESETS, presetFor, renameKey } from "./config-data.ts";
+import type { Metadata, NumberingStyle, PageConfig, RunningEntry } from "../../metadata/types.ts";
+import {
+  isValidSize,
+  makeRunningEntry,
+  MARGIN_AREAS,
+  NUMBERING_STYLES,
+  PAGE_SIZE_PRESETS,
+  presetFor,
+  renameKey,
+  RUNNING_CONTENT_CHOICES,
+  splitRunningEntry,
+} from "./config-data.ts";
 import { GOOGLE_FONTS } from "./fonts-list.ts";
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -55,7 +65,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       buildPageSection(meta, queueSave),
       buildFontsSection(meta, queueSave),
       buildNumberingSection(meta, queueSave),
-      // Task 6 appends running here; Task 7 appends print here.
+      buildRunningSection(meta, queueSave),
+      // Task 7 appends print here.
       buildNotesSection(meta, queueSave),
     );
   }
@@ -343,6 +354,108 @@ function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElemen
         ),
       ),
     );
+  }
+  return box;
+}
+
+const AREA_CHOICES = MARGIN_AREAS.map((a) => ({ label: a, value: a }));
+const LITERAL = "__literal"; // select sentinel for "type your own text"
+
+function buildRunningSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
+  const box = sectionBox("Running headers / footers");
+  const running = meta.running ??= {};
+
+  for (const side of ["odd", "even"] as const) {
+    const head = document.createElement("div");
+    head.className = "cfg-field";
+    const title = document.createElement("span");
+    title.className = "cfg-label";
+    title.textContent = `${side} pages`;
+    const add = document.createElement("button");
+    add.textContent = "+ entry";
+    head.append(title, add);
+    const list = document.createElement("div");
+
+    function render(): void {
+      list.innerHTML = "";
+      (running[side] ?? []).forEach((_, i) => list.appendChild(entryRow(i)));
+    }
+
+    function entryRow(i: number): HTMLElement {
+      const entries = running[side]!;
+      const form = splitRunningEntry(entries[i]!);
+      const commit = () => {
+        entries[i] = makeRunningEntry(form);
+        queueSave("running");
+      };
+      const row = document.createElement("div");
+      row.className = "cfg-entry";
+
+      const isChoice = (RUNNING_CONTENT_CHOICES as readonly string[]).includes(form.content);
+      // Raw (non-trimming): a literal running-header string may legitimately
+      // need a leading/trailing space to control spacing against an adjacent
+      // margin-box element (same rationale as numbering prefix/suffix).
+      const literal = textInputRaw(isChoice ? "" : form.content, (v) => {
+        form.content = v;
+        commit();
+      });
+      literal.placeholder = "literal text";
+      literal.hidden = isChoice;
+      const contentSel = selectInput(
+        [
+          ...RUNNING_CONTENT_CHOICES.map((c) => ({ label: c, value: c })),
+          { label: "literal…", value: LITERAL },
+        ],
+        isChoice ? form.content : LITERAL,
+        (v) => {
+          literal.hidden = v !== LITERAL;
+          form.content = v === LITERAL ? literal.value : v;
+          commit();
+        },
+      );
+
+      const areaSel = selectInput(AREA_CHOICES, form.area, (v) => {
+        form.area = v;
+        commit();
+      });
+
+      const css = document.createElement("textarea");
+      css.rows = 2;
+      css.value = form.extraCss;
+      css.placeholder = "font-size: 8pt\nfont-style: italic";
+      css.oninput = () => {
+        form.extraCss = css.value;
+        commit();
+      };
+
+      const rm = document.createElement("button");
+      rm.textContent = "✕ remove entry";
+      rm.onclick = () => {
+        entries.splice(i, 1);
+        queueSave("running");
+        render(); // indices shifted — rebuild the rows
+      };
+
+      row.append(
+        field("content", contentSel, literal),
+        field("area", areaSel),
+        field("css", css),
+        rm,
+      );
+      return row;
+    }
+
+    add.onclick = () => {
+      const entries = running[side] ??= [];
+      // Sensible seed per §4.8's example: outer top corner of the spread.
+      const seed: RunningEntry = { content: "book-title", area: side === "odd" ? "top-right" : "top-left" };
+      entries.push(seed);
+      queueSave("running");
+      render();
+    };
+
+    render();
+    box.append(head, list);
   }
   return box;
 }
