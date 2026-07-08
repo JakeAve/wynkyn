@@ -2,18 +2,48 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Book Editor — Preview</title>
+<title>Book Editor</title>
 <style>
-  body { margin: 0; font-family: system-ui, sans-serif; background: #52555a; }
-  #toolbar {
-    position: fixed; top: 0; left: 0; right: 0; height: 36px; z-index: 10;
-    background: #23252a; color: #e8e8e8; font-size: 13px;
-    display: flex; align-items: center; gap: 12px; padding: 0 12px;
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: system-ui, sans-serif; background: #52555a;
+    display: grid; grid-template-rows: 40px minmax(0, 1fr); overflow: hidden;
   }
-  #diagnostics { color: #f2b263; }
-  #status { margin-left: auto; }
-  #preview { padding: 56px 20px 40px; }
-  /* Spread layout (spec §7.6 direction): two book pages per row, page 1 recto-alone. */
+  #toolbar {
+    background: #23252a; color: #e8e8e8; font-size: 13px;
+    display: flex; align-items: center; gap: 10px; padding: 0 12px; overflow-x: auto;
+  }
+  #toolbar select {
+    background: #34363c; color: #e8e8e8; border: 1px solid #4a4d55;
+    border-radius: 4px; padding: 3px 6px; font-size: 13px;
+  }
+  #snippet-buttons { display: flex; gap: 4px; }
+  #snippet-buttons button {
+    background: #34363c; color: #cfd2d8; border: 1px solid #4a4d55;
+    border-radius: 4px; padding: 2px 7px; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  #snippet-buttons button:hover { background: #3f424a; }
+  #diagnostics { color: #f2b263; white-space: nowrap; }
+  #status { margin-left: auto; white-space: nowrap; }
+  #panes {
+    display: grid; grid-template-columns: 230px minmax(0, 1fr) minmax(0, 1fr);
+    min-height: 0;
+  }
+  #tree { background: #2b2d31; color: #d8d8d8; overflow-y: auto; padding: 6px 0; font-size: 13px; }
+  #tree ul.tree-list { list-style: none; margin: 0; padding: 0; }
+  #tree button.tree-node {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    color: inherit; font: inherit; padding: 3px 8px; cursor: pointer;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #tree button.tree-node:hover { background: #3a3d44; }
+  #tree .tree-matter { color: #9aa0ab; }
+  #tree .tree-part { font-weight: 600; }
+  #editor { min-width: 0; overflow: hidden; }
+  #editor .cm-editor { height: 100%; }
+  #preview { overflow: auto; padding: 16px; }
+  /* Spread layout (spec §7.6): two book pages per row, page 1 recto-alone. */
   .pagedjs_pages { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 8px; }
   .pagedjs_page { background: white; box-shadow: 0 2px 8px rgba(0, 0, 0, .4); margin-bottom: 16px; }
   .pagedjs_pages .pagedjs_page:first-child { margin-left: calc(var(--pagedjs-width) + 8px); }
@@ -21,12 +51,17 @@
 </head>
 <body>
 <div id="toolbar">
-  <strong id="book-title">loading…</strong>
+  <select id="book-switcher"></select>
+  <span id="snippet-buttons"></span>
   <span id="diagnostics"></span>
   <span id="status">connecting…</span>
 </div>
-<div id="preview"></div>
+<div id="panes">
+  <nav id="tree"></nav>
+  <div id="editor"></div>
+  <div id="preview"></div>
+</div>
 <script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.js"></script>
-<script src="/web/main.js"></script>
+<script type="module" src="/web/app.js"></script>
 </body>
 </html>
