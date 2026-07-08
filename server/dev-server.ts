@@ -117,6 +117,105 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     }
   }
 
+  interface PendingMetaSave {
+    metadata: Record<string, unknown>;
+    clientId: string | null;
+    timer: number;
+  }
+  const pendingMetaSaves = new Map<string, PendingMetaSave>();
+
+  // The authoritative current metadata for serving and merging: a pending
+  // debounced save wins over the disk copy. Returns null when metadata.json
+  // exists but is corrupt JSON — callers turn that into a 409, because
+  // merging over a file we can't parse would silently discard its content.
+  async function currentMetadata(book: string): Promise<Record<string, unknown> | null> {
+    const pending = pendingMetaSaves.get(book);
+    if (pending) return pending.metadata;
+    let text: string;
+    try {
+      text = await Deno.readTextFile(`${booksRoot}/${book}/metadata.json`);
+    } catch {
+      return {}; // no metadata.json yet — metadata is optional (spec §4)
+    }
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleMetadataGet(book: string): Promise<Response> {
+    if (!safeName(book)) return new Response("bad path", { status: 400 });
+    try {
+      await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
+    } catch {
+      return new Response("book not found", { status: 404 });
+    }
+    const metadata = await currentMetadata(book);
+    if (metadata === null) {
+      return new Response("metadata.json is not valid JSON — fix it on disk first", {
+        status: 409,
+      });
+    }
+    return Response.json({ metadata });
+  }
+
+  async function handleMetadataSave(book: string, req: Request): Promise<Response> {
+    if (!safeName(book)) return new Response("bad path", { status: 400 });
+    let body: { sections?: unknown; clientId?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response("invalid JSON body", { status: 400 });
+    }
+    const sections = body.sections;
+    if (sections === null || typeof sections !== "object" || Array.isArray(sections)) {
+      return new Response("body must be { sections: object, clientId?: string }", {
+        status: 400,
+      });
+    }
+    try {
+      await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
+    } catch {
+      return new Response("book not found", { status: 404 });
+    }
+    const base = await currentMetadata(book);
+    if (base === null) {
+      return new Response("metadata.json is not valid JSON — fix it on disk first", {
+        status: 409,
+      });
+    }
+    // Shallow-merge only the POSTed top-level keys; everything else —
+    // elements, is, future schema keys — passes through untouched.
+    const merged = { ...base };
+    for (const [key, value] of Object.entries(sections)) {
+      if (value === null) delete merged[key]; // null removes a section outright
+      else merged[key] = value;
+    }
+    const existing = pendingMetaSaves.get(book);
+    if (existing) clearTimeout(existing.timer);
+    const clientId = typeof body.clientId === "string" ? body.clientId : null;
+    const save: PendingMetaSave = { metadata: merged, clientId, timer: 0 };
+    save.timer = setTimeout(async () => {
+      pendingMetaSaves.delete(book);
+      recentWrites.set(book, save.clientId);
+      try {
+        await Deno.writeTextFile(
+          `${booksRoot}/${book}/metadata.json`,
+          JSON.stringify(save.metadata, null, 2) + "\n",
+        );
+        // The watcher sees this write and broadcasts, tagged via recentWrites.
+      } catch (err) {
+        // Same reasoning as the manuscript save path: drop the origin tag so
+        // it isn't misattributed to a later broadcast, log, never die.
+        recentWrites.delete(book);
+        console.error(`metadata save failed for book "${book}":`, err);
+      }
+    }, saveDebounceMs);
+    pendingMetaSaves.set(book, save);
+    return Response.json({ ok: true });
+  }
+
   async function buildMessage(book: string, origin: string | null): Promise<string> {
     try {
       const build = await buildBook(booksRoot, book);
@@ -216,6 +315,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     if (manuscriptApi && req.method === "GET") return handleManuscriptGet(manuscriptApi[1]!);
     if (manuscriptApi && req.method === "POST") return handleSave(manuscriptApi[1]!, req);
 
+    const metadataApi = path.match(/^\/api\/books\/([^/]+)\/metadata$/);
+    if (metadataApi && req.method === "GET") return handleMetadataGet(metadataApi[1]!);
+    if (metadataApi && req.method === "POST") return handleMetadataSave(metadataApi[1]!, req);
+
     const image = path.match(/^\/books\/([^/]+)\/images\/([^/]+)$/);
     if (image && req.method === "GET") {
       const [, book, file] = image;
@@ -233,6 +336,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     async stop() {
       watcher.stop();
       for (const p of pendingSaves.values()) clearTimeout(p.timer);
+      for (const p of pendingMetaSaves.values()) clearTimeout(p.timer);
       for (const c of clients) {
         try {
           c.socket.close();

@@ -253,3 +253,133 @@ Deno.test("save: unknown book is a 404", async () => {
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("metadata: GET returns config; POST merges sections, preserves the rest", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 40 });
+  const base = `http://localhost:${server.port}`;
+  try {
+    const res = await fetch(`${base}/api/books/demo-book/metadata`);
+    assertEquals(res.status, 200);
+    const { metadata } = await res.json();
+    assertEquals(metadata.page.size, "5.5in 8.5in"); // fixture content
+    assert(metadata.elements); // fixture has sentinel styles — must survive saves
+
+    const post = await fetch(`${base}/api/books/demo-book/metadata`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sections: { page: { size: "A5" } }, clientId: "t1" }),
+    });
+    assertEquals((await post.json()).ok, true);
+
+    // Pending save reads through before the debounce flushes.
+    const during = await (await fetch(`${base}/api/books/demo-book/metadata`)).json();
+    assertEquals(during.metadata.page.size, "A5");
+
+    await new Promise((r) => setTimeout(r, 150));
+    const onDisk = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/metadata.json`),
+    );
+    assertEquals(onDisk.page.size, "A5"); // POSTed section replaced wholesale
+    assertEquals(onDisk.elements, metadata.elements); // untouched section preserved
+    assertEquals(onDisk.fonts, metadata.fonts); // untouched section preserved
+
+    // null deletes a section outright.
+    await (await fetch(`${base}/api/books/demo-book/metadata`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sections: { numbering: null } }),
+    })).body?.cancel();
+    await new Promise((r) => setTimeout(r, 150));
+    const afterDelete = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/metadata.json`),
+    );
+    assertEquals("numbering" in afterDelete, false);
+
+    const missing = await fetch(`${base}/api/books/no-such/metadata`);
+    assertEquals(missing.status, 404);
+    await missing.body?.cancel();
+
+    const badBody = await fetch(`${base}/api/books/demo-book/metadata`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sections: [1, 2] }),
+    });
+    assertEquals(badBody.status, 400);
+    await badBody.body?.cancel();
+
+    // Corrupt file: both methods refuse rather than lose data.
+    await Deno.writeTextFile(`${root}/demo-book/metadata.json`, "{ not json");
+    const corruptGet = await fetch(`${base}/api/books/demo-book/metadata`);
+    assertEquals(corruptGet.status, 409);
+    await corruptGet.body?.cancel();
+    const corruptPost = await fetch(`${base}/api/books/demo-book/metadata`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sections: { page: {} } }),
+    });
+    assertEquals(corruptPost.status, 409);
+    await corruptPost.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("metadata: missing metadata.json GETs as {} and POST creates it", async () => {
+  const root = await makeBooksRoot();
+  await Deno.remove(`${root}/demo-book/metadata.json`);
+  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 40 });
+  const base = `http://localhost:${server.port}`;
+  try {
+    const empty = await (await fetch(`${base}/api/books/demo-book/metadata`)).json();
+    assertEquals(empty.metadata, {});
+
+    await (await fetch(`${base}/api/books/demo-book/metadata`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sections: { notes: { placement: "endnote" } } }),
+    })).body?.cancel();
+    await new Promise((r) => setTimeout(r, 150));
+    const created = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/metadata.json`),
+    );
+    assertEquals(created, { notes: { placement: "endnote" } });
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("metadata: debounced write broadcasts an update tagged with origin", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 40 });
+  const ws = new WebSocket(`ws://localhost:${server.port}/ws?book=demo-book&client=cfg-1`);
+  try {
+    await nextMessage(ws); // initial build
+    await new Promise((r) => setTimeout(r, 300)); // let the watch warm up
+    const pushed = nextMessage(ws);
+
+    const post = await fetch(
+      `http://localhost:${server.port}/api/books/demo-book/metadata`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sections: { notes: { placement: "footnote" } },
+          clientId: "cfg-1",
+        }),
+      },
+    );
+    assertEquals((await post.json()).ok, true);
+
+    const msg = await pushed;
+    assertEquals(msg.type, "update");
+    assertEquals(msg.origin, "cfg-1"); // spec §6: originator can ignore the echo
+    assert((msg.pagedCss as string).includes("float: footnote"));
+  } finally {
+    ws.close();
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
