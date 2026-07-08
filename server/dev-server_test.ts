@@ -205,6 +205,35 @@ Deno.test("save: failed debounced write doesn't leak a stale recentWrites entry"
   }
 });
 
+Deno.test("http: GET manuscript returns source; pending saves read through", async () => {
+  const root = await makeBooksRoot();
+  // 5s debounce: the POSTed save is guaranteed still pending when we GET.
+  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 5000 });
+  const base = `http://localhost:${server.port}`;
+  try {
+    const res = await fetch(`${base}/api/books/demo-book/manuscript`);
+    assertEquals(res.status, 200);
+    const { text } = await res.json();
+    assert(text.includes("{chapter: one}"));
+
+    const post = await fetch(`${base}/api/books/demo-book/manuscript`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "{chapter: two}\nNew text.", clientId: "t1" }),
+    });
+    assertEquals((await post.json()).ok, true);
+    const after = await (await fetch(`${base}/api/books/demo-book/manuscript`)).json();
+    assertEquals(after.text, "{chapter: two}\nNew text.");
+
+    const missing = await fetch(`${base}/api/books/no-such/manuscript`);
+    assertEquals(missing.status, 404);
+    await missing.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
 Deno.test("save: unknown book is a 404", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });

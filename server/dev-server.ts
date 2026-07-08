@@ -103,6 +103,20 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     return Response.json({ ok: true });
   }
 
+  async function handleManuscriptGet(book: string): Promise<Response> {
+    if (!safeName(book)) return new Response("bad path", { status: 400 });
+    // A save may still be sitting in the debounce window — serve what the
+    // client most recently sent, not the stale disk copy.
+    const pending = pendingSaves.get(book);
+    if (pending) return Response.json({ text: pending.text });
+    try {
+      const text = await Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`);
+      return Response.json({ text });
+    } catch {
+      return new Response("book not found", { status: 404 });
+    }
+  }
+
   async function buildMessage(book: string, origin: string | null): Promise<string> {
     try {
       const build = await buildBook(booksRoot, book);
@@ -198,8 +212,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       }
     }
 
-    const saveApi = path.match(/^\/api\/books\/([^/]+)\/manuscript$/);
-    if (saveApi && req.method === "POST") return handleSave(saveApi[1]!, req);
+    const manuscriptApi = path.match(/^\/api\/books\/([^/]+)\/manuscript$/);
+    if (manuscriptApi && req.method === "GET") return handleManuscriptGet(manuscriptApi[1]!);
+    if (manuscriptApi && req.method === "POST") return handleSave(manuscriptApi[1]!, req);
 
     const image = path.match(/^\/books\/([^/]+)\/images\/([^/]+)$/);
     if (image && req.method === "GET") {
