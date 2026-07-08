@@ -101,6 +101,17 @@ function textInput(value: string, onInput: (v: string) => void): HTMLInputElemen
   return el;
 }
 
+// Like textInput, but never trims. Use for fields where leading/trailing
+// whitespace is semantically load-bearing (e.g. numbering prefix/suffix,
+// which render.ts concatenates verbatim — "Part " + "IV").
+function textInputRaw(value: string, onInput: (v: string) => void): HTMLInputElement {
+  const el = document.createElement("input");
+  el.type = "text";
+  el.value = value;
+  el.oninput = () => onInput(el.value);
+  return el;
+}
+
 function selectInput(
   choices: ReadonlyArray<{ label: string; value: string }>,
   value: string,
@@ -300,13 +311,13 @@ function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElemen
       ),
     );
     box.appendChild(
-      field(`${key} prefix`, textInput(cfg.prefix ?? "", (v) => {
+      field(`${key} prefix`, textInputRaw(cfg.prefix ?? "", (v) => {
         cfg.prefix = v;
         queueSave("numbering");
       })),
     );
     box.appendChild(
-      field(`${key} suffix`, textInput(cfg.suffix ?? "", (v) => {
+      field(`${key} suffix`, textInputRaw(cfg.suffix ?? "", (v) => {
         cfg.suffix = v;
         queueSave("numbering");
       })),
