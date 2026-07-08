@@ -1,8 +1,8 @@
 // web/src/config-panel.ts — document configuration panel (spec §7.5): a form
 // UI over metadata.json's book-wide sections, one builder per section. DOM
 // assembly only — reusable transforms live in config-data.ts with tests.
-import type { Metadata, PageConfig } from "../../metadata/types.ts";
-import { isValidSize, PAGE_SIZE_PRESETS, presetFor, renameKey } from "./config-data.ts";
+import type { Metadata, NumberingStyle, PageConfig } from "../../metadata/types.ts";
+import { isValidSize, NUMBERING_STYLES, PAGE_SIZE_PRESETS, presetFor, renameKey } from "./config-data.ts";
 import { GOOGLE_FONTS } from "./fonts-list.ts";
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -54,7 +54,9 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       head,
       buildPageSection(meta, queueSave),
       buildFontsSection(meta, queueSave),
-      // Tasks 5–7 append here: numbering, running, print, notes.
+      buildNumberingSection(meta, queueSave),
+      // Task 6 appends running here; Task 7 appends print here.
+      buildNotesSection(meta, queueSave),
     );
   }
 
@@ -270,5 +272,88 @@ function buildFontsSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
 
   render();
   box.append(dl, rows, add);
+  return box;
+}
+
+const STYLE_CHOICES = NUMBERING_STYLES.map((s) => ({ label: s, value: s }));
+
+function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
+  const box = sectionBox("Numbering");
+  const numbering = meta.numbering ??= {};
+
+  for (const key of ["chapters", "parts"] as const) {
+    const cfg = numbering[key] ??= {};
+    box.appendChild(
+      field(
+        key,
+        selectInput(STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
+          cfg.style = v as NumberingStyle;
+          queueSave("numbering");
+        }),
+        inlineLabel(
+          "show",
+          checkboxInput(cfg.show ?? true, (v) => {
+            cfg.show = v;
+            queueSave("numbering");
+          }),
+        ),
+      ),
+    );
+    box.appendChild(
+      field(`${key} prefix`, textInput(cfg.prefix ?? "", (v) => {
+        cfg.prefix = v;
+        queueSave("numbering");
+      })),
+    );
+    box.appendChild(
+      field(`${key} suffix`, textInput(cfg.suffix ?? "", (v) => {
+        cfg.suffix = v;
+        queueSave("numbering");
+      })),
+    );
+  }
+
+  const pages = numbering.pages ??= {};
+  for (const zone of ["front-matter", "body", "back-matter"] as const) {
+    const cfg = pages[zone] ??= {};
+    box.appendChild(
+      field(
+        `${zone} pages`,
+        selectInput(STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
+          cfg.style = v as NumberingStyle;
+          queueSave("numbering");
+        }),
+        inlineLabel(
+          "show",
+          checkboxInput(cfg.show ?? true, (v) => {
+            cfg.show = v;
+            queueSave("numbering");
+          }),
+        ),
+      ),
+    );
+  }
+  return box;
+}
+
+function buildNotesSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
+  const box = sectionBox("Notes");
+  const notes = meta.notes ??= {};
+  box.appendChild(
+    field(
+      "placement",
+      selectInput(
+        [
+          { label: "footnote — bottom of the page", value: "footnote" },
+          { label: "endnote — end of chapter/matter", value: "endnote" },
+        ],
+        notes.placement ?? "footnote",
+        (v) => {
+          notes.placement = v as "footnote" | "endnote";
+          queueSave("notes");
+        },
+      ),
+    ),
+  );
   return box;
 }
