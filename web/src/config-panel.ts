@@ -48,8 +48,24 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     clearTimeout(timer);
     timer = setTimeout(() => {
       const sections: Record<string, unknown> = {};
-      // ?? null: a section the user emptied out is deleted server-side.
+      // ?? null: defensive fallback for a section the user emptied out to
+      // delete server-side. In the current UI every section builder eagerly
+      // creates its object via `??=`, so meta[k] is always defined (possibly
+      // {}) by the time this fires — this branch is not reachable today, but
+      // is kept in case a future section is built lazily.
       for (const k of dirty) sections[k] = (meta as Record<string, unknown>)[k] ?? null;
+      // Fonts rows can sit blank in the DOM while the user is still typing an
+      // alias (see buildFontsSection's "+ font alias" button). A sibling
+      // field's save must not flush that blank entry to disk — an empty
+      // family produces a malformed css2 URL param in generateFontLinks and
+      // can knock out every custom font in the live preview.
+      if (dirty.has("fonts") && sections.fonts && typeof sections.fonts === "object") {
+        const filtered: Record<string, string> = {};
+        for (const [alias, family] of Object.entries(sections.fonts as Record<string, string>)) {
+          if (family) filtered[alias] = family;
+        }
+        sections.fonts = filtered;
+      }
       dirty.clear();
       opts.saveSections(sections as Partial<Metadata>);
     }, SAVE_DEBOUNCE_MS);
