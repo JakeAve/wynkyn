@@ -220,14 +220,19 @@ function buildPageSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
       }),
     ),
   );
-  const margins = page.margins ??= {};
+  // Read-only snapshot for display — must not eagerly create page.margins,
+  // or an edit to an unrelated field (e.g. size) would persist a spurious
+  // empty margins object on save (the whole "page" section round-trips
+  // together, so any local default-filling here leaks onto disk).
+  const margins = page.margins ?? {};
   for (const key of MARGIN_KEYS) {
     box.appendChild(
       field(
         `margin ${key}`,
         textInput(margins[key] ?? "", (v) => {
-          if (v) margins[key] = v;
-          else delete margins[key];
+          const m = page.margins ??= {};
+          if (v) m[key] = v;
+          else delete m[key];
           queueSave("page");
         }),
       ),
@@ -310,19 +315,23 @@ function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElemen
   const box = sectionBox("Numbering");
   const numbering = meta.numbering ??= {};
 
+  // Read-only snapshots for display — must not eagerly create
+  // numbering.chapters/parts/pages[zone], or an edit to one of them (e.g.
+  // chapters.style) would persist a spurious empty sibling (e.g. parts: {})
+  // on save, since the whole "numbering" section round-trips together.
   for (const key of ["chapters", "parts"] as const) {
-    const cfg = numbering[key] ??= {};
+    const cfg = numbering[key] ?? {};
     box.appendChild(
       field(
         key,
         selectInput(STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
-          cfg.style = v as NumberingStyle;
+          (numbering[key] ??= {}).style = v as NumberingStyle;
           queueSave("numbering");
         }),
         inlineLabel(
           "show",
           checkboxInput(cfg.show ?? true, (v) => {
-            cfg.show = v;
+            (numbering[key] ??= {}).show = v;
             queueSave("numbering");
           }),
         ),
@@ -330,32 +339,32 @@ function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElemen
     );
     box.appendChild(
       field(`${key} prefix`, textInputRaw(cfg.prefix ?? "", (v) => {
-        cfg.prefix = v;
+        (numbering[key] ??= {}).prefix = v;
         queueSave("numbering");
       })),
     );
     box.appendChild(
       field(`${key} suffix`, textInputRaw(cfg.suffix ?? "", (v) => {
-        cfg.suffix = v;
+        (numbering[key] ??= {}).suffix = v;
         queueSave("numbering");
       })),
     );
   }
 
-  const pages = numbering.pages ??= {};
+  const pages = numbering.pages ?? {};
   for (const zone of ["front-matter", "body", "back-matter"] as const) {
-    const cfg = pages[zone] ??= {};
+    const cfg = pages[zone] ?? {};
     box.appendChild(
       field(
         `${zone} pages`,
         selectInput(STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
-          cfg.style = v as NumberingStyle;
+          ((numbering.pages ??= {})[zone] ??= {}).style = v as NumberingStyle;
           queueSave("numbering");
         }),
         inlineLabel(
           "show",
           checkboxInput(cfg.show ?? true, (v) => {
-            cfg.show = v;
+            ((numbering.pages ??= {})[zone] ??= {}).show = v;
             queueSave("numbering");
           }),
         ),
