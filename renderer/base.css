@@ -75,3 +75,30 @@
 .bml a.ref {
   color: inherit;
 }
+
+/* Paged.js marks elements it splits across pages with
+   data-align-last-split-element and sets text-align-last: justify on them —
+   meant for the split paragraph's last line, but the property inherits, so a
+   split .bml container leaks it onto every heading. Reset descendants; keep it
+   on the split element itself. */
+.bml [data-align-last-split-element="justify"] > * {
+  text-align-last: auto;
+}
+.bml [data-align-last-split-element="justify"] {
+  text-align-last: justify;
+}
+/* TOC: title left, page number right (number comes from ::after in paged CSS). */
+.bml .toc a.entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 1em;
+}
+/* Display matter carries no running head or folio (named page "display",
+   blanked in css-generator). */
+.bml .matter-half-title,
+.bml .matter-title-page,
+.bml .matter-copyright,
+.bml .matter-dedication,
+.bml .matter-epigraph {
+  page: display;
+}

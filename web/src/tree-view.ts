@@ -24,7 +24,12 @@ function list(
     btn.className = `tree-node tree-${n.kind}`;
     btn.style.paddingLeft = `${8 + depth * 14}px`;
     btn.textContent = n.label;
-    btn.onclick = () => onSelect(n);
+    btn.dataset.line = String(n.line);
+    btn.onclick = () => {
+      btn.closest("nav")?.querySelector("[aria-current]")?.removeAttribute("aria-current");
+      btn.setAttribute("aria-current", "true");
+      onSelect(n);
+    };
     li.appendChild(btn);
     if (n.children.length) li.appendChild(list(n.children, depth + 1, onSelect));
     ul.appendChild(li);

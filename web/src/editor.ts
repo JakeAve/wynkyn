@@ -16,7 +16,9 @@ export function createEditor(opts: {
   parent: HTMLElement;
   text: string;
   onDocChanged: (text: string) => void;
+  onCursorLine?: (line: number) => void; // 1-based; fires when the cursor moves lines
 }): EditorView {
+  let lastLine = 0;
   return new EditorView({
     parent: opts.parent,
     state: EditorState.create({
@@ -31,6 +33,13 @@ export function createEditor(opts: {
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !suppressChanges) {
             opts.onDocChanged(u.state.doc.toString());
+          }
+          if (u.selectionSet || u.docChanged) {
+            const line = u.state.doc.lineAt(u.state.selection.main.head).number;
+            if (line !== lastLine) {
+              lastLine = line;
+              opts.onCursorLine?.(line);
+            }
           }
         }),
       ],

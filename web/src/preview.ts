@@ -41,6 +41,7 @@ export async function renderPreview(
     container.innerHTML = "";
     const previewer = new Paged.Previewer();
     await previewer.preview(update.html, [blobUrl], container);
+    fitPreview(container);
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
   } finally {
@@ -68,5 +69,23 @@ export function setFontLinks(html: string): void {
 // Duplicate slugs resolve to the first occurrence, per spec §3.2.4.
 export function scrollPreviewTo(anchorId: string, container: HTMLElement): void {
   const el = container.querySelector(`#${CSS.escape(anchorId)}`);
-  el?.scrollIntoView({ block: "start", behavior: "smooth" });
+  // Scroll the page, not the element: the section start is the page start,
+  // and instant scroll can't be raced by the next Paged.js re-render.
+  (el?.closest(".pagedjs_page") ?? el)?.scrollIntoView({ block: "start", behavior: "auto" });
+}
+
+// Fit a full spread (two pages + gap) to the pane width via CSS zoom, never
+// upscaling past 1:1. Called after each render and on pane resize.
+const SPREAD_GAP = 8;
+const PANE_PADDING = 48; // 2×16px pane padding + slack so the spread never wraps
+export function fitPreview(container: HTMLElement): void {
+  const pages = container.querySelector<HTMLElement>(".pagedjs_pages");
+  const page = pages?.querySelector<HTMLElement>(".pagedjs_page");
+  if (!pages || !page) return;
+  // Computed width is the unzoomed CSS length, so measuring is zoom-independent.
+  const spread = 2 * parseFloat(getComputedStyle(page).width) + SPREAD_GAP;
+  const k = Math.min(1, (container.clientWidth - PANE_PADDING) / spread);
+  // Set on the container (not .pagedjs_pages, which Paged.js recreates) so the
+  // zoom survives re-renders and pages don't flash at 1:1 mid-render.
+  container.style.setProperty("--preview-zoom", k.toFixed(3));
 }

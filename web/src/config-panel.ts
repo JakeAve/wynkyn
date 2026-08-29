@@ -28,6 +28,7 @@ export interface ConfigPanel {
   toggle(): void;
   isDirty(): boolean; // sections touched but not yet handed to saveSections
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
+  markSaved(ok: boolean, detail?: string): void; // feedback from the save round-trip
 }
 
 export interface ConfigPanelOptions {
@@ -43,8 +44,16 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   const dirty = new Set<keyof Metadata>();
   let timer = 0;
 
+  const saved = document.createElement("span");
+  saved.className = "cfg-saved";
+  const setSaved = (text: string, state: "saving" | "ok" | "error") => {
+    saved.textContent = text;
+    saved.dataset.state = state;
+  };
+
   const queueSave: QueueSave = (key) => {
     dirty.add(key);
+    setSaved("Saving…", "saving");
     clearTimeout(timer);
     timer = setTimeout(() => {
       const sections: Record<string, unknown> = {};
@@ -79,10 +88,12 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     title.textContent = "Document configuration";
     const close = document.createElement("button");
     close.textContent = "✕";
+    close.setAttribute("aria-label", "close");
+    close.title = "close (Esc)";
     close.onclick = () => {
       opts.overlay.hidden = true;
     };
-    head.append(title, close);
+    head.append(title, saved, close);
     opts.overlay.append(
       head,
       buildPageSection(meta, queueSave),
@@ -94,26 +105,45 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     );
   }
 
+  opts.overlay.setAttribute("role", "dialog");
+  opts.overlay.setAttribute("aria-label", "Document configuration");
+  opts.overlay.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      opts.overlay.hidden = true;
+      e.stopPropagation();
+    }
+  });
   build();
   return {
     toggle: () => {
       opts.overlay.hidden = !opts.overlay.hidden;
+      if (!opts.overlay.hidden) opts.overlay.querySelector<HTMLElement>("input, select")?.focus();
     },
     isDirty: () => dirty.size > 0,
     refresh(metadata: Metadata) {
       meta = structuredClone(metadata);
       build();
     },
+    markSaved(ok, detail) {
+      if (dirty.size) return; // a newer edit is already queued — stay on "Saving…"
+      const at = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      setSaved(ok ? `Saved ${at}` : `Not saved — ${detail ?? "error"}`, ok ? "ok" : "error");
+    },
   };
 }
 
 // ---------- shared DOM helpers (used by every section builder) ----------
 
-function sectionBox(title: string): HTMLFieldSetElement {
-  const box = document.createElement("fieldset");
-  const legend = document.createElement("legend");
-  legend.textContent = title;
-  box.appendChild(legend);
+// Sections are native <details>: Page and Fonts open by default, the rarer
+// ones collapsed so the panel isn't one long wall of fields.
+const OPEN_BY_DEFAULT = new Set(["Page", "Fonts"]);
+function sectionBox(title: string): HTMLDetailsElement {
+  const box = document.createElement("details");
+  box.className = "cfg-section";
+  box.open = OPEN_BY_DEFAULT.has(title);
+  const summary = document.createElement("summary");
+  summary.textContent = title;
+  box.appendChild(summary);
   return box;
 }
 
@@ -273,6 +303,8 @@ function buildFontsSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
       const aliasIn = document.createElement("input");
       aliasIn.type = "text";
       aliasIn.value = alias;
+      aliasIn.placeholder = "alias";
+      aliasIn.setAttribute("aria-label", "font alias");
       // Rename on commit (change = blur/enter), not per keystroke — a
       // half-typed alias must not repeatedly rename the key.
       aliasIn.onchange = () => {
@@ -297,6 +329,7 @@ function buildFontsSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
       });
       familyIn.setAttribute("list", "google-fonts-list");
       familyIn.placeholder = "Google Fonts family";
+      familyIn.setAttribute("aria-label", "font family");
       const rm = document.createElement("button");
       rm.textContent = "✕";
       rm.title = `remove ${alias}`;
@@ -471,7 +504,7 @@ function buildRunningSection(meta: Metadata, queueSave: QueueSave): HTMLElement 
       row.append(
         field("content", contentSel, literal),
         field("area", areaSel),
-        field("css", css),
+        field("extra css", css),
         rm,
       );
       return row;

@@ -150,6 +150,16 @@ export function generatePagedCSS(
   };
   emitEntries(":right", metadata.running?.odd);
   emitEntries(":left", metadata.running?.even);
+  // Display matter (half-title, title page, …) sits on the named page
+  // "display" (base.css) and carries no running head or folio: blank every
+  // margin box the running/page-number rules above populate.
+  const usedAreas = new Set<string>(["bottom-center"]);
+  for (const e of [...(metadata.running?.odd ?? []), ...(metadata.running?.even ?? [])]) {
+    usedAreas.add(e.area);
+  }
+  out.push(
+    `@page display {\n${[...usedAreas].map((a) => `  @${a} {\n    content: none;\n  }`).join("\n")}\n}\n`,
+  );
 
   // 4. TOC + cross-reference page numbers (§4.11 items 9–10)
   out.push(`.toc a.entry::after { content: target-counter(attr(href url), page); }\n`);

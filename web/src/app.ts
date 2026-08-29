@@ -2,7 +2,7 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
-import { renderPreview, type UpdateMessage, scrollPreviewTo } from "./preview.ts";
+import { fitPreview, renderPreview, type UpdateMessage, scrollPreviewTo } from "./preview.ts";
 import { applyDiagnostics, createEditor, replaceBuffer, scrollEditorToLine } from "./editor.ts";
 import { applySnippet, SNIPPETS } from "./snippets.ts";
 import { buildTree } from "./tree-data.ts";
@@ -17,8 +17,26 @@ const clientId = crypto.randomUUID();
 const params = new URLSearchParams(location.search);
 const $ = (id: string) => document.getElementById(id)!;
 
-function setStatus(text: string): void {
-  $("status").textContent = text;
+// Author-facing status: a glyph + a plain phrase; the raw error goes in the
+// tooltip rather than the footer.
+type StatusKind = "connecting" | "saved" | "saving" | "error" | "offline";
+const STATUS_TEXT: Record<StatusKind, string> = {
+  connecting: "◌ Connecting…",
+  saved: "● Saved",
+  saving: "◌ Saving…",
+  error: "✕ Not saved",
+  offline: "✕ Disconnected — restart the server and reload",
+};
+function setStatus(kind: StatusKind, detail?: string): void {
+  const el = $("status");
+  el.textContent = detail && kind === "error" ? `${STATUS_TEXT[kind]} — ${detail}` : STATUS_TEXT[kind];
+  el.dataset.kind = kind;
+  el.title = detail ?? "";
+}
+
+// Short, readable tail of an error for the footer; full text stays in the title.
+function brief(err: unknown): string {
+  return String(err).replace(/^Error:\s*/, "").split("\n")[0]!.slice(0, 80);
 }
 
 let editor: EditorView;
@@ -35,6 +53,7 @@ let queuedMetaSections: Partial<Metadata> | null = null;
 
 function onDocChanged(text: string): void {
   dirty = true;
+  setStatus("saving");
   clearTimeout(parseTimer);
   parseTimer = setTimeout(() => reparse(text), PARSE_DEBOUNCE_MS);
   clearTimeout(saveTimer);
@@ -44,19 +63,37 @@ function onDocChanged(text: string): void {
 function reparse(text: string): void {
   const doc = parse(text);
   applyDiagnostics(editor, doc.diagnostics);
-  $("diagnostics").textContent = doc.diagnostics.length
-    ? `${doc.diagnostics.length} parse note(s) — line ${doc.diagnostics[0]!.line}: ${
-      doc.diagnostics[0]!.message
-    }`
+  const diag = $("diagnostics");
+  const first = doc.diagnostics[0];
+  diag.textContent = first
+    ? `▲ ${doc.diagnostics.length} parse note${doc.diagnostics.length > 1 ? "s" : ""} — line ${first.line}: ${first.message}`
     : "";
+  diag.title = first ? "click to jump to the first note" : "";
+  diag.onclick = first ? () => scrollEditorToLine(editor, first.line) : null;
   refreshTree(doc);
 }
 
+let treeLines: number[] = []; // start line of every tree node, ascending
+let cursorLine = 1;
+
 function refreshTree(doc: BmlDocument): void {
-  renderTree($("tree"), buildTree(doc), (node) => {
+  const nodes = buildTree(doc);
+  treeLines = nodes.flatMap((n) => [n.line, ...n.children.map((c) => c.line)]).sort((a, b) => a - b);
+  renderTree($("tree"), nodes, (node) => {
     scrollEditorToLine(editor, node.line);
     scrollPreviewTo(node.anchorId, $("preview"));
   });
+  highlightTreeNode(cursorLine);
+}
+
+// Follow the cursor: the node whose block contains the cursor line is current.
+function highlightTreeNode(line: number): void {
+  cursorLine = line;
+  let best = 0;
+  for (const l of treeLines) if (l <= line) best = l;
+  const tree = $("tree");
+  tree.querySelector("[aria-current]")?.removeAttribute("aria-current");
+  tree.querySelector(`[data-line="${best}"]`)?.setAttribute("aria-current", "true");
 }
 
 function populateSwitcher(books: string[], active: string): void {
@@ -91,10 +128,12 @@ async function doSave(text: string): Promise<void> {
       body: JSON.stringify({ text, clientId }),
     });
     if (!res.ok) throw new Error(await res.text());
-    if (editor.state.doc.toString() === text) dirty = false;
-    setStatus("live");
+    if (editor.state.doc.toString() === text) {
+      dirty = false;
+      setStatus("saved");
+    }
   } catch (err) {
-    setStatus(`save failed: ${err}`);
+    setStatus("error", brief(err));
   } finally {
     saveInFlight = false;
     if (queuedSaveText !== null) {
@@ -125,9 +164,10 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
       body: JSON.stringify({ sections, clientId }),
     });
     if (!res.ok) throw new Error(await res.text());
-    setStatus("live");
+    configPanel?.markSaved(true);
   } catch (err) {
-    setStatus(`config save failed: ${err}`);
+    configPanel?.markSaved(false, brief(err));
+    setStatus("error", `config: ${brief(err)}`);
   } finally {
     metaSaveInFlight = false;
     if (queuedMetaSections !== null) {
@@ -155,7 +195,7 @@ async function toggleConfigPanel(): Promise<void> {
         saveSections: saveMetadataSections,
       });
     } catch (err) {
-      setStatus(String(err)); // e.g. 409 corrupt metadata.json — fix on disk
+      setStatus("error", brief(err)); // e.g. 409 corrupt metadata.json — fix on disk
       return;
     }
   }
@@ -191,25 +231,104 @@ async function refreshConfigFromRemote(): Promise<void> {
   }
 }
 
-function buildSnippetToolbar(): void {
-  const bar = $("snippet-buttons");
-  for (const s of SNIPPETS) {
-    const b = document.createElement("button");
-    b.textContent = s.label;
-    b.title = `insert ${s.label}`;
-    b.onclick = () => {
-      editor.dispatch(applySnippet(editor.state, s));
+type PaneMode = "split" | "editor" | "preview";
+let paneMode: PaneMode = "split";
+
+// Expands the editor or preview pane by hiding the other; the tree stays put
+// since it's navigation, not content to expand into. Clicking the toggle for
+// the already-active mode restores the split view. Session-only — resets on
+// reload/book-switch like the rest of the UI's transient state.
+function setPaneMode(mode: PaneMode): void {
+  paneMode = mode;
+  const panes = $("panes");
+  panes.classList.remove("pane-mode-editor", "pane-mode-preview");
+  if (mode !== "split") panes.classList.add(`pane-mode-${mode}`);
+  $("pane-toggle-editor").setAttribute("aria-pressed", String(mode === "editor"));
+  $("pane-toggle-preview").setAttribute("aria-pressed", String(mode === "preview"));
+}
+
+const STRUCTURE_SNIPPETS = new Set(["matter", "part", "chapter", "heading", "subheading"]);
+const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
+// Keyboard chords. Snippet chords insert via applySnippet; the rest are UI.
+const SNIPPET_KEYS: Record<string, string> = {
+  em: "Mod-E",
+  chapter: "Mod-Shift-C",
+  heading: "Mod-Shift-H",
+  footnote: "Mod-Shift-F",
+  quote: "Mod-Shift-Q",
+  break: "Mod-Shift-B",
+};
+function chordLabel(chord: string): string {
+  return chord.replace("Mod-", MOD).replace("Shift-", "⇧");
+}
+function chordOf(e: KeyboardEvent): string | null {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey) return null;
+  return `Mod-${e.shiftKey ? "Shift-" : ""}${e.key.length === 1 ? e.key.toUpperCase() : e.key}`;
+}
+function installShortcuts(): void {
+  const bySnippet = new Map(SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((s) => [SNIPPET_KEYS[s.label], s]));
+  document.addEventListener("keydown", (e) => {
+    const chord = chordOf(e);
+    if (!chord) return;
+    const snippet = bySnippet.get(chord);
+    if (snippet) {
+      editor.dispatch(applySnippet(editor.state, snippet));
       editor.focus();
-    };
-    bar.appendChild(b);
+    } else if (chord === "Mod-1") setPaneMode("editor");
+    else if (chord === "Mod-2") setPaneMode("split");
+    else if (chord === "Mod-3") setPaneMode("preview");
+    else if (chord === "Mod-,") toggleConfigPanel();
+    else return;
+    e.preventDefault();
+  }, true);
+  $("pane-toggle-editor").title += ` (${chordLabel("Mod-1")}; ${chordLabel("Mod-2")} restores split)`;
+  $("pane-toggle-preview").title += ` (${chordLabel("Mod-3")}; ${chordLabel("Mod-2")} restores split)`;
+  $("config-button").title += ` (${chordLabel("Mod-,")})`;
+}
+
+// Snippets live in a grouped dropdown (structure / block / inline) rather than
+// 19 flat toolbar buttons — the toolbar overflowed and hid the status text.
+function buildSnippetToolbar(): void {
+  const menu = $("insert-menu") as HTMLDetailsElement;
+  const bar = $("snippet-buttons");
+  const groups = { structure: [] as typeof SNIPPETS, block: [] as typeof SNIPPETS, inline: [] as typeof SNIPPETS };
+  for (const s of SNIPPETS) {
+    (STRUCTURE_SNIPPETS.has(s.label) ? groups.structure : s.kind === "block" ? groups.block : groups.inline).push(s);
   }
+  for (const [name, list] of Object.entries(groups)) {
+    const col = document.createElement("div");
+    col.className = "group";
+    const h = document.createElement("h4");
+    h.textContent = name;
+    col.appendChild(h);
+    for (const s of list) {
+      const b = document.createElement("button");
+      b.textContent = s.label;
+      const chord = SNIPPET_KEYS[s.label];
+      if (chord) {
+        const kbd = document.createElement("kbd");
+        kbd.textContent = chordLabel(chord);
+        b.appendChild(kbd);
+      }
+      b.onclick = () => {
+        menu.open = false;
+        editor.dispatch(applySnippet(editor.state, s));
+        editor.focus();
+      };
+      col.appendChild(b);
+    }
+    bar.appendChild(col);
+  }
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target as Node)) menu.open = false;
+  });
 }
 
 async function main(): Promise<void> {
   const res = await fetch("/api/books");
   const { books } = (await res.json()) as { books: string[] };
   if (!books.length) {
-    setStatus("no books found in books/");
+    setStatus("error", "no books found in books/");
     return;
   }
   const requested = params.get("book");
@@ -218,19 +337,27 @@ async function main(): Promise<void> {
   populateSwitcher(books, book);
 
   const text = await fetchManuscript(book);
-  editor = createEditor({ parent: $("editor"), text, onDocChanged });
+  editor = createEditor({ parent: $("editor"), text, onDocChanged, onCursorLine: highlightTreeNode });
   reparse(text);
   buildSnippetToolbar();
+  installShortcuts();
   $("config-button").onclick = () => {
     toggleConfigPanel();
   };
+  $("pane-toggle-editor").onclick = () => {
+    setPaneMode(paneMode === "editor" ? "split" : "editor");
+  };
+  $("pane-toggle-preview").onclick = () => {
+    setPaneMode(paneMode === "preview" ? "split" : "preview");
+  };
 
   const previewEl = $("preview");
+  new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);
   const ws = new WebSocket(
     `ws://${location.host}/ws?book=${encodeURIComponent(book)}&client=${clientId}`,
   );
-  ws.onopen = () => setStatus("live");
-  ws.onclose = () => setStatus("disconnected — restart the server and reload");
+  ws.onopen = () => setStatus("saved");
+  ws.onclose = () => setStatus("offline");
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data) as UpdateMessage | {
       type: "error";
@@ -239,10 +366,10 @@ async function main(): Promise<void> {
       message: string;
     };
     if (msg.type === "error") {
-      setStatus(`build error: ${msg.message}`);
+      setStatus("error", `build: ${brief(msg.message)}`);
       return;
     }
-    setStatus("live");
+    if (!dirty && !saveInFlight) setStatus("saved");
     // Own-origin: preview only — never the buffer (spec §6 echo suppression).
     renderPreview(msg, previewEl);
     if (msg.origin !== clientId) {
