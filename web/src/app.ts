@@ -299,6 +299,7 @@ function buildSnippetToolbar(): void {
     const col = document.createElement("div");
     col.className = "group";
     const h = document.createElement("h4");
+    h.className = "caption";
     h.textContent = name;
     col.appendChild(h);
     for (const s of list) {

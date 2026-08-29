@@ -142,6 +142,7 @@ function sectionBox(title: string): HTMLDetailsElement {
   box.className = "cfg-section";
   box.open = OPEN_BY_DEFAULT.has(title);
   const summary = document.createElement("summary");
+  summary.className = "caption";
   summary.textContent = title;
   box.appendChild(summary);
   return box;
@@ -551,7 +552,7 @@ function buildPrintSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
   folios.placeholder = "4";
   box.appendChild(field("folios/signature", folios, error));
   const note = document.createElement("p");
-  note.style.color = "#9aa0ab";
+  note.style.color = "var(--fg-muted)";
   note.style.margin = "6px 0 0";
   note.textContent =
     "Consumed by print export (Plan 5) — changing these does not affect the preview.";

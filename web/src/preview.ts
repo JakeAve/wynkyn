@@ -38,9 +38,15 @@ export async function renderPreview(
     // string-set / target-counter; base + dom CSS ride along in the same sheet.
     const css = [update.baseCss, update.domCss, update.pagedCss].join("\n");
     const blobUrl = URL.createObjectURL(new Blob([css], { type: "text/css" }));
-    container.innerHTML = "";
+    // Stage the new render invisibly next to the live pages, then swap — the
+    // old pages stay on screen for the seconds Paged.js takes, no white flash.
+    const stage = document.createElement("div");
+    stage.className = "preview-stage";
+    container.appendChild(stage);
     const previewer = new Paged.Previewer();
-    await previewer.preview(update.html, [blobUrl], container);
+    await previewer.preview(update.html, [blobUrl], stage);
+    for (const old of container.children) if (old !== stage) old.remove();
+    stage.className = "";
     fitPreview(container);
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
