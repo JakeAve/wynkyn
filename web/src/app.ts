@@ -267,6 +267,33 @@ function setPaneMode(mode: PaneMode): void {
   $("pane-toggle-preview").setAttribute("aria-pressed", String(mode === "preview"));
 }
 
+// Draggable gutters: each one writes a CSS var on #panes that the grid
+// template reads, persisted so widths survive a reload.
+function installGutters(): void {
+  const panes = $("panes");
+  for (const [id, cssVar, min] of [["gutter-tree", "--w-tree", 120], ["gutter-editor", "--w-editor", 240]] as const) {
+    const saved = localStorage.getItem(cssVar);
+    if (saved) panes.style.setProperty(cssVar, saved);
+    const gutter = $(id);
+    gutter.onpointerdown = (e) => {
+      e.preventDefault();
+      gutter.setPointerCapture(e.pointerId);
+      gutter.classList.add("dragging");
+      const left = (cssVar === "--w-tree" ? panes : $("editor")).getBoundingClientRect().left;
+      gutter.onpointermove = (m) => {
+        // Leave at least 200px for whatever pane sits to the right.
+        const max = panes.getBoundingClientRect().right - left - 200;
+        panes.style.setProperty(cssVar, `${Math.min(Math.max(m.clientX - left, min), max)}px`);
+      };
+      gutter.onpointerup = () => {
+        gutter.onpointermove = gutter.onpointerup = null;
+        gutter.classList.remove("dragging");
+        localStorage.setItem(cssVar, panes.style.getPropertyValue(cssVar));
+      };
+    };
+  }
+}
+
 const STRUCTURE_SNIPPETS = new Set(["matter", "part", "chapter", "heading", "subheading"]);
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 // Keyboard chords. Snippet chords insert via applySnippet; the rest are UI.
@@ -371,6 +398,7 @@ async function main(): Promise<void> {
   $("pane-toggle-preview").onclick = () => {
     setPaneMode(paneMode === "preview" ? "split" : "preview");
   };
+  installGutters();
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);
