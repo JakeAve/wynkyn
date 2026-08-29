@@ -151,6 +151,11 @@
   .cfg-inline { display: inline-flex; align-items: center; gap: 3px; flex: none; color: var(--fg-muted); }
   .cfg-error { color: var(--err); flex-basis: 100%; }
   .cfg-entry { border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 6px; }
+  .cfg-more { margin-top: 8px; }
+  .cfg-more summary { cursor: pointer; padding: 2px 0; user-select: none; }
+  /* Click-to-style: the picked element in the preview */
+  [data-style-selected] { outline: 2px solid var(--accent-border); outline-offset: 2px; }
+  .pagedjs_page .bml *, .pagedjs_margin-content { cursor: pointer; }
 </style>
 </head>
 <body>

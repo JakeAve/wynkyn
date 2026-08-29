@@ -1,5 +1,6 @@
 // web/src/preview.ts — Paged.js re-render + font links (spec §7.6).
 // Paged.js is the CDN global from index.html; there is no npm build to bundle.
+import { matchKey, type StyleEntry } from "./style-catalog.ts";
 declare const Paged: {
   Previewer: new () => {
     preview(html: string, css: string[], el: Element): Promise<unknown>;
@@ -78,6 +79,32 @@ export function scrollPreviewTo(anchorId: string, container: HTMLElement): void 
   // Scroll the page, not the element: the section start is the page start,
   // and instant scroll can't be raced by the next Paged.js re-render.
   (el?.closest(".pagedjs_page") ?? el)?.scrollIntoView({ block: "start", behavior: "auto" });
+}
+
+// Click-to-style (spec §7.4): resolve the clicked node to a style-catalog
+// key and hand it back; the clicked node is outlined until the next click
+// or re-render. Link clicks that resolve are consumed so the TOC doesn't
+// navigate the preview. `catalog` is read per click — `is:` entries change
+// with the metadata.
+export function installStyleClicks(
+  container: HTMLElement,
+  catalog: () => StyleEntry[],
+  onPick: (key: string) => void,
+): void {
+  container.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement | null;
+    if (!target || target.closest(".preview-stage")) return;
+    const chain: string[][] = [];
+    for (let el: HTMLElement | null = target; el && el !== container; el = el.parentElement) {
+      chain.push([...el.classList]);
+    }
+    const key = matchKey(chain, catalog());
+    if (!key) return;
+    e.preventDefault();
+    container.querySelector("[data-style-selected]")?.removeAttribute("data-style-selected");
+    target.setAttribute("data-style-selected", "");
+    onPick(key);
+  });
 }
 
 // "Page 12 of 208" for the footer: the page nearest the pane's vertical

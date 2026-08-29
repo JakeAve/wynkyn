@@ -21,6 +21,7 @@ import {
   splitRunningEntry,
 } from "./config-data.ts";
 import { GOOGLE_FONTS } from "./fonts-list.ts";
+import { buildStyleSection, type StyleSection } from "./style-panel.ts";
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -29,6 +30,7 @@ export interface ConfigPanel {
   isDirty(): boolean; // sections touched but not yet handed to saveSections
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   markSaved(ok: boolean, detail?: string): void; // feedback from the save round-trip
+  selectStyle(key: string): void; // open the Styles section on a catalog entry (§7.4)
 }
 
 export interface ConfigPanelOptions {
@@ -80,8 +82,12 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     }, SAVE_DEBOUNCE_MS);
   };
 
+  let styles: StyleSection | null = null;
+  let styleKey: string | undefined; // survives refresh()
+
   function build(): void {
     opts.overlay.innerHTML = "";
+    styles = buildStyleSection(meta, queueSave, styleKey);
     const head = document.createElement("div");
     head.className = "cfg-head";
     const title = document.createElement("strong");
@@ -102,6 +108,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       buildRunningSection(meta, queueSave),
       buildPrintSection(meta, queueSave),
       buildNotesSection(meta, queueSave),
+      styles.el,
     );
   }
 
@@ -129,6 +136,11 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       const at = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
       setSaved(ok ? `Saved ${at}` : `Not saved — ${detail ?? "error"}`, ok ? "ok" : "error");
     },
+    selectStyle(key) {
+      styleKey = key;
+      opts.overlay.hidden = false;
+      styles?.select(key);
+    },
   };
 }
 
@@ -137,7 +149,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
 // Sections are native <details>: Page and Fonts open by default, the rarer
 // ones collapsed so the panel isn't one long wall of fields.
 const OPEN_BY_DEFAULT = new Set(["Page", "Fonts"]);
-function sectionBox(title: string): HTMLDetailsElement {
+export function sectionBox(title: string): HTMLDetailsElement {
   const box = document.createElement("details");
   box.className = "cfg-section";
   box.open = OPEN_BY_DEFAULT.has(title);
@@ -148,7 +160,7 @@ function sectionBox(title: string): HTMLDetailsElement {
   return box;
 }
 
-function field(labelText: string, ...controls: HTMLElement[]): HTMLLabelElement {
+export function field(labelText: string, ...controls: HTMLElement[]): HTMLLabelElement {
   const label = document.createElement("label");
   label.className = "cfg-field";
   const span = document.createElement("span");
@@ -158,7 +170,7 @@ function field(labelText: string, ...controls: HTMLElement[]): HTMLLabelElement 
   return label;
 }
 
-function textInput(value: string, onInput: (v: string) => void): HTMLInputElement {
+export function textInput(value: string, onInput: (v: string) => void): HTMLInputElement {
   const el = document.createElement("input");
   el.type = "text";
   el.value = value;
@@ -177,7 +189,7 @@ function textInputRaw(value: string, onInput: (v: string) => void): HTMLInputEle
   return el;
 }
 
-function selectInput(
+export function selectInput(
   choices: ReadonlyArray<{ label: string; value: string }>,
   value: string,
   onChange: (v: string) => void,
@@ -190,7 +202,7 @@ function selectInput(
   return el;
 }
 
-function checkboxInput(checked: boolean, onChange: (v: boolean) => void): HTMLInputElement {
+export function checkboxInput(checked: boolean, onChange: (v: boolean) => void): HTMLInputElement {
   const el = document.createElement("input");
   el.type = "checkbox";
   el.checked = checked;

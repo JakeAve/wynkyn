@@ -35,6 +35,7 @@ export interface StructureNumbering {
 export interface PageNumbering {
   style?: NumberingStyle;
   show?: boolean;
+  css?: CssProps; // styles the folio's margin box (§4.7)
 }
 
 export interface Numbering {

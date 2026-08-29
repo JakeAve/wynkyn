@@ -2,9 +2,11 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
+import { catalogFor } from "./style-catalog.ts";
 import {
   fitPreview,
   installPageIndicator,
+  installStyleClicks,
   renderPreview,
   scrollPreviewTo,
   type UpdateMessage,
@@ -192,20 +194,31 @@ async function fetchMetadata(): Promise<Metadata> {
   return ((await res.json()) as { metadata: Metadata }).metadata;
 }
 
-async function toggleConfigPanel(): Promise<void> {
-  if (!configPanel) {
-    try {
-      configPanel = createConfigPanel({
-        overlay: $("config-overlay"),
-        metadata: await fetchMetadata(),
-        saveSections: saveMetadataSections,
-      });
-    } catch (err) {
-      setStatus("error", brief(err)); // e.g. 409 corrupt metadata.json — fix on disk
-      return;
-    }
+let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
+
+async function ensureConfigPanel(): Promise<ConfigPanel | null> {
+  if (configPanel) return configPanel;
+  try {
+    metadata = await fetchMetadata();
+    configPanel = createConfigPanel({
+      overlay: $("config-overlay"),
+      metadata,
+      saveSections: saveMetadataSections,
+    });
+    return configPanel;
+  } catch (err) {
+    setStatus("error", brief(err)); // e.g. 409 corrupt metadata.json — fix on disk
+    return null;
   }
-  configPanel.toggle();
+}
+
+async function toggleConfigPanel(): Promise<void> {
+  (await ensureConfigPanel())?.toggle();
+}
+
+// Preview click → Styles section on that element (spec §7.4).
+async function pickStyle(key: string): Promise<void> {
+  (await ensureConfigPanel())?.selectStyle(key);
 }
 
 async function fetchManuscript(name: string): Promise<string> {
@@ -231,7 +244,8 @@ async function refreshFromRemote(): Promise<void> {
 async function refreshConfigFromRemote(): Promise<void> {
   if (!configPanel || configPanel.isDirty() || metaSaveInFlight) return;
   try {
-    configPanel.refresh(await fetchMetadata());
+    metadata = await fetchMetadata();
+    configPanel.refresh(metadata);
   } catch {
     // 409/network — leave the panel as-is; the user can close and reopen.
   }
@@ -361,6 +375,7 @@ async function main(): Promise<void> {
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);
   const refreshPageIndicator = installPageIndicator(previewEl, $("page-indicator"));
+  installStyleClicks(previewEl, () => catalogFor(metadata ?? {}), pickStyle);
   const ws = new WebSocket(
     `ws://${location.host}/ws?book=${encodeURIComponent(book)}&client=${clientId}`,
   );

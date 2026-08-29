@@ -166,3 +166,16 @@ Deno.test("generateFontLinks percent-encodes special characters in family names"
   assertStringIncludes(html, encodeURIComponent('My "Weird" Font').replace(/%20/g, "+"));
   assert(!html.includes('"Weird"'));
 });
+
+Deno.test("page-number css props are emitted in the zone's @bottom-center box", () => {
+  const css = generatePagedCSS({
+    fonts: { display: "Cormorant Garamond" },
+    numbering: {
+      pages: { body: { style: "arabic", show: true, css: { "font-size": "9pt", "font-family": "display" } } },
+    },
+  });
+  const box = css.slice(css.indexOf("@page body {"));
+  assertStringIncludes(box, "content: counter(page, decimal);");
+  assertStringIncludes(box, "font-size: 9pt;");
+  assertStringIncludes(box, 'font-family: "Cormorant Garamond";');
+});

@@ -114,3 +114,25 @@ export function renameKey<T>(
   for (const [k, v] of Object.entries(obj)) out[k === from ? to : k] = v;
   return out;
 }
+
+// ---------- style panel (spec §7.4) ----------
+
+// The properties a typesetter actually changes, in form order. Everything
+// else on an element goes to the "more CSS" rows.
+export const CURATED_PROPS = [
+  "font-family", "font-size", "font-weight", "font-style", "text-align",
+  "letter-spacing", "text-transform", "margin-top", "margin-bottom",
+] as const;
+
+export function splitProps(
+  props: Record<string, unknown>,
+): { curated: CssProps; extra: CssProps } {
+  const curated: CssProps = {};
+  const extra: CssProps = {};
+  for (const [k, v] of Object.entries(props)) {
+    if (typeof v !== "string") continue; // nested sub-element — not ours
+    if ((CURATED_PROPS as readonly string[]).includes(k)) curated[k] = v;
+    else extra[k] = v;
+  }
+  return { curated, extra };
+}

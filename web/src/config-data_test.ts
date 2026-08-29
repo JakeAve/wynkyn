@@ -7,6 +7,7 @@ import {
   parseCssLines,
   presetFor,
   renameKey,
+  splitProps,
   splitRunningEntry,
 } from "./config-data.ts";
 
@@ -78,4 +79,15 @@ Deno.test("renameKey preserves entry order", () => {
   const out = renameKey({ body: "EB Garamond", display: "Playfair Display" }, "body", "text");
   assertEquals(Object.keys(out), ["text", "display"]);
   assertEquals(out["text"], "EB Garamond");
+});
+
+Deno.test("splitProps partitions curated from extra CSS", () => {
+  const { curated, extra } = splitProps({
+    "font-size": "9pt",
+    "text-align": "center",
+    "border-left": "2pt solid #bbb",
+    number: { "font-size": "7pt" },
+  });
+  assertEquals(curated, { "font-size": "9pt", "text-align": "center" });
+  assertEquals(extra, { "border-left": "2pt solid #bbb" });
 });

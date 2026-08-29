@@ -10,7 +10,8 @@ const MATTER_KEYS = new Set([
 
 const PROSE_MATTER = ["foreword", "preface", "introduction"];
 
-function selectorFor(key: string): string {
+// Exported so the web style catalog matches clicks against the same selectors.
+export function selectorFor(key: string): string {
   if (key === "body") return ".bml";
   if (key === "em") return ".bml em";
   if (key === "prose-matter") return PROSE_MATTER.map((t) => `.matter-${t}`).join(", ");
@@ -128,9 +129,11 @@ export function generatePagedCSS(
     const style = cfg?.style ?? "arabic";
     const show = cfg?.show ?? true;
     if (show && style !== "none") {
-      out.push(
-        `@page ${name} {\n  @bottom-center {\n    content: counter(page, ${NUM_STYLE[style]});\n  }\n}\n`,
-      );
+      const decls = [`    content: counter(page, ${NUM_STYLE[style]});`];
+      for (const [k, v] of Object.entries(cfg?.css ?? {})) {
+        decls.push(`    ${k}: ${k === "font-family" ? resolveFontValue(v, metadata.fonts) : v};`);
+      }
+      out.push(`@page ${name} {\n  @bottom-center {\n${decls.join("\n")}\n  }\n}\n`);
     }
   }
   out.push(`.zone-body { counter-reset: page 1; }\n`);
