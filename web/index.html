@@ -84,7 +84,9 @@
   #status[data-kind="error"], #status[data-kind="offline"] { color: var(--err); }
 
   /* ---- panes ---- */
-  #panes { display: grid; grid-template-columns: 230px minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
+  /* The preview is the hero: the editor holds a fixed reading measure
+     (~70 monospace chars), the preview takes every remaining pixel. */
+  #panes { display: grid; grid-template-columns: 230px clamp(380px, 36%, 600px) minmax(0, 1fr); min-height: 0; }
   /* Pane toggles: hide one of editor/preview and let the other fill the row.
      The tree stays put — it's navigation, not part of what gets expanded.
      display:none removes the hidden pane from grid flow entirely, so only
@@ -112,11 +114,17 @@
      complete, so the preview never flashes empty mid-render. */
   /* --preview-zoom: 1 is essential — Paged.js paginates by measuring rects,
      and a zoomed stage makes it fit twice as much text per page. */
+  /* First load: nothing live yet, only the hidden stage — say so. */
+  #preview:not(:has(> :not(.preview-stage)))::before {
+    content: "Rendering pages…"; color: var(--fg); opacity: .7;
+    display: block; text-align: center; padding-top: 40vh;
+  }
   #preview .preview-stage { visibility: hidden; position: absolute; inset: 16px; --preview-zoom: 1; }
   /* Spread layout (spec §7.6): two book pages per row, page 1 recto-alone.
      --preview-zoom is set by fitPreview() so a full spread always fits the pane. */
   .pagedjs_pages { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 8px; zoom: var(--preview-zoom, 1); }
-  .pagedjs_page { background: white; box-shadow: 0 2px 8px rgba(0, 0, 0, .4); margin-bottom: 16px; }
+  /* Pages are paper: ink black, never the chrome's light text color. */
+  .pagedjs_page { background: white; color: #111; box-shadow: 0 2px 8px rgba(0, 0, 0, .4); margin-bottom: 16px; }
   .pagedjs_pages .pagedjs_page:first-child { margin-left: calc(var(--pagedjs-width) + 8px); }
 
   /* ---- config panel ---- */
@@ -176,6 +184,7 @@
   <div id="preview"></div>
 </div>
 <div id="footer">
+  <span id="page-indicator"></span>
   <span id="diagnostics"></span>
   <span id="status">connecting…</span>
 </div>

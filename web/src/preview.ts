@@ -80,6 +80,37 @@ export function scrollPreviewTo(anchorId: string, container: HTMLElement): void 
   (el?.closest(".pagedjs_page") ?? el)?.scrollIntoView({ block: "start", behavior: "auto" });
 }
 
+// "Page 12 of 208" for the footer: the page nearest the pane's vertical
+// centre, refreshed on scroll and after each render.
+export function installPageIndicator(container: HTMLElement, out: HTMLElement): () => void {
+  let raf = 0;
+  const update = () => {
+    raf = 0;
+    const pages = container.querySelectorAll<HTMLElement>(":scope > :not(.preview-stage) .pagedjs_page");
+    if (!pages.length) {
+      out.textContent = "";
+      return;
+    }
+    const mid = container.getBoundingClientRect().top + container.clientHeight / 2;
+    let best = pages[0]!;
+    let bestDist = Infinity;
+    for (const p of pages) {
+      const r = p.getBoundingClientRect();
+      const d = Math.abs((r.top + r.bottom) / 2 - mid);
+      if (d < bestDist) {
+        bestDist = d;
+        best = p;
+      }
+    }
+    out.textContent = `Page ${best.dataset.pageNumber ?? "?"} of ${pages.length}`;
+  };
+  const schedule = () => {
+    if (!raf) raf = requestAnimationFrame(update);
+  };
+  container.addEventListener("scroll", schedule, { passive: true });
+  return schedule;
+}
+
 // Fit a full spread (two pages + gap) to the pane width via CSS zoom, never
 // upscaling past 1:1. Called after each render and on pane resize.
 const SPREAD_GAP = 8;

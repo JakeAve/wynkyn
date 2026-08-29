@@ -2,7 +2,13 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
-import { fitPreview, renderPreview, type UpdateMessage, scrollPreviewTo } from "./preview.ts";
+import {
+  fitPreview,
+  installPageIndicator,
+  renderPreview,
+  scrollPreviewTo,
+  type UpdateMessage,
+} from "./preview.ts";
 import { applyDiagnostics, createEditor, replaceBuffer, scrollEditorToLine } from "./editor.ts";
 import { applySnippet, SNIPPETS } from "./snippets.ts";
 import { buildTree } from "./tree-data.ts";
@@ -354,6 +360,7 @@ async function main(): Promise<void> {
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);
+  const refreshPageIndicator = installPageIndicator(previewEl, $("page-indicator"));
   const ws = new WebSocket(
     `ws://${location.host}/ws?book=${encodeURIComponent(book)}&client=${clientId}`,
   );
@@ -372,7 +379,7 @@ async function main(): Promise<void> {
     }
     if (!dirty && !saveInFlight) setStatus("saved");
     // Own-origin: preview only — never the buffer (spec §6 echo suppression).
-    renderPreview(msg, previewEl);
+    renderPreview(msg, previewEl).then(refreshPageIndicator);
     if (msg.origin !== clientId) {
       refreshFromRemote();
       refreshConfigFromRemote();
