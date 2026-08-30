@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "test": "deno test --allow-read --allow-write --allow-net --allow-run --allow-env",
+    "test": "deno test --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys",
     "build:web": "deno check web/src/app.ts && deno bundle --platform browser --output web/app.js web/src/app.ts",
     "bml": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env bml.ts",
     "dev": "deno task build:web && deno run --allow-read --allow-write --allow-net server/dev-server.ts"

@@ -39,3 +39,8 @@ Deno.test("buildBook picks images by spec extension priority", async () => {
 Deno.test("buildBook rejects for a missing book", async () => {
   await assertRejects(() => buildBook(ROOT, "no-such-book"));
 });
+
+Deno.test("buildBook accepts an image url prefix override", async () => {
+  const b = await buildBook(ROOT, "demo-book", "file:///abs/images");
+  assert(!b.html.includes('"/books/demo-book/images'), "default prefix must not appear");
+});

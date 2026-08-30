@@ -80,12 +80,16 @@ async function resolveImages(
   return images;
 }
 
-export async function buildBook(booksRoot: string, book: string): Promise<BuildResult> {
+export async function buildBook(
+  booksRoot: string,
+  book: string,
+  imageUrlPrefix = `/books/${book}/images`,
+): Promise<BuildResult> {
   const bookDir = `${booksRoot}/${book}`;
   const source = await Deno.readTextFile(`${bookDir}/manuscript.md`);
   const doc = parse(source);
   const meta = (await loadMetadata(bookDir)) ?? {};
-  const images = await resolveImages(bookDir, `/books/${book}/images`);
+  const images = await resolveImages(bookDir, imageUrlPrefix);
   const bookTitle = extractBookTitle(doc, book);
   return {
     book,
