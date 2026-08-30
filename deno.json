@@ -1,8 +1,8 @@
 {
   "tasks": {
-    "test": "deno test --allow-read --allow-write --allow-net",
+    "test": "deno test --allow-read --allow-write --allow-net --allow-run --allow-env",
     "build:web": "deno check web/src/app.ts && deno bundle --platform browser --output web/app.js web/src/app.ts",
-    "bml": "deno run --allow-read --allow-write bml.ts",
+    "bml": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env bml.ts",
     "dev": "deno task build:web && deno run --allow-read --allow-write --allow-net server/dev-server.ts"
   },
   "imports": {
@@ -12,7 +12,10 @@
     "@codemirror/language": "npm:@codemirror/language@^6.11.0",
     "@codemirror/lint": "npm:@codemirror/lint@^6.8.0",
     "@codemirror/theme-one-dark": "npm:@codemirror/theme-one-dark@^6.1.0",
-    "@lezer/highlight": "npm:@lezer/highlight@^1.2.0"
+    "@lezer/highlight": "npm:@lezer/highlight@^1.2.0",
+    "pdf-lib": "npm:pdf-lib@1.17.1",
+    "playwright": "npm:playwright@1.55.0",
+    "@std/cli": "jsr:@std/cli@^1.0.0"
   },
   "compilerOptions": {
     "strict": true,
