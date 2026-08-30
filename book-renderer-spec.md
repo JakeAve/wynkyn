@@ -1064,12 +1064,14 @@ Physical print/imposition settings, consumed only by print export (§7.7). Kept 
 ```json
 "print": {
   "sheet-size": "legal",
-  "folios-per-signature": 4
+  "folios-per-signature": 4,
+  "duplex": "short-edge"
 }
 ```
 
 - `sheet-size` — the physical paper the printer loads. Same value space as `page.size` (§4.3): named sizes or explicit dimensions.
 - `folios-per-signature` — signature thickness, counted in folios (one folio = one folded piece = 4 book pages, §7.7). Signature page count = `folios-per-signature` × 4.
+- `duplex` — `short-edge` (book-style turn, default), `long-edge` (calendar-style turn), or `none` (separate fronts/backs files). CLI flags (`bml export --sheet/--folios/--duplex`) override per run.
 
 ### 4.10 Section: `notes`
 
@@ -1132,7 +1134,7 @@ These are the contracts each module must satisfy, per the layout in §1. Plan 0 
 Both entry points compose the same pipeline — `parse` → `render` → `generatePagedCSS` + `generateDomCSS` + `generateFontLinks` (§5.1–§5.3) — with Paged.js as the single pagination engine. Because preview and export share the layout engine, the preview is the export by construction.
 
 - `dev-server.ts` — **live preview** (§6, §7.6). Serves the pipeline output to the browser wrapped with Paged.js for on-screen pagination, and pushes updates over a WebSocket whenever a watched book's `manuscript.md`/`metadata.json` changes.
-- `print-export.ts` — **print export** (§7.7). Takes the same Paged.js-paginated output, runs the imposition algorithm (§7.7) over the resulting page boxes to place them onto sheet-sized output pages, and produces the final file via the browser's print-to-PDF. Printing an already-paginated, sheet-sized document is a 1:1 operation — the browser adds no layout of its own.
+- `print-export.ts` — **print export** (§7.7). Prints the Paged.js document to `book.pdf` at trim size via headless Chrome, then imposes at the PDF level (pdf-lib) onto sheet-sized pages. Preview == export still holds: the pages are Paged.js's own, untouched.
 
 ---
 
@@ -1231,10 +1233,10 @@ Example: a 3.5in × 8.5in book page on US Legal (14in × 8.5in) gives *n* = 4 (c
 **Imposition algorithm (to be implemented in Plan 5, §9):**
 1. Take the total page count from the Paged.js-paginated document (§5.4); pad the final signature with blank pages up to a multiple of `folios-per-signature` × 4.
 2. For each signature of *F* folios (*P* = 4*F* local pages), assign pages to folios by the standard nesting mapping — folio *k* (1 = outermost) carries, on its front face, local pages [*P*−2*k*+2 | 2*k*−1] (left | right of the fold) and, on its back face, [2*k* | *P*−2*k*+1] — so that folding and nesting reconstructs reading order. (Check, *P* = 16: folio 1 is [16 | 1] front, [2 | 15] back.)
-3. Pack folios onto physical sheets, *n*/2 folios per sheet side by side. The back side's column order is horizontally mirrored relative to the front so that each page lands exactly behind its folio-mate under duplex printing (long-edge flip assumed).
+3. Pack folios onto physical sheets, *n*/2 folios per sheet side by side. Back-side layout follows `print.duplex`: `short-edge` (book-style turn on a landscape sheet) mirrors the folio column order with each `[2k | P−2k+1]` pair intact; `long-edge` (calendar-style turn) is that layout rotated 180° as a whole.
 4. Emit the final print file via `print-export.ts` (§5.4, §6) — one output page per sheet side, at the sheet's physical dimensions, with the already-paginated book pages positioned at their exact trim size.
 
-**Output:** a single print-ready file (PDF via the browser's print-to-PDF of the sheet-imposed, Paged.js-paginated DOM) that a user can send directly to a printer, confident that cutting and folding per the binding model reconstructs correct reading order.
+**Output:** one `sheets.pdf` (or `sheets-fronts.pdf` + `sheets-backs.pdf` for `duplex: none`), built by embedding `book.pdf` pages onto sheet-sized PDF pages; `--proof` emits numbered placeholders for a one-sheet printer check.
 
 ---
 

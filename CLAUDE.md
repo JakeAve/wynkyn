@@ -6,7 +6,7 @@ with `manuscript.md` (BML — semantic markup, spec §3 / `bml-spec-v06.md`),
 
 `book-renderer-spec.md` is the source of truth; when code and spec disagree, ask.
 Plans 0–4 are done (parser, live server, editor, config panel, sentinel styling).
-Plan 5 (print imposition/export, `server/print-export.ts`) is not built yet.
+Plan 5 is the `bml export` command (`server/print-export.ts`, `server/imposition.ts`, `server/pdf.ts`).
 
 ## Layout
 
@@ -24,11 +24,13 @@ Plan 5 (print imposition/export, `server/print-export.ts`) is not built yet.
 - `deno task bml new <slug>`             scaffold `books/<slug>/` from `templates/metadata.json` (house style)
 - `deno task bml check <book>`           parse diagnostics as `file:line: msg`; exit 1 on any — run after every manuscript edit
 - `deno task bml render <book> [out]`    standalone HTML (default `books/<book>/render.html`); open in a browser to paginate
+- `deno task bml export <book> [--proof] [--sheet S] [--folios N] [--duplex M]` → `books/<book>/export/`; needs Google Chrome installed
 
 ## Adding a book
 
 `deno task bml new <slug>`, put the source text at `books/<slug>/download.txt`, then the
 `convert-manuscript` skill (`.claude/skills/`) writes `manuscript.md`. Style afterwards in the app.
+Print: `bml export <slug> --proof` first on a new printer, check one signature by hand, then the real export.
 
 ## Conventions
 
