@@ -1,0 +1,216 @@
+{
+  "page": {
+    "size": "5.25in 8in",
+    "margins": {
+      "top": "18mm",
+      "bottom": "22mm",
+      "inside": "22mm",
+      "outside": "16mm"
+    }
+  },
+  "fonts": {
+    "body": "Crimson Pro",
+    "display": "Cormorant Garamond"
+  },
+  "elements": {
+    "body": {
+      "font-family": "body",
+      "font-size": "11pt",
+      "line-height": "1.5",
+      "text-align": "justify"
+    },
+    "em": {
+      "font-style": "italic"
+    },
+    "half-title": {
+      "title": {
+        "font-family": "display",
+        "font-size": "22pt",
+        "text-align": "center"
+      }
+    },
+    "title-page": {
+      "title": {
+        "font-family": "display",
+        "font-size": "26pt",
+        "text-align": "center"
+      },
+      "subtitle": {
+        "font-size": "13pt",
+        "font-style": "italic",
+        "text-align": "center"
+      },
+      "author": {
+        "font-size": "12pt",
+        "text-transform": "uppercase",
+        "letter-spacing": "0.08em",
+        "text-align": "center"
+      },
+      "edition": {
+        "font-size": "9pt",
+        "font-style": "italic",
+        "text-align": "center"
+      }
+    },
+    "toc": {
+      "title": {
+        "font-family": "display",
+        "font-size": "16pt",
+        "text-align": "center"
+      },
+      "entry": {
+        "font-size": "10pt"
+      }
+    },
+    "prose-matter": {
+      "title": {
+        "font-family": "display",
+        "font-size": "16pt",
+        "text-align": "center"
+      }
+    },
+    "dedication": {
+      "font-family": "display",
+      "font-size": "13pt",
+      "font-style": "italic",
+      "text-align": "center"
+    },
+    "chapter": {
+      "title": {
+        "font-family": "display",
+        "font-size": "15pt",
+        "text-align": "center",
+        "margin-top": "30pt",
+        "margin-bottom": "30pt"
+      },
+      "number": {
+        "font-size": "10pt",
+        "text-transform": "uppercase",
+        "letter-spacing": "0.08em",
+        "text-align": "center"
+      }
+    },
+    "heading": {
+      "font-size": "11pt",
+      "text-transform": "uppercase",
+      "letter-spacing": "0.06em",
+      "text-align": "center"
+    },
+    "subheading": {
+      "font-size": "11pt",
+      "font-style": "italic"
+    },
+    "epigraph": {
+      "text": {
+        "font-size": "9.5pt",
+        "font-style": "italic",
+        "margin-left": "15%"
+      },
+      "attribution": {
+        "font-size": "8.5pt",
+        "text-align": "right"
+      }
+    },
+    "dropcap": {
+      "font-family": "display",
+      "font-size": "3.4em",
+      "line-height": "0.82"
+    },
+    "break": {
+      "content": "•"
+    },
+    "pullquote": {
+      "font-size": "13pt",
+      "font-style": "italic",
+      "text-align": "center"
+    },
+    "quote": {
+      "font-size": "10pt",
+      "margin-left": "10mm",
+      "margin-right": "10mm"
+    },
+    "poem": {
+      "font-size": "10pt",
+      "margin-left": "15%"
+    },
+    "sidebar": {
+      "font-size": "9pt",
+      "border-left": "2pt solid #bbb",
+      "padding-left": "12pt"
+    },
+    "verses": {
+      "font-size": "10pt",
+      "number": {
+        "font-size": "7pt",
+        "vertical-align": "super"
+      }
+    },
+    "illustration": {
+      "caption": {
+        "font-size": "8.5pt",
+        "font-style": "italic",
+        "text-align": "center"
+      }
+    },
+    "footnote": {
+      "font-size": "8.5pt"
+    },
+    "colophon": {
+      "font-size": "9pt",
+      "text-align": "center"
+    }
+  },
+  "numbering": {
+    "chapters": {
+      "style": "roman-upper",
+      "show": true,
+      "prefix": "Stave ",
+      "suffix": ""
+    },
+    "pages": {
+      "front-matter": {
+        "style": "roman-lower",
+        "show": true
+      },
+      "body": {
+        "style": "arabic",
+        "show": true,
+        "css": {
+          "font-family": "body"
+        }
+      },
+      "back-matter": {
+        "style": "arabic",
+        "show": true
+      }
+    },
+    "parts": {
+      "style": "roman-upper"
+    }
+  },
+  "running": {
+    "odd": [
+      {
+        "content": "book-title",
+        "area": "top-right",
+        "font-size": "8pt",
+        "font-style": "italic"
+      }
+    ],
+    "even": [
+      {
+        "content": "chapter-title",
+        "area": "top-left",
+        "font-size": "8pt",
+        "font-style": "italic"
+      }
+    ]
+  },
+  "print": {
+    "sheet-size": "legal",
+    "folios-per-signature": 4
+  },
+  "notes": {
+    "placement": "endnote"
+  }
+}

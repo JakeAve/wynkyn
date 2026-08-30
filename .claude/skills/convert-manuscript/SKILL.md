@@ -61,4 +61,4 @@ em dashes from the source stay; don't normalise to ASCII.
 2. `grep -c '^{chapter' manuscript.md` equals the number of chapter headings actually present in the source (not the source TOC);
    `grep -c '^{dropcap}'` equals chapters + prose front-matter sections.
 3. `grep -n 'Gutenberg\|\*\*\* \|\[Illustration' manuscript.md` shows only the `{rights}` and `{printer}` lines.
-4. If `metadata.json` is missing, copy `books/a-christmas-carol/metadata.json` — styling is a separate job.
+4. If `metadata.json` is missing, `cp templates/metadata.json books/<slug>/` — styling is a separate job.
