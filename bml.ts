@@ -60,11 +60,11 @@ if (import.meta.main) {
         proof: a.proof,
         out: a.out,
       };
-      const duplex = opts.duplex ?? "short-edge";
-      if (opts.flip !== undefined && duplex !== "none") console.error(`note: --flip is ignored unless --duplex none`);
       if (opts.pages !== undefined && !opts.proof) console.error(`note: --pages is ignored unless --proof`);
-      if (opts.reverseBacks && duplex !== "none") console.error(`note: --reverse-backs is ignored unless --duplex none`);
       const s = await exportBook(BOOKS, book, opts);
+      // resolved.duplex includes metadata.print.duplex, which the flags alone can't see
+      if (opts.flip !== undefined && s.resolved.duplex !== "none") console.error(`note: --flip is ignored unless duplex is none`);
+      if (opts.reverseBacks && s.resolved.duplex !== "none") console.error(`note: --reverse-backs is ignored unless duplex is none`);
       if (s.diagnostics) console.error(`${s.diagnostics} parse diagnostic(s) — run: bml check ${book}`);
       console.log(formatSummary(book, s, s.resolved));
       for (const f of s.files) console.log(`wrote ${f}`);
