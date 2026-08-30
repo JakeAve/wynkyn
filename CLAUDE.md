@@ -1,0 +1,32 @@
+# book-editor-app
+
+Web app for editing and printing hand-bound books. A book is `books/<slug>/`
+with `manuscript.md` (BML — semantic markup, spec §3 / `bml-spec-v06.md`),
+`metadata.json` (all styling, spec §4), and `images/`. `books/` is gitignored.
+
+`book-renderer-spec.md` is the source of truth; when code and spec disagree, ask.
+Plans 0–4 are done (parser, live server, editor, config panel, sentinel styling).
+Plan 5 (print imposition/export, `server/print-export.ts`) is not built yet.
+
+## Layout
+
+- `parser/`   BML → `BmlDocument` tree (pure, `parse(source)`)
+- `metadata/` metadata.json → CSS (`generateDomCSS/PagedCSS/FontLinks`)
+- `renderer/` tree → HTML body (`render(doc, opts)`), `base.css`
+- `server/`   `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket, watches book files)
+- `web/`      browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored). Paged.js paginates the preview.
+
+## Commands
+
+- `deno task test`                       all tests (`*_test.ts` next to each module)
+- `deno task dev`                        build client + live server at http://localhost:8000
+- `deno task bml list`                   books on disk
+- `deno task bml check <book>`           parse diagnostics as `file:line: msg`; exit 1 on any — run after every manuscript edit
+- `deno task bml render <book> [out]`    standalone HTML (default `books/<book>/render.html`); open in a browser to paginate
+
+## Conventions
+
+- Deno only, strict TS, `noUncheckedIndexedAccess`. No new deps without reason.
+- Tests are plain `Deno.test` with `jsr:@std/assert`. Fixture book: `server/testdata/demo-book`.
+- Sample manuscripts start from Project Gutenberg `download.txt` in the book dir; strip the Gutenberg header/footer, never leave it in `manuscript.md`.
+- Commit messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.
