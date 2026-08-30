@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals, assertRejects } from "jsr:@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { impose, parseDims } from "./imposition.ts";
 import { buildSheetPdf, exportBook, formatSummary, sidesFor } from "./print-export.ts";
@@ -49,8 +49,76 @@ Deno.test("exportBook --proof: writes sheets.pdf sized to the sheet, one signatu
 Deno.test("exportBook --proof --duplex none: fronts and backs files", async () => {
   const out = await Deno.makeTempDir();
   const s = await exportBook(ROOT, "demo-book", { proof: true, folios: 1, sheet: "legal", duplex: "none", pages: 9, out });
+  // folios 1, pages 9 → 12 padded → 3 signatures × 1 sheet each → 3 fronts, 3 backs.
   assertEquals(s.imposition.paddedCount, 12);
   assertEquals(s.files, [`${out}/sheets-fronts.pdf`, `${out}/sheets-backs.pdf`]);
+  const fronts = await PDFDocument.load(await Deno.readFile(`${out}/sheets-fronts.pdf`));
+  const backs = await PDFDocument.load(await Deno.readFile(`${out}/sheets-backs.pdf`));
+  assertEquals(fronts.getPageCount(), 3);
+  assertEquals(backs.getPageCount(), 3);
+});
+
+Deno.test("exportBook: rejects a folios value that isn't a whole number ≥ 1", async () => {
+  const out = await Deno.makeTempDir();
+  await assertRejects(
+    () => exportBook(ROOT, "demo-book", { proof: true, folios: 0, sheet: "legal", out }),
+    Error,
+    "folios-per-signature must be a whole number ≥ 1 (got 0)",
+  );
+});
+
+Deno.test("exportBook: rejects a non-integer pages value", async () => {
+  const out = await Deno.makeTempDir();
+  await assertRejects(
+    () => exportBook(ROOT, "demo-book", { proof: true, pages: 2.5, sheet: "legal", out }),
+    Error,
+    "pages must be a whole number ≥ 1 (got 2.5)",
+  );
+});
+
+Deno.test("exportBook: rejects an unrecognized duplex value", async () => {
+  const out = await Deno.makeTempDir();
+  await assertRejects(
+    // deno-lint-ignore no-explicit-any
+    () => exportBook(ROOT, "demo-book", { proof: true, duplex: "banana" as any, sheet: "legal", out }),
+    Error,
+    'duplex must be short-edge, long-edge, or none (got "banana")',
+  );
+});
+
+Deno.test("exportBook: rejects an unrecognized flip value", async () => {
+  const out = await Deno.makeTempDir();
+  await assertRejects(
+    // deno-lint-ignore no-explicit-any
+    () => exportBook(ROOT, "demo-book", { proof: true, flip: "banana" as any, sheet: "legal", out }),
+    Error,
+    'flip must be short-edge or long-edge (got "banana")',
+  );
+});
+
+Deno.test("exportBook: rejects a nonexistent book before writing anything", async () => {
+  const out = await Deno.makeTempDir();
+  await assertRejects(
+    () => exportBook(ROOT, "no-such-book", { proof: true, out }),
+    Error,
+    "no such book: no-such-book",
+  );
+  const entries = [];
+  for await (const e of Deno.readDir(out)) entries.push(e.name);
+  assertEquals(entries, []); // exportBook must not have written into `out` either
+});
+
+Deno.test("exportBook: falls back to metadata.json's print section when no flags are given", async () => {
+  const root = await Deno.makeTempDir();
+  const bookDir = `${root}/book`;
+  await Deno.mkdir(bookDir, { recursive: true });
+  await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
+  await Deno.writeTextFile(
+    `${bookDir}/metadata.json`,
+    JSON.stringify({ print: { "sheet-size": "legal", "folios-per-signature": 2, duplex: "long-edge" } }),
+  );
+  const s = await exportBook(root, "book", { proof: true });
+  assertEquals(s.resolved, { sheet: "legal", duplex: "long-edge", folios: 2 });
 });
 
 Deno.test("formatSummary is one line plus a waste warning when relevant", () => {

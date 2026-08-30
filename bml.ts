@@ -18,8 +18,15 @@ export function formatDiagnostics(book: string, diags: { line: number; message: 
 
 if (import.meta.main) {
   const a = parseArgs(Deno.args, {
-    string: ["sheet", "duplex", "flip", "out"],
+    string: ["sheet", "duplex", "flip", "out", "folios", "pages"],
     boolean: ["proof", "reverse-backs"],
+    unknown: (arg, key) => {
+      if (key !== undefined) {
+        console.error(`unknown flag --${key}`);
+        Deno.exit(2);
+      }
+      return true;
+    },
   });
   const [cmd, book, out] = a._.map(String);
   if (cmd === "list") {

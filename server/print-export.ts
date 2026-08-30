@@ -102,15 +102,34 @@ function assertWholeNumber(value: number, label: string): void {
   }
 }
 
+const DUPLEX_VALUES = ["short-edge", "long-edge", "none"] as const;
+const FLIP_VALUES = ["short-edge", "long-edge"] as const;
+
+function assertOneOf<T extends string>(value: T, allowed: readonly T[], label: string): void {
+  if (!allowed.includes(value)) {
+    const list = allowed.length > 2
+      ? `${allowed.slice(0, -1).join(", ")}, or ${allowed[allowed.length - 1]}`
+      : allowed.join(" or ");
+    throw new Error(`${label} must be ${list} (got ${JSON.stringify(value)})`);
+  }
+}
+
 export async function exportBook(booksRoot: string, book: string, opts: ExportOptions): Promise<ExportSummary> {
   const bookDir = `${booksRoot}/${book}`;
+  try {
+    await Deno.stat(`${bookDir}/manuscript.md`);
+  } catch {
+    throw new Error(`no such book: ${book}`);
+  }
   const meta = (await loadMetadata(bookDir)) ?? {};
   const folios = opts.folios ?? meta.print?.["folios-per-signature"] ?? 4;
   assertWholeNumber(folios, "folios-per-signature");
   if (opts.pages !== undefined) assertWholeNumber(opts.pages, "pages");
   const sheetName = opts.sheet ?? meta.print?.["sheet-size"] ?? "letter";
   const duplex = opts.duplex ?? meta.print?.duplex ?? "short-edge";
+  assertOneOf(duplex, DUPLEX_VALUES, "duplex");
   const flip = opts.flip ?? "short-edge";
+  assertOneOf(flip, FLIP_VALUES, "flip");
   const page = parseDims(meta.page?.size ?? "5.5in 8.5in");
   const sheet = parseDims(sheetName);
   const out = opts.out ?? `${bookDir}/export`;
@@ -150,7 +169,7 @@ export async function exportBook(booksRoot: string, book: string, opts: ExportOp
 
 export function formatSummary(book: string, s: ExportSummary, cfg: { sheet: string; duplex: string }): string {
   const i = s.imposition;
-  const folios = i.paddedCount / i.signatures / 4;
+  const folios = s.resolved.folios;
   const lines = [
     `${book}: ${s.pageCount} pages → ${i.paddedCount} padded · ${i.signatures} signature${i.signatures === 1 ? "" : "s"} × ${folios} folios · ${i.nUp}-up on ${cfg.sheet} · ${i.sheets.length} sheets · duplex ${cfg.duplex}`,
   ];
