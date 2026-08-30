@@ -76,16 +76,13 @@
   color: inherit;
 }
 
-/* Paged.js marks elements it splits across pages with
-   data-align-last-split-element and sets text-align-last: justify on them —
-   meant for the split paragraph's last line, but the property inherits, so a
-   split .bml container leaks it onto every heading. Reset descendants; keep it
-   on the split element itself. */
-.bml [data-align-last-split-element="justify"] > * {
+/* Paged.js stamps data-align-last-split-element="justify" on the deepest
+   element continued from the previous page and sets text-align-last: justify
+   on it. After a forced page break that element is a container (.bml, .zone),
+   not a paragraph, and the property inherits into every intact <p> below it
+   (docs/pagedjs-justify-leak.md). Only honor the mark on a real paragraph. */
+[data-align-last-split-element="justify"]:not(p) {
   text-align-last: auto;
-}
-.bml [data-align-last-split-element="justify"] {
-  text-align-last: justify;
 }
 /* TOC: title left, page number right (number comes from ::after in paged CSS). */
 .bml .toc a.entry {
