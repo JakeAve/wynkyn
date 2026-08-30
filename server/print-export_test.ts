@@ -1,7 +1,7 @@
 import { assertEquals } from "jsr:@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { impose, parseDims } from "./imposition.ts";
-import { buildSheetPdf, sidesFor } from "./print-export.ts";
+import { buildSheetPdf, exportBook, formatSummary, sidesFor } from "./print-export.ts";
 
 const geom = { sheet: parseDims("legal"), page: { w: 3.5, h: 8.5 }, nUp: 4 };
 const imp = impose(8, { folios: 2, sheet: geom.sheet, page: geom.page, duplex: "short-edge", flip: "short-edge" });
@@ -31,4 +31,31 @@ Deno.test("buildSheetPdf: embeds real pages from a source PDF", async () => {
   const doc = await PDFDocument.load(bytes);
   assertEquals(doc.getPageCount(), 2);
   assertEquals(doc.getPage(1).getSize().width, 14 * 72);
+});
+
+const ROOT = new URL("./testdata", import.meta.url).pathname;
+
+Deno.test("exportBook --proof: writes sheets.pdf sized to the sheet, one signature by default", async () => {
+  const out = await Deno.makeTempDir();
+  // demo-book is 5.5×8.5in → 2-up on legal: 2 folios = 2 sheets = 4 sides.
+  const s = await exportBook(ROOT, "demo-book", { proof: true, folios: 2, sheet: "legal", duplex: "short-edge", out });
+  assertEquals(s.pageCount, 8);
+  assertEquals(s.imposition.nUp, 2);
+  assertEquals(s.files, [`${out}/sheets.pdf`]);
+  const doc = await PDFDocument.load(await Deno.readFile(`${out}/sheets.pdf`));
+  assertEquals(doc.getPageCount(), 4);
+});
+
+Deno.test("exportBook --proof --duplex none: fronts and backs files", async () => {
+  const out = await Deno.makeTempDir();
+  const s = await exportBook(ROOT, "demo-book", { proof: true, folios: 1, sheet: "legal", duplex: "none", pages: 9, out });
+  assertEquals(s.imposition.paddedCount, 12);
+  assertEquals(s.files, [`${out}/sheets-fronts.pdf`, `${out}/sheets-backs.pdf`]);
+});
+
+Deno.test("formatSummary is one line plus a waste warning when relevant", () => {
+  const imp = impose(12, { folios: 3, sheet: parseDims("legal"), page: { w: 3.5, h: 8.5 }, duplex: "short-edge", flip: "short-edge" });
+  const text = formatSummary("demo", { pageCount: 12, imposition: imp, files: [], diagnostics: 0, resolved: { sheet: "legal", duplex: "short-edge", folios: 3 } }, { sheet: "legal", duplex: "short-edge" });
+  assertEquals(text.split("\n")[0], "demo: 12 pages → 12 padded · 1 signature × 3 folios · 4-up on legal · 2 sheets · duplex short-edge");
+  assertEquals(text.split("\n")[1], "warning: 1 blank folio slot per signature (cut half is waste)");
 });

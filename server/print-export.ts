@@ -1,6 +1,9 @@
 // server/print-export.ts — sheet PDFs from an Imposition (spec §7.7, design §2 step 4).
 import { degrees, PDFDocument, type PDFEmbeddedPage, type PDFPage, rgb, StandardFonts } from "pdf-lib";
-import type { Dims, Imposition, Slot } from "./imposition.ts";
+import { type Dims, type Flip, impose, type Imposition, parseDims, type Slot } from "./imposition.ts";
+import { loadMetadata } from "../metadata/loader.ts";
+import { buildBook, toHtml } from "./pipeline.ts";
+import { renderPdf } from "./pdf.ts";
 
 const PT = 72; // points per inch
 
@@ -72,4 +75,87 @@ export async function buildSheetPdf(sides: Side[], geom: SheetGeometry, source: 
     side.slots.forEach((slot, i) => drawSlot(page, slot, i, side.label));
   }
   return await out.save();
+}
+
+export interface ExportOptions {
+  folios?: number;
+  sheet?: string;
+  duplex?: Flip | "none";
+  flip?: Flip;
+  reverseBacks?: boolean;
+  proof?: boolean;
+  pages?: number; // proof only
+  out?: string;
+}
+
+export interface ExportSummary {
+  pageCount: number;
+  imposition: Imposition;
+  files: string[];
+  diagnostics: number;
+  resolved: { sheet: string; duplex: string; folios: number };
+}
+
+function assertWholeNumber(value: number, label: string): void {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${label} must be a whole number ≥ 1 (got ${value})`);
+  }
+}
+
+export async function exportBook(booksRoot: string, book: string, opts: ExportOptions): Promise<ExportSummary> {
+  const bookDir = `${booksRoot}/${book}`;
+  const meta = (await loadMetadata(bookDir)) ?? {};
+  const folios = opts.folios ?? meta.print?.["folios-per-signature"] ?? 4;
+  assertWholeNumber(folios, "folios-per-signature");
+  if (opts.pages !== undefined) assertWholeNumber(opts.pages, "pages");
+  const sheetName = opts.sheet ?? meta.print?.["sheet-size"] ?? "letter";
+  const duplex = opts.duplex ?? meta.print?.duplex ?? "short-edge";
+  const flip = opts.flip ?? "short-edge";
+  const page = parseDims(meta.page?.size ?? "5.5in 8.5in");
+  const sheet = parseDims(sheetName);
+  const out = opts.out ?? `${bookDir}/export`;
+  await Deno.mkdir(out, { recursive: true });
+
+  let source: Uint8Array | null = null;
+  let pageCount: number;
+  let diagnostics = 0;
+  const files: string[] = [];
+  if (opts.proof) {
+    pageCount = opts.pages ?? 4 * folios;
+  } else {
+    const imagesDir = `file://${await Deno.realPath(bookDir)}/images`;
+    const built = await buildBook(booksRoot, book, imagesDir);
+    diagnostics = built.diagnostics.length;
+    source = await renderPdf(toHtml(built));
+    pageCount = (await PDFDocument.load(source)).getPageCount();
+    await Deno.writeFile(`${out}/book.pdf`, source);
+    files.push(`${out}/book.pdf`);
+  }
+
+  const imposition = impose(pageCount, { folios, sheet, page, duplex, flip });
+  const geom: SheetGeometry = { sheet, page, nUp: imposition.nUp };
+  if (duplex === "none") {
+    for (const [name, mode] of [["sheets-fronts.pdf", "fronts"], ["sheets-backs.pdf", "backs"]] as const) {
+      const path = `${out}/${name}`;
+      await Deno.writeFile(path, await buildSheetPdf(sidesFor(imposition, mode, opts.reverseBacks ?? false), geom, source));
+      files.push(path);
+    }
+  } else {
+    const path = `${out}/sheets.pdf`;
+    await Deno.writeFile(path, await buildSheetPdf(sidesFor(imposition, "duplex", false), geom, source));
+    files.push(path);
+  }
+  return { pageCount, imposition, files, diagnostics, resolved: { sheet: sheetName, duplex, folios } };
+}
+
+export function formatSummary(book: string, s: ExportSummary, cfg: { sheet: string; duplex: string }): string {
+  const i = s.imposition;
+  const folios = i.paddedCount / i.signatures / 4;
+  const lines = [
+    `${book}: ${s.pageCount} pages → ${i.paddedCount} padded · ${i.signatures} signature${i.signatures === 1 ? "" : "s"} × ${folios} folios · ${i.nUp}-up on ${cfg.sheet} · ${i.sheets.length} sheets · duplex ${cfg.duplex}`,
+  ];
+  if (i.wastedFolioSlots > 0) {
+    lines.push(`warning: ${i.wastedFolioSlots} blank folio slot${i.wastedFolioSlots === 1 ? "" : "s"} per signature (cut half is waste)`);
+  }
+  return lines.join("\n");
 }

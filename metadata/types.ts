@@ -64,6 +64,7 @@ export interface Running {
 export interface PrintConfig {
   "sheet-size"?: string;
   "folios-per-signature"?: number;
+  duplex?: "short-edge" | "long-edge" | "none";
 }
 
 export interface NotesConfig {

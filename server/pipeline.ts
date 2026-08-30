@@ -27,6 +27,15 @@ export interface BuildResult {
   diagnostics: Diagnostic[];
 }
 
+export function toHtml(b: BuildResult): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${b.bookTitle}</title>
+${b.fontLinks}
+<style>${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
+<script>window.PagedConfig = { after() { document.documentElement.dataset.paged = "done"; } };</script>
+<script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js"></script>
+</head><body>${b.html}</body></html>`;
+}
+
 export async function listBooks(booksRoot: string): Promise<string[]> {
   const books: string[] = [];
   for await (const e of Deno.readDir(booksRoot)) {

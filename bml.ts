@@ -3,25 +3,25 @@
 //   deno task bml render <book> [out.html] → standalone HTML (Paged.js polyfill paginates on open)
 //   deno task bml list
 //   deno task bml new <slug>              → books/<slug>/ from templates/ (house-style metadata.json)
-import { buildBook, listBooks } from "./server/pipeline.ts";
+//   deno task bml export <book> [--sheet S] [--folios N] [--duplex short-edge|long-edge|none]
+//                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir]
+import { parseArgs } from "@std/cli/parse-args";
+import { buildBook, listBooks, toHtml } from "./server/pipeline.ts";
+
+export { toHtml } from "./server/pipeline.ts";
 
 const BOOKS = "books";
-
-export function toHtml(b: Awaited<ReturnType<typeof buildBook>>): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${b.bookTitle}</title>
-${b.fontLinks}
-<style>${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
-<script>window.PagedConfig = { after() { document.documentElement.dataset.paged = "done"; } };</script>
-<script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js"></script>
-</head><body>${b.html}</body></html>`;
-}
 
 export function formatDiagnostics(book: string, diags: { line: number; message: string }[]): string {
   return diags.map((d) => `${BOOKS}/${book}/manuscript.md:${d.line}: ${d.message}`).join("\n");
 }
 
 if (import.meta.main) {
-  const [cmd, book, out] = Deno.args;
+  const a = parseArgs(Deno.args, {
+    string: ["sheet", "duplex", "flip", "out"],
+    boolean: ["proof", "reverse-backs"],
+  });
+  const [cmd, book, out] = a._.map(String);
   if (cmd === "list") {
     console.log((await listBooks(BOOKS)).join("\n"));
   } else if (cmd === "new" && book) {
@@ -40,8 +40,30 @@ if (import.meta.main) {
     const path = out ?? `${BOOKS}/${book}/render.html`;
     await Deno.writeTextFile(path, toHtml(b));
     console.log(`wrote ${path}`);
+  } else if (cmd === "export" && book) {
+    const { exportBook, formatSummary } = await import("./server/print-export.ts");
+    try {
+      const s = await exportBook(BOOKS, book, {
+        folios: a.folios !== undefined ? Number(a.folios) : undefined,
+        pages: a.pages !== undefined ? Number(a.pages) : undefined,
+        sheet: a.sheet,
+        duplex: a.duplex as "short-edge" | "long-edge" | "none" | undefined,
+        flip: a.flip as "short-edge" | "long-edge" | undefined,
+        reverseBacks: a["reverse-backs"],
+        proof: a.proof,
+        out: a.out,
+      });
+      if (s.diagnostics) console.error(`${s.diagnostics} parse diagnostic(s) — run: bml check ${book}`);
+      console.log(formatSummary(book, s, s.resolved));
+      for (const f of s.files) console.log(`wrote ${f}`);
+    } catch (e) {
+      console.error(`export failed: ${(e as Error).message}`);
+      Deno.exit(1);
+    }
   } else {
-    console.error("usage: bml list | new <slug> | check <book> | render <book> [out.html]");
+    console.error(
+      "usage: bml list | new <slug> | check <book> | render <book> [out.html] | export <book> [--sheet S] [--folios N] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir]",
+    );
     Deno.exit(2);
   }
 }

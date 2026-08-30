@@ -1,8 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { renderPdf } from "./pdf.ts";
-import { buildBook } from "./pipeline.ts";
-import { toHtml } from "../bml.ts";
+import { buildBook, toHtml } from "./pipeline.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;
 const hasChrome = await Deno.stat("/Applications/Google Chrome.app").then(() => true, () => false);
