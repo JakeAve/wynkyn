@@ -47,6 +47,13 @@ Deno.test("impose: spec §7.7 check — 4 folios, 16 pages, 2-up", () => {
   assertEquals(pages(r.sheets[3]!.back), [8, 9]);
 });
 
+Deno.test("impose: sig > 0 && sheet > 0 — second signature's second sheet", () => {
+  const r = impose(32, { ...base, folios: 4 });
+  assertEquals(r.sheets[5]!.signature, 1);
+  assertEquals(pages(r.sheets[5]!.front), [30, 19]);
+  assertEquals(pages(r.sheets[5]!.back), [20, 29]);
+});
+
 Deno.test("impose: 2 folios on a 4-up sheet → one sheet, mirrored back", () => {
   const r = impose(8, { ...base, folios: 2, page: { w: 3.5, h: 8.5 } });
   assertEquals(r.nUp, 4);

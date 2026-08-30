@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "jsr:@std/assert";
-import { PDFDocument } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFPage, PDFStream } from "pdf-lib";
 import { impose, parseDims } from "./imposition.ts";
 import { buildSheetPdf, exportBook, formatSummary, sidesFor } from "./print-export.ts";
 
@@ -119,6 +119,58 @@ Deno.test("exportBook: falls back to metadata.json's print section when no flags
   );
   const s = await exportBook(root, "book", { proof: true });
   assertEquals(s.resolved, { sheet: "legal", duplex: "long-edge", folios: 2 });
+});
+
+// Reads the /BBox height of each embedded-page XObject on `page`, in the order pdf-lib
+// listed them in the page's /Resources /XObject dict — which is the order buildSheetPdf's
+// drawSlot calls drew them in, since PDFDict preserves insertion order. Each source page in
+// the test below has a distinct height (100 + i), so the BBox height identifies which source
+// page landed in which slot without having to parse the content stream's `Do` operators.
+function xobjectHeightsInOrder(page: PDFPage): number[] {
+  const resources = page.node.Resources();
+  if (!resources) return [];
+  const xobjects = resources.lookup(PDFName.of("XObject"), PDFDict);
+  return xobjects.keys().map((name) => {
+    const form = xobjects.lookup(name, PDFStream);
+    const bbox = form.dict.lookup(PDFName.of("BBox"));
+    // deno-lint-ignore no-explicit-any
+    const height = (bbox as any).asArray()[3].asNumber();
+    return height as number;
+  });
+}
+
+Deno.test("buildSheetPdf: draws embedded pages in slot order (spec §7.7 4-up example)", async () => {
+  // Source: 8 pages, each with a distinct height (100 + i) so we can tell them apart by BBox.
+  const src = await PDFDocument.create();
+  for (let i = 0; i < 8; i++) {
+    src.addPage([50, 100 + i]).drawText(String(i + 1), { x: 5, y: 5, size: 8 });
+  }
+  const bytes = await buildSheetPdf(sidesFor(imp, "duplex", false), geom, await src.save());
+  const doc = await PDFDocument.load(bytes);
+  const toPageNumbers = (heights: number[]) => heights.map((h) => h - 100 + 1); // 1-based source page
+  assertEquals(toPageNumbers(xobjectHeightsInOrder(doc.getPage(0))), [8, 1, 6, 3]); // front
+  assertEquals(toPageNumbers(xobjectHeightsInOrder(doc.getPage(1))), [4, 5, 2, 7]); // back
+});
+
+Deno.test("exportBook: trim size comes from book.pdf, not metadata.page.size", async () => {
+  const root = await Deno.makeTempDir();
+  const bookDir = `${root}/book`;
+  await Deno.mkdir(`${bookDir}/images`, { recursive: true });
+  await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
+  await Deno.writeTextFile(`${bookDir}/metadata.json`, JSON.stringify({})); // no page.size at all
+  const out = await Deno.makeTempDir();
+
+  // Stub renderer: no Chrome — 4 Letter-size (8.5×11in) pages instead of the demo's 5.5×8.5in.
+  const render = async () => {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < 4; i++) doc.addPage([612, 792]).drawText(String(i + 1), { x: 20, y: 20, size: 12 }); // 8.5×11in in points
+    return await doc.save();
+  };
+
+  const s = await exportBook(root, "book", { proof: false, sheet: "tabloid", duplex: "short-edge", out, render });
+  assertEquals(s.pageCount, 4);
+  assertEquals(s.imposition.nUp, 2); // 8.5×11in pages, 2-up on tabloid (only fits at Letter size, not the 5.5×8.5in default)
+  await Deno.stat(`${out}/book.pdf`);
 });
 
 Deno.test("formatSummary is one line plus a waste warning when relevant", () => {

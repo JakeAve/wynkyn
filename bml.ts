@@ -50,7 +50,7 @@ if (import.meta.main) {
   } else if (cmd === "export" && book) {
     const { exportBook, formatSummary } = await import("./server/print-export.ts");
     try {
-      const s = await exportBook(BOOKS, book, {
+      const opts = {
         folios: a.folios !== undefined ? Number(a.folios) : undefined,
         pages: a.pages !== undefined ? Number(a.pages) : undefined,
         sheet: a.sheet,
@@ -59,7 +59,12 @@ if (import.meta.main) {
         reverseBacks: a["reverse-backs"],
         proof: a.proof,
         out: a.out,
-      });
+      };
+      const duplex = opts.duplex ?? "short-edge";
+      if (opts.flip !== undefined && duplex !== "none") console.error(`note: --flip is ignored unless --duplex none`);
+      if (opts.pages !== undefined && !opts.proof) console.error(`note: --pages is ignored unless --proof`);
+      if (opts.reverseBacks && duplex !== "none") console.error(`note: --reverse-backs is ignored unless --duplex none`);
+      const s = await exportBook(BOOKS, book, opts);
       if (s.diagnostics) console.error(`${s.diagnostics} parse diagnostic(s) — run: bml check ${book}`);
       console.log(formatSummary(book, s, s.resolved));
       for (const f of s.files) console.log(`wrote ${f}`);

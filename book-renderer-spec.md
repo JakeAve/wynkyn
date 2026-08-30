@@ -1230,7 +1230,7 @@ The one subsystem with no analogue in §5's other modules — a new algorithm, n
 
 Example: a 3.5in × 8.5in book page on US Legal (14in × 8.5in) gives *n* = 4 (cut + fold, 8 pages per duplex sheet); a 5.5in × 8.5in page on the same sheet gives *n* = 2 (fold only, 4 pages per sheet).
 
-**Imposition algorithm (to be implemented in Plan 5, §9):**
+**Imposition algorithm (`server/imposition.ts`, Plan 5):**
 1. Take the total page count from the Paged.js-paginated document (§5.4); pad the final signature with blank pages up to a multiple of `folios-per-signature` × 4.
 2. For each signature of *F* folios (*P* = 4*F* local pages), assign pages to folios by the standard nesting mapping — folio *k* (1 = outermost) carries, on its front face, local pages [*P*−2*k*+2 | 2*k*−1] (left | right of the fold) and, on its back face, [2*k* | *P*−2*k*+1] — so that folding and nesting reconstructs reading order. (Check, *P* = 16: folio 1 is [16 | 1] front, [2 | 15] back.)
 3. Pack folios onto physical sheets, *n*/2 folios per sheet side by side. Back-side layout follows `print.duplex`: `short-edge` (book-style turn on a landscape sheet) mirrors the folio column order with each `[2k | P−2k+1]` pair intact; `long-edge` (calendar-style turn) is that layout rotated 180° as a whole.

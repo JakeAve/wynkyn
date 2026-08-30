@@ -67,7 +67,10 @@ export async function buildSheetPdf(sides: Side[], geom: SheetGeometry, source: 
     const num = String(slot.page + 1);
     const size = 72;
     page.drawText(num, { x: x + pw / 2 - font.widthOfTextAtSize(num, size) / 2, y: y + ph / 2 - size / 3, size, font, ...(slot.rotate === 180 ? { rotate: degrees(180), x: x + pw / 2 + font.widthOfTextAtSize(num, size) / 2, y: y + ph / 2 + size / 3 } : {}) });
-    page.drawText(`${label} · folio ${slot.folio}`, { x: x + 8, y: y + 8, size: 8, font });
+    const caption = `${label} · folio ${slot.folio}`;
+    page.drawText(caption, slot.rotate === 180
+      ? { x: x + pw - 8, y: y + ph - 8, size: 8, font, rotate: degrees(180) }
+      : { x: x + 8, y: y + 8, size: 8, font });
   };
 
   for (const side of sides) {
@@ -86,6 +89,8 @@ export interface ExportOptions {
   proof?: boolean;
   pages?: number; // proof only
   out?: string;
+  /** Test seam: swap the Chrome-based renderer for a stub that returns pdf-lib bytes directly. */
+  render?: (html: string) => Promise<Uint8Array>;
 }
 
 export interface ExportSummary {
@@ -130,23 +135,28 @@ export async function exportBook(booksRoot: string, book: string, opts: ExportOp
   assertOneOf(duplex, DUPLEX_VALUES, "duplex");
   const flip = opts.flip ?? "short-edge";
   assertOneOf(flip, FLIP_VALUES, "flip");
-  const page = parseDims(meta.page?.size ?? "5.5in 8.5in");
   const sheet = parseDims(sheetName);
   const out = opts.out ?? `${bookDir}/export`;
   await Deno.mkdir(out, { recursive: true });
 
   let source: Uint8Array | null = null;
+  let page: Dims;
   let pageCount: number;
   let diagnostics = 0;
   const files: string[] = [];
   if (opts.proof) {
+    // No PDF exists yet to measure — fall back to the metadata-declared trim size.
+    page = parseDims(meta.page?.size ?? "5.5in 8.5in");
     pageCount = opts.pages ?? 4 * folios;
   } else {
     const imagesDir = `file://${await Deno.realPath(bookDir)}/images`;
     const built = await buildBook(booksRoot, book, imagesDir);
     diagnostics = built.diagnostics.length;
-    source = await renderPdf(toHtml(built));
-    pageCount = (await PDFDocument.load(source)).getPageCount();
+    source = await (opts.render ?? renderPdf)(toHtml(built));
+    const src = await PDFDocument.load(source);
+    pageCount = src.getPageCount();
+    const { width, height } = src.getPage(0).getSize();
+    page = { w: width / PT, h: height / PT }; // trim size comes from the rendered PDF, not metadata
     await Deno.writeFile(`${out}/book.pdf`, source);
     files.push(`${out}/book.pdf`);
   }
