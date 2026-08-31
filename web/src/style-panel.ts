@@ -16,6 +16,7 @@ const OTHER = "__other";
 const COMMON_PROPS = [
   ...CURATED_PROPS, "line-height", "color", "text-indent", "margin-left", "margin-right",
   "padding-left", "border-left", "border-bottom", "content", "vertical-align", "word-spacing",
+  "display", "order", "opacity", "font-variant", "width",
 ];
 
 export function buildStyleSection(

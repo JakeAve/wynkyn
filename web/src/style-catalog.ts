@@ -23,7 +23,10 @@ const ELEMENTS: Array<[string, string, string[]]> = [
   ["Title page", "title-page", ["title", "subtitle", "author", "edition", "epigraph", "imprint"]],
   ["Copyright", "copyright", ["copyright-line", "rights", "isbn", "edition"]],
   ["Dedication", "dedication", []],
-  ["Contents", "toc", ["title", "entry"]],
+  ["Contents", "toc", [
+    "title", "entry", "label", "number", "subtitle", "leader", "page",
+    "toc-front", "toc-part", "toc-chapter", "toc-heading", "toc-back",
+  ]],
   ["Foreword / preface / introduction", "prose-matter", ["title"]],
   ["Part", "part", ["title", "number"]],
   ["Chapter", "chapter", ["title", "number"]],
@@ -46,12 +49,25 @@ function titleCase(s: string): string {
   return s.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
+const LABELS: Record<string, string> = {
+  page: "Page number",
+  "toc-front": "Front matter rows",
+  "toc-part": "Part rows",
+  "toc-chapter": "Chapter rows",
+  "toc-heading": "Heading rows",
+  "toc-back": "Back matter rows",
+};
+
+function labelFor(sub: string): string {
+  return LABELS[sub] ?? titleCase(sub);
+}
+
 const STATIC_CATALOG: StyleEntry[] = ELEMENTS.flatMap(([group, type, subs]) =>
   subs.length
     ? subs.map((sub) => ({
       key: `${type}.${sub}`,
       group,
-      label: titleCase(sub),
+      label: labelFor(sub),
       path: ["elements", type, sub],
       section: "elements" as const,
       selector: `${selectorFor(type)} .${sub}`,
@@ -76,6 +92,20 @@ const PAGE_NUMBERS: StyleEntry[] = ZONES.map(([zone, name]) => ({
   selector: `.pagedjs_${name}_page .pagedjs_margin-bottom-center`,
 }));
 
+// Per-level spans inside the contents: part and chapter rows get their own
+// number/label/page entries so "Book One" can be small caps while the part
+// title is italic (spec §4.5 recipes).
+const TOC_NESTED: StyleEntry[] = (["toc-part", "toc-chapter"] as const).flatMap((level) =>
+  (["number", "label", "page"] as const).map((sub) => ({
+    key: `toc.${level}.${sub}`,
+    group: "Contents",
+    label: `${level === "toc-part" ? "Part" : "Chapter"} ${labelFor(sub).toLowerCase()}`,
+    path: ["elements", "toc", level, sub],
+    section: "elements" as const,
+    selector: `.matter-toc .${level} .${sub}`,
+  }))
+);
+
 export function catalogFor(metadata: Metadata): StyleEntry[] {
   const is = Object.keys(metadata.is ?? {}).map((name): StyleEntry => ({
     key: `is.${name}`,
@@ -85,7 +115,7 @@ export function catalogFor(metadata: Metadata): StyleEntry[] {
     section: "is",
     selector: `.is-${name}`,
   }));
-  return [...STATIC_CATALOG, ...PAGE_NUMBERS, ...is];
+  return [...STATIC_CATALOG, ...TOC_NESTED, ...PAGE_NUMBERS, ...is];
 }
 
 // `chain[0]` is the clicked node's classes, `chain[n]` its n-th ancestor's.

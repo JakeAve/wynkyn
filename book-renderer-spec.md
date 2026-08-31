@@ -1209,6 +1209,7 @@ A visual layer over the *existing* `metadata.json` schema (§4) — no new file 
 
 The panel exposes the selector model already implicit in `elements`/`is` (§4.5, §4.6):
 - **By type** — every sentinel of this kind (e.g. all `{chapter:}` titles) → writes to `elements.chapter.title`.
+  Nested sub-elements (§4.5) are their own entries — the Contents group lists part and chapter `number`/`label`/`page` separately — and a preview click resolves to the deepest matching selector, so clicking a part number in the contents opens `elements.toc.toc-part.number`.
 - **By slug** — every sentinel sharing this slug (e.g. every `{is: handwritten-letter}`) → writes to `is.handwritten-letter`.
 - **By single instance** — this one occurrence only, addressed by its slug, so the rule survives tree reorganization (per §3.2.4's slug-stability guarantee) → requires extending the schema with a per-slug override map, since v1 of the schema (§4) only supports type-wide and class-wide rules, not one-off overrides. This is a schema addition, tracked explicitly in Plan 4 (§9).
 

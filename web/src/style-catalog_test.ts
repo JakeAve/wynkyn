@@ -46,3 +46,26 @@ Deno.test("getProps reads flat and nested paths; ignores object-valued keys", ()
   assertEquals(getProps(meta, versesNumber), { "font-size": "7pt" });
   assertEquals(getProps({}, heading), {});
 });
+
+Deno.test("toc: a part number resolves to the nested part entry, a front-matter label to the flat one", () => {
+  const toc = ["toc"];
+  const matter = ["matter", "matter-toc"];
+  assertEquals(
+    matchKey([["number"], ["entry", "toc-part"], toc, matter, ["zone", "zone-front"], ["bml"]], catalog),
+    "toc.toc-part.number",
+  );
+  assertEquals(
+    matchKey([["label"], ["entry", "toc-chapter", "in-part"], toc, matter, ["bml"]], catalog),
+    "toc.toc-chapter.label",
+  );
+  assertEquals(matchKey([["label"], ["entry", "toc-front"], toc, matter, ["bml"]], catalog), "toc.label");
+  assertEquals(matchKey([["leader"], ["entry", "toc-chapter"], toc, matter, ["bml"]], catalog), "toc.leader");
+});
+
+Deno.test("toc: nested catalog entries have three-deep paths and readable labels", () => {
+  const e = catalog.find((c) => c.key === "toc.toc-part.number")!;
+  assertEquals(e.path, ["elements", "toc", "toc-part", "number"]);
+  assertEquals(e.selector, ".matter-toc .toc-part .number");
+  assertEquals(e.label, "Part number");
+  assertEquals(catalog.find((c) => c.key === "toc.toc-back")!.label, "Back matter rows");
+});
