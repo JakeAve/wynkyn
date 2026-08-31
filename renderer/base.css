@@ -58,26 +58,26 @@
    ::before repeats --leader (set by css-generator from toc.leader.content);
    direction: rtl + overflow: hidden anchors the repetition to the right edge
    so glyphs align across rows like tab leaders — Paged.js has no leader(). */
-.bml .toc .entry {
+:where(.bml .toc) .entry {
   display: flex;
   align-items: flex-end;
   gap: 0.4em;
 }
-.bml .toc a {
+:where(.bml .toc) a {
   text-decoration: none;
   color: inherit;
 }
-.bml .toc .label {
+:where(.bml .toc) .label {
   min-width: 0;
 }
-.bml .toc .number,
-.bml .toc .page {
+:where(.bml .toc) .number,
+:where(.bml .toc) .page {
   flex: none;
 }
-.bml .toc .page {
+:where(.bml .toc) .page {
   font-variant-numeric: tabular-nums;
 }
-.bml .toc .leader {
+:where(.bml .toc) .leader {
   flex: 1 1 0;
   min-width: 1em;
   overflow: hidden;
@@ -85,7 +85,7 @@
   direction: rtl;
   text-align: right;
 }
-.bml .toc .leader::before {
+:where(.bml .toc) .leader::before {
   content: var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
     var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
     var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
@@ -93,11 +93,11 @@
     var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
     var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "");
 }
-.bml .toc .in-part,
-.bml .toc .toc-heading {
+:where(.bml .toc) .in-part,
+:where(.bml .toc) .toc-heading {
   margin-left: 1.5em;
 }
-.bml .toc .toc-heading.in-part {
+:where(.bml .toc) .toc-heading.in-part {
   margin-left: 3em;
 }
 .bml aside.notes {
