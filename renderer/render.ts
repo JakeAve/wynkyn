@@ -170,8 +170,15 @@ function splitFirstChar(inlines: Inline[]): { head: string; rest: Inline[] } {
 }
 
 function titleOf(children: (ContentNode | Chapter)[]): string | null {
+  return componentText(children, "title");
+}
+
+function componentText(
+  children: (ContentNode | Chapter)[],
+  name: "title" | "subtitle",
+): string | null {
   for (const c of children) {
-    if (c.kind === "component" && c.name === "title") return inlinePlainText(c.inlines);
+    if (c.kind === "component" && c.name === name) return inlinePlainText(c.inlines);
   }
   return null;
 }
@@ -311,12 +318,20 @@ function renderBlockWithNotes(
   return html;
 }
 
-function numberDiv(
+function numberText(
   n: number,
   cfg: { style?: NumberingStyle; show?: boolean; prefix?: string; suffix?: string } | undefined,
 ): string {
   if (!cfg || cfg.show === false || !cfg.style || cfg.style === "none") return "";
-  return `<div class="number">${escapeHtml(cfg.prefix ?? "")}${formatNumber(n, cfg.style)}${escapeHtml(cfg.suffix ?? "")}</div>`;
+  return `${cfg.prefix ?? ""}${formatNumber(n, cfg.style)}${cfg.suffix ?? ""}`;
+}
+
+function numberDiv(
+  n: number,
+  cfg: { style?: NumberingStyle; show?: boolean; prefix?: string; suffix?: string } | undefined,
+): string {
+  const t = numberText(n, cfg);
+  return t ? `<div class="number">${escapeHtml(t)}</div>` : "";
 }
 
 function renderChapter(ch: Chapter, n: number, opts: RenderOptions): string {
@@ -328,17 +343,19 @@ function renderChapter(ch: Chapter, n: number, opts: RenderOptions): string {
   });
 }
 
+function matterId(m: MatterBlock): string {
+  return `matter-${escapeHtml(m.type)}${m.label ? `-${escapeHtml(m.label.toLowerCase())}` : ""}`;
+}
+
 function renderMatter(m: MatterBlock, doc: BmlDocument, opts: RenderOptions): string {
-  const id = `matter-${escapeHtml(m.type)}${
-    m.label ? `-${escapeHtml(m.label.toLowerCase())}` : ""
-  }`;
+  const id = matterId(m);
   const open = `<section class="matter matter-${escapeHtml(m.type)}" id="${id}">`;
   if (m.type === "toc") {
     const onlyTitles = m.children.every((c) => c.kind === "component" && c.name === "title");
     if (onlyTitles) {
       return renderBlockWithNotes(m.children, opts, (ctx) => {
         const title = m.children.map((c) => renderContent(c, ctx, opts)).join("");
-        return `${open}${title}${generateToc(doc)}</section>`;
+        return `${open}${title}${generateToc(doc, opts)}</section>`;
       });
     }
   }
@@ -348,28 +365,65 @@ function renderMatter(m: MatterBlock, doc: BmlDocument, opts: RenderOptions): st
   });
 }
 
-function generateToc(doc: BmlDocument): string {
+// Front-matter types that never appear in the contents (spec §3.4.6).
+const DISPLAY_MATTER = new Set(["half-title", "title-page", "copyright", "dedication", "epigraph", "toc"]);
+
+interface TocRow {
+  cls: string; // "toc-front" | "toc-part" | "toc-chapter" | "toc-heading" | "toc-back" (+ " in-part")
+  href: string;
+  label: string;
+  number?: string;
+  subtitle?: string | null;
+}
+
+function tocRow(r: TocRow): string {
+  const href = escapeHtml(r.href);
+  const number = r.number ? `<span class="number">${escapeHtml(r.number)}</span>` : "";
+  const subtitle = r.subtitle ? `<span class="subtitle">${escapeHtml(r.subtitle)}</span>` : "";
+  return `<div class="entry ${r.cls}">${number}<a class="label" href="#${href}">${
+    escapeHtml(r.label)
+  }</a>${subtitle}<span class="leader"></span><a class="page" href="#${href}"></a></div>`;
+}
+
+function generateToc(doc: BmlDocument, opts: RenderOptions): string {
   const rows: string[] = [];
-  const row = (href: string, label: string, cls: string) =>
-    rows.push(
-      `<div class="entry-row ${cls}"><a class="entry" href="#${escapeHtml(href)}">${
-        escapeHtml(label)
-      }</a></div>`,
-    );
+  const matterRows = (blocks: MatterBlock[], cls: string) => {
+    for (const m of blocks) {
+      if (DISPLAY_MATTER.has(m.type)) continue;
+      const label = titleOf(m.children);
+      if (label) rows.push(tocRow({ cls, href: matterId(m), label }));
+    }
+  };
+  matterRows(doc.frontMatter, "toc-front");
+
+  let partNo = 0;
+  let chapterNo = 0;
+  const chapterRow = (ch: Chapter, inPart: boolean) => {
+    const number = numberText(++chapterNo, opts.numbering?.chapters);
+    rows.push(tocRow({
+      cls: `toc-chapter${inPart ? " in-part" : ""}`,
+      href: ch.slug,
+      label: titleOf(ch.children) ?? (number ? "" : ch.slug),
+      number,
+      subtitle: componentText(ch.children, "subtitle"),
+    }));
+  };
   for (const b of doc.body) {
     if (b.kind === "part") {
-      row(b.slug, titleOf(b.children) ?? b.slug, "toc-part");
-      for (const c of b.children) {
-        if (c.kind === "chapter") row(c.slug, titleOf(c.children) ?? c.slug, "toc-chapter");
-      }
+      const number = numberText(++partNo, opts.numbering?.parts);
+      rows.push(tocRow({
+        cls: "toc-part",
+        href: b.slug,
+        label: titleOf(b.children) ?? (number ? "" : b.slug),
+        number,
+        subtitle: componentText(b.children, "subtitle"),
+      }));
+      for (const c of b.children) if (c.kind === "chapter") chapterRow(c, true);
     } else {
-      row(b.slug, titleOf(b.children) ?? b.slug, "toc-chapter");
+      chapterRow(b, false);
     }
   }
-  for (const m of doc.backMatter) {
-    const t = titleOf(m.children);
-    if (t) row(`matter-${m.type}${m.label ? `-${m.label.toLowerCase()}` : ""}`, t, "toc-matter");
-  }
+  matterRows(doc.backMatter, "toc-back");
   return `<nav class="toc">${rows.join("")}</nav>`;
 }
 

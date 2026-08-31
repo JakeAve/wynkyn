@@ -103,27 +103,80 @@ Deno.test("ref renders as an empty anchor for target-counter (§3.8)", () => {
   assertStringIncludes(html, '<a class="ref" href="#thaw"></a>');
 });
 
-Deno.test("toc: generated from structure when only a title is present", () => {
-  const html = render(parse([
-    "{matter: toc}",
-    "{title}",
-    "Contents",
-    "{part: one}",
-    "{title}",
-    "Part One",
-    "{chapter: thaw}",
-    "{title}",
-    "The First Thaw",
-    "",
-    "x",
-    "{matter: appendix}",
-    "{title}",
-    "Family Tree",
-  ].join("\n")));
+const TOC_BOOK = [
+  "{matter: title-page}",
+  "{title}",
+  "The Book",
+  "{matter: toc}",
+  "{title}",
+  "Contents",
+  "{matter: preface}",
+  "{title}",
+  "Preface",
+  "",
+  "p",
+  "{part: one}",
+  "{title}",
+  "Before the Frost",
+  "{subtitle}",
+  "A beginning",
+  "{chapter: thaw}",
+  "{title}",
+  "The First Thaw",
+  "",
+  "x",
+  "{chapter: crossing}",
+  "",
+  "y",
+  "{matter: appendix}",
+  "{title}",
+  "Family Tree",
+  "{matter: colophon}",
+  "{printer}",
+  "Set by hand.",
+].join("\n");
+
+Deno.test("toc: rows carry level classes, spans, and an empty page link (§3.4.6)", () => {
+  const html = render(parse(TOC_BOOK));
   assertStringIncludes(html, '<nav class="toc">');
-  assertStringIncludes(html, '<a class="entry" href="#thaw">The First Thaw</a>');
-  assertStringIncludes(html, '<a class="entry" href="#one">Part One</a>');
-  assertStringIncludes(html, '<a class="entry" href="#matter-appendix">Family Tree</a>');
+  assertStringIncludes(
+    html,
+    '<div class="entry toc-front"><a class="label" href="#matter-preface">Preface</a><span class="leader"></span><a class="page" href="#matter-preface"></a></div>',
+  );
+  assertStringIncludes(
+    html,
+    '<div class="entry toc-part"><a class="label" href="#one">Before the Frost</a><span class="subtitle">A beginning</span><span class="leader"></span><a class="page" href="#one"></a></div>',
+  );
+  assertStringIncludes(
+    html,
+    '<div class="entry toc-chapter in-part"><a class="label" href="#thaw">The First Thaw</a><span class="leader"></span><a class="page" href="#thaw"></a></div>',
+  );
+  assertStringIncludes(html, '<a class="label" href="#matter-appendix">Family Tree</a>');
+});
+
+Deno.test("toc: display matter and untitled back matter are not listed", () => {
+  const html = render(parse(TOC_BOOK));
+  const nav = html.slice(html.indexOf('<nav class="toc">'), html.indexOf("</nav>"));
+  assert(!nav.includes("matter-title-page"));
+  assert(!nav.includes("matter-toc"));
+  assert(!nav.includes("matter-colophon"));
+});
+
+Deno.test("toc: numbers follow numbering.chapters/parts; untitled chapter shows number only", () => {
+  const html = render(parse(TOC_BOOK), {
+    numbering: {
+      chapters: { style: "roman-upper", show: true, suffix: "." },
+      parts: { style: "words", show: true, prefix: "Book " },
+    },
+  });
+  assertStringIncludes(html, '<div class="entry toc-part"><span class="number">Book One</span><a class="label" href="#one">Before the Frost</a>');
+  assertStringIncludes(html, '<span class="number">I.</span><a class="label" href="#thaw">The First Thaw</a>');
+  assertStringIncludes(html, '<span class="number">II.</span><a class="label" href="#crossing"></a>');
+});
+
+Deno.test("toc: untitled chapter with no numbering falls back to its slug; flat chapters are not in-part", () => {
+  const html = render(parse("{matter: toc}\n{title}\nC\n{chapter: crossing}\n\ny"));
+  assertStringIncludes(html, '<div class="entry toc-chapter"><a class="label" href="#crossing">crossing</a>');
 });
 
 Deno.test("toc: manual content renders verbatim, no generated nav", () => {
