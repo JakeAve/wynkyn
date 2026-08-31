@@ -3,7 +3,6 @@ import { basicSetup } from "codemirror";
 import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
-import { oneDark } from "@codemirror/theme-one-dark";
 import { bml } from "./bml-language.ts";
 import { toCmDiagnostics } from "./diagnostics.ts";
 import type { Diagnostic } from "../../parser/types.ts";
@@ -11,6 +10,21 @@ import type { Diagnostic } from "../../parser/types.ts";
 // True while replaceBuffer() applies a remote change: those edits must not
 // re-enter the save path (spec §6 — a save never round-trips).
 let suppressChanges = false;
+
+// Chrome-matched editor theme: every color is a CSS variable from
+// index.html's Ink palette, so light/dark switching needs no CodeMirror
+// reconfigure — the vars flip and the editor follows.
+const inkTheme = EditorView.theme({
+  "&": { height: "100%", backgroundColor: "transparent", color: "var(--fg)" },
+  ".cm-scroller": { overflow: "auto" },
+  ".cm-gutters": { backgroundColor: "transparent", color: "var(--muted)", border: "none" },
+  ".cm-activeLine": { backgroundColor: "var(--hover)" },
+  ".cm-activeLineGutter": { backgroundColor: "var(--hover)", color: "var(--fg)" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--fg)" },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
+    { backgroundColor: "var(--sel)" },
+  ".cm-panels, .cm-tooltip": { backgroundColor: "var(--bg)", color: "var(--fg)" },
+});
 
 export function createEditor(opts: {
   parent: HTMLElement;
@@ -25,11 +39,10 @@ export function createEditor(opts: {
       doc: opts.text,
       extensions: [
         basicSetup,
-        oneDark,
+        inkTheme,
         bml(),
         lintGutter(),
         EditorView.lineWrapping,
-        EditorView.theme({ "&": { height: "100%" }, ".cm-scroller": { overflow: "auto" } }),
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !suppressChanges) {
             opts.onDocChanged(u.state.doc.toString());

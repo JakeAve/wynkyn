@@ -93,7 +93,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     const title = document.createElement("strong");
     title.textContent = "Document configuration";
     const close = document.createElement("button");
-    close.textContent = "✕";
+    close.innerHTML =
+      '<svg class="tico" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
     close.setAttribute("aria-label", "close");
     close.title = "close (Esc)";
     close.onclick = () => {

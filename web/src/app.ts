@@ -29,11 +29,11 @@ const $ = (id: string) => document.getElementById(id)!;
 // tooltip rather than the footer.
 type StatusKind = "connecting" | "saved" | "saving" | "error" | "offline";
 const STATUS_TEXT: Record<StatusKind, string> = {
-  connecting: "◌ Connecting…",
-  saved: "● Saved",
-  saving: "◌ Saving…",
-  error: "✕ Not saved",
-  offline: "✕ Disconnected — restart the server and reload",
+  connecting: "Connecting…",
+  saved: "Saved",
+  saving: "Saving…",
+  error: "Not saved",
+  offline: "Disconnected — restart the server and reload",
 };
 function setStatus(kind: StatusKind, detail?: string): void {
   const el = $("status");
@@ -74,7 +74,7 @@ function reparse(text: string): void {
   const diag = $("diagnostics");
   const first = doc.diagnostics[0];
   diag.textContent = first
-    ? `▲ ${doc.diagnostics.length} parse note${doc.diagnostics.length > 1 ? "s" : ""} — line ${first.line}: ${first.message}`
+    ? `${doc.diagnostics.length} parse note${doc.diagnostics.length > 1 ? "s" : ""} — line ${first.line}: ${first.message}`
     : "";
   diag.title = first ? "click to jump to the first note" : "";
   diag.onclick = first ? () => scrollEditorToLine(editor, first.line) : null;
@@ -104,13 +104,57 @@ function highlightTreeNode(line: number): void {
   tree.querySelector(`[data-line="${best}"]`)?.setAttribute("aria-current", "true");
 }
 
+// "a-christmas-carol" → "A Christmas Carol" for the toolbar and picker.
+function prettify(slug: string): string {
+  return slug.split("-").map((w) => w ? w[0]!.toUpperCase() + w.slice(1) : w).join(" ");
+}
+
+// The book switcher is a file-picker dialog: search + one row per book.
 function populateSwitcher(books: string[], active: string): void {
-  const sel = $("book-switcher") as HTMLSelectElement;
-  sel.innerHTML = "";
-  for (const b of books) sel.appendChild(new Option(b, b, false, b === active));
-  sel.onchange = () => {
-    // Full navigation, not in-place teardown: clean WS/editor/tree state.
-    location.search = `?book=${encodeURIComponent(sel.value)}`;
+  $("book-name").textContent = prettify(active);
+  const dialog = $("book-dialog") as HTMLDialogElement;
+  const search = $("book-search") as HTMLInputElement;
+  const list = $("book-list");
+  const render = () => {
+    const q = search.value.trim().toLowerCase();
+    list.innerHTML = "";
+    const hits = books.filter((b) => !q || b.includes(q) || prettify(b).toLowerCase().includes(q));
+    hits.forEach((b, i) => {
+      const row = document.createElement("button");
+      row.className = "book-row";
+      if (b === active) row.setAttribute("aria-current", "true");
+      const num = document.createElement("span");
+      num.className = "book-num";
+      num.textContent = String(i + 1).padStart(2, "0");
+      const title = document.createElement("span");
+      title.className = "book-title";
+      title.textContent = prettify(b);
+      const slug = document.createElement("span");
+      slug.className = "book-slug";
+      slug.textContent = b;
+      row.append(num, title, slug);
+      row.onclick = () => {
+        // Full navigation, not in-place teardown: clean WS/editor/tree state.
+        if (b === active) dialog.close();
+        else location.search = `?book=${encodeURIComponent(b)}`;
+      };
+      list.appendChild(row);
+    });
+    if (!hits.length) {
+      const empty = document.createElement("div");
+      empty.className = "book-empty";
+      empty.textContent = "No books match";
+      list.appendChild(empty);
+    }
+  };
+  search.oninput = render;
+  $("book-switcher").onclick = () => {
+    search.value = "";
+    render();
+    dialog.showModal();
+  };
+  dialog.onclick = (e) => {
+    if (e.target === dialog) dialog.close(); // backdrop click closes
   };
 }
 
@@ -260,10 +304,14 @@ let paneMode: PaneMode = "split";
 // reload/book-switch like the rest of the UI's transient state.
 function setPaneMode(mode: PaneMode): void {
   paneMode = mode;
+  // The config panel sits in the editor's slot and must never cover the
+  // preview, so leaving split view closes it.
+  if (mode !== "split") $("config-overlay").hidden = true;
   const panes = $("panes");
   panes.classList.remove("pane-mode-editor", "pane-mode-preview");
   if (mode !== "split") panes.classList.add(`pane-mode-${mode}`);
   $("pane-toggle-editor").setAttribute("aria-pressed", String(mode === "editor"));
+  $("pane-toggle-split").setAttribute("aria-pressed", String(mode === "split"));
   $("pane-toggle-preview").setAttribute("aria-pressed", String(mode === "preview"));
 }
 
@@ -292,6 +340,43 @@ function installGutters(): void {
       };
     };
   }
+}
+
+// Collapsible contents tree: a toolbar toggle, persisted across reloads.
+function installTreeToggle(): void {
+  const btn = $("tree-toggle");
+  const set = (hidden: boolean) => {
+    $("panes").classList.toggle("tree-hidden", hidden);
+    btn.setAttribute("aria-pressed", String(!hidden));
+    btn.title = hidden ? "Show contents" : "Hide contents";
+    localStorage.setItem("tree-hidden", hidden ? "1" : "");
+  };
+  btn.onclick = () => set(!$("panes").classList.contains("tree-hidden"));
+  set(localStorage.getItem("tree-hidden") === "1");
+}
+
+// Light/dark toggle; an explicit choice persists, first load follows the
+// system (resolved by the inline script in index.html before first paint).
+function installThemeToggle(): void {
+  $("theme-toggle").onclick = () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem("theme", next);
+  };
+}
+
+// The config panel occupies the editor's slot so it never covers the preview:
+// mirror the overlay's hidden attribute onto #panes, and force split view on
+// open so the preview always sits beside it. The observer catches every close
+// path (close button, Esc, pane-mode change).
+function installConfigPlacement(): void {
+  const overlay = $("config-overlay");
+  const sync = () => {
+    $("panes").classList.toggle("config-open", !overlay.hidden);
+    if (!overlay.hidden && paneMode !== "split") setPaneMode("split");
+  };
+  new MutationObserver(sync).observe(overlay, { attributeFilter: ["hidden"] });
+  sync();
 }
 
 const STRUCTURE_SNIPPETS = new Set(["matter", "part", "chapter", "heading", "subheading"]);
@@ -328,8 +413,9 @@ function installShortcuts(): void {
     else return;
     e.preventDefault();
   }, true);
-  $("pane-toggle-editor").title += ` (${chordLabel("Mod-1")}; ${chordLabel("Mod-2")} restores split)`;
-  $("pane-toggle-preview").title += ` (${chordLabel("Mod-3")}; ${chordLabel("Mod-2")} restores split)`;
+  $("pane-toggle-editor").title += ` (${chordLabel("Mod-1")})`;
+  $("pane-toggle-split").title += ` (${chordLabel("Mod-2")})`;
+  $("pane-toggle-preview").title += ` (${chordLabel("Mod-3")})`;
   $("config-button").title += ` (${chordLabel("Mod-,")})`;
 }
 
@@ -395,10 +481,16 @@ async function main(): Promise<void> {
   $("pane-toggle-editor").onclick = () => {
     setPaneMode(paneMode === "editor" ? "split" : "editor");
   };
+  $("pane-toggle-split").onclick = () => {
+    setPaneMode("split");
+  };
   $("pane-toggle-preview").onclick = () => {
     setPaneMode(paneMode === "preview" ? "split" : "preview");
   };
   installGutters();
+  installTreeToggle();
+  installThemeToggle();
+  installConfigPlacement();
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);

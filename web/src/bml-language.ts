@@ -69,16 +69,17 @@ export const bmlLanguage = StreamLanguage.define<BmlStreamState>({
   token: bmlToken,
 });
 
-// Colors chosen for the One Dark chrome added in Task 4.
+// Colors are CSS variables from index.html's Ink palette, so one highlight
+// style serves light and dark without a reconfigure.
 const bmlHighlight = syntaxHighlighting(HighlightStyle.define([
-  { tag: tags.comment, color: "#7a7f8a", fontStyle: "italic" },
-  { tag: tags.keyword, color: "#61afef" },
-  { tag: tags.labelName, color: "#d19a66" },
-  { tag: tags.propertyName, color: "#98c379" },
-  { tag: tags.string, color: "#e5c07b" },
-  { tag: tags.bracket, color: "#56b6c2" },
-  { tag: tags.punctuation, color: "#56b6c2" },
-  { tag: tags.escape, color: "#c678dd", fontWeight: "bold" },
+  { tag: tags.comment, color: "var(--syn-c)", fontStyle: "italic" },
+  { tag: tags.keyword, color: "var(--syn-k)", fontWeight: "600" },
+  { tag: tags.labelName, color: "var(--syn-slug)" },
+  { tag: tags.propertyName, color: "var(--syn-key)" },
+  { tag: tags.string, color: "var(--syn-t)" },
+  { tag: tags.bracket, color: "var(--syn-p)" },
+  { tag: tags.punctuation, color: "var(--syn-p)" },
+  { tag: tags.escape, color: "var(--syn-k)", fontWeight: "bold" },
 ]));
 
 export function bml(): Extension[] {
