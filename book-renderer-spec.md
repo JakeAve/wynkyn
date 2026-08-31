@@ -996,7 +996,7 @@ Per-element CSS overrides. Property names and values are CSS. Elements that repr
 }
 ```
 
-**Contents sub-elements.** `title` is the heading. Each listed item is an `entry` row with a level class — `toc-front`, `toc-part`, `toc-chapter`, `toc-heading`, `toc-back` (rows under a part also `in-part`, indented 1.5em by default) — containing `number` (when `numbering` shows one), the `label` link, `subtitle` (when present), an empty `leader`, and the `page` link whose `::after` is the folio. Sub-elements nest, so `toc-part` may hold its own `number`/`label`/`page` blocks. `leader.content` is any string, repeated across the row and aligned right; `""` (the default) is no leader.
+**Contents sub-elements.** `title` is the heading. Each listed item is an `entry` row with a level class — `toc-front`, `toc-part`, `toc-chapter`, `toc-heading`, `toc-back` (rows under a part also `in-part`, indented 1.5em by default) — containing `number` (when `numbering` shows one), the `label` link, `subtitle` (when present), an empty `leader`, and the `page` link whose `::after` is the folio. Sub-elements nest, so `toc-part` may hold its own `number`/`label`/`page` blocks. `leader.content` is any string, repeated across the row and aligned right; `""` (the default) is no leader. Since every row carries both `entry` and its level class, `.matter-toc .entry` and `.matter-toc .toc-part` (etc.) have identical specificity — when both set the same property, the one written later in `elements.toc` wins, so put level-class keys (`toc-part`, `toc-chapter`, `toc-heading`, `toc-front`, `toc-back`) after `entry` in `metadata.json`.
 
 | Want | `elements.toc` |
 |---|---|
