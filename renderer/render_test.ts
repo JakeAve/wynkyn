@@ -179,6 +179,19 @@ Deno.test("toc: untitled chapter with no numbering falls back to its slug; flat 
   assertStringIncludes(html, '<div class="entry toc-chapter"><a class="label" href="#crossing">crossing</a>');
 });
 
+Deno.test("toc: back-matter label with an HTML-special character escapes once; id and href match", () => {
+  const html = render(parse([
+    "{matter: toc}",
+    "{title}",
+    "Contents",
+    "{matter: appendix | label: A & B}",
+    "{title}",
+    "Family Tree",
+  ].join("\n")));
+  assertStringIncludes(html, 'id="matter-appendix-a &amp; b"');
+  assertStringIncludes(html, 'href="#matter-appendix-a &amp; b"');
+});
+
 Deno.test("toc: manual content renders verbatim, no generated nav", () => {
   const html = render(parse("{matter: toc}\nChapter One .... 1\n{chapter: a}\nx"));
   assert(!html.includes('<nav class="toc">'));

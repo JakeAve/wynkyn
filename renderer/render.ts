@@ -343,12 +343,14 @@ function renderChapter(ch: Chapter, n: number, opts: RenderOptions): string {
   });
 }
 
+// Raw (unescaped) id — callers escape once at their own interpolation site
+// (renderMatter into id="…", tocRow into href="#…") so it isn't double-escaped.
 function matterId(m: MatterBlock): string {
-  return `matter-${escapeHtml(m.type)}${m.label ? `-${escapeHtml(m.label.toLowerCase())}` : ""}`;
+  return `matter-${m.type}${m.label ? `-${m.label.toLowerCase()}` : ""}`;
 }
 
 function renderMatter(m: MatterBlock, doc: BmlDocument, opts: RenderOptions): string {
-  const id = matterId(m);
+  const id = escapeHtml(matterId(m));
   const open = `<section class="matter matter-${escapeHtml(m.type)}" id="${id}">`;
   if (m.type === "toc") {
     const onlyTitles = m.children.every((c) => c.kind === "component" && c.name === "title");
