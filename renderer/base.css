@@ -52,16 +52,53 @@
   text-align: center;
   color: #777;
 }
-.bml .toc .entry-row {
+/* TOC rows (spec §3.4.6 / §4.11 item 10). Row = .entry so existing
+   toc.entry styles keep applying to the whole line. Folio sits on the last
+   line of a wrapped title (align-items: flex-end). Leaders: the spacer's
+   ::before repeats --leader (set by css-generator from toc.leader.content);
+   direction: rtl + overflow: hidden anchors the repetition to the right edge
+   so glyphs align across rows like tab leaders — Paged.js has no leader(). */
+.bml .toc .entry {
   display: flex;
+  align-items: flex-end;
+  gap: 0.4em;
 }
-.bml .toc a.entry {
+.bml .toc a {
   text-decoration: none;
   color: inherit;
-  width: 100%;
 }
-.bml .toc .toc-chapter {
+.bml .toc .label {
+  min-width: 0;
+}
+.bml .toc .number,
+.bml .toc .page {
+  flex: none;
+}
+.bml .toc .page {
+  font-variant-numeric: tabular-nums;
+}
+.bml .toc .leader {
+  flex: 1 1 0;
+  min-width: 1em;
+  overflow: hidden;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: right;
+}
+.bml .toc .leader::before {
+  content: var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
+    var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
+    var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
+    var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
+    var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
+    var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "");
+}
+.bml .toc .in-part,
+.bml .toc .toc-heading {
   margin-left: 1.5em;
+}
+.bml .toc .toc-heading.in-part {
+  margin-left: 3em;
 }
 .bml aside.notes {
   margin-top: 2em;
@@ -83,12 +120,6 @@
    (docs/pagedjs-justify-leak.md). Only honor the mark on a real paragraph. */
 [data-align-last-split-element="justify"]:not(p) {
   text-align-last: auto;
-}
-/* TOC: title left, page number right (number comes from ::after in paged CSS). */
-.bml .toc a.entry {
-  display: flex;
-  justify-content: space-between;
-  gap: 1em;
 }
 /* Display matter carries no running head or folio (named page "display",
    blanked in css-generator). */

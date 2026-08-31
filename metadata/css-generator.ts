@@ -174,8 +174,12 @@ export function generatePagedCSS(
     `@page display {\n${[...usedAreas].map((a) => `  @${a} {\n    content: none;\n  }`).join("\n")}\n}\n`,
   );
 
-  // 4. TOC + cross-reference page numbers (§4.11 items 9–10)
-  out.push(`.toc a.entry::after { content: target-counter(attr(href url), page); }\n`);
+  // 4. TOC + cross-reference page numbers (§4.11 items 9–10). Front/back rows
+  // show the folio in their zone's own style (a preface is "v", not "5").
+  const tocStyle = (cfg: PageNumbering | undefined) => NUM_STYLE[cfg?.style ?? "arabic"] ?? "decimal";
+  out.push(`.toc a.page::after { content: target-counter(attr(href url), page); }\n`);
+  out.push(`.toc .toc-front a.page::after { content: target-counter(attr(href url), page, ${tocStyle(pages?.["front-matter"])}); }\n`);
+  out.push(`.toc .toc-back a.page::after { content: target-counter(attr(href url), page, ${tocStyle(pages?.["back-matter"])}); }\n`);
   out.push(`a.ref::after { content: target-counter(attr(href url), page); }\n`);
 
   // 5. Footnote placement (§4.10)

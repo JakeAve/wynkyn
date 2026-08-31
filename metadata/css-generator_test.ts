@@ -129,10 +129,21 @@ Deno.test("running content vocabulary: page-number, none, literal (§4.8)", () =
   assertStringIncludes(css, 'content: "· 1943 ·";');
 });
 
-Deno.test("TOC and ref target-counter rules always emitted (§4.11)", () => {
-  const css = generatePagedCSS({});
-  assertStringIncludes(css, ".toc a.entry::after { content: target-counter(attr(href url), page); }");
+Deno.test("TOC folios: page link, zone styles; ref unchanged (§4.11)", () => {
+  const css = generatePagedCSS({
+    numbering: { pages: { "front-matter": { style: "roman-lower" }, "back-matter": { style: "alpha-upper" } } },
+  });
+  assertStringIncludes(css, ".toc a.page::after { content: target-counter(attr(href url), page); }");
+  assertStringIncludes(css, ".toc .toc-front a.page::after { content: target-counter(attr(href url), page, lower-roman); }");
+  assertStringIncludes(css, ".toc .toc-back a.page::after { content: target-counter(attr(href url), page, upper-alpha); }");
   assertStringIncludes(css, "a.ref::after { content: target-counter(attr(href url), page); }");
+  assert(!css.includes("a.entry::after"));
+});
+
+Deno.test("TOC zone folios default to decimal when a zone has no style or 'none'", () => {
+  const css = generatePagedCSS({ numbering: { pages: { "front-matter": { style: "none" } } } });
+  assertStringIncludes(css, ".toc .toc-front a.page::after { content: target-counter(attr(href url), page, decimal); }");
+  assertStringIncludes(css, ".toc .toc-back a.page::after { content: target-counter(attr(href url), page, decimal); }");
 });
 
 Deno.test("footnote float only when placement is footnote (§4.10)", () => {

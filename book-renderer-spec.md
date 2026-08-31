@@ -942,7 +942,9 @@ Per-element CSS overrides. Property names and values are CSS. Elements that repr
 
   "toc": {
     "title": { "font-family": "display", "font-size": "16pt", "text-align": "center" },
-    "entry": { "font-size": "10pt" }
+    "entry": { "font-size": "10pt" },
+    "leader": { "content": ". " },
+    "toc-part": { "margin-top": "1.2em", "font-variant": "small-caps" }
   },
 
   "prose-matter": {
@@ -992,6 +994,24 @@ Per-element CSS overrides. Property names and values are CSS. Elements that repr
   }
 }
 ```
+
+**Contents sub-elements.** `title` is the heading. Each listed item is an `entry` row with a level class — `toc-front`, `toc-part`, `toc-chapter`, `toc-heading`, `toc-back` (rows under a part also `in-part`, indented 1.5em by default) — containing `number` (when `numbering` shows one), the `label` link, `subtitle` (when present), an empty `leader`, and the `page` link whose `::after` is the folio. Sub-elements nest, so `toc-part` may hold its own `number`/`label`/`page` blocks. `leader.content` is any string, repeated across the row and aligned right; `""` (the default) is no leader.
+
+| Want | `elements.toc` |
+|---|---|
+| Spaced dot leaders | `"leader": { "content": ". " }` — also `"."`, `"· "`, `"– "` |
+| Light dots | `"leader": { "content": ". ", "font-size": "0.85em", "opacity": "0.45" }` |
+| Hairline rule | `"leader": { "content": "", "border-bottom": "0.3pt solid" }` |
+| Ornament | `"leader": { "content": "✦ ", "font-size": "0.55em", "letter-spacing": "0.9em" }` |
+| Folio before the title | `"page": { "order": "-1", "width": "2.4em", "text-align": "right", "margin-right": "1em" }, "leader": { "display": "none" }` |
+| No folios | `"page": { "display": "none" }, "leader": { "display": "none" }` |
+| Number column | `"number": { "width": "2.2em" }` (numbers appear when `numbering.chapters.show` is true) |
+| Close-set, no leaders | `"leader": { "display": "none" }, "entry": { "max-width": "80%", "margin": "0.4em auto 0" }` |
+| Parts as heads, no folio | `"toc-part": { "margin-top": "1.4em", "font-variant": "small-caps", "letter-spacing": "0.1em", "page": { "display": "none" }, "leader": { "display": "none" } }` |
+| Centered "Book One" over an italic title | `"toc-part": { "display": "block", "text-align": "center", "margin-top": "1.4em", "number": { "display": "block", "font-variant": "small-caps", "letter-spacing": "0.14em" }, "label": { "font-family": "display", "font-style": "italic", "font-size": "13pt" }, "leader": { "display": "none" }, "page": { "display": "none" } }` |
+| Parts only | `"toc-chapter": { "display": "none" }` |
+| Hide front matter | `"toc-front": { "display": "none" }` |
+| Hanging indent for long titles | `"label": { "padding-left": "1.5em", "text-indent": "-1.5em" }` |
 
 Notes on specific keys:
 
