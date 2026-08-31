@@ -1,5 +1,5 @@
 // metadata/css-generator.ts — Metadata → CSS strings (spec §5.2). Pure, no I/O.
-import type { CssProps, Metadata } from "./types.ts";
+import type { CssProps, ElementStyle, Metadata } from "./types.ts";
 import type { PageNumbering, RunningEntry } from "./types.ts";
 
 const MATTER_KEYS = new Set([
@@ -28,7 +28,11 @@ function rule(selector: string, props: CssProps, fonts?: Record<string, string>)
   const decls: string[] = [];
   const pseudo: string[] = [];
   for (const [prop, value] of Object.entries(props)) {
-    if (prop === "content") {
+    if (prop === "content" && selector.endsWith(".leader")) {
+      // TOC leaders repeat the string many times from base.css; hand it over
+      // as a custom property instead of a single ::before content (spec §4.5).
+      decls.push(`  --leader: ${JSON.stringify(value)};`);
+    } else if (prop === "content") {
       pseudo.push(`  content: ${JSON.stringify(value)};`);
     } else if (prop === "font-family") {
       decls.push(`  font-family: ${resolveFontValue(value, fonts)};`);
@@ -45,24 +49,29 @@ function rule(selector: string, props: CssProps, fonts?: Record<string, string>)
   return out;
 }
 
+function emitStyle(
+  selector: string,
+  style: ElementStyle,
+  fonts: Record<string, string> | undefined,
+  out: string[],
+): void {
+  const flat: CssProps = {};
+  const nested: Array<[string, ElementStyle]> = [];
+  for (const [prop, value] of Object.entries(style)) {
+    if (typeof value === "string") flat[prop] = value;
+    else nested.push([prop, value]);
+  }
+  if (Object.keys(flat).length) out.push(rule(selector, flat, fonts));
+  for (const [sub, subStyle] of nested) {
+    emitStyle(selector.split(", ").map((s) => `${s} .${sub}`).join(", "), subStyle, fonts, out);
+  }
+}
+
 export function generateDomCSS(metadata: Metadata): string {
   const out: string[] = [];
   const fonts = metadata.fonts;
   for (const [key, style] of Object.entries(metadata.elements ?? {})) {
-    const base = selectorFor(key);
-    const flat: CssProps = {};
-    const subRules: string[] = [];
-    for (const [prop, value] of Object.entries(style)) {
-      if (typeof value === "string") {
-        flat[prop] = value;
-      } else {
-        const sub = base.split(", ").map((s) => `${s} .${prop}`).join(", ");
-        const r = rule(sub, value, fonts);
-        if (r) subRules.push(r);
-      }
-    }
-    if (Object.keys(flat).length) out.push(rule(base, flat, fonts));
-    out.push(...subRules);
+    emitStyle(selectorFor(key), style, fonts, out);
   }
   for (const [cls, props] of Object.entries(metadata.is ?? {})) {
     out.push(rule(`.is-${cls}`, props, fonts));

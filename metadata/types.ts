@@ -2,8 +2,10 @@
 
 export type CssProps = Record<string, string>;
 
-// An element entry: flat CSS props, and/or nested sub-element props (spec §4.5).
-export type ElementStyle = Record<string, string | CssProps>;
+// An element entry: CSS props, and/or nested sub-element props (spec §4.5).
+// Nesting is recursive so a row-level sub-element can style its own spans,
+// e.g. elements.toc["toc-part"].number → `.matter-toc .toc-part .number`.
+export type ElementStyle = { [prop: string]: string | ElementStyle };
 
 export interface PageMargins {
   top?: string;

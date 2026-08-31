@@ -184,3 +184,31 @@ Deno.test("page numbering 'words' falls back to decimal — CSS counters have no
   const css = generatePagedCSS({ numbering: { pages: { body: { style: "words" } } } });
   assertStringIncludes(css, "@page body {\n  @bottom-center {\n    content: counter(page, decimal);");
 });
+
+Deno.test("nested sub-elements emit descendant selectors at any depth (§4.5)", () => {
+  const css = generateDomCSS({
+    elements: {
+      toc: {
+        "toc-part": {
+          "margin-top": "1.4em",
+          number: { "font-variant": "small-caps" },
+        },
+      },
+    },
+  });
+  assertStringIncludes(css, ".matter-toc .toc-part {\n  margin-top: 1.4em;\n}");
+  assertStringIncludes(css, ".matter-toc .toc-part .number {\n  font-variant: small-caps;\n}");
+});
+
+Deno.test("toc leader content becomes the --leader custom property, not ::before (§4.5)", () => {
+  const css = generateDomCSS({
+    elements: { toc: { leader: { content: ". ", opacity: "0.5" } } },
+  });
+  assertStringIncludes(css, '.matter-toc .leader {\n  --leader: ". ";\n  opacity: 0.5;\n}');
+  assert(!css.includes(".matter-toc .leader::before"));
+});
+
+Deno.test("break content still goes to ::before (unchanged)", () => {
+  const css = generateDomCSS({ elements: { break: { content: "✦" } } });
+  assertStringIncludes(css, '.break::before {\n  content: "✦";\n}');
+});

@@ -897,7 +897,7 @@ Named aliases pointing to Google Fonts family names. Elements reference aliases 
 
 ### 4.5 Section: `elements`
 
-Per-element CSS overrides. Property names and values are CSS. Elements that represent a *page type* (half-title, title-page, copyright, etc.) nest their sub-elements. Elements that are a single typographic unit (heading, dropcap, etc.) are flat.
+Per-element CSS overrides. Property names and values are CSS. Elements that represent a *page type* (half-title, title-page, copyright, etc.) nest their sub-elements. Elements that are a single typographic unit (heading, dropcap, etc.) are flat. Sub-elements may themselves nest, to any depth; each level becomes a descendant selector (`toc → toc-part → number` is `.matter-toc .toc-part .number`). One property is special: `content` on `toc.leader` is emitted as the `--leader` custom property that the base stylesheet repeats across the row (§4.5 recipes); everywhere else `content` sets the element's `::before`, as for `break`.
 
 ```json
 "elements": {
