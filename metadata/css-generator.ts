@@ -76,6 +76,7 @@ const NUM_STYLE: Record<string, string> = {
   "roman-lower": "lower-roman",
   "alpha-upper": "upper-alpha",
   "alpha-lower": "lower-alpha",
+  "words": "decimal",
 };
 
 function runningContent(value: string, bookTitle?: string): string {

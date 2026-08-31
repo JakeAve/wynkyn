@@ -202,3 +202,12 @@ Deno.test("ref target slug with a quote character is escaped in the href", () =>
   const html = render(parse('{chapter: safe}\nSee {ref: a"b}.'));
   assertStringIncludes(html, 'href="#a&quot;b"');
 });
+
+Deno.test("formatNumber words: spelled out to ninety-nine, digits after (§4.7)", () => {
+  assertEquals(formatNumber(1, "words"), "One");
+  assertEquals(formatNumber(12, "words"), "Twelve");
+  assertEquals(formatNumber(20, "words"), "Twenty");
+  assertEquals(formatNumber(21, "words"), "Twenty-One");
+  assertEquals(formatNumber(99, "words"), "Ninety-Nine");
+  assertEquals(formatNumber(100, "words"), "100");
+});

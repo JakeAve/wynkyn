@@ -14,6 +14,7 @@ import {
   makeRunningEntry,
   MARGIN_AREAS,
   NUMBERING_STYLES,
+  PAGE_NUMBERING_STYLES,
   PAGE_SIZE_PRESETS,
   presetFor,
   renameKey,
@@ -373,6 +374,7 @@ function buildFontsSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
 }
 
 const STYLE_CHOICES = NUMBERING_STYLES.map((s) => ({ label: s, value: s }));
+const PAGE_STYLE_CHOICES = PAGE_NUMBERING_STYLES.map((s) => ({ label: s, value: s }));
 
 function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
   const box = sectionBox("Numbering");
@@ -420,7 +422,7 @@ function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElemen
     box.appendChild(
       field(
         `${zone} pages`,
-        selectInput(STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
+        selectInput(PAGE_STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
           ((numbering.pages ??= {})[zone] ??= {}).style = v as NumberingStyle;
           queueSave("numbering");
         }),

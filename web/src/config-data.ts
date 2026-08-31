@@ -45,8 +45,10 @@ export function isValidFolios(value: string): boolean {
 }
 
 export const NUMBERING_STYLES: NumberingStyle[] = [
-  "arabic", "roman-upper", "roman-lower", "alpha-upper", "alpha-lower", "none",
+  "arabic", "roman-upper", "roman-lower", "alpha-upper", "alpha-lower", "words", "none",
 ];
+// Page counters are CSS counters; "words" has no CSS equivalent (§4.7).
+export const PAGE_NUMBERING_STYLES: NumberingStyle[] = NUMBERING_STYLES.filter((s) => s !== "words");
 
 // The 16 CSS Paged Media margin boxes, in §4.8's order.
 export const MARGIN_AREAS = [

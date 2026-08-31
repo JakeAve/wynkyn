@@ -4,6 +4,8 @@ import {
   isValidFolios,
   isValidSize,
   makeRunningEntry,
+  NUMBERING_STYLES,
+  PAGE_NUMBERING_STYLES,
   parseCssLines,
   presetFor,
   renameKey,
@@ -90,4 +92,10 @@ Deno.test("splitProps partitions curated from extra CSS", () => {
   });
   assertEquals(curated, { "font-size": "9pt", "text-align": "center" });
   assertEquals(extra, { "border-left": "2pt solid #bbb" });
+});
+
+Deno.test("page-number style choices exclude 'words'", () => {
+  assert(NUMBERING_STYLES.includes("words"));
+  assert(!PAGE_NUMBERING_STYLES.includes("words"));
+  assertEquals(PAGE_NUMBERING_STYLES.length, NUMBERING_STYLES.length - 1);
 });

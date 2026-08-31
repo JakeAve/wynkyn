@@ -179,3 +179,8 @@ Deno.test("page-number css props are emitted in the zone's @bottom-center box", 
   assertStringIncludes(box, "font-size: 9pt;");
   assertStringIncludes(box, 'font-family: "Cormorant Garamond";');
 });
+
+Deno.test("page numbering 'words' falls back to decimal — CSS counters have no spelled form (§4.7)", () => {
+  const css = generatePagedCSS({ numbering: { pages: { body: { style: "words" } } } });
+  assertStringIncludes(css, "@page body {\n  @bottom-center {\n    content: counter(page, decimal);");
+});

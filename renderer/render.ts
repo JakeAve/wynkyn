@@ -27,6 +27,8 @@ export function formatNumber(n: number, style: NumberingStyle): string {
       return toAlpha(n);
     case "alpha-lower":
       return toAlpha(n).toLowerCase();
+    case "words":
+      return toWords(n);
     case "none":
       return "";
     default:
@@ -57,6 +59,21 @@ function toAlpha(n: number): string {
     n = Math.floor(n / 26);
   }
   return out;
+}
+
+const ONES = [
+  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+// ponytail: spelled numbers stop at 99; a book with a hundred chapters gets digits.
+function toWords(n: number): string {
+  if (n < 1 || n >= 100) return String(n);
+  if (n < 20) return ONES[n] ?? String(n);
+  const tens = TENS[Math.floor(n / 10)] ?? "";
+  const ones = ONES[n % 10] ?? "";
+  return ones ? `${tens}-${ones}` : tens;
 }
 
 export function escapeHtml(s: string): string {

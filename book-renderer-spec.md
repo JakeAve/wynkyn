@@ -1010,7 +1010,7 @@ Styles for custom semantic blocks declared with `{is: class-name}` in the markup
 
 Controls how chapters, parts, and pages are numbered. Uses semantic style names since CSS has no direct equivalent.
 
-**`style` options:** `"arabic"`, `"roman-upper"`, `"roman-lower"`, `"alpha-upper"`, `"alpha-lower"`, `"none"`
+**`style` options:** `"arabic"`, `"roman-upper"`, `"roman-lower"`, `"alpha-upper"`, `"alpha-lower"`, `"words"` (One, Two … Ninety-Nine; digits from 100), `"none"`. `"words"` applies to `chapters` and `parts` only — page counters are CSS counters with no spelled form, so `pages.*.style: "words"` renders as arabic and the configuration panel does not offer it there.
 
 ```json
 "numbering": {
