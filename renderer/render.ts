@@ -9,11 +9,12 @@ import type {
   Note,
   Part,
 } from "../parser/types.ts";
-import type { Numbering, NotesConfig, NumberingStyle } from "../metadata/types.ts";
+import type { Numbering, NotesConfig, NumberingStyle, TocConfig } from "../metadata/types.ts";
 
 export interface RenderOptions {
   numbering?: Numbering;
   notes?: NotesConfig;
+  toc?: TocConfig;
   images?: Record<string, string>; // slug → relative path; resolved by the caller
 }
 
@@ -409,6 +410,17 @@ function generateToc(doc: BmlDocument, opts: RenderOptions): string {
       number,
       subtitle: componentText(ch.children, "subtitle"),
     }));
+    if (opts.toc?.headings) {
+      for (const c of ch.children) {
+        if (c.kind === "heading" && c.level === 1 && c.slug) {
+          rows.push(tocRow({
+            cls: `toc-heading${inPart ? " in-part" : ""}`,
+            href: c.slug,
+            label: inlinePlainText(c.inlines),
+          }));
+        }
+      }
+    }
   };
   for (const b of doc.body) {
     if (b.kind === "part") {

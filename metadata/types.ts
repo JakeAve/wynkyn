@@ -74,6 +74,12 @@ export interface NotesConfig {
   placement?: "footnote" | "endnote";
 }
 
+// Which structure the generated contents lists beyond parts, chapters and
+// titled matter (spec §4.12). Everything visual about the TOC is CSS (§4.5).
+export interface TocConfig {
+  headings?: boolean; // list level-1 {heading: slug}s under their chapter
+}
+
 export interface Metadata {
   page?: PageConfig;
   fonts?: Record<string, string>;
@@ -83,4 +89,5 @@ export interface Metadata {
   running?: Running;
   print?: PrintConfig;
   notes?: NotesConfig;
+  toc?: TocConfig;
 }

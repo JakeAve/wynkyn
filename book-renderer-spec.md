@@ -861,7 +861,8 @@ books/
   "numbering": { ... },
   "running": { ... },
   "print": { ... },
-  "notes": { ... }
+  "notes": { ... },
+  "toc": { ... }
 }
 ```
 
@@ -1125,6 +1126,16 @@ When `metadata.json` is present, the renderer:
 9. Resolves `{ref: slug}` to the target's page number via Paged.js `target-counter()`.
 10. Generates the table of contents for a `{matter: toc}` block from the document tree (§3.4.6): one `.entry` row per item, classed `toc-front`, `toc-part`, `toc-chapter`, `toc-heading` or `toc-back` (rows under a part also `in-part`), each holding optional `.number` and `.subtitle`, a `.label` link, an empty `.leader`, and an empty `.page` link whose `::after` is `target-counter()`. If the toc block contains manuscript prose, that prose is used verbatim instead.
 11. Places `{note:}` content as footnotes or endnotes per `notes.placement` (§4.10).
+
+### 4.12 Section: `toc`
+
+What the generated contents (§3.4.6) lists beyond the structure it always lists. Everything *visual* about the contents is CSS under `elements.toc` (§4.5).
+
+```json
+"toc": { "headings": true }
+```
+
+- `headings` — list level-1 `{heading: slug}` entries under their chapter, indented one step further than the chapter row (class `toc-heading`). Only headings with a slug are listed, since only they have an anchor to link to; `{subheading}` is never listed. Default `false`.
 
 ---
 

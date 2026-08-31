@@ -103,7 +103,7 @@ export async function buildBook(
   return {
     book,
     bookTitle,
-    html: render(doc, { numbering: meta.numbering, notes: meta.notes, images }),
+    html: render(doc, { numbering: meta.numbering, notes: meta.notes, toc: meta.toc, images }),
     baseCss: BASE_CSS,
     domCss: generateDomCSS(meta),
     pagedCss: generatePagedCSS(meta, { bookTitle }),

@@ -277,3 +277,41 @@ Deno.test("formatNumber words: spelled out to ninety-nine, digits after (§4.7)"
   assertEquals(formatNumber(99, "words"), "Ninety-Nine");
   assertEquals(formatNumber(100, "words"), "100");
 });
+
+const HEADINGS_BOOK = [
+  "{matter: toc}",
+  "{title}",
+  "Contents",
+  "{part: one}",
+  "{title}",
+  "Part One",
+  "{chapter: govt}",
+  "{title}",
+  "Of Government",
+  "",
+  "{heading: origin}",
+  "Of its Origin",
+  "",
+  "p",
+  "{heading}",
+  "Unslugged",
+  "",
+  "p",
+  "{subheading: minor}",
+  "A subheading",
+  "",
+  "p",
+].join("\n");
+
+Deno.test("toc: level-1 slugged headings listed only when toc.headings is true (§4.12)", () => {
+  const on = render(parse(HEADINGS_BOOK), { toc: { headings: true } });
+  assertStringIncludes(
+    on,
+    '<a class="page" href="#govt"></a></div><div class="entry toc-heading in-part"><a class="label" href="#origin">Of its Origin</a><span class="leader"></span><a class="page" href="#origin"></a></div>',
+  );
+  assert(!on.includes("Unslugged</a>"));
+  assert(!on.includes('href="#minor"'));
+
+  const off = render(parse(HEADINGS_BOOK));
+  assert(!off.includes("toc-heading"));
+});
