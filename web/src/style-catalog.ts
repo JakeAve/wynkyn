@@ -24,8 +24,8 @@ const ELEMENTS: Array<[string, string, string[]]> = [
   ["Copyright", "copyright", ["copyright-line", "rights", "isbn", "edition"]],
   ["Dedication", "dedication", []],
   ["Contents", "toc", [
-    "title", "entry", "label", "number", "subtitle", "leader", "page",
-    "toc-front", "toc-part", "toc-chapter", "toc-heading", "toc-back",
+    "title", "label", "number", "subtitle", "leader", "page",
+    "toc-front", "toc-part", "toc-chapter", "toc-heading", "toc-back", "entry",
   ]],
   ["Foreword / preface / introduction", "prose-matter", ["title"]],
   ["Part", "part", ["title", "number"]],

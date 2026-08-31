@@ -62,6 +62,13 @@ Deno.test("toc: a part number resolves to the nested part entry, a front-matter 
   assertEquals(matchKey([["leader"], ["entry", "toc-chapter"], toc, matter, ["bml"]], catalog), "toc.leader");
 });
 
+Deno.test("toc: clicking a part row itself resolves to the level entry, not the generic entry row", () => {
+  assertEquals(
+    matchKey([[], ["entry", "toc-part"], ["toc"], ["matter", "matter-toc"], ["bml"]], catalog),
+    "toc.toc-part",
+  );
+});
+
 Deno.test("toc: nested catalog entries have three-deep paths and readable labels", () => {
   const e = catalog.find((c) => c.key === "toc.toc-part.number")!;
   assertEquals(e.path, ["elements", "toc", "toc-part", "number"]);
