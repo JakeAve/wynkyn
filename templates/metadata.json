@@ -60,6 +60,9 @@
       },
       "entry": {
         "font-size": "10pt"
+      },
+      "leader": {
+        "content": ""
       }
     },
     "prose-matter": {

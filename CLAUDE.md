@@ -5,7 +5,7 @@ with `manuscript.md` (BML — semantic markup, spec §3 / `bml-spec-v06.md`),
 `metadata.json` (all styling, spec §4), and `images/`. `books/` is gitignored.
 
 `book-renderer-spec.md` is the source of truth; when code and spec disagree, ask.
-Plans 0–5 are done (parser, live server, editor, config panel, sentinel styling, print export).
+Plans 0–5 and 7 are done (parser, live server, editor, config panel, sentinel styling, print export, table of contents); Plan 6 (integration & polish) is open.
 `bml export` is the print-export command (`server/print-export.ts`, `server/imposition.ts`, `server/pdf.ts`).
 
 ## Layout

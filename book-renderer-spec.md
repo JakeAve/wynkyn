@@ -1135,7 +1135,7 @@ What the generated contents (§3.4.6) lists beyond the structure it always lists
 "toc": { "headings": true }
 ```
 
-- `headings` — list level-1 `{heading: slug}` entries under their chapter, indented one step further than the chapter row (class `toc-heading`). Only headings with a slug are listed, since only they have an anchor to link to; `{subheading}` is never listed. Default `false`.
+- `headings` — list level-1 `{heading: slug}` entries under their chapter, indented one step further than the chapter row (class `toc-heading`). Only headings with a slug are listed, since only they have an anchor to link to; `{subheading}` is never listed. Default `false`. Only headings that are direct children of the chapter are listed — a heading nested inside a `{quote}`, `{sidebar}`, `{is:}`, or `{columns}` block belongs to that block, not to the chapter's outline, and is never collected into the contents.
 
 ---
 
@@ -1336,3 +1336,9 @@ Each plan below is scoped to be handed to one agent working somewhat independent
 - **Goal:** tie the pieces together into one coherent app.
 - **Deliverables:** multi-book switching end-to-end, consistent error states across panels, an end-to-end smoke test per book, a short README covering how to run the app and add a new book.
 - **Definition of done:** a new user can clone the repo, run one command, open the app, pick a book, edit it, style it, and export a print file — without reading any code.
+
+### Plan 7 — Table of Contents
+- **Depends on:** Plans 0 and 4.
+- **Goal:** §3.4.6, §4.5 (contents sub-elements and recipes), §4.12 — a generated contents page whose every visual choice is a CSS block in `metadata.json`, edited live in the style panel.
+- **Deliverables:** row/span markup with level classes; right-anchored repeated-string leaders (`--leader`); zone-aware folios via `target-counter()`; numbers, subtitles, front and back matter, optional slugged headings; recursive element sub-styles; `words` numbering; style-catalog entries for every contents span.
+- **Definition of done:** each recipe in §4.5 reproduces its layout on a real book in both the preview and `bml export`, with no change to the renderer.
