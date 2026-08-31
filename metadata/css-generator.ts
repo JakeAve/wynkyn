@@ -177,7 +177,7 @@ export function generatePagedCSS(
   // 4. TOC + cross-reference page numbers (§4.11 items 9–10). Front/back rows
   // show the folio in their zone's own style (a preface is "v", not "5").
   const tocStyle = (cfg: PageNumbering | undefined) => NUM_STYLE[cfg?.style ?? "arabic"] ?? "decimal";
-  out.push(`.toc a.page::after { content: target-counter(attr(href url), page); }\n`);
+  out.push(`.toc a.page::after { content: target-counter(attr(href url), page, ${tocStyle(pages?.body)}); }\n`);
   out.push(`.toc .toc-front a.page::after { content: target-counter(attr(href url), page, ${tocStyle(pages?.["front-matter"])}); }\n`);
   out.push(`.toc .toc-back a.page::after { content: target-counter(attr(href url), page, ${tocStyle(pages?.["back-matter"])}); }\n`);
   out.push(`a.ref::after { content: target-counter(attr(href url), page); }\n`);

@@ -133,7 +133,7 @@ Deno.test("TOC folios: page link, zone styles; ref unchanged (§4.11)", () => {
   const css = generatePagedCSS({
     numbering: { pages: { "front-matter": { style: "roman-lower" }, "back-matter": { style: "alpha-upper" } } },
   });
-  assertStringIncludes(css, ".toc a.page::after { content: target-counter(attr(href url), page); }");
+  assertStringIncludes(css, ".toc a.page::after { content: target-counter(attr(href url), page, decimal); }");
   assertStringIncludes(css, ".toc .toc-front a.page::after { content: target-counter(attr(href url), page, lower-roman); }");
   assertStringIncludes(css, ".toc .toc-back a.page::after { content: target-counter(attr(href url), page, upper-alpha); }");
   assertStringIncludes(css, "a.ref::after { content: target-counter(attr(href url), page); }");
@@ -142,8 +142,16 @@ Deno.test("TOC folios: page link, zone styles; ref unchanged (§4.11)", () => {
 
 Deno.test("TOC zone folios default to decimal when a zone has no style or 'none'", () => {
   const css = generatePagedCSS({ numbering: { pages: { "front-matter": { style: "none" } } } });
+  assertStringIncludes(css, ".toc a.page::after { content: target-counter(attr(href url), page, decimal); }");
   assertStringIncludes(css, ".toc .toc-front a.page::after { content: target-counter(attr(href url), page, decimal); }");
   assertStringIncludes(css, ".toc .toc-back a.page::after { content: target-counter(attr(href url), page, decimal); }");
+});
+
+Deno.test("TOC generic folio rule honors body page style (§4.11)", () => {
+  const css = generatePagedCSS({
+    numbering: { pages: { body: { style: "roman-lower" } } },
+  });
+  assertStringIncludes(css, ".toc a.page::after { content: target-counter(attr(href url), page, lower-roman); }");
 });
 
 Deno.test("footnote float only when placement is footnote (§4.10)", () => {
