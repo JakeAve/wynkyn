@@ -1,5 +1,5 @@
 // server/watch_test.ts
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { watchTree } from "./watch.ts";
 
 async function waitFor(pred: () => boolean, timeoutMs = 3000): Promise<void> {

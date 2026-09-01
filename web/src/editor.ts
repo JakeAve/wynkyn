@@ -17,13 +17,23 @@ let suppressChanges = false;
 const inkTheme = EditorView.theme({
   "&": { height: "100%", backgroundColor: "transparent", color: "var(--fg)" },
   ".cm-scroller": { overflow: "auto" },
-  ".cm-gutters": { backgroundColor: "transparent", color: "var(--muted)", border: "none" },
+  ".cm-gutters": {
+    backgroundColor: "transparent",
+    color: "var(--muted)",
+    border: "none",
+  },
   ".cm-activeLine": { backgroundColor: "var(--hover)" },
-  ".cm-activeLineGutter": { backgroundColor: "var(--hover)", color: "var(--fg)" },
+  ".cm-activeLineGutter": {
+    backgroundColor: "var(--hover)",
+    color: "var(--fg)",
+  },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--fg)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
     { backgroundColor: "var(--sel)" },
-  ".cm-panels, .cm-tooltip": { backgroundColor: "var(--bg)", color: "var(--fg)" },
+  ".cm-panels, .cm-tooltip": {
+    backgroundColor: "var(--bg)",
+    color: "var(--fg)",
+  },
 });
 
 export function createEditor(opts: {
@@ -61,7 +71,9 @@ export function createEditor(opts: {
 }
 
 export function applyDiagnostics(view: EditorView, diags: Diagnostic[]): void {
-  view.dispatch(setDiagnostics(view.state, toCmDiagnostics(view.state.doc, diags)));
+  view.dispatch(
+    setDiagnostics(view.state, toCmDiagnostics(view.state.doc, diags)),
+  );
 }
 
 // Replace the whole buffer from an external change, preserving the cursor
@@ -81,7 +93,9 @@ export function replaceBuffer(view: EditorView, text: string): void {
 }
 
 export function scrollEditorToLine(view: EditorView, line: number): void {
-  const l = view.state.doc.line(Math.min(Math.max(line, 1), view.state.doc.lines));
+  const l = view.state.doc.line(
+    Math.min(Math.max(line, 1), view.state.doc.lines),
+  );
   view.dispatch({
     selection: { anchor: l.from },
     effects: EditorView.scrollIntoView(l.from, { y: "start" }),

@@ -1,5 +1,5 @@
 // parser/inline_test.ts
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { parseInlines } from "./inline.ts";
 
 Deno.test("plain prose, multi-line joins with space", () => {
@@ -24,21 +24,27 @@ Deno.test("unclosed em extends to paragraph end", () => {
 });
 
 Deno.test("footnote and ref point markers", () => {
-  assertEquals(parseInlines(["poor.{footnote: harvest-1943} See {ref: thaw}."]), [
-    { kind: "text", text: "poor." },
-    { kind: "footnote", slug: "harvest-1943" },
-    { kind: "text", text: " See " },
-    { kind: "ref", slug: "thaw" },
-    { kind: "text", text: "." },
-  ]);
+  assertEquals(
+    parseInlines(["poor.{footnote: harvest-1943} See {ref: thaw}."]),
+    [
+      { kind: "text", text: "poor." },
+      { kind: "footnote", slug: "harvest-1943" },
+      { kind: "text", text: " See " },
+      { kind: "ref", slug: "thaw" },
+      { kind: "text", text: "." },
+    ],
+  );
 });
 
 Deno.test("hard line break", () => {
-  assertEquals(parseInlines(["The water does not ask\\", "where it is going."]), [
-    { kind: "text", text: "The water does not ask" },
-    { kind: "linebreak" },
-    { kind: "text", text: "where it is going." },
-  ]);
+  assertEquals(
+    parseInlines(["The water does not ask\\", "where it is going."]),
+    [
+      { kind: "text", text: "The water does not ask" },
+      { kind: "linebreak" },
+      { kind: "text", text: "where it is going." },
+    ],
+  );
 });
 
 Deno.test("double backslash at EOL is a literal backslash, not a break", () => {

@@ -10,7 +10,12 @@ import type {
   Note,
   Part,
 } from "../parser/types.ts";
-import type { Numbering, NotesConfig, NumberingStyle, TocConfig } from "../metadata/types.ts";
+import type {
+  NotesConfig,
+  Numbering,
+  NumberingStyle,
+  TocConfig,
+} from "../metadata/types.ts";
 
 export interface RenderOptions {
   numbering?: Numbering;
@@ -40,8 +45,19 @@ export function formatNumber(n: number, style: NumberingStyle): string {
 
 function toRoman(n: number): string {
   const table: Array<[number, string]> = [
-    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"],
-    [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+    [1000, "M"],
+    [900, "CM"],
+    [500, "D"],
+    [400, "CD"],
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
   ];
   let out = "";
   for (const [v, s] of table) {
@@ -64,10 +80,39 @@ function toAlpha(n: number): string {
 }
 
 const ONES = [
-  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
-  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+  "",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+  "Thirteen",
+  "Fourteen",
+  "Fifteen",
+  "Sixteen",
+  "Seventeen",
+  "Eighteen",
+  "Nineteen",
 ];
-const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const TENS = [
+  "",
+  "",
+  "Twenty",
+  "Thirty",
+  "Forty",
+  "Fifty",
+  "Sixty",
+  "Seventy",
+  "Eighty",
+  "Ninety",
+];
 
 // ponytail: spelled numbers stop at 99; a book with a hundred chapters gets digits.
 function toWords(n: number): string {
@@ -79,7 +124,10 @@ function toWords(n: number): string {
 }
 
 export function escapeHtml(s: string): string {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(
+    ">",
+    "&gt;",
+  )
     .replaceAll('"', "&quot;");
 }
 
@@ -123,12 +171,17 @@ function renderInlines(inlines: Inline[], ctx: NoteCtx): string {
         const n = ctx.used.length;
         const note = ctx.notes.get(i.slug);
         if (ctx.placement === "footnote" && note) {
-          out += `<sup class="footnote-anchor" id="fnref-${escapeHtml(i.slug)}">${n}</sup>` +
-            `<span class="note" id="note-${escapeHtml(i.slug)}">${renderInlines(note.inlines, ctx)}</span>`;
+          out +=
+            `<sup class="footnote-anchor" id="fnref-${
+              escapeHtml(i.slug)
+            }">${n}</sup>` +
+            `<span class="note" id="note-${escapeHtml(i.slug)}">${
+              renderInlines(note.inlines, ctx)
+            }</span>`;
         } else {
-          out += `<sup class="footnote-anchor" id="fnref-${escapeHtml(i.slug)}"><a href="#note-${
+          out += `<sup class="footnote-anchor" id="fnref-${
             escapeHtml(i.slug)
-          }">${n}</a></sup>`;
+          }"><a href="#note-${escapeHtml(i.slug)}">${n}</a></sup>`;
         }
         break;
       }
@@ -157,7 +210,9 @@ function splitFirstChar(inlines: Inline[]): { head: string; rest: Inline[] } {
     }
     const head = first.text.charAt(0);
     const restText = first.text.slice(1);
-    const rest: Inline[] = restText ? [{ kind: "text", text: restText }, ...others] : others;
+    const rest: Inline[] = restText
+      ? [{ kind: "text", text: restText }, ...others]
+      : others;
     return { head, rest };
   }
   if (first.kind === "em") {
@@ -180,18 +235,26 @@ function componentText(
   name: "title" | "subtitle",
 ): string | null {
   for (const c of children) {
-    if (c.kind === "component" && c.name === name) return inlinePlainText(c.inlines);
+    if (c.kind === "component" && c.name === name) {
+      return inlinePlainText(c.inlines);
+    }
   }
   return null;
 }
 
 // ── content rendering ───────────────────────────────────────────────────────
-function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): string {
+function renderContent(
+  node: ContentNode,
+  ctx: NoteCtx,
+  opts: RenderOptions,
+): string {
   switch (node.kind) {
     case "paragraph":
       return `<p>${renderInlines(node.inlines, ctx)}</p>`;
     case "component": {
-      if (node.name === "title") return `<h1 class="title">${renderInlines(node.inlines, ctx)}</h1>`;
+      if (node.name === "title") {
+        return `<h1 class="title">${renderInlines(node.inlines, ctx)}</h1>`;
+      }
       return `<p class="${node.name}">${renderInlines(node.inlines, ctx)}</p>`;
     }
     case "dropcap": {
@@ -203,22 +266,26 @@ function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): st
             renderInlines(node.inlines, ctx)
           }</p>`;
         }
-        return `<p class="has-dropcap"><span class="dropcap">${escapeHtml(head)}</span>${
-          renderInlines(rest, ctx)
-        }</p>`;
+        return `<p class="has-dropcap"><span class="dropcap">${
+          escapeHtml(head)
+        }</span>${renderInlines(rest, ctx)}</p>`;
       }
-      return `<p class="has-dropcap"><span class="dropcap">${escapeHtml(head)}</span>${
-        renderInlines(rest, ctx)
-      }</p>`;
+      return `<p class="has-dropcap"><span class="dropcap">${
+        escapeHtml(head)
+      }</span>${renderInlines(rest, ctx)}</p>`;
     }
     case "heading": {
       const tag = node.level === 1 ? "h3" : "h4";
       const cls = node.level === 1 ? "heading" : "subheading";
       const id = node.slug ? ` id="${escapeHtml(node.slug)}"` : "";
-      return `<${tag} class="${cls}"${id}>${renderInlines(node.inlines, ctx)}</${tag}>`;
+      return `<${tag} class="${cls}"${id}>${
+        renderInlines(node.inlines, ctx)
+      }</${tag}>`;
     }
     case "break":
-      return `<div class="break${node.slug ? ` break-${escapeHtml(node.slug)}` : ""}"></div>`;
+      return `<div class="break${
+        node.slug ? ` break-${escapeHtml(node.slug)}` : ""
+      }"></div>`;
     case "epigraph":
     case "quote": {
       const inner = node.children.map((c) =>
@@ -226,58 +293,89 @@ function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): st
           ? `<p class="text">${renderInlines(c.inlines, ctx)}</p>`
           : renderContent(c, ctx, opts)
       ).join("");
-      return `<blockquote class="${node.kind}">${inner}${attribution(node.attribution, ctx)}</blockquote>`;
+      return `<blockquote class="${node.kind}">${inner}${
+        attribution(node.attribution, ctx)
+      }</blockquote>`;
     }
     case "pullquote": {
-      const inner = node.children.map((c) => renderContent(c, ctx, opts)).join("");
-      return `<aside class="pullquote">${inner}${attribution(node.attribution, ctx)}</aside>`;
+      const inner = node.children.map((c) => renderContent(c, ctx, opts)).join(
+        "",
+      );
+      return `<aside class="pullquote">${inner}${
+        attribution(node.attribution, ctx)
+      }</aside>`;
     }
     case "poem": {
       const stanzas = node.stanzas.map((s) =>
-        s.kind === "paragraph" ? `<p class="stanza">${renderInlines(s.inlines, ctx)}</p>` : ""
+        s.kind === "paragraph"
+          ? `<p class="stanza">${renderInlines(s.inlines, ctx)}</p>`
+          : ""
       ).join("");
-      return `<div class="poem">${stanzas}${attribution(node.attribution, ctx)}</div>`;
+      return `<div class="poem">${stanzas}${
+        attribution(node.attribution, ctx)
+      }</div>`;
     }
     case "sidebar":
-      return `<aside class="sidebar">${node.children.map((c) => renderContent(c, ctx, opts)).join("")}</aside>`;
+      return `<aside class="sidebar">${
+        node.children.map((c) => renderContent(c, ctx, opts)).join("")
+      }</aside>`;
     case "verses": {
       const verses = node.verses.map((v, i) =>
         v.kind === "paragraph"
-          ? `<p class="verse"><span class="number">${node.start + i}</span> ${renderInlines(v.inlines, ctx)}</p>`
+          ? `<p class="verse"><span class="number">${node.start + i}</span> ${
+            renderInlines(v.inlines, ctx)
+          }</p>`
           : ""
       ).join("");
-      return `<div class="verses" id="${escapeHtml(node.slug)}">${verses}</div>`;
+      return `<div class="verses" id="${
+        escapeHtml(node.slug)
+      }">${verses}</div>`;
     }
     case "columns": {
       if (node.mode === "flow") {
-        const inner = (node.columns[0] ?? []).map((c) => renderContent(c, ctx, opts)).join("");
+        const inner = (node.columns[0] ?? []).map((c) =>
+          renderContent(c, ctx, opts)
+        ).join("");
         return `<div class="columns columns-flow" style="column-count: ${node.count}">${inner}</div>`;
       }
       const cols = node.columns.map((col) =>
-        `<div class="col">${col.map((c) => renderContent(c, ctx, opts)).join("")}</div>`
+        `<div class="col">${
+          col.map((c) => renderContent(c, ctx, opts)).join("")
+        }</div>`
       ).join("");
       return `<div class="columns columns-parallel" style="grid-template-columns: repeat(${node.count}, 1fr)">${cols}</div>`;
     }
     case "is":
-      return `<div class="is-${
-        escapeHtml(node.className)
-      }">${node.children.map((c) => renderContent(c, ctx, opts)).join("")}</div>`;
+      return `<div class="is-${escapeHtml(node.className)}">${
+        node.children.map((c) => renderContent(c, ctx, opts)).join("")
+      }</div>`;
     case "illustration": {
-      const cls = `illustration${node.placement ? ` placement-${node.placement}` : ""}`;
+      const cls = `illustration${
+        node.placement ? ` placement-${node.placement}` : ""
+      }`;
       const captionText = node.caption ? inlinePlainText(node.caption) : "";
       const src = opts.images?.[node.slug];
       const media = src
         ? `<img src="${src}" alt="${escapeHtml(captionText)}">`
-        : `<div class="illustration-placeholder">[illustration: ${escapeHtml(node.slug)}]</div>`;
+        : `<div class="illustration-placeholder">[illustration: ${
+          escapeHtml(node.slug)
+        }]</div>`;
       const cap = node.caption
-        ? `<figcaption class="caption">${renderInlines(node.caption, ctx)}</figcaption>`
+        ? `<figcaption class="caption">${
+          renderInlines(node.caption, ctx)
+        }</figcaption>`
         : "";
-      return `<figure class="${cls}" id="${escapeHtml(node.slug)}">${media}${cap}</figure>`;
+      return `<figure class="${cls}" id="${
+        escapeHtml(node.slug)
+      }">${media}${cap}</figure>`;
     }
     case "list": {
-      const items = node.items.map((it) => `<li>${renderInlines(it, ctx)}</li>`).join("");
+      const items = node.items.map((it) => `<li>${renderInlines(it, ctx)}</li>`)
+        .join("");
       if (node.ordered) {
-        const start = node.start && node.start !== 1 ? ` start="${node.start}"` : "";
+        const start = node.start && node.start !== 1
+          ? ` start="${node.start}"`
+          : "";
         return `<ol${start}>${items}</ol>`;
       }
       return `<ul>${items}</ul>`;
@@ -288,7 +386,9 @@ function renderContent(node: ContentNode, ctx: NoteCtx, opts: RenderOptions): st
 }
 
 function attribution(attr: Component | undefined, ctx: NoteCtx): string {
-  return attr ? `<p class="attribution">${renderInlines(attr.inlines, ctx)}</p>` : "";
+  return attr
+    ? `<p class="attribution">${renderInlines(attr.inlines, ctx)}</p>`
+    : "";
 }
 
 // ── structural rendering ────────────────────────────────────────────────────
@@ -305,14 +405,17 @@ function renderBlockWithNotes(
   collectNotes(children, ctx.notes);
   let html = body(ctx);
   if (ctx.placement === "endnote") {
-    const slugs = [...ctx.used, ...[...ctx.notes.keys()].filter((s) => !ctx.used.includes(s))];
+    const slugs = [
+      ...ctx.used,
+      ...[...ctx.notes.keys()].filter((s) => !ctx.used.includes(s)),
+    ];
     if (slugs.length && ctx.notes.size) {
       const rendered = slugs
         .filter((s, i) => slugs.indexOf(s) === i && ctx.notes.has(s))
         .map((s, i) =>
-          `<div class="note" id="note-${escapeHtml(s)}"><sup>${
-            i + 1
-          }</sup> ${renderInlines(ctx.notes.get(s)!.inlines, ctx)}</div>`
+          `<div class="note" id="note-${escapeHtml(s)}"><sup>${i + 1}</sup> ${
+            renderInlines(ctx.notes.get(s)!.inlines, ctx)
+          }</div>`
         ).join("");
       if (rendered) html += `<aside class="notes">${rendered}</aside>`;
     }
@@ -322,15 +425,27 @@ function renderBlockWithNotes(
 
 function numberText(
   n: number,
-  cfg: { style?: NumberingStyle; show?: boolean; prefix?: string; suffix?: string } | undefined,
+  cfg: {
+    style?: NumberingStyle;
+    show?: boolean;
+    prefix?: string;
+    suffix?: string;
+  } | undefined,
 ): string {
-  if (!cfg || cfg.show === false || !cfg.style || cfg.style === "none") return "";
+  if (!cfg || cfg.show === false || !cfg.style || cfg.style === "none") {
+    return "";
+  }
   return `${cfg.prefix ?? ""}${formatNumber(n, cfg.style)}${cfg.suffix ?? ""}`;
 }
 
 function numberDiv(
   n: number,
-  cfg: { style?: NumberingStyle; show?: boolean; prefix?: string; suffix?: string } | undefined,
+  cfg: {
+    style?: NumberingStyle;
+    show?: boolean;
+    prefix?: string;
+    suffix?: string;
+  } | undefined,
 ): string {
   const t = numberText(n, cfg);
   return t ? `<div class="number">${escapeHtml(t)}</div>` : "";
@@ -339,9 +454,9 @@ function numberDiv(
 function renderChapter(ch: Chapter, n: number, opts: RenderOptions): string {
   return renderBlockWithNotes(ch.children, opts, (ctx) => {
     const inner = ch.children.map((c) => renderContent(c, ctx, opts)).join("");
-    return `<section class="chapter" id="${
-      escapeHtml(ch.slug)
-    }">${numberDiv(n, opts.numbering?.chapters)}${inner}</section>`;
+    return `<section class="chapter" id="${escapeHtml(ch.slug)}">${
+      numberDiv(n, opts.numbering?.chapters)
+    }${inner}</section>`;
   });
 }
 
@@ -351,14 +466,24 @@ function matterId(m: MatterBlock): string {
   return `matter-${m.type}${m.label ? `-${m.label.toLowerCase()}` : ""}`;
 }
 
-function renderMatter(m: MatterBlock, doc: BmlDocument, opts: RenderOptions): string {
+function renderMatter(
+  m: MatterBlock,
+  doc: BmlDocument,
+  opts: RenderOptions,
+): string {
   const id = escapeHtml(matterId(m));
-  const open = `<section class="matter matter-${escapeHtml(m.type)}" id="${id}">`;
+  const open = `<section class="matter matter-${
+    escapeHtml(m.type)
+  }" id="${id}">`;
   if (m.type === "toc") {
-    const onlyTitles = m.children.every((c) => c.kind === "component" && c.name === "title");
+    const onlyTitles = m.children.every((c) =>
+      c.kind === "component" && c.name === "title"
+    );
     if (onlyTitles) {
       return renderBlockWithNotes(m.children, opts, (ctx) => {
-        const title = m.children.map((c) => renderContent(c, ctx, opts)).join("");
+        const title = m.children.map((c) => renderContent(c, ctx, opts)).join(
+          "",
+        );
         return `${open}${title}${generateToc(doc, opts)}</section>`;
       });
     }
@@ -379,8 +504,12 @@ interface TocRow {
 
 function tocRow(r: TocRow): string {
   const href = escapeHtml(r.href);
-  const number = r.number ? `<span class="number">${escapeHtml(r.number)}</span>` : "";
-  const subtitle = r.subtitle ? `<span class="subtitle">${escapeHtml(r.subtitle)}</span>` : "";
+  const number = r.number
+    ? `<span class="number">${escapeHtml(r.number)}</span>`
+    : "";
+  const subtitle = r.subtitle
+    ? `<span class="subtitle">${escapeHtml(r.subtitle)}</span>`
+    : "";
   return `<div class="entry ${r.cls}">${number}<a class="label" href="#${href}">${
     escapeHtml(r.label)
   }</a>${subtitle}<span class="leader"></span><a class="page" href="#${href}"></a></div>`;
@@ -439,17 +568,27 @@ function generateToc(doc: BmlDocument, opts: RenderOptions): string {
   return `<nav class="toc">${rows.join("")}</nav>`;
 }
 
-function renderPart(part: Part, partNo: number, chapterNo: { n: number }, opts: RenderOptions): string {
-  const contentKids = part.children.filter((c) => c.kind !== "chapter") as ContentNode[];
-  const head = renderBlockWithNotes(contentKids, opts, (ctx) =>
-    contentKids.map((c) => renderContent(c, ctx, opts)).join(""));
+function renderPart(
+  part: Part,
+  partNo: number,
+  chapterNo: { n: number },
+  opts: RenderOptions,
+): string {
+  const contentKids = part.children.filter((c) =>
+    c.kind !== "chapter"
+  ) as ContentNode[];
+  const head = renderBlockWithNotes(
+    contentKids,
+    opts,
+    (ctx) => contentKids.map((c) => renderContent(c, ctx, opts)).join(""),
+  );
   const chapters = part.children
     .filter((c): c is Chapter => c.kind === "chapter")
     .map((ch) => renderChapter(ch, ++chapterNo.n, opts))
     .join("");
-  return `<section class="part" id="${
-    escapeHtml(part.slug)
-  }">${numberDiv(partNo, opts.numbering?.parts)}${head}${chapters}</section>`;
+  return `<section class="part" id="${escapeHtml(part.slug)}">${
+    numberDiv(partNo, opts.numbering?.parts)
+  }${head}${chapters}</section>`;
 }
 
 export function render(doc: BmlDocument, opts: RenderOptions = {}): string {

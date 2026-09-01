@@ -2,9 +2,15 @@
 // §7.4, tiers 1–2): pick any stylable element, edit the handful of CSS
 // properties a typesetter touches, plus a "more CSS" list for the rest.
 import type { Metadata } from "../../metadata/types.ts";
-import { checkboxInput, field, sectionBox, selectInput, textInput } from "./config-panel.ts";
+import {
+  checkboxInput,
+  field,
+  sectionBox,
+  selectInput,
+  textInput,
+} from "./config-panel.ts";
 import { CURATED_PROPS, splitProps } from "./config-data.ts";
-import { catalogFor, ensureProps, getProps, type StyleEntry } from "./style-catalog.ts";
+import { catalogFor, ensureProps, getProps } from "./style-catalog.ts";
 
 export interface StyleSection {
   el: HTMLDetailsElement;
@@ -14,9 +20,23 @@ export interface StyleSection {
 const INHERIT = "";
 const OTHER = "__other";
 const COMMON_PROPS = [
-  ...CURATED_PROPS, "line-height", "color", "text-indent", "margin-left", "margin-right",
-  "padding-left", "border-left", "border-bottom", "content", "vertical-align", "word-spacing",
-  "display", "order", "opacity", "font-variant", "width",
+  ...CURATED_PROPS,
+  "line-height",
+  "color",
+  "text-indent",
+  "margin-left",
+  "margin-right",
+  "padding-left",
+  "border-left",
+  "border-bottom",
+  "content",
+  "vertical-align",
+  "word-spacing",
+  "display",
+  "order",
+  "opacity",
+  "font-variant",
+  "width",
 ];
 
 export function buildStyleSection(
@@ -65,39 +85,83 @@ export function buildStyleSection(
     };
 
     form.append(
-      field("font", fontControl(meta, props["font-family"], (v) => set("font-family", v))),
-      field("size", placeholder(textInput(props["font-size"] ?? "", (v) => set("font-size", v)), "11pt")),
+      field(
+        "font",
+        fontControl(meta, props["font-family"], (v) => set("font-family", v)),
+      ),
+      field(
+        "size",
+        placeholder(
+          textInput(props["font-size"] ?? "", (v) => set("font-size", v)),
+          "11pt",
+        ),
+      ),
       field(
         "weight",
         selectInput(
-          [{ label: "(inherit)", value: INHERIT }, { label: "normal", value: "normal" }, { label: "bold", value: "bold" }],
+          [{ label: "(inherit)", value: INHERIT }, {
+            label: "normal",
+            value: "normal",
+          }, { label: "bold", value: "bold" }],
           props["font-weight"] ?? INHERIT,
           (v) => set("font-weight", v),
         ),
       ),
-      field("italic", checkboxInput(props["font-style"] === "italic", (on) => set("font-style", on ? "italic" : ""))),
+      field(
+        "italic",
+        checkboxInput(
+          props["font-style"] === "italic",
+          (on) => set("font-style", on ? "italic" : ""),
+        ),
+      ),
       field(
         "align",
         selectInput(
-          [INHERIT, "left", "center", "right", "justify"].map((v) => ({ label: v || "(inherit)", value: v })),
+          [INHERIT, "left", "center", "right", "justify"].map((v) => ({
+            label: v || "(inherit)",
+            value: v,
+          })),
           props["text-align"] ?? INHERIT,
           (v) => set("text-align", v),
         ),
       ),
       field(
         "letter-spacing",
-        placeholder(textInput(props["letter-spacing"] ?? "", (v) => set("letter-spacing", v)), "0.08em"),
+        placeholder(
+          textInput(
+            props["letter-spacing"] ?? "",
+            (v) => set("letter-spacing", v),
+          ),
+          "0.08em",
+        ),
       ),
       field(
         "transform",
         selectInput(
-          [INHERIT, "uppercase", "lowercase", "capitalize", "none"].map((v) => ({ label: v || "(inherit)", value: v })),
+          [INHERIT, "uppercase", "lowercase", "capitalize", "none"].map((
+            v,
+          ) => ({ label: v || "(inherit)", value: v })),
           props["text-transform"] ?? INHERIT,
           (v) => set("text-transform", v),
         ),
       ),
-      field("space above", placeholder(textInput(props["margin-top"] ?? "", (v) => set("margin-top", v)), "30pt")),
-      field("space below", placeholder(textInput(props["margin-bottom"] ?? "", (v) => set("margin-bottom", v)), "30pt")),
+      field(
+        "space above",
+        placeholder(
+          textInput(props["margin-top"] ?? "", (v) => set("margin-top", v)),
+          "30pt",
+        ),
+      ),
+      field(
+        "space below",
+        placeholder(
+          textInput(
+            props["margin-bottom"] ?? "",
+            (v) => set("margin-bottom", v),
+          ),
+          "30pt",
+        ),
+      ),
       moreCss(extra, set),
     );
   }
@@ -123,7 +187,11 @@ function placeholder(input: HTMLInputElement, text: string): HTMLInputElement {
 }
 
 // Font alias picker with an escape hatch for a literal family name.
-function fontControl(meta: Metadata, value: string | undefined, onChange: (v: string) => void): HTMLElement {
+function fontControl(
+  meta: Metadata,
+  value: string | undefined,
+  onChange: (v: string) => void,
+): HTMLElement {
   const wrap = document.createElement("span");
   wrap.className = "cfg-row";
   const aliases = Object.keys(meta.fonts ?? {});
@@ -150,7 +218,10 @@ function fontControl(meta: Metadata, value: string | undefined, onChange: (v: st
 
 // Key/value rows for properties outside the curated set. Commit on change;
 // a blank key or value removes the property.
-function moreCss(extra: Record<string, string>, set: (prop: string, value: string) => void): HTMLElement {
+function moreCss(
+  extra: Record<string, string>,
+  set: (prop: string, value: string) => void,
+): HTMLElement {
   const details = document.createElement("details");
   details.className = "cfg-more";
   const summary = document.createElement("summary");

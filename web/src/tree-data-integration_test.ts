@@ -5,7 +5,7 @@
 // could silently break click-to-scroll without any other test noticing.
 // This test renders the same doc both ways and asserts every anchorId
 // buildTree() produces is a real id in the rendered HTML.
-import { assertStringIncludes } from "jsr:@std/assert";
+import { assertStringIncludes } from "@std/assert";
 import { parse } from "../../parser/parser.ts";
 import { render } from "../../renderer/render.ts";
 import { buildTree, type TreeNode } from "./tree-data.ts";

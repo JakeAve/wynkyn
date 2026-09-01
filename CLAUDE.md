@@ -4,41 +4,52 @@ Web app for editing and printing hand-bound books. A book is `books/<slug>/`
 with `manuscript.md` (BML — semantic markup, spec §3 / `bml-spec-v06.md`),
 `metadata.json` (all styling, spec §4), and `images/`. `books/` is gitignored.
 
-`book-renderer-spec.md` is the source of truth; when code and spec disagree, ask.
-Plans 0–5 and 7 are done (parser, live server, editor, config panel, sentinel styling, print export, table of contents); Plan 6 (integration & polish) is open.
-`bml export` is the print-export command (`server/print-export.ts`, `server/imposition.ts`, `server/pdf.ts`).
+`book-renderer-spec.md` is the source of truth; when code and spec disagree,
+ask. Plans 0–5 and 7 are done (parser, live server, editor, config panel,
+sentinel styling, print export, table of contents); Plan 6 (integration &
+polish) is open. `bml export` is the print-export command
+(`server/print-export.ts`, `server/imposition.ts`, `server/pdf.ts`).
 
 ## Layout
 
-- `parser/`   BML → `BmlDocument` tree (pure, `parse(source)`)
+- `parser/` BML → `BmlDocument` tree (pure, `parse(source)`)
 - `metadata/` metadata.json → CSS (`generateDomCSS/PagedCSS/FontLinks`)
 - `renderer/` tree → HTML body (`render(doc, opts)`), `base.css`
-- `server/`   `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket, watches book files)
-- `web/`      browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored). Paged.js paginates the preview.
+- `server/` `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket,
+  watches book files)
+- `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored).
+  Paged.js paginates the preview.
 
 ## Commands
 
-- `deno task test`                       all tests (`*_test.ts` next to each module)
-- `deno task dev`                        build client + live server at http://localhost:8000
-- `deno task bml list`                   books on disk
-- `deno task bml new <slug>`             scaffold `books/<slug>/` from `templates/metadata.json` (house style)
-- `deno task bml check <book>`           parse diagnostics as `file:line: msg`; exit 1 on any — run after every manuscript edit
-- `deno task bml render <book> [out]`    standalone HTML (default `books/<book>/render.html`); open in a browser to paginate
-- `deno task bml export <book> [--proof] [--sheet S] [--folios N] [--duplex M]` → `books/<book>/export/`; needs Google Chrome installed
+- `deno task test` all tests (`*_test.ts` next to each module)
+- `deno task dev` build client + live server at http://localhost:8000
+- `deno task bml list` books on disk
+- `deno task bml new <slug>` scaffold `books/<slug>/` from
+  `templates/metadata.json` (house style)
+- `deno task bml check <book>` parse diagnostics as `file:line: msg`; exit 1 on
+  any — run after every manuscript edit
+- `deno task bml render <book> [out]` standalone HTML (default
+  `books/<book>/render.html`); open in a browser to paginate
+- `deno task bml export <book> [--proof] [--sheet S] [--folios N] [--duplex M]`
+  → `books/<book>/export/`; needs Google Chrome installed
 
 ## Adding a book
 
-`deno task bml new <slug>`, put the source text at `books/<slug>/download.txt`, then the
-`convert-manuscript` skill (`.claude/skills/`) writes `manuscript.md`. Style afterwards in the app.
-Print: `bml export <slug> --proof` first on a new printer, check one signature by hand, then the real export.
+`deno task bml new <slug>`, put the source text at `books/<slug>/download.txt`,
+then the `convert-manuscript` skill (`.claude/skills/`) writes `manuscript.md`.
+Style afterwards in the app. Print: `bml export <slug> --proof` first on a new
+printer, check one signature by hand, then the real export.
 
 ## Conventions
 
 - Deno only, strict TS, `noUncheckedIndexedAccess`. No new deps without reason.
-- Tests are plain `Deno.test` with `jsr:@std/assert`. Fixture book: `server/testdata/demo-book`.
-  `testdata/common-sense` and `testdata/great-gatsby` are the tracked full-grammar corpus
-  (`books_test.ts`) — public domain, kept in sync by hand with `books/` when styling changes.
-- CI (`.github/workflows/ci.yml`) runs `build:web` + `test` on push/PR; it has no Chrome, so the
-  PDF tests self-skip there.
-- Sample manuscripts start from Project Gutenberg `download.txt` in the book dir; strip the Gutenberg header/footer, never leave it in `manuscript.md`.
+- Tests are plain `Deno.test` with `jsr:@std/assert`. Fixture book:
+  `server/testdata/demo-book`. `testdata/common-sense` and
+  `testdata/great-gatsby` are the tracked full-grammar corpus (`books_test.ts`)
+  — public domain, kept in sync by hand with `books/` when styling changes.
+- CI (`.github/workflows/ci.yml`) runs `build:web` + `test` on push/PR; it has
+  no Chrome, so the PDF tests self-skip there.
+- Sample manuscripts start from Project Gutenberg `download.txt` in the book
+  dir; strip the Gutenberg header/footer, never leave it in `manuscript.md`.
 - Commit messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.

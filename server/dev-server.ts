@@ -44,7 +44,9 @@ interface PendingSave {
   timer: number;
 }
 
-export async function startServer(opts: ServerOptions = {}): Promise<RunningServer> {
+export async function startServer(
+  opts: ServerOptions = {},
+): Promise<RunningServer> {
   const booksRoot = opts.booksRoot ?? "books";
   await Deno.stat(booksRoot); // fail fast at startup if the root is missing
 
@@ -86,7 +88,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       pendingSaves.delete(book);
       recentWrites.set(book, pending.clientId);
       try {
-        await Deno.writeTextFile(`${booksRoot}/${book}/manuscript.md`, pending.text);
+        await Deno.writeTextFile(
+          `${booksRoot}/${book}/manuscript.md`,
+          pending.text,
+        );
         // The watcher sees this write and broadcasts, tagged via recentWrites.
       } catch (err) {
         // No write means no filesystem event, so nothing will ever consume
@@ -110,7 +115,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     const pending = pendingSaves.get(book);
     if (pending) return Response.json({ text: pending.text });
     try {
-      const text = await Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`);
+      const text = await Deno.readTextFile(
+        `${booksRoot}/${book}/manuscript.md`,
+      );
       return Response.json({ text });
     } catch {
       return new Response("book not found", { status: 404 });
@@ -128,7 +135,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   // debounced save wins over the disk copy. Returns null when metadata.json
   // exists but is corrupt JSON — callers turn that into a 409, because
   // merging over a file we can't parse would silently discard its content.
-  async function currentMetadata(book: string): Promise<Record<string, unknown> | null> {
+  async function currentMetadata(
+    book: string,
+  ): Promise<Record<string, unknown> | null> {
     const pending = pendingMetaSaves.get(book);
     if (pending) return pending.metadata;
     let text: string;
@@ -153,14 +162,20 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     }
     const metadata = await currentMetadata(book);
     if (metadata === null) {
-      return new Response("metadata.json is not valid JSON — fix it on disk first", {
-        status: 409,
-      });
+      return new Response(
+        "metadata.json is not valid JSON — fix it on disk first",
+        {
+          status: 409,
+        },
+      );
     }
     return Response.json({ metadata });
   }
 
-  async function handleMetadataSave(book: string, req: Request): Promise<Response> {
+  async function handleMetadataSave(
+    book: string,
+    req: Request,
+  ): Promise<Response> {
     if (!safeName(book)) return new Response("bad path", { status: 400 });
     let body: { sections?: unknown; clientId?: unknown };
     try {
@@ -169,10 +184,16 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       return new Response("invalid JSON body", { status: 400 });
     }
     const sections = body.sections;
-    if (sections === null || typeof sections !== "object" || Array.isArray(sections)) {
-      return new Response("body must be { sections: object, clientId?: string }", {
-        status: 400,
-      });
+    if (
+      sections === null || typeof sections !== "object" ||
+      Array.isArray(sections)
+    ) {
+      return new Response(
+        "body must be { sections: object, clientId?: string }",
+        {
+          status: 400,
+        },
+      );
     }
     try {
       await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
@@ -181,9 +202,12 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     }
     const base = await currentMetadata(book);
     if (base === null) {
-      return new Response("metadata.json is not valid JSON — fix it on disk first", {
-        status: 409,
-      });
+      return new Response(
+        "metadata.json is not valid JSON — fix it on disk first",
+        {
+          status: 409,
+        },
+      );
     }
     // Shallow-merge only the POSTed top-level keys; everything else —
     // elements, is, future schema keys — passes through untouched.
@@ -216,14 +240,22 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     return Response.json({ ok: true });
   }
 
-  async function buildMessage(book: string, origin: string | null): Promise<string> {
+  async function buildMessage(
+    book: string,
+    origin: string | null,
+  ): Promise<string> {
     try {
       const build = await buildBook(booksRoot, book);
       return JSON.stringify({ type: "update", origin, ...build });
     } catch (err) {
       // Bad metadata.json or a mid-write read must never kill the server —
       // push the failure to the preview instead (Global Constraints).
-      return JSON.stringify({ type: "error", book, origin, message: String(err) });
+      return JSON.stringify({
+        type: "error",
+        book,
+        origin,
+        message: String(err),
+      });
     }
   }
 
@@ -244,7 +276,11 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       if (!p.startsWith(absRoot + "/")) continue;
       const [book, ...rest] = p.slice(absRoot.length + 1).split("/");
       const file = rest.join("/");
-      if (book && (file === "manuscript.md" || file === "metadata.json" || rest[0] === "images")) {
+      if (
+        book &&
+        (file === "manuscript.md" || file === "metadata.json" ||
+          rest[0] === "images")
+      ) {
         changed.add(book);
       }
     }
@@ -269,7 +305,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     return response;
   }
 
-  async function serveStatic(dirUrl: URL | string, name: string): Promise<Response> {
+  async function serveStatic(
+    dirUrl: URL | string,
+    name: string,
+  ): Promise<Response> {
     if (!safeName(name)) return new Response("bad path", { status: 400 });
     try {
       const data = typeof dirUrl === "string"
@@ -277,7 +316,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
         : await Deno.readFile(new URL(name, dirUrl));
       const ext = name.slice(name.lastIndexOf("."));
       return new Response(data, {
-        headers: { "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream" },
+        headers: {
+          "content-type": CONTENT_TYPES[ext] ?? "application/octet-stream",
+        },
       });
     } catch {
       return new Response("not found", { status: 404 });
@@ -290,8 +331,12 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
 
     if (path === "/ws") return handleWebSocket(req, url);
 
-    if (path === "/" || path === "/index.html") return serveStatic(WEB_DIR, "index.html");
-    if (path.startsWith("/web/")) return serveStatic(WEB_DIR, path.slice("/web/".length));
+    if (path === "/" || path === "/index.html") {
+      return serveStatic(WEB_DIR, "index.html");
+    }
+    if (path.startsWith("/web/")) {
+      return serveStatic(WEB_DIR, path.slice("/web/".length));
+    }
 
     if (path === "/api/books" && req.method === "GET") {
       return Response.json({ books: await listBooks(booksRoot) });
@@ -312,24 +357,37 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     }
 
     const manuscriptApi = path.match(/^\/api\/books\/([^/]+)\/manuscript$/);
-    if (manuscriptApi && req.method === "GET") return handleManuscriptGet(manuscriptApi[1]!);
-    if (manuscriptApi && req.method === "POST") return handleSave(manuscriptApi[1]!, req);
+    if (manuscriptApi && req.method === "GET") {
+      return handleManuscriptGet(manuscriptApi[1]!);
+    }
+    if (manuscriptApi && req.method === "POST") {
+      return handleSave(manuscriptApi[1]!, req);
+    }
 
     const metadataApi = path.match(/^\/api\/books\/([^/]+)\/metadata$/);
-    if (metadataApi && req.method === "GET") return handleMetadataGet(metadataApi[1]!);
-    if (metadataApi && req.method === "POST") return handleMetadataSave(metadataApi[1]!, req);
+    if (metadataApi && req.method === "GET") {
+      return handleMetadataGet(metadataApi[1]!);
+    }
+    if (metadataApi && req.method === "POST") {
+      return handleMetadataSave(metadataApi[1]!, req);
+    }
 
     const image = path.match(/^\/books\/([^/]+)\/images\/([^/]+)$/);
     if (image && req.method === "GET") {
       const [, book, file] = image;
-      if (!safeName(book!) || !safeName(file!)) return new Response("bad path", { status: 400 });
+      if (!safeName(book!) || !safeName(file!)) {
+        return new Response("bad path", { status: 400 });
+      }
       return serveStatic(`${booksRoot}/${book}/images`, file!);
     }
 
     return new Response("not found", { status: 404 });
   }
 
-  const server = Deno.serve({ port: opts.port ?? 8000, onListen: () => {} }, handleRequest);
+  const server = Deno.serve(
+    { port: opts.port ?? 8000, onListen: () => {} },
+    handleRequest,
+  );
 
   return {
     port: server.addr.port,

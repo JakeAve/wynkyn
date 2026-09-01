@@ -21,7 +21,8 @@ export function parseDims(size: string): Dims {
   if (named) return named;
   const m = size.trim().match(/^([\d.]+)(in|mm)\s+([\d.]+)(in|mm)$/);
   if (!m) throw new Error(`unknown size "${size}"`);
-  const toIn = (v: string, unit: string) => unit === "mm" ? Number(v) / 25.4 : Number(v);
+  const toIn = (v: string, unit: string) =>
+    unit === "mm" ? Number(v) / 25.4 : Number(v);
   return { w: toIn(m[1]!, m[2]!), h: toIn(m[3]!, m[4]!) }; // regex guarantees groups
 }
 
@@ -73,7 +74,11 @@ export interface Imposition {
 export function impose(pageCount: number, cfg: ImposeConfig): Imposition {
   const n = nUp(cfg.sheet, cfg.page);
   if (n < 2) {
-    throw new Error(`page ${fmtDims(cfg.page)} does not fit 2-up on sheet ${fmtDims(cfg.sheet)}`);
+    throw new Error(
+      `page ${fmtDims(cfg.page)} does not fit 2-up on sheet ${
+        fmtDims(cfg.sheet)
+      }`,
+    );
   }
   const P = 4 * cfg.folios; // pages per signature
   const paddedCount = Math.ceil(Math.max(pageCount, 1) / P) * P;
@@ -108,7 +113,9 @@ export function impose(pageCount: number, cfg: ImposeConfig): Imposition {
       // each pair stays [2k | P−2k+1] so page 2k lands behind page 2k−1.
       let back = backPairs.reverse().flat();
       // Calendar-style turn (long-edge): the whole back side is rotated 180°.
-      if (flip === "long-edge") back = back.reverse().map((s) => ({ ...s, rotate: 180 }));
+      if (flip === "long-edge") {
+        back = back.reverse().map((s) => ({ ...s, rotate: 180 }));
+      }
       sheets.push({ signature: sig, front, back });
     }
   }

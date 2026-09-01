@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { parse } from "../../parser/parser.ts";
 import { buildTree } from "./tree-data.ts";
 

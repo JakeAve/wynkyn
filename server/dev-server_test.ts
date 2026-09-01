@@ -1,5 +1,5 @@
 // server/dev-server_test.ts
-import { assert, assertEquals } from "jsr:@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { startServer } from "./dev-server.ts";
 
 // Tests copy the fixture into a temp dir: later tasks write to it, and the
@@ -71,7 +71,9 @@ function nextMessage(
 Deno.test("websocket: initial build on connect, rebuild pushed on file change", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });
-  const ws = new WebSocket(`ws://localhost:${server.port}/ws?book=demo-book&client=t1`);
+  const ws = new WebSocket(
+    `ws://localhost:${server.port}/ws?book=demo-book&client=t1`,
+  );
   try {
     const first = await nextMessage(ws);
     assertEquals(first.type, "update");
@@ -83,7 +85,10 @@ Deno.test("websocket: initial build on connect, rebuild pushed on file change", 
     const pushed = nextMessage(ws);
     const manuscript = `${root}/demo-book/manuscript.md`;
     const src = await Deno.readTextFile(manuscript);
-    await Deno.writeTextFile(manuscript, src.replace("Chapter One", "Chapter Won"));
+    await Deno.writeTextFile(
+      manuscript,
+      src.replace("Chapter One", "Chapter Won"),
+    );
 
     const msg = await pushed;
     assertEquals(msg.type, "update");
@@ -99,9 +104,15 @@ Deno.test("websocket: initial build on connect, rebuild pushed on file change", 
 Deno.test("save: rapid posts coalesce to one write, broadcast tagged with origin", async () => {
   const root = await makeBooksRoot();
   // Debounce long enough that two sequential local fetches land inside one window.
-  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 200 });
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 200,
+  });
   const base = `http://localhost:${server.port}`;
-  const ws = new WebSocket(`ws://localhost:${server.port}/ws?book=demo-book&client=observer`);
+  const ws = new WebSocket(
+    `ws://localhost:${server.port}/ws?book=demo-book&client=observer`,
+  );
   try {
     await nextMessage(ws); // initial build
     await new Promise((r) => setTimeout(r, 300)); // let the watch warm up
@@ -128,7 +139,10 @@ Deno.test("save: rapid posts coalesce to one write, broadcast tagged with origin
     assertEquals(msg.origin, "editor-1"); // spec §6: originating editor can ignore this
     assert((msg.html as string).includes("Draft B"));
     // Only the LAST text hit the disk — the debounce swallowed Draft A.
-    assertEquals(await Deno.readTextFile(`${root}/demo-book/manuscript.md`), draftB);
+    assertEquals(
+      await Deno.readTextFile(`${root}/demo-book/manuscript.md`),
+      draftB,
+    );
 
     const bad = await fetch(`${base}/api/books/demo-book/manuscript`, {
       method: "POST",
@@ -145,7 +159,11 @@ Deno.test("save: rapid posts coalesce to one write, broadcast tagged with origin
 
 Deno.test("save: failed debounced write doesn't leak a stale recentWrites entry", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 150 });
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 150,
+  });
   const base = `http://localhost:${server.port}`;
   try {
     // Accepted synchronously, but the actual write happens after the debounce.
@@ -181,7 +199,9 @@ Deno.test("save: failed debounced write doesn't leak a stale recentWrites entry"
     );
     await new Promise((r) => setTimeout(r, 500)); // let the watcher settle after recreation
 
-    const ws = new WebSocket(`ws://localhost:${server.port}/ws?book=demo-book&client=observer`);
+    const ws = new WebSocket(
+      `ws://localhost:${server.port}/ws?book=demo-book&client=observer`,
+    );
     try {
       const first = await nextMessage(ws);
       assertEquals(first.type, "update");
@@ -189,7 +209,10 @@ Deno.test("save: failed debounced write doesn't leak a stale recentWrites entry"
       const pushed = nextMessage(ws);
       const manuscript = `${root}/demo-book/manuscript.md`;
       const text = await Deno.readTextFile(manuscript);
-      await Deno.writeTextFile(manuscript, text.replace("Chapter One", "Chapter Won"));
+      await Deno.writeTextFile(
+        manuscript,
+        text.replace("Chapter One", "Chapter Won"),
+      );
 
       const msg = await pushed;
       assertEquals(msg.type, "update");
@@ -208,7 +231,11 @@ Deno.test("save: failed debounced write doesn't leak a stale recentWrites entry"
 Deno.test("http: GET manuscript returns source; pending saves read through", async () => {
   const root = await makeBooksRoot();
   // 5s debounce: the POSTed save is guaranteed still pending when we GET.
-  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 5000 });
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 5000,
+  });
   const base = `http://localhost:${server.port}`;
   try {
     const res = await fetch(`${base}/api/books/demo-book/manuscript`);
@@ -219,10 +246,14 @@ Deno.test("http: GET manuscript returns source; pending saves read through", asy
     const post = await fetch(`${base}/api/books/demo-book/manuscript`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: "{chapter: two}\nNew text.", clientId: "t1" }),
+      body: JSON.stringify({
+        text: "{chapter: two}\nNew text.",
+        clientId: "t1",
+      }),
     });
     assertEquals((await post.json()).ok, true);
-    const after = await (await fetch(`${base}/api/books/demo-book/manuscript`)).json();
+    const after = await (await fetch(`${base}/api/books/demo-book/manuscript`))
+      .json();
     assertEquals(after.text, "{chapter: two}\nNew text.");
 
     const missing = await fetch(`${base}/api/books/no-such/manuscript`);
@@ -256,7 +287,11 @@ Deno.test("save: unknown book is a 404", async () => {
 
 Deno.test("metadata: GET returns config; POST merges sections, preserves the rest", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 40 });
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
   const base = `http://localhost:${server.port}`;
   try {
     const res = await fetch(`${base}/api/books/demo-book/metadata`);
@@ -268,12 +303,16 @@ Deno.test("metadata: GET returns config; POST merges sections, preserves the res
     const post = await fetch(`${base}/api/books/demo-book/metadata`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sections: { page: { size: "A5" } }, clientId: "t1" }),
+      body: JSON.stringify({
+        sections: { page: { size: "A5" } },
+        clientId: "t1",
+      }),
     });
     assertEquals((await post.json()).ok, true);
 
     // Pending save reads through before the debounce flushes.
-    const during = await (await fetch(`${base}/api/books/demo-book/metadata`)).json();
+    const during = await (await fetch(`${base}/api/books/demo-book/metadata`))
+      .json();
     assertEquals(during.metadata.page.size, "A5");
 
     await new Promise((r) => setTimeout(r, 150));
@@ -329,10 +368,15 @@ Deno.test("metadata: GET returns config; POST merges sections, preserves the res
 Deno.test("metadata: missing metadata.json GETs as {} and POST creates it", async () => {
   const root = await makeBooksRoot();
   await Deno.remove(`${root}/demo-book/metadata.json`);
-  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 40 });
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
   const base = `http://localhost:${server.port}`;
   try {
-    const empty = await (await fetch(`${base}/api/books/demo-book/metadata`)).json();
+    const empty = await (await fetch(`${base}/api/books/demo-book/metadata`))
+      .json();
     assertEquals(empty.metadata, {});
 
     await (await fetch(`${base}/api/books/demo-book/metadata`, {
@@ -353,8 +397,14 @@ Deno.test("metadata: missing metadata.json GETs as {} and POST creates it", asyn
 
 Deno.test("metadata: debounced write broadcasts an update tagged with origin", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({ booksRoot: root, port: 0, saveDebounceMs: 40 });
-  const ws = new WebSocket(`ws://localhost:${server.port}/ws?book=demo-book&client=cfg-1`);
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
+  const ws = new WebSocket(
+    `ws://localhost:${server.port}/ws?book=demo-book&client=cfg-1`,
+  );
   try {
     await nextMessage(ws); // initial build
     await new Promise((r) => setTimeout(r, 300)); // let the watch warm up

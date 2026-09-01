@@ -11,7 +11,9 @@ import {
 import { render } from "../renderer/render.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 
-const BASE_CSS = await Deno.readTextFile(new URL("../renderer/base.css", import.meta.url));
+const BASE_CSS = await Deno.readTextFile(
+  new URL("../renderer/base.css", import.meta.url),
+);
 
 // spec §4.11 item 8: try these in order for each {illustration:}/{dropcap|image:} slug.
 const IMAGE_EXT_ORDER = ["svg", "png", "jpg", "jpeg", "webp"];
@@ -103,7 +105,12 @@ export async function buildBook(
   return {
     book,
     bookTitle,
-    html: render(doc, { numbering: meta.numbering, notes: meta.notes, toc: meta.toc, images }),
+    html: render(doc, {
+      numbering: meta.numbering,
+      notes: meta.notes,
+      toc: meta.toc,
+      images,
+    }),
     baseCss: BASE_CSS,
     domCss: generateDomCSS(meta),
     pagedCss: generatePagedCSS(meta, { bookTitle }),

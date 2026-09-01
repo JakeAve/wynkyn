@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { EditorState } from "@codemirror/state";
 import { applySnippet, SNIPPETS } from "./snippets.ts";
 
@@ -53,7 +53,11 @@ Deno.test("inline snippet inserts at the cursor and selects its slug", () => {
 
 Deno.test("every block snippet with an explicit close names the same sentinel", () => {
   // Guards against a typo like {quote}...{/qoute} in the table.
-  for (const s of SNIPPETS.filter((s) => s.kind === "block" && s.text.includes("{/"))) {
+  for (
+    const s of SNIPPETS.filter((s) =>
+      s.kind === "block" && s.text.includes("{/")
+    )
+  ) {
     const open = s.text.match(/^\{([a-z-]+)/)![1];
     const close = s.text.match(/\{\/([a-z-]+)/)![1];
     assertEquals(close, open, `snippet ${s.label}`);

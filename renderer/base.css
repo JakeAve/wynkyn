@@ -86,7 +86,8 @@
   text-align: right;
 }
 :where(.bml .toc) .leader::before {
-  content: var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
+  content: var(--leader, "") var(--leader, "") var(--leader, "") var(--leader,
+    "")
     var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
     var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")
     var(--leader, "") var(--leader, "") var(--leader, "") var(--leader, "")

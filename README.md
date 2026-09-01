@@ -17,9 +17,14 @@ folded signatures for hand binding.
 ## Quick start
 
 ```sh
+deno task setup         # wire the git hooks (once, after cloning)
+deno task check         # deno fmt --check, lint, and type check
 deno task test          # run the suite
 deno task dev           # build the client + live server at http://localhost:8000
 ```
+
+`setup` points `core.hooksPath` at `.githooks/`, so `check` and `test` run on
+every commit and push.
 
 `deno task dev` watches the book's files and pushes changes to the preview over
 a WebSocket, so editing the manuscript or the styling updates the page live.

@@ -1,6 +1,6 @@
 // books_test.ts — the two public-domain fixture books under testdata/ are the
 // full-grammar regression corpus; they are tracked so a fresh clone and CI run them.
-import { assert, assertEquals } from "jsr:@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { parse } from "./parser/parser.ts";
 import { loadMetadata } from "./metadata/loader.ts";
 import { render } from "./renderer/render.ts";

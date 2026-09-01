@@ -68,7 +68,10 @@ export function parseInlines(lines: string[]): Inline[] {
           const m = tag.match(POINT_RE);
           if (m) {
             flush();
-            top().push({ kind: m[1] as "footnote" | "ref", slug: m[2]!.trim() });
+            top().push({
+              kind: m[1] as "footnote" | "ref",
+              slug: m[2]!.trim(),
+            });
             i = close + 1;
             continue;
           }

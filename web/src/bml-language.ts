@@ -17,7 +17,10 @@ export interface BmlStreamState {
   tag: TagField | null; // null = in prose
 }
 
-export function bmlToken(stream: StringStream, state: BmlStreamState): string | null {
+export function bmlToken(
+  stream: StringStream,
+  state: BmlStreamState,
+): string | null {
   // A sentinel never spans lines — an unterminated tag resets at the next line.
   if (state.tag !== null && stream.sol()) state.tag = null;
 
@@ -31,7 +34,9 @@ export function bmlToken(stream: StringStream, state: BmlStreamState): string | 
       return "bracket";
     }
     // prose: advance to the next markup-significant character
-    while (!stream.eol() && stream.peek() !== "{" && stream.peek() !== "\\") stream.next();
+    while (!stream.eol() && stream.peek() !== "{" && stream.peek() !== "\\") {
+      stream.next();
+    }
     return null;
   }
 

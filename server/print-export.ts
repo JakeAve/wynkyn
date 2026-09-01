@@ -1,6 +1,20 @@
 // server/print-export.ts — sheet PDFs from an Imposition (spec §7.7, design §2 step 4).
-import { degrees, PDFDocument, type PDFEmbeddedPage, type PDFPage, rgb, StandardFonts } from "pdf-lib";
-import { type Dims, type Flip, impose, type Imposition, parseDims, type Slot } from "./imposition.ts";
+import {
+  degrees,
+  PDFDocument,
+  type PDFEmbeddedPage,
+  type PDFPage,
+  rgb,
+  StandardFonts,
+} from "pdf-lib";
+import {
+  type Dims,
+  type Flip,
+  impose,
+  type Imposition,
+  parseDims,
+  type Slot,
+} from "./imposition.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
 import { renderPdf } from "./pdf.ts";
@@ -19,12 +33,19 @@ export interface Side {
 }
 
 /** Order the sheet sides for a given output file. */
-export function sidesFor(imp: Imposition, mode: "duplex" | "fronts" | "backs", reverseBacks: boolean): Side[] {
+export function sidesFor(
+  imp: Imposition,
+  mode: "duplex" | "fronts" | "backs",
+  reverseBacks: boolean,
+): Side[] {
   const sides: Side[] = [];
   imp.sheets.forEach((sh, i) => {
     const n = (i % imp.sheetsPerSignature) + 1;
-    const label = (face: string) => `sig ${sh.signature + 1} · sheet ${n} · ${face}`;
-    if (mode !== "backs") sides.push({ label: label("front"), slots: sh.front });
+    const label = (face: string) =>
+      `sig ${sh.signature + 1} · sheet ${n} · ${face}`;
+    if (mode !== "backs") {
+      sides.push({ label: label("front"), slots: sh.front });
+    }
     if (mode !== "fronts") sides.push({ label: label("back"), slots: sh.back });
   });
   return mode === "backs" && reverseBacks ? sides.reverse() : sides;
@@ -34,7 +55,11 @@ export function sidesFor(imp: Imposition, mode: "duplex" | "fronts" | "backs", r
  * One landscape PDF page per side. `source` is the trim-size book PDF whose
  * pages get embedded; null draws numbered proof placeholders instead.
  */
-export async function buildSheetPdf(sides: Side[], geom: SheetGeometry, source: Uint8Array | null): Promise<Uint8Array> {
+export async function buildSheetPdf(
+  sides: Side[],
+  geom: SheetGeometry,
+  source: Uint8Array | null,
+): Promise<Uint8Array> {
   const out = await PDFDocument.create();
   const font = await out.embedFont(StandardFonts.Helvetica);
   const W = Math.max(geom.sheet.w, geom.sheet.h) * PT;
@@ -54,7 +79,9 @@ export async function buildSheetPdf(sides: Side[], geom: SheetGeometry, source: 
     const x = x0 + i * pw;
     const y = y0;
     // pdf-lib rotates about (x, y); a 180° turn needs the opposite corner as origin.
-    const at = slot.rotate === 180 ? { x: x + pw, y: y + ph, rotate: degrees(180) } : { x, y, rotate: degrees(0) };
+    const at = slot.rotate === 180
+      ? { x: x + pw, y: y + ph, rotate: degrees(180) }
+      : { x, y, rotate: degrees(0) };
     if (slot.page === null) return;
     if (source) {
       const emb = embedded[slot.page];
@@ -63,14 +90,36 @@ export async function buildSheetPdf(sides: Side[], geom: SheetGeometry, source: 
       return;
     }
     // Proof placeholder: border, big page number, and where this slot sits.
-    page.drawRectangle({ x, y, width: pw, height: ph, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 0.5 });
+    page.drawRectangle({
+      x,
+      y,
+      width: pw,
+      height: ph,
+      borderColor: rgb(0.6, 0.6, 0.6),
+      borderWidth: 0.5,
+    });
     const num = String(slot.page + 1);
     const size = 72;
-    page.drawText(num, { x: x + pw / 2 - font.widthOfTextAtSize(num, size) / 2, y: y + ph / 2 - size / 3, size, font, ...(slot.rotate === 180 ? { rotate: degrees(180), x: x + pw / 2 + font.widthOfTextAtSize(num, size) / 2, y: y + ph / 2 + size / 3 } : {}) });
+    page.drawText(num, {
+      x: x + pw / 2 - font.widthOfTextAtSize(num, size) / 2,
+      y: y + ph / 2 - size / 3,
+      size,
+      font,
+      ...(slot.rotate === 180
+        ? {
+          rotate: degrees(180),
+          x: x + pw / 2 + font.widthOfTextAtSize(num, size) / 2,
+          y: y + ph / 2 + size / 3,
+        }
+        : {}),
+    });
     const caption = `${label} · folio ${slot.folio}`;
-    page.drawText(caption, slot.rotate === 180
-      ? { x: x + pw - 8, y: y + ph - 8, size: 8, font, rotate: degrees(180) }
-      : { x: x + 8, y: y + 8, size: 8, font });
+    page.drawText(
+      caption,
+      slot.rotate === 180
+        ? { x: x + pw - 8, y: y + ph - 8, size: 8, font, rotate: degrees(180) }
+        : { x: x + 8, y: y + 8, size: 8, font },
+    );
   };
 
   for (const side of sides) {
@@ -110,7 +159,11 @@ function assertWholeNumber(value: number, label: string): void {
 const DUPLEX_VALUES = ["short-edge", "long-edge", "none"] as const;
 const FLIP_VALUES = ["short-edge", "long-edge"] as const;
 
-function assertOneOf<T extends string>(value: T, allowed: readonly T[], label: string): void {
+function assertOneOf<T extends string>(
+  value: T,
+  allowed: readonly T[],
+  label: string,
+): void {
   if (!allowed.includes(value)) {
     const list = allowed.length > 2
       ? `${allowed.slice(0, -1).join(", ")}, or ${allowed[allowed.length - 1]}`
@@ -119,7 +172,11 @@ function assertOneOf<T extends string>(value: T, allowed: readonly T[], label: s
   }
 }
 
-export async function exportBook(booksRoot: string, book: string, opts: ExportOptions): Promise<ExportSummary> {
+export async function exportBook(
+  booksRoot: string,
+  book: string,
+  opts: ExportOptions,
+): Promise<ExportSummary> {
   const bookDir = `${booksRoot}/${book}`;
   try {
     await Deno.stat(`${bookDir}/manuscript.md`);
@@ -164,27 +221,58 @@ export async function exportBook(booksRoot: string, book: string, opts: ExportOp
   const imposition = impose(pageCount, { folios, sheet, page, duplex, flip });
   const geom: SheetGeometry = { sheet, page, nUp: imposition.nUp };
   if (duplex === "none") {
-    for (const [name, mode] of [["sheets-fronts.pdf", "fronts"], ["sheets-backs.pdf", "backs"]] as const) {
+    for (
+      const [name, mode] of [["sheets-fronts.pdf", "fronts"], [
+        "sheets-backs.pdf",
+        "backs",
+      ]] as const
+    ) {
       const path = `${out}/${name}`;
-      await Deno.writeFile(path, await buildSheetPdf(sidesFor(imposition, mode, opts.reverseBacks ?? false), geom, source));
+      await Deno.writeFile(
+        path,
+        await buildSheetPdf(
+          sidesFor(imposition, mode, opts.reverseBacks ?? false),
+          geom,
+          source,
+        ),
+      );
       files.push(path);
     }
   } else {
     const path = `${out}/sheets.pdf`;
-    await Deno.writeFile(path, await buildSheetPdf(sidesFor(imposition, "duplex", false), geom, source));
+    await Deno.writeFile(
+      path,
+      await buildSheetPdf(sidesFor(imposition, "duplex", false), geom, source),
+    );
     files.push(path);
   }
-  return { pageCount, imposition, files, diagnostics, resolved: { sheet: sheetName, duplex, folios } };
+  return {
+    pageCount,
+    imposition,
+    files,
+    diagnostics,
+    resolved: { sheet: sheetName, duplex, folios },
+  };
 }
 
-export function formatSummary(book: string, s: ExportSummary, cfg: { sheet: string; duplex: string }): string {
+export function formatSummary(
+  book: string,
+  s: ExportSummary,
+  cfg: { sheet: string; duplex: string },
+): string {
   const i = s.imposition;
   const folios = s.resolved.folios;
   const lines = [
-    `${book}: ${s.pageCount} pages → ${i.paddedCount} padded · ${i.signatures} signature${i.signatures === 1 ? "" : "s"} × ${folios} folios · ${i.nUp}-up on ${cfg.sheet} · ${i.sheets.length} sheets · duplex ${cfg.duplex}`,
+    `${book}: ${s.pageCount} pages → ${i.paddedCount} padded · ${i.signatures} signature${
+      i.signatures === 1 ? "" : "s"
+    } × ${folios} folios · ${i.nUp}-up on ${cfg.sheet} · ${i.sheets.length} sheets · duplex ${cfg.duplex}`,
   ];
   if (i.wastedFolioSlots > 0) {
-    lines.push(`warning: ${i.wastedFolioSlots} blank folio slot${i.wastedFolioSlots === 1 ? "" : "s"} per signature (cut half is waste)`);
+    lines.push(
+      `warning: ${i.wastedFolioSlots} blank folio slot${
+        i.wastedFolioSlots === 1 ? "" : "s"
+      } per signature (cut half is waste)`,
+    );
   }
   return lines.join("\n");
 }

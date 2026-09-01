@@ -1,7 +1,15 @@
-import { assert, assertEquals } from "jsr:@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { parse } from "./parser.ts";
 import type { Chapter, Paragraph, Part } from "./types.ts";
-import type { Break, Component, DropcapParagraph, Heading, Illustration, Inline, Note } from "./types.ts";
+import type {
+  Break,
+  Component,
+  DropcapParagraph,
+  Heading,
+  Illustration,
+  Inline,
+  Note,
+} from "./types.ts";
 import type { Epigraph, IsBlock, Poem, Quote, Sidebar } from "./types.ts";
 import type { Columns, List, Verses } from "./types.ts";
 
@@ -42,7 +50,9 @@ Deno.test("chapter nests inside part; part closes part (§3.2.3)", () => {
   assertEquals(doc.body.length, 2);
   const p1 = doc.body[0] as Part;
   assertEquals(
-    p1.children.filter((c) => c.kind === "chapter").map((c) => (c as Chapter).slug),
+    p1.children.filter((c) => c.kind === "chapter").map((c) =>
+      (c as Chapter).slug
+    ),
     ["thaw", "river"],
   );
   const p2 = doc.body[1] as Part;
@@ -63,7 +73,10 @@ Deno.test("matter closes an open part and chapter (§3.2.3)", () => {
 
 Deno.test("prose in a matter block (dedication, §3.4.4)", () => {
   const doc = parse("{matter: dedication}\nFor my father, who kept the trees.");
-  assertEquals(text(doc.frontMatter[0]!.children[0] as Paragraph), "For my father, who kept the trees.");
+  assertEquals(
+    text(doc.frontMatter[0]!.children[0] as Paragraph),
+    "For my father, who kept the trees.",
+  );
 });
 
 Deno.test("paragraphs split on blank lines; source lines join (§3.2.5)", () => {
@@ -82,7 +95,10 @@ Deno.test("comments are stripped and do not break a paragraph (§3.2.1)", () => 
 
 Deno.test("escaped line is prose, not a comment (§3.2.8)", () => {
   const doc = parse("{chapter: one}\n\\%% not a comment");
-  assertEquals(text((doc.body[0] as Chapter).children[0] as Paragraph), "%% not a comment");
+  assertEquals(
+    text((doc.body[0] as Chapter).children[0] as Paragraph),
+    "%% not a comment",
+  );
 });
 
 Deno.test("orphan prose lands in an implicit chapter with a diagnostic", () => {
@@ -106,7 +122,10 @@ Deno.test("part or chapter after back matter: diagnostic, content preserved", ()
 
 Deno.test("CRLF input parses identically", () => {
   const doc = parse("{chapter: one}\r\nProse.\r\n");
-  assertEquals(text((doc.body[0] as Chapter).children[0] as Paragraph), "Prose.");
+  assertEquals(
+    text((doc.body[0] as Chapter).children[0] as Paragraph),
+    "Prose.",
+  );
 });
 
 Deno.test("unknown sentinel: diagnostic, no throw", () => {
@@ -129,7 +148,13 @@ Deno.test("title page components, repeated {author} (§3.4.2)", () => {
     "2024",
   ].join("\n"));
   const kids = doc.frontMatter[0]!.children as Component[];
-  assertEquals(kids.map((k) => k.name), ["title", "subtitle", "author", "author", "year"]);
+  assertEquals(kids.map((k) => k.name), [
+    "title",
+    "subtitle",
+    "author",
+    "author",
+    "year",
+  ]);
   assertEquals(inlineText(kids[2]!.inlines), "Jane Ellory");
   assertEquals(doc.diagnostics, []);
 });
@@ -152,7 +177,9 @@ Deno.test("component content may wrap lines until blank/sentinel ({rights}, §3.
 });
 
 Deno.test("chapter title lives as a component child of the chapter (§3.5.2)", () => {
-  const doc = parse("{chapter: thaw}\n{title}\nThe First Thaw\n\nProse begins.");
+  const doc = parse(
+    "{chapter: thaw}\n{title}\nThe First Thaw\n\nProse begins.",
+  );
   const ch = doc.body[0] as Chapter;
   assertEquals(ch.children.length, 2);
   assertEquals((ch.children[0] as Component).name, "title");
@@ -174,7 +201,9 @@ Deno.test("dropcap wraps its following paragraph (§3.5.4)", () => {
 });
 
 Deno.test("dropcap with image param (§3.5.4)", () => {
-  const doc = parse("{chapter: thaw}\n{dropcap | image: initial-T}\nThe morning came slowly.");
+  const doc = parse(
+    "{chapter: thaw}\n{dropcap | image: initial-T}\nThe morning came slowly.",
+  );
   const d = (doc.body[0] as Chapter).children[0] as DropcapParagraph;
   assertEquals(d.image, "initial-T");
 });
@@ -196,20 +225,34 @@ Deno.test("heading and subheading levels, optional slug (§3.5.3)", () => {
   const ch = doc.body[0] as Chapter;
   const h1 = ch.children[0] as Heading;
   const h2 = ch.children[1] as Heading;
-  assertEquals([h1.level, h1.slug, inlineText(h1.inlines)], [1, "spring-1943", "Spring, 1943"]);
+  assertEquals([h1.level, h1.slug, inlineText(h1.inlines)], [
+    1,
+    "spring-1943",
+    "Spring, 1943",
+  ]);
   assertEquals([h2.level, h2.slug], [2, undefined]);
 });
 
 Deno.test("break: bare and slugged (§3.5.6)", () => {
-  const doc = parse("{chapter: one}\nBefore.\n\n{break}\n\nMiddle.\n\n{break: passage-of-years}\n\nAfter.");
+  const doc = parse(
+    "{chapter: one}\nBefore.\n\n{break}\n\nMiddle.\n\n{break: passage-of-years}\n\nAfter.",
+  );
   const kinds = (doc.body[0] as Chapter).children.map((c) => c.kind);
-  assertEquals(kinds, ["paragraph", "break", "paragraph", "break", "paragraph"]);
+  assertEquals(kinds, [
+    "paragraph",
+    "break",
+    "paragraph",
+    "break",
+    "paragraph",
+  ]);
   const b2 = (doc.body[0] as Chapter).children[3] as Break;
   assertEquals(b2.slug, "passage-of-years");
 });
 
 Deno.test("illustration with placement and caption (§3.6.1)", () => {
-  const doc = parse("{chapter: one}\n{illustration: orchard-1943 | placement: full-page}\nThe Orchard, circa 1943");
+  const doc = parse(
+    "{chapter: one}\n{illustration: orchard-1943 | placement: full-page}\nThe Orchard, circa 1943",
+  );
   const il = (doc.body[0] as Chapter).children[0] as Illustration;
   assertEquals(il.slug, "orchard-1943");
   assertEquals(il.placement, "full-page");
@@ -225,17 +268,24 @@ Deno.test("illustration without placement or caption (§3.6.1)", () => {
 });
 
 Deno.test("invalid illustration placement: diagnostic", () => {
-  const doc = parse("{chapter: one}\n{illustration: x | placement: sideways}\nCap");
+  const doc = parse(
+    "{chapter: one}\n{illustration: x | placement: sideways}\nCap",
+  );
   assert(doc.diagnostics.some((d) => d.message.includes("placement")));
 });
 
 Deno.test("note content node (§3.6.8)", () => {
-  const doc = parse("{chapter: one}\nThe harvest was poor.{footnote: harvest-1943}\n\n{note: harvest-1943}\nRegional records show a 40% reduction.");
+  const doc = parse(
+    "{chapter: one}\nThe harvest was poor.{footnote: harvest-1943}\n\n{note: harvest-1943}\nRegional records show a 40% reduction.",
+  );
   const ch = doc.body[0] as Chapter;
   const note = ch.children[1] as Note;
   assertEquals(note.kind, "note");
   assertEquals(note.slug, "harvest-1943");
-  assertEquals(inlineText(note.inlines), "Regional records show a 40% reduction.");
+  assertEquals(
+    inlineText(note.inlines),
+    "Regional records show a 40% reduction.",
+  );
 });
 
 Deno.test("attribution with nothing to bind to: diagnostic, kept as component", () => {
@@ -246,7 +296,9 @@ Deno.test("attribution with nothing to bind to: diagnostic, kept as component", 
 });
 
 Deno.test("single-paragraph sidebar closes implicitly (§3.6.2)", () => {
-  const doc = parse("{chapter: one}\n{sidebar}\nA brief aside.\n\nBack to prose.");
+  const doc = parse(
+    "{chapter: one}\n{sidebar}\nA brief aside.\n\nBack to prose.",
+  );
   const ch = doc.body[0] as Chapter;
   const sb = ch.children[0] as Sidebar;
   assertEquals(sb.kind, "sidebar");
@@ -256,7 +308,9 @@ Deno.test("single-paragraph sidebar closes implicitly (§3.6.2)", () => {
 });
 
 Deno.test("explicit sidebar spans multiple paragraphs (§3.6.2)", () => {
-  const doc = parse("{chapter: one}\n{sidebar}\nFirst.\n\nSecond.\n{/sidebar}\n\nOutside.");
+  const doc = parse(
+    "{chapter: one}\n{sidebar}\nFirst.\n\nSecond.\n{/sidebar}\n\nOutside.",
+  );
   const ch = doc.body[0] as Chapter;
   const sb = ch.children[0] as Sidebar;
   assertEquals(sb.children.length, 2);
@@ -274,7 +328,11 @@ Deno.test("unclosed block: content after first paragraph falls outside (§3.2.3)
 Deno.test("implicit block ends at the next sentinel, even with no content", () => {
   const doc = parse("{chapter: one}\n{sidebar}\n{break}\nProse.");
   const ch = doc.body[0] as Chapter;
-  assertEquals(ch.children.map((c) => c.kind), ["sidebar", "break", "paragraph"]);
+  assertEquals(ch.children.map((c) => c.kind), [
+    "sidebar",
+    "break",
+    "paragraph",
+  ]);
   assertEquals((ch.children[0] as Sidebar).children.length, 0);
 });
 
@@ -306,7 +364,10 @@ Deno.test("multi-paragraph quote, attribution after the close (§3.6.4)", () => 
   ].join("\n"));
   const q = (doc.body[0] as Chapter).children[0] as Quote;
   assertEquals(q.children.length, 2);
-  assertEquals(inlineText(q.attribution!.inlines), "— Declaration of Independence");
+  assertEquals(
+    inlineText(q.attribution!.inlines),
+    "— Declaration of Independence",
+  );
 });
 
 Deno.test("poem: paragraphs are stanzas, hard breaks are lines, attribution binds (§3.5.8)", () => {
@@ -329,12 +390,16 @@ Deno.test("poem: paragraphs are stanzas, hard breaks are lines, attribution bind
 });
 
 Deno.test("component sentinels are not allowed inside a poem: diagnostic", () => {
-  const doc = parse("{chapter: one}\n{poem}\nStanza.\n\n{title}\nNope\n{/poem}");
+  const doc = parse(
+    "{chapter: one}\n{poem}\nStanza.\n\n{title}\nNope\n{/poem}",
+  );
   assert(doc.diagnostics.some((d) => d.message.includes("poem")));
 });
 
 Deno.test("pullquote (§3.6.3)", () => {
-  const doc = parse("{chapter: one}\n{pullquote}\nThe orchard remembers what the house has forgotten.");
+  const doc = parse(
+    "{chapter: one}\n{pullquote}\nThe orchard remembers what the house has forgotten.",
+  );
   assertEquals((doc.body[0] as Chapter).children[0]!.kind, "pullquote");
 });
 
@@ -419,7 +484,9 @@ Deno.test("verses: one verse per paragraph, default start 1 (§3.5.7)", () => {
 });
 
 Deno.test("verses with start param (§3.5.7)", () => {
-  const doc = parse("{chapter: one}\n{verses: genesis-1 | start: 3}\nAnd God said.\n{/verses}");
+  const doc = parse(
+    "{chapter: one}\n{verses: genesis-1 | start: 3}\nAnd God said.\n{/verses}",
+  );
   const v = (doc.body[0] as Chapter).children[0] as Verses;
   assertEquals(v.start, 3);
 });
@@ -439,7 +506,9 @@ Deno.test("verses nest inside columns (§3.2.3 example)", () => {
 });
 
 Deno.test("columns flow mode: no {col}, single stream (§3.6.5)", () => {
-  const doc = parse("{chapter: one}\n{columns: 2}\nA long passage of prose.\n{/columns}");
+  const doc = parse(
+    "{chapter: one}\n{columns: 2}\nA long passage of prose.\n{/columns}",
+  );
   const cols = (doc.body[0] as Chapter).children[0] as Columns;
   assertEquals(cols.count, 2);
   assertEquals(cols.mode, "flow");
@@ -479,7 +548,9 @@ Deno.test("invalid columns count: diagnostic", () => {
 });
 
 Deno.test("unordered list (§3.6.7)", () => {
-  const doc = parse("{chapter: one}\n- First item\n- Second item\n- Third item");
+  const doc = parse(
+    "{chapter: one}\n- First item\n- Second item\n- Third item",
+  );
   const l = (doc.body[0] as Chapter).children[0] as List;
   assertEquals(l.ordered, false);
   assertEquals(l.items.length, 3);
@@ -502,7 +573,9 @@ Deno.test("escaped leading dash is prose, not a list (§3.2.8)", () => {
 });
 
 Deno.test("mixed prose and dash lines stay one paragraph", () => {
-  const doc = parse("{chapter: one}\nShe said\n- or seemed to say -\nnothing at all.");
+  const doc = parse(
+    "{chapter: one}\nShe said\n- or seemed to say -\nnothing at all.",
+  );
   assertEquals((doc.body[0] as Chapter).children[0]!.kind, "paragraph");
 });
 
@@ -520,19 +593,33 @@ Deno.test("mixed prose and dash lines stay one paragraph", () => {
 // invariant changes later), but only the two closeBlock paths are reachable
 // today. These two tests pin down the actual (verified) behavior instead.
 Deno.test("columns divider check does not false-fire via popImplicitBlocks when {col} evicts the implicit block first", () => {
-  const doc = parse("{chapter: one}\n{columns: 3}\na\n{col}\nb\n\nOutside now.");
+  const doc = parse(
+    "{chapter: one}\n{columns: 3}\na\n{col}\nb\n\nOutside now.",
+  );
   assert(!doc.diagnostics.some((d) => d.message.includes("divider")));
-  assert(doc.diagnostics.some((d) => d.message.includes("{col} outside a {columns:} block")));
+  assert(
+    doc.diagnostics.some((d) =>
+      d.message.includes("{col} outside a {columns:} block")
+    ),
+  );
 });
 
 Deno.test("columns divider check does not false-fire via openStructural when the block was already evicted by {col}", () => {
-  const doc = parse("{chapter: one}\n{columns: 3}\na\n{col}\nb\n{chapter: two}\nc");
+  const doc = parse(
+    "{chapter: one}\n{columns: 3}\na\n{col}\nb\n{chapter: two}\nc",
+  );
   assert(!doc.diagnostics.some((d) => d.message.includes("divider")));
-  assert(doc.diagnostics.some((d) => d.message.includes("{col} outside a {columns:} block")));
+  assert(
+    doc.diagnostics.some((d) =>
+      d.message.includes("{col} outside a {columns:} block")
+    ),
+  );
 });
 
 Deno.test("parallel columns divider mismatch is diagnosed when a LIFO close-order violation discards it", () => {
-  const doc = parse("{chapter: one}\n{columns: 3}\na\n{col}\nb\n{sidebar}\nc\n{/columns}\n{/sidebar}");
+  const doc = parse(
+    "{chapter: one}\n{columns: 3}\na\n{col}\nb\n{sidebar}\nc\n{/columns}\n{/sidebar}",
+  );
   assert(doc.diagnostics.some((d) => d.message.includes("divider")));
 });
 
@@ -576,12 +663,16 @@ Deno.test("diagnostic: component-built and untitled display pages are exempt", (
 });
 
 Deno.test("diagnostic: a titled matter block with {title} is clean", () => {
-  const doc = parse("{matter: preface}\n{title}\nPreface\n\np\n{chapter: one}\n\nx");
+  const doc = parse(
+    "{matter: preface}\n{title}\nPreface\n\np\n{chapter: one}\n\nx",
+  );
   assertEquals(doc.diagnostics, []);
 });
 
 Deno.test("diagnostic: a toc without {title} is reported as a missing heading, not a missing entry", () => {
-  const doc = parse("{matter: toc}\n%% auto-generated by renderer\n{chapter: one}\n\nx");
+  const doc = parse(
+    "{matter: toc}\n%% auto-generated by renderer\n{chapter: one}\n\nx",
+  );
   assertEquals(doc.diagnostics.map((d) => `${d.line}: ${d.message}`), [
     "1: {matter: toc} has no {title} — the contents page will render without a heading",
   ]);

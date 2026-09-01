@@ -1,5 +1,5 @@
 // parser/sentinel_test.ts
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { parseSentinelLine } from "./sentinel.ts";
 
 Deno.test("bare sentinel", () => {
@@ -69,11 +69,17 @@ Deno.test("numeric slug (columns count)", () => {
 });
 
 Deno.test("surrounding whitespace tolerated", () => {
-  assertEquals(parseSentinelLine("  {break: passage-of-years}  ")?.slug, "passage-of-years");
+  assertEquals(
+    parseSentinelLine("  {break: passage-of-years}  ")?.slug,
+    "passage-of-years",
+  );
 });
 
 Deno.test("prose containing inline tags is not a sentinel line", () => {
-  assertEquals(parseSentinelLine("She saw the {em}Queen Mary{/em} at dock."), null);
+  assertEquals(
+    parseSentinelLine("She saw the {em}Queen Mary{/em} at dock."),
+    null,
+  );
 });
 
 Deno.test("escaped line is not a sentinel", () => {

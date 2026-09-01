@@ -1,5 +1,5 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert";
-import { impose, nUp, parseDims, type ImposeConfig } from "./imposition.ts";
+import { assertEquals, assertThrows } from "@std/assert";
+import { impose, type ImposeConfig, nUp, parseDims } from "./imposition.ts";
 
 Deno.test("parseDims: named sizes and explicit in/mm", () => {
   assertEquals(parseDims("legal"), { w: 8.5, h: 14 });
@@ -21,8 +21,15 @@ Deno.test("nUp: derived from sheet long side / page width, even only", () => {
 });
 
 const LEGAL = parseDims("legal");
-const base: ImposeConfig = { folios: 1, sheet: LEGAL, page: { w: 5.5, h: 8.5 }, duplex: "short-edge", flip: "short-edge" };
-const pages = (slots: { page: number | null }[]) => slots.map((s) => s.page === null ? null : s.page + 1); // 1-based for readability
+const base: ImposeConfig = {
+  folios: 1,
+  sheet: LEGAL,
+  page: { w: 5.5, h: 8.5 },
+  duplex: "short-edge",
+  flip: "short-edge",
+};
+const pages = (slots: { page: number | null }[]) =>
+  slots.map((s) => s.page === null ? null : s.page + 1); // 1-based for readability
 
 Deno.test("impose: one folio, 2-up, 4 pages", () => {
   const r = impose(4, base);
@@ -84,7 +91,12 @@ Deno.test("impose: odd folio count on a 4-up sheet leaves a blank folio slot", (
 });
 
 Deno.test("impose: long-edge flip = book-style back rotated 180° as a whole", () => {
-  const r = impose(8, { ...base, folios: 2, page: { w: 3.5, h: 8.5 }, duplex: "long-edge" });
+  const r = impose(8, {
+    ...base,
+    folios: 2,
+    page: { w: 3.5, h: 8.5 },
+    duplex: "long-edge",
+  });
   assertEquals(pages(r.sheets[0]!.back), [7, 2, 5, 4]);
   assertEquals(r.sheets[0]!.back.every((s) => s.rotate === 180), true);
   assertEquals(r.sheets[0]!.front.every((s) => s.rotate === 0), true);

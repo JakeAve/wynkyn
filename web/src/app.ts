@@ -11,7 +11,12 @@ import {
   scrollPreviewTo,
   type UpdateMessage,
 } from "./preview.ts";
-import { applyDiagnostics, createEditor, replaceBuffer, scrollEditorToLine } from "./editor.ts";
+import {
+  applyDiagnostics,
+  createEditor,
+  replaceBuffer,
+  scrollEditorToLine,
+} from "./editor.ts";
 import { applySnippet, SNIPPETS } from "./snippets.ts";
 import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
@@ -37,7 +42,9 @@ const STATUS_TEXT: Record<StatusKind, string> = {
 };
 function setStatus(kind: StatusKind, detail?: string): void {
   const el = $("status");
-  el.textContent = detail && kind === "error" ? `${STATUS_TEXT[kind]} — ${detail}` : STATUS_TEXT[kind];
+  el.textContent = detail && kind === "error"
+    ? `${STATUS_TEXT[kind]} — ${detail}`
+    : STATUS_TEXT[kind];
   el.dataset.kind = kind;
   el.title = detail ?? "";
 }
@@ -74,7 +81,9 @@ function reparse(text: string): void {
   const diag = $("diagnostics");
   const first = doc.diagnostics[0];
   diag.textContent = first
-    ? `${doc.diagnostics.length} parse note${doc.diagnostics.length > 1 ? "s" : ""} — line ${first.line}: ${first.message}`
+    ? `${doc.diagnostics.length} parse note${
+      doc.diagnostics.length > 1 ? "s" : ""
+    } — line ${first.line}: ${first.message}`
     : "";
   diag.title = first ? "click to jump to the first note" : "";
   diag.onclick = first ? () => scrollEditorToLine(editor, first.line) : null;
@@ -86,7 +95,8 @@ let cursorLine = 1;
 
 function refreshTree(doc: BmlDocument): void {
   const nodes = buildTree(doc);
-  treeLines = nodes.flatMap((n) => [n.line, ...n.children.map((c) => c.line)]).sort((a, b) => a - b);
+  treeLines = nodes.flatMap((n) => [n.line, ...n.children.map((c) => c.line)])
+    .sort((a, b) => a - b);
   renderTree($("tree"), nodes, (node) => {
     scrollEditorToLine(editor, node.line);
     scrollPreviewTo(node.anchorId, $("preview"));
@@ -101,12 +111,16 @@ function highlightTreeNode(line: number): void {
   for (const l of treeLines) if (l <= line) best = l;
   const tree = $("tree");
   tree.querySelector("[aria-current]")?.removeAttribute("aria-current");
-  tree.querySelector(`[data-line="${best}"]`)?.setAttribute("aria-current", "true");
+  tree.querySelector(`[data-line="${best}"]`)?.setAttribute(
+    "aria-current",
+    "true",
+  );
 }
 
 // "a-christmas-carol" → "A Christmas Carol" for the toolbar and picker.
 function prettify(slug: string): string {
-  return slug.split("-").map((w) => w ? w[0]!.toUpperCase() + w.slice(1) : w).join(" ");
+  return slug.split("-").map((w) => w ? w[0]!.toUpperCase() + w.slice(1) : w)
+    .join(" ");
 }
 
 // The book switcher is a file-picker dialog: search + one row per book.
@@ -118,7 +132,9 @@ function populateSwitcher(books: string[], active: string): void {
   const render = () => {
     const q = search.value.trim().toLowerCase();
     list.innerHTML = "";
-    const hits = books.filter((b) => !q || b.includes(q) || prettify(b).toLowerCase().includes(q));
+    const hits = books.filter((b) =>
+      !q || b.includes(q) || prettify(b).toLowerCase().includes(q)
+    );
     hits.forEach((b, i) => {
       const row = document.createElement("button");
       row.className = "book-row";
@@ -174,11 +190,14 @@ function save(text: string): void {
 
 async function doSave(text: string): Promise<void> {
   try {
-    const res = await fetch(`/api/books/${encodeURIComponent(book)}/manuscript`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, clientId }),
-    });
+    const res = await fetch(
+      `/api/books/${encodeURIComponent(book)}/manuscript`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, clientId }),
+      },
+    );
     if (!res.ok) throw new Error(await res.text());
     if (editor.state.doc.toString() === text) {
       dirty = false;
@@ -234,7 +253,9 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
 
 async function fetchMetadata(): Promise<Metadata> {
   const res = await fetch(`/api/books/${encodeURIComponent(book)}/metadata`);
-  if (!res.ok) throw new Error(`metadata load failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    throw new Error(`metadata load failed: ${res.status} ${await res.text()}`);
+  }
   return ((await res.json()) as { metadata: Metadata }).metadata;
 }
 
@@ -310,16 +331,28 @@ function setPaneMode(mode: PaneMode): void {
   const panes = $("panes");
   panes.classList.remove("pane-mode-editor", "pane-mode-preview");
   if (mode !== "split") panes.classList.add(`pane-mode-${mode}`);
-  $("pane-toggle-editor").setAttribute("aria-pressed", String(mode === "editor"));
+  $("pane-toggle-editor").setAttribute(
+    "aria-pressed",
+    String(mode === "editor"),
+  );
   $("pane-toggle-split").setAttribute("aria-pressed", String(mode === "split"));
-  $("pane-toggle-preview").setAttribute("aria-pressed", String(mode === "preview"));
+  $("pane-toggle-preview").setAttribute(
+    "aria-pressed",
+    String(mode === "preview"),
+  );
 }
 
 // Draggable gutters: each one writes a CSS var on #panes that the grid
 // template reads, persisted so widths survive a reload.
 function installGutters(): void {
   const panes = $("panes");
-  for (const [id, cssVar, min] of [["gutter-tree", "--w-tree", 120], ["gutter-editor", "--w-editor", 240]] as const) {
+  for (
+    const [id, cssVar, min] of [["gutter-tree", "--w-tree", 120], [
+      "gutter-editor",
+      "--w-editor",
+      240,
+    ]] as const
+  ) {
     const saved = localStorage.getItem(cssVar);
     if (saved) panes.style.setProperty(cssVar, saved);
     const gutter = $(id);
@@ -327,11 +360,16 @@ function installGutters(): void {
       e.preventDefault();
       gutter.setPointerCapture(e.pointerId);
       gutter.classList.add("dragging");
-      const left = (cssVar === "--w-tree" ? panes : $("editor")).getBoundingClientRect().left;
+      const left =
+        (cssVar === "--w-tree" ? panes : $("editor")).getBoundingClientRect()
+          .left;
       gutter.onpointermove = (m) => {
         // Leave at least 200px for whatever pane sits to the right.
         const max = panes.getBoundingClientRect().right - left - 200;
-        panes.style.setProperty(cssVar, `${Math.min(Math.max(m.clientX - left, min), max)}px`);
+        panes.style.setProperty(
+          cssVar,
+          `${Math.min(Math.max(m.clientX - left, min), max)}px`,
+        );
       };
       gutter.onpointerup = () => {
         gutter.onpointermove = gutter.onpointerup = null;
@@ -359,7 +397,9 @@ function installTreeToggle(): void {
 // system (resolved by the inline script in index.html before first paint).
 function installThemeToggle(): void {
   $("theme-toggle").onclick = () => {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    const next = document.documentElement.dataset.theme === "dark"
+      ? "light"
+      : "dark";
     document.documentElement.dataset.theme = next;
     localStorage.setItem("theme", next);
   };
@@ -379,7 +419,13 @@ function installConfigPlacement(): void {
   sync();
 }
 
-const STRUCTURE_SNIPPETS = new Set(["matter", "part", "chapter", "heading", "subheading"]);
+const STRUCTURE_SNIPPETS = new Set([
+  "matter",
+  "part",
+  "chapter",
+  "heading",
+  "subheading",
+]);
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 // Keyboard chords. Snippet chords insert via applySnippet; the rest are UI.
 const SNIPPET_KEYS: Record<string, string> = {
@@ -395,10 +441,16 @@ function chordLabel(chord: string): string {
 }
 function chordOf(e: KeyboardEvent): string | null {
   if (!(e.metaKey || e.ctrlKey) || e.altKey) return null;
-  return `Mod-${e.shiftKey ? "Shift-" : ""}${e.key.length === 1 ? e.key.toUpperCase() : e.key}`;
+  return `Mod-${e.shiftKey ? "Shift-" : ""}${
+    e.key.length === 1 ? e.key.toUpperCase() : e.key
+  }`;
 }
 function installShortcuts(): void {
-  const bySnippet = new Map(SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((s) => [SNIPPET_KEYS[s.label], s]));
+  const bySnippet = new Map(
+    SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((
+      s,
+    ) => [SNIPPET_KEYS[s.label], s]),
+  );
   document.addEventListener("keydown", (e) => {
     const chord = chordOf(e);
     if (!chord) return;
@@ -424,9 +476,17 @@ function installShortcuts(): void {
 function buildSnippetToolbar(): void {
   const menu = $("insert-menu") as HTMLDetailsElement;
   const bar = $("snippet-buttons");
-  const groups = { structure: [] as typeof SNIPPETS, block: [] as typeof SNIPPETS, inline: [] as typeof SNIPPETS };
+  const groups = {
+    structure: [] as typeof SNIPPETS,
+    block: [] as typeof SNIPPETS,
+    inline: [] as typeof SNIPPETS,
+  };
   for (const s of SNIPPETS) {
-    (STRUCTURE_SNIPPETS.has(s.label) ? groups.structure : s.kind === "block" ? groups.block : groups.inline).push(s);
+    (STRUCTURE_SNIPPETS.has(s.label)
+      ? groups.structure
+      : s.kind === "block"
+      ? groups.block
+      : groups.inline).push(s);
   }
   for (const [name, list] of Object.entries(groups)) {
     const col = document.createElement("div");
@@ -471,7 +531,12 @@ async function main(): Promise<void> {
   populateSwitcher(books, book);
 
   const text = await fetchManuscript(book);
-  editor = createEditor({ parent: $("editor"), text, onDocChanged, onCursorLine: highlightTreeNode });
+  editor = createEditor({
+    parent: $("editor"),
+    text,
+    onDocChanged,
+    onCursorLine: highlightTreeNode,
+  });
   reparse(text);
   buildSnippetToolbar();
   installShortcuts();
@@ -494,10 +559,15 @@ async function main(): Promise<void> {
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);
-  const refreshPageIndicator = installPageIndicator(previewEl, $("page-indicator"));
+  const refreshPageIndicator = installPageIndicator(
+    previewEl,
+    $("page-indicator"),
+  );
   installStyleClicks(previewEl, () => catalogFor(metadata ?? {}), pickStyle);
   const ws = new WebSocket(
-    `ws://${location.host}/ws?book=${encodeURIComponent(book)}&client=${clientId}`,
+    `ws://${location.host}/ws?book=${
+      encodeURIComponent(book)
+    }&client=${clientId}`,
   );
   ws.onopen = () => setStatus("saved");
   ws.onclose = () => setStatus("offline");

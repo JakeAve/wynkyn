@@ -42,7 +42,9 @@ function inlineText(inlines: Inline[]): string {
 
 function titleOf(children: (ContentNode | Chapter)[]): string | null {
   for (const c of children) {
-    if (c.kind === "component" && c.name === "title") return inlineText(c.inlines);
+    if (c.kind === "component" && c.name === "title") {
+      return inlineText(c.inlines);
+    }
   }
   return null;
 }

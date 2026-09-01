@@ -65,15 +65,24 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       // creates its object via `??=`, so meta[k] is always defined (possibly
       // {}) by the time this fires — this branch is not reachable today, but
       // is kept in case a future section is built lazily.
-      for (const k of dirty) sections[k] = (meta as Record<string, unknown>)[k] ?? null;
+      for (const k of dirty) {
+        sections[k] = (meta as Record<string, unknown>)[k] ?? null;
+      }
       // Fonts rows can sit blank in the DOM while the user is still typing an
       // alias (see buildFontsSection's "+ font alias" button). A sibling
       // field's save must not flush that blank entry to disk — an empty
       // family produces a malformed css2 URL param in generateFontLinks and
       // can knock out every custom font in the live preview.
-      if (dirty.has("fonts") && sections.fonts && typeof sections.fonts === "object") {
+      if (
+        dirty.has("fonts") && sections.fonts &&
+        typeof sections.fonts === "object"
+      ) {
         const filtered: Record<string, string> = {};
-        for (const [alias, family] of Object.entries(sections.fonts as Record<string, string>)) {
+        for (
+          const [alias, family] of Object.entries(
+            sections.fonts as Record<string, string>,
+          )
+        ) {
           if (family) filtered[alias] = family;
         }
         sections.fonts = filtered;
@@ -126,7 +135,9 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   return {
     toggle: () => {
       opts.overlay.hidden = !opts.overlay.hidden;
-      if (!opts.overlay.hidden) opts.overlay.querySelector<HTMLElement>("input, select")?.focus();
+      if (!opts.overlay.hidden) {
+        opts.overlay.querySelector<HTMLElement>("input, select")?.focus();
+      }
     },
     isDirty: () => dirty.size > 0,
     refresh(metadata: Metadata) {
@@ -135,8 +146,14 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     },
     markSaved(ok, detail) {
       if (dirty.size) return; // a newer edit is already queued — stay on "Saving…"
-      const at = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      setSaved(ok ? `Saved ${at}` : `Not saved — ${detail ?? "error"}`, ok ? "ok" : "error");
+      const at = new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      setSaved(
+        ok ? `Saved ${at}` : `Not saved — ${detail ?? "error"}`,
+        ok ? "ok" : "error",
+      );
     },
     selectStyle(key) {
       styleKey = key;
@@ -162,7 +179,10 @@ export function sectionBox(title: string): HTMLDetailsElement {
   return box;
 }
 
-export function field(labelText: string, ...controls: HTMLElement[]): HTMLLabelElement {
+export function field(
+  labelText: string,
+  ...controls: HTMLElement[]
+): HTMLLabelElement {
   const label = document.createElement("label");
   label.className = "cfg-field";
   const span = document.createElement("span");
@@ -172,7 +192,10 @@ export function field(labelText: string, ...controls: HTMLElement[]): HTMLLabelE
   return label;
 }
 
-export function textInput(value: string, onInput: (v: string) => void): HTMLInputElement {
+export function textInput(
+  value: string,
+  onInput: (v: string) => void,
+): HTMLInputElement {
   const el = document.createElement("input");
   el.type = "text";
   el.value = value;
@@ -183,7 +206,10 @@ export function textInput(value: string, onInput: (v: string) => void): HTMLInpu
 // Like textInput, but never trims. Use for fields where leading/trailing
 // whitespace is semantically load-bearing (e.g. numbering prefix/suffix,
 // which render.ts concatenates verbatim — "Part " + "IV").
-function textInputRaw(value: string, onInput: (v: string) => void): HTMLInputElement {
+function textInputRaw(
+  value: string,
+  onInput: (v: string) => void,
+): HTMLInputElement {
   const el = document.createElement("input");
   el.type = "text";
   el.value = value;
@@ -204,7 +230,10 @@ export function selectInput(
   return el;
 }
 
-export function checkboxInput(checked: boolean, onChange: (v: boolean) => void): HTMLInputElement {
+export function checkboxInput(
+  checked: boolean,
+  onChange: (v: boolean) => void,
+): HTMLInputElement {
   const el = document.createElement("input");
   el.type = "checkbox";
   el.checked = checked;
@@ -374,9 +403,15 @@ function buildFontsSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
 }
 
 const STYLE_CHOICES = NUMBERING_STYLES.map((s) => ({ label: s, value: s }));
-const PAGE_STYLE_CHOICES = PAGE_NUMBERING_STYLES.map((s) => ({ label: s, value: s }));
+const PAGE_STYLE_CHOICES = PAGE_NUMBERING_STYLES.map((s) => ({
+  label: s,
+  value: s,
+}));
 
-function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
+function buildNumberingSection(
+  meta: Metadata,
+  queueSave: QueueSave,
+): HTMLElement {
   const box = sectionBox("Numbering");
   const numbering = meta.numbering ??= {};
 
@@ -403,16 +438,22 @@ function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElemen
       ),
     );
     box.appendChild(
-      field(`${key} prefix`, textInputRaw(cfg.prefix ?? "", (v) => {
-        (numbering[key] ??= {}).prefix = v;
-        queueSave("numbering");
-      })),
+      field(
+        `${key} prefix`,
+        textInputRaw(cfg.prefix ?? "", (v) => {
+          (numbering[key] ??= {}).prefix = v;
+          queueSave("numbering");
+        }),
+      ),
     );
     box.appendChild(
-      field(`${key} suffix`, textInputRaw(cfg.suffix ?? "", (v) => {
-        (numbering[key] ??= {}).suffix = v;
-        queueSave("numbering");
-      })),
+      field(
+        `${key} suffix`,
+        textInputRaw(cfg.suffix ?? "", (v) => {
+          (numbering[key] ??= {}).suffix = v;
+          queueSave("numbering");
+        }),
+      ),
     );
   }
 
@@ -442,7 +483,10 @@ function buildNumberingSection(meta: Metadata, queueSave: QueueSave): HTMLElemen
 const AREA_CHOICES = MARGIN_AREAS.map((a) => ({ label: a, value: a }));
 const LITERAL = "__literal"; // select sentinel for "type your own text"
 
-function buildRunningSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
+function buildRunningSection(
+  meta: Metadata,
+  queueSave: QueueSave,
+): HTMLElement {
   const box = sectionBox("Running headers / footers");
   const running = meta.running ??= {};
 
@@ -457,12 +501,12 @@ function buildRunningSection(meta: Metadata, queueSave: QueueSave): HTMLElement 
     head.append(title, add);
     const list = document.createElement("div");
 
-    function render(): void {
+    const render = (): void => {
       list.innerHTML = "";
       (running[side] ?? []).forEach((_, i) => list.appendChild(entryRow(i)));
-    }
+    };
 
-    function entryRow(i: number): HTMLElement {
+    const entryRow = (i: number): HTMLElement => {
       const entries = running[side]!;
       const form = splitRunningEntry(entries[i]!);
       const commit = () => {
@@ -472,7 +516,9 @@ function buildRunningSection(meta: Metadata, queueSave: QueueSave): HTMLElement 
       const row = document.createElement("div");
       row.className = "cfg-entry";
 
-      const isChoice = (RUNNING_CONTENT_CHOICES as readonly string[]).includes(form.content);
+      const isChoice = (RUNNING_CONTENT_CHOICES as readonly string[]).includes(
+        form.content,
+      );
       // Raw (non-trimming): a literal running-header string may legitimately
       // need a leading/trailing space to control spacing against an adjacent
       // margin-box element (same rationale as numbering prefix/suffix).
@@ -524,12 +570,15 @@ function buildRunningSection(meta: Metadata, queueSave: QueueSave): HTMLElement 
         rm,
       );
       return row;
-    }
+    };
 
     add.onclick = () => {
       const entries = running[side] ??= [];
       // Sensible seed per §4.8's example: outer top corner of the spread.
-      const seed: RunningEntry = { content: "book-title", area: side === "odd" ? "top-right" : "top-left" };
+      const seed: RunningEntry = {
+        content: "book-title",
+        area: side === "odd" ? "top-right" : "top-left",
+      };
       entries.push(seed);
       queueSave("running");
       render();

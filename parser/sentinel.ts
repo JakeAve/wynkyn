@@ -7,7 +7,8 @@ export interface SentinelTag {
 }
 
 // {name}, {/name}, {name: slug}, {name: slug | key: value | ...}, {name | key: value}
-const SENTINEL_RE = /^\{(\/?)([a-z][a-z-]*)\s*(?::\s*([^|}]*?))?\s*((?:\|[^|}]*)*)\}$/;
+const SENTINEL_RE =
+  /^\{(\/?)([a-z][a-z-]*)\s*(?::\s*([^|}]*?))?\s*((?:\|[^|}]*)*)\}$/;
 
 export function parseSentinelLine(line: string): SentinelTag | null {
   const m = line.trim().match(SENTINEL_RE);

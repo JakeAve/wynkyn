@@ -1,5 +1,5 @@
 // server/pipeline_test.ts
-import { assert, assertEquals, assertRejects } from "jsr:@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { buildBook, listBooks } from "./pipeline.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;
@@ -42,5 +42,8 @@ Deno.test("buildBook rejects for a missing book", async () => {
 
 Deno.test("buildBook accepts an image url prefix override", async () => {
   const b = await buildBook(ROOT, "demo-book", "file:///abs/images");
-  assert(!b.html.includes('"/books/demo-book/images'), "default prefix must not appear");
+  assert(
+    !b.html.includes('"/books/demo-book/images'),
+    "default prefix must not appear",
+  );
 });

@@ -1,6 +1,10 @@
 // web/src/config-data.ts — pure form-model helpers for the configuration
 // panel (spec §7.5). No DOM: everything here is unit-tested in Deno.
-import type { CssProps, NumberingStyle, RunningEntry } from "../../metadata/types.ts";
+import type {
+  CssProps,
+  NumberingStyle,
+  RunningEntry,
+} from "../../metadata/types.ts";
 
 export interface SizePreset {
   label: string;
@@ -29,7 +33,16 @@ export function presetFor(size: string | undefined): string {
 
 const LENGTH = /^\d+(\.\d+)?(in|mm|cm|pt|pc|px)$/;
 const NAMED_SIZES = new Set([
-  "a3", "a4", "a5", "b4", "b5", "jis-b4", "jis-b5", "letter", "legal", "ledger",
+  "a3",
+  "a4",
+  "a5",
+  "b4",
+  "b5",
+  "jis-b4",
+  "jis-b5",
+  "letter",
+  "legal",
+  "ledger",
 ]);
 
 // A size is a CSS named page size or "<length> <length>" (§4.3).
@@ -45,22 +58,45 @@ export function isValidFolios(value: string): boolean {
 }
 
 export const NUMBERING_STYLES: NumberingStyle[] = [
-  "arabic", "roman-upper", "roman-lower", "alpha-upper", "alpha-lower", "words", "none",
+  "arabic",
+  "roman-upper",
+  "roman-lower",
+  "alpha-upper",
+  "alpha-lower",
+  "words",
+  "none",
 ];
 // Page counters are CSS counters; "words" has no CSS equivalent (§4.7).
-export const PAGE_NUMBERING_STYLES: NumberingStyle[] = NUMBERING_STYLES.filter((s) => s !== "words");
+export const PAGE_NUMBERING_STYLES: NumberingStyle[] = NUMBERING_STYLES.filter((
+  s,
+) => s !== "words");
 
 // The 16 CSS Paged Media margin boxes, in §4.8's order.
 export const MARGIN_AREAS = [
-  "top-left-corner", "top-left", "top-center", "top-right", "top-right-corner",
-  "right-top", "right-middle", "right-bottom",
-  "bottom-right-corner", "bottom-right", "bottom-center", "bottom-left",
+  "top-left-corner",
+  "top-left",
+  "top-center",
+  "top-right",
+  "top-right-corner",
+  "right-top",
+  "right-middle",
+  "right-bottom",
+  "bottom-right-corner",
+  "bottom-right",
+  "bottom-center",
+  "bottom-left",
   "bottom-left-corner",
-  "left-bottom", "left-middle", "left-top",
+  "left-bottom",
+  "left-middle",
+  "left-top",
 ] as const;
 
 export const RUNNING_CONTENT_CHOICES = [
-  "book-title", "chapter-title", "part-title", "page-number", "none",
+  "book-title",
+  "chapter-title",
+  "part-title",
+  "page-number",
+  "none",
 ] as const;
 
 // "font-size: 8pt\nfont-style: italic" ↔ { "font-size": "8pt", ... }.
@@ -96,7 +132,11 @@ export function splitRunningEntry(entry: RunningEntry): RunningEntryForm {
   for (const [k, v] of Object.entries(entry)) {
     if (k !== "content" && k !== "area") extras[k] = v;
   }
-  return { content: entry.content, area: entry.area, extraCss: formatCssLines(extras) };
+  return {
+    content: entry.content,
+    area: entry.area,
+    extraCss: formatCssLines(extras),
+  };
 }
 
 export function makeRunningEntry(form: RunningEntryForm): RunningEntry {
@@ -122,8 +162,15 @@ export function renameKey<T>(
 // The properties a typesetter actually changes, in form order. Everything
 // else on an element goes to the "more CSS" rows.
 export const CURATED_PROPS = [
-  "font-family", "font-size", "font-weight", "font-style", "text-align",
-  "letter-spacing", "text-transform", "margin-top", "margin-bottom",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "font-style",
+  "text-align",
+  "letter-spacing",
+  "text-transform",
+  "margin-top",
+  "margin-bottom",
 ] as const;
 
 export function splitProps(

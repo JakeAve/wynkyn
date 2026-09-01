@@ -22,7 +22,8 @@ export interface UpdateMessage {
 
 let currentBlobUrl: string | null = null;
 let rendering = false;
-let queuedUpdate: { update: UpdateMessage; container: HTMLElement } | null = null;
+let queuedUpdate: { update: UpdateMessage; container: HTMLElement } | null =
+  null;
 
 export async function renderPreview(
   update: UpdateMessage,
@@ -62,7 +63,9 @@ export async function renderPreview(
 }
 
 export function setFontLinks(html: string): void {
-  for (const el of document.querySelectorAll("link[data-book-font]")) el.remove();
+  for (const el of document.querySelectorAll("link[data-book-font]")) {
+    el.remove();
+  }
   const tpl = document.createElement("template");
   tpl.innerHTML = html;
   for (const link of tpl.content.querySelectorAll("link")) {
@@ -74,11 +77,17 @@ export function setFontLinks(html: string): void {
 // Scroll the preview pane to a rendered section anchor (renderer id formats:
 // "<slug>" for parts/chapters, "matter-<type>[-<label>]" for matter blocks).
 // Duplicate slugs resolve to the first occurrence, per spec §3.2.4.
-export function scrollPreviewTo(anchorId: string, container: HTMLElement): void {
+export function scrollPreviewTo(
+  anchorId: string,
+  container: HTMLElement,
+): void {
   const el = container.querySelector(`#${CSS.escape(anchorId)}`);
   // Scroll the page, not the element: the section start is the page start,
   // and instant scroll can't be raced by the next Paged.js re-render.
-  (el?.closest(".pagedjs_page") ?? el)?.scrollIntoView({ block: "start", behavior: "auto" });
+  (el?.closest(".pagedjs_page") ?? el)?.scrollIntoView({
+    block: "start",
+    behavior: "auto",
+  });
 }
 
 // Click-to-style (spec §7.4): resolve the clicked node to a style-catalog
@@ -95,13 +104,19 @@ export function installStyleClicks(
     const target = e.target as HTMLElement | null;
     if (!target || target.closest(".preview-stage")) return;
     const chain: string[][] = [];
-    for (let el: HTMLElement | null = target; el && el !== container; el = el.parentElement) {
+    for (
+      let el: HTMLElement | null = target;
+      el && el !== container;
+      el = el.parentElement
+    ) {
       chain.push([...el.classList]);
     }
     const key = matchKey(chain, catalog());
     if (!key) return;
     e.preventDefault();
-    container.querySelector("[data-style-selected]")?.removeAttribute("data-style-selected");
+    container.querySelector("[data-style-selected]")?.removeAttribute(
+      "data-style-selected",
+    );
     target.setAttribute("data-style-selected", "");
     onPick(key);
   });
@@ -109,16 +124,22 @@ export function installStyleClicks(
 
 // "Page 12 of 208" for the footer: the page nearest the pane's vertical
 // centre, refreshed on scroll and after each render.
-export function installPageIndicator(container: HTMLElement, out: HTMLElement): () => void {
+export function installPageIndicator(
+  container: HTMLElement,
+  out: HTMLElement,
+): () => void {
   let raf = 0;
   const update = () => {
     raf = 0;
-    const pages = container.querySelectorAll<HTMLElement>(":scope > :not(.preview-stage) .pagedjs_page");
+    const pages = container.querySelectorAll<HTMLElement>(
+      ":scope > :not(.preview-stage) .pagedjs_page",
+    );
     if (!pages.length) {
       out.textContent = "";
       return;
     }
-    const mid = container.getBoundingClientRect().top + container.clientHeight / 2;
+    const mid = container.getBoundingClientRect().top +
+      container.clientHeight / 2;
     let best = pages[0]!;
     let bestDist = Infinity;
     for (const p of pages) {
@@ -129,7 +150,9 @@ export function installPageIndicator(container: HTMLElement, out: HTMLElement): 
         best = p;
       }
     }
-    out.textContent = `Page ${best.dataset.pageNumber ?? "?"} of ${pages.length}`;
+    out.textContent = `Page ${
+      best.dataset.pageNumber ?? "?"
+    } of ${pages.length}`;
   };
   const schedule = () => {
     if (!raf) raf = requestAnimationFrame(update);

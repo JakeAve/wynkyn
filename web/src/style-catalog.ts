@@ -20,12 +20,29 @@ const ELEMENTS: Array<[string, string, string[]]> = [
   ["Body text", "dropcap", []],
   ["Body text", "footnote", []],
   ["Half title", "half-title", ["title"]],
-  ["Title page", "title-page", ["title", "subtitle", "author", "edition", "epigraph", "imprint"]],
+  ["Title page", "title-page", [
+    "title",
+    "subtitle",
+    "author",
+    "edition",
+    "epigraph",
+    "imprint",
+  ]],
   ["Copyright", "copyright", ["copyright-line", "rights", "isbn", "edition"]],
   ["Dedication", "dedication", []],
   ["Contents", "toc", [
-    "title", "label", "number", "subtitle", "leader", "page",
-    "toc-front", "toc-part", "toc-chapter", "toc-heading", "toc-back", "entry",
+    "title",
+    "label",
+    "number",
+    "subtitle",
+    "leader",
+    "page",
+    "toc-front",
+    "toc-part",
+    "toc-chapter",
+    "toc-heading",
+    "toc-back",
+    "entry",
   ]],
   ["Foreword / preface / introduction", "prose-matter", ["title"]],
   ["Part", "part", ["title", "number"]],
@@ -82,7 +99,10 @@ const STATIC_CATALOG: StyleEntry[] = ELEMENTS.flatMap(([group, type, subs]) =>
     }]
 );
 
-const ZONES: Array<[string, string]> = [["front-matter", "front"], ["body", "body"], ["back-matter", "back"]];
+const ZONES: Array<[string, string]> = [["front-matter", "front"], [
+  "body",
+  "body",
+], ["back-matter", "back"]];
 const PAGE_NUMBERS: StyleEntry[] = ZONES.map(([zone, name]) => ({
   key: `numbering.pages.${zone}`,
   group: "Page numbers",
@@ -95,15 +115,18 @@ const PAGE_NUMBERS: StyleEntry[] = ZONES.map(([zone, name]) => ({
 // Per-level spans inside the contents: part and chapter rows get their own
 // number/label/page entries so "Book One" can be small caps while the part
 // title is italic (spec §4.5 recipes).
-const TOC_NESTED: StyleEntry[] = (["toc-part", "toc-chapter"] as const).flatMap((level) =>
-  (["number", "label", "page"] as const).map((sub) => ({
-    key: `toc.${level}.${sub}`,
-    group: "Contents",
-    label: `${level === "toc-part" ? "Part" : "Chapter"} ${labelFor(sub).toLowerCase()}`,
-    path: ["elements", "toc", level, sub],
-    section: "elements" as const,
-    selector: `.matter-toc .${level} .${sub}`,
-  }))
+const TOC_NESTED: StyleEntry[] = (["toc-part", "toc-chapter"] as const).flatMap(
+  (level) =>
+    (["number", "label", "page"] as const).map((sub) => ({
+      key: `toc.${level}.${sub}`,
+      group: "Contents",
+      label: `${level === "toc-part" ? "Part" : "Chapter"} ${
+        labelFor(sub).toLowerCase()
+      }`,
+      path: ["elements", "toc", level, sub],
+      section: "elements" as const,
+      selector: `.matter-toc .${level} .${sub}`,
+    })),
 );
 
 export function catalogFor(metadata: Metadata): StyleEntry[] {
@@ -123,14 +146,20 @@ export function catalogFor(metadata: Metadata): StyleEntry[] {
 // innermost token matches nearest the click wins, so ".chapter .number" beats
 // ".chapter" for a click on the number. Multi-selector entries (prose-matter)
 // are comma-separated; any alternative may match.
-export function matchKey(chain: string[][], catalog: StyleEntry[]): string | null {
+export function matchKey(
+  chain: string[][],
+  catalog: StyleEntry[],
+): string | null {
   let best: { key: string; depth: number; tokens: number } | null = null;
   for (const entry of catalog) {
     for (const alt of entry.selector.split(", ")) {
       const tokens = alt.trim().split(/\s+/).map((t) => t.slice(1)).reverse(); // innermost first
       const depth = matchDepth(chain, tokens);
       if (depth === null) continue;
-      if (!best || depth < best.depth || (depth === best.depth && tokens.length > best.tokens)) {
+      if (
+        !best || depth < best.depth ||
+        (depth === best.depth && tokens.length > best.tokens)
+      ) {
         best = { key: entry.key, depth, tokens: tokens.length };
       }
     }
@@ -168,14 +197,19 @@ export function getProps(metadata: Metadata, entry: StyleEntry): CssProps {
     node = (node as Record<string, unknown>)[p];
   }
   const out: CssProps = {};
-  for (const [k, v] of Object.entries((node ?? {}) as Record<string, unknown>)) {
+  for (
+    const [k, v] of Object.entries((node ?? {}) as Record<string, unknown>)
+  ) {
     if (typeof v === "string") out[k] = v;
   }
   return out;
 }
 
 // The live object at entry.path, created on demand — mutate it, then save.
-export function ensureProps(metadata: Metadata, entry: StyleEntry): Record<string, unknown> {
+export function ensureProps(
+  metadata: Metadata,
+  entry: StyleEntry,
+): Record<string, unknown> {
   let node = metadata as unknown as Record<string, unknown>;
   for (const p of entry.path) {
     node = (node[p] ??= {}) as Record<string, unknown>;

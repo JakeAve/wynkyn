@@ -26,12 +26,16 @@ function list(
     btn.textContent = n.label;
     btn.dataset.line = String(n.line);
     btn.onclick = () => {
-      btn.closest("nav")?.querySelector("[aria-current]")?.removeAttribute("aria-current");
+      btn.closest("nav")?.querySelector("[aria-current]")?.removeAttribute(
+        "aria-current",
+      );
       btn.setAttribute("aria-current", "true");
       onSelect(n);
     };
     li.appendChild(btn);
-    if (n.children.length) li.appendChild(list(n.children, depth + 1, onSelect));
+    if (n.children.length) {
+      li.appendChild(list(n.children, depth + 1, onSelect));
+    }
     ul.appendChild(li);
   }
   return ul;

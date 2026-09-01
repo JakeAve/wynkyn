@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { Text } from "@codemirror/state";
 import { toCmDiagnostics } from "./diagnostics.ts";
 

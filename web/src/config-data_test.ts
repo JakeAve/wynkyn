@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertFalse } from "jsr:@std/assert";
+import { assert, assertEquals, assertFalse } from "@std/assert";
 import {
   formatCssLines,
   isValidFolios,
@@ -44,7 +44,9 @@ Deno.test("isValidFolios accepts positive integers only", () => {
 });
 
 Deno.test("css lines parse and format round-trip", () => {
-  const props = parseCssLines("font-size: 8pt\nfont-style: italic;\n\nnonsense line\n");
+  const props = parseCssLines(
+    "font-size: 8pt\nfont-style: italic;\n\nnonsense line\n",
+  );
   assertEquals(props, { "font-size": "8pt", "font-style": "italic" });
   assertEquals(formatCssLines(props), "font-size: 8pt\nfont-style: italic");
   assertEquals(parseCssLines(""), {});
@@ -64,7 +66,10 @@ Deno.test("running entry split/make round-trip; content/area protected", () => {
   const form = splitRunningEntry(entry);
   assertEquals(form.content, "book-title");
   assertEquals(form.area, "top-right");
-  assertEquals(parseCssLines(form.extraCss), { "font-size": "8pt", "font-style": "italic" });
+  assertEquals(parseCssLines(form.extraCss), {
+    "font-size": "8pt",
+    "font-style": "italic",
+  });
   assertEquals(makeRunningEntry(form), entry);
   // A "content: x" line in the extra css cannot clobber the real content key.
   const sneaky = makeRunningEntry({
@@ -78,7 +83,11 @@ Deno.test("running entry split/make round-trip; content/area protected", () => {
 });
 
 Deno.test("renameKey preserves entry order", () => {
-  const out = renameKey({ body: "EB Garamond", display: "Playfair Display" }, "body", "text");
+  const out = renameKey(
+    { body: "EB Garamond", display: "Playfair Display" },
+    "body",
+    "text",
+  );
   assertEquals(Object.keys(out), ["text", "display"]);
   assertEquals(out["text"], "EB Garamond");
 });

@@ -12,15 +12,20 @@ export { toHtml } from "./server/pipeline.ts";
 
 const BOOKS = "books";
 
-export function formatDiagnostics(book: string, diags: { line: number; message: string }[]): string {
-  return diags.map((d) => `${BOOKS}/${book}/manuscript.md:${d.line}: ${d.message}`).join("\n");
+export function formatDiagnostics(
+  book: string,
+  diags: { line: number; message: string }[],
+): string {
+  return diags.map((d) =>
+    `${BOOKS}/${book}/manuscript.md:${d.line}: ${d.message}`
+  ).join("\n");
 }
 
 if (import.meta.main) {
   const a = parseArgs(Deno.args, {
     string: ["sheet", "duplex", "flip", "out", "folios", "pages"],
     boolean: ["proof", "reverse-backs"],
-    unknown: (arg, key) => {
+    unknown: (_arg, key) => {
       if (key !== undefined) {
         console.error(`unknown flag --${key}`);
         Deno.exit(2);
@@ -35,11 +40,19 @@ if (import.meta.main) {
     const dir = `${BOOKS}/${book}`;
     await Deno.mkdir(`${dir}/images`, { recursive: true });
     await Deno.copyFile("templates/metadata.json", `${dir}/metadata.json`);
-    await Deno.writeTextFile(`${dir}/manuscript.md`, `{matter: half-title}\n{title}\n${book}\n`, { createNew: true });
-    console.log(`created ${dir}/ — drop the source text in as download.txt, then use the convert-manuscript skill`);
+    await Deno.writeTextFile(
+      `${dir}/manuscript.md`,
+      `{matter: half-title}\n{title}\n${book}\n`,
+      { createNew: true },
+    );
+    console.log(
+      `created ${dir}/ — drop the source text in as download.txt, then use the convert-manuscript skill`,
+    );
   } else if ((cmd === "check" || cmd === "render") && book) {
     const b = await buildBook(BOOKS, book);
-    if (b.diagnostics.length) console.error(formatDiagnostics(book, b.diagnostics));
+    if (b.diagnostics.length) {
+      console.error(formatDiagnostics(book, b.diagnostics));
+    }
     if (cmd === "check") {
       console.log(`${book}: ${b.diagnostics.length} diagnostic(s)`);
       Deno.exit(b.diagnostics.length ? 1 : 0);
@@ -48,7 +61,9 @@ if (import.meta.main) {
     await Deno.writeTextFile(path, toHtml(b));
     console.log(`wrote ${path}`);
   } else if (cmd === "export" && book) {
-    const { exportBook, formatSummary } = await import("./server/print-export.ts");
+    const { exportBook, formatSummary } = await import(
+      "./server/print-export.ts"
+    );
     try {
       const opts = {
         folios: a.folios !== undefined ? Number(a.folios) : undefined,
@@ -60,12 +75,22 @@ if (import.meta.main) {
         proof: a.proof,
         out: a.out,
       };
-      if (opts.pages !== undefined && !opts.proof) console.error(`note: --pages is ignored unless --proof`);
+      if (opts.pages !== undefined && !opts.proof) {
+        console.error(`note: --pages is ignored unless --proof`);
+      }
       const s = await exportBook(BOOKS, book, opts);
       // resolved.duplex includes metadata.print.duplex, which the flags alone can't see
-      if (opts.flip !== undefined && s.resolved.duplex !== "none") console.error(`note: --flip is ignored unless duplex is none`);
-      if (opts.reverseBacks && s.resolved.duplex !== "none") console.error(`note: --reverse-backs is ignored unless duplex is none`);
-      if (s.diagnostics) console.error(`${s.diagnostics} parse diagnostic(s) — run: bml check ${book}`);
+      if (opts.flip !== undefined && s.resolved.duplex !== "none") {
+        console.error(`note: --flip is ignored unless duplex is none`);
+      }
+      if (opts.reverseBacks && s.resolved.duplex !== "none") {
+        console.error(`note: --reverse-backs is ignored unless duplex is none`);
+      }
+      if (s.diagnostics) {
+        console.error(
+          `${s.diagnostics} parse diagnostic(s) — run: bml check ${book}`,
+        );
+      }
       console.log(formatSummary(book, s, s.resolved));
       for (const f of s.files) console.log(`wrote ${f}`);
     } catch (e) {

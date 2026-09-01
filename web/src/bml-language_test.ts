@@ -1,6 +1,6 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { StringStream } from "@codemirror/language";
-import { bmlToken, type BmlStreamState } from "./bml-language.ts";
+import { type BmlStreamState, bmlToken } from "./bml-language.ts";
 
 // Run the tokenizer over one line, collecting [style, consumedText] pairs.
 function tokenize(

@@ -1,7 +1,7 @@
 // base-css_test.ts — structural regression test for base.css's TOC rules.
 // Placed beside base.css (not a .ts module, so no import — just a text-based
 // structural check), following the repo's X_test.ts-next-to-X convention.
-import { assert } from "jsr:@std/assert";
+import { assert } from "@std/assert";
 
 Deno.test("TOC rules in base.css keep zero own-specificity via :where() (review fix, plan 7 task 4)", () => {
   const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url))

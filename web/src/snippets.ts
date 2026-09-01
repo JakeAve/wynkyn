@@ -15,28 +15,117 @@ export interface Snippet {
 }
 
 export const SNIPPETS: Snippet[] = [
-  { label: "matter", kind: "block", text: "{matter: preface}\n{title}\nPreface", placeholder: "preface" },
-  { label: "part", kind: "block", text: "{part: slug}\n{title}\nPart Title", placeholder: "slug" },
-  { label: "chapter", kind: "block", text: "{chapter: slug}\n{title}\nChapter Title", placeholder: "slug" },
-  { label: "heading", kind: "block", text: "{heading}\nHeading", placeholder: "Heading" },
-  { label: "subheading", kind: "block", text: "{subheading}\nSubheading", placeholder: "Subheading" },
-  { label: "dropcap", kind: "block", text: "{dropcap}\nOpening paragraph", placeholder: "Opening paragraph" },
+  {
+    label: "matter",
+    kind: "block",
+    text: "{matter: preface}\n{title}\nPreface",
+    placeholder: "preface",
+  },
+  {
+    label: "part",
+    kind: "block",
+    text: "{part: slug}\n{title}\nPart Title",
+    placeholder: "slug",
+  },
+  {
+    label: "chapter",
+    kind: "block",
+    text: "{chapter: slug}\n{title}\nChapter Title",
+    placeholder: "slug",
+  },
+  {
+    label: "heading",
+    kind: "block",
+    text: "{heading}\nHeading",
+    placeholder: "Heading",
+  },
+  {
+    label: "subheading",
+    kind: "block",
+    text: "{subheading}\nSubheading",
+    placeholder: "Subheading",
+  },
+  {
+    label: "dropcap",
+    kind: "block",
+    text: "{dropcap}\nOpening paragraph",
+    placeholder: "Opening paragraph",
+  },
   { label: "break", kind: "block", text: "{break}" },
-  { label: "epigraph", kind: "block", text: "{epigraph}\nQuotation\n{attribution}\n— Source", placeholder: "Quotation" },
-  { label: "quote", kind: "block", text: "{quote}\nQuotation\n{/quote}", placeholder: "Quotation" },
-  { label: "pullquote", kind: "block", text: "{pullquote}\nPulled phrase\n{/pullquote}", placeholder: "Pulled phrase" },
-  { label: "sidebar", kind: "block", text: "{sidebar}\nAside text\n{/sidebar}", placeholder: "Aside text" },
-  { label: "poem", kind: "block", text: "{poem}\nFirst line\\\nsecond line.\n{/poem}", placeholder: "First line" },
-  { label: "verses", kind: "block", text: "{verses: slug}\nFirst verse.\n{/verses}", placeholder: "slug" },
-  { label: "columns", kind: "block", text: "{columns: 2}\nColumn text\n{/columns}", placeholder: "Column text" },
-  { label: "is", kind: "block", text: "{is: class-name}\nContent\n{/is: class-name}", placeholder: "class-name" },
-  { label: "illustration", kind: "block", text: "{illustration: slug | placement: inline}\nCaption", placeholder: "slug" },
-  { label: "em", kind: "wrap", text: "{em}", closeText: "{/em}", placeholder: "emphasized" },
-  { label: "footnote", kind: "inline", text: "{footnote: slug}", placeholder: "slug" },
+  {
+    label: "epigraph",
+    kind: "block",
+    text: "{epigraph}\nQuotation\n{attribution}\n— Source",
+    placeholder: "Quotation",
+  },
+  {
+    label: "quote",
+    kind: "block",
+    text: "{quote}\nQuotation\n{/quote}",
+    placeholder: "Quotation",
+  },
+  {
+    label: "pullquote",
+    kind: "block",
+    text: "{pullquote}\nPulled phrase\n{/pullquote}",
+    placeholder: "Pulled phrase",
+  },
+  {
+    label: "sidebar",
+    kind: "block",
+    text: "{sidebar}\nAside text\n{/sidebar}",
+    placeholder: "Aside text",
+  },
+  {
+    label: "poem",
+    kind: "block",
+    text: "{poem}\nFirst line\\\nsecond line.\n{/poem}",
+    placeholder: "First line",
+  },
+  {
+    label: "verses",
+    kind: "block",
+    text: "{verses: slug}\nFirst verse.\n{/verses}",
+    placeholder: "slug",
+  },
+  {
+    label: "columns",
+    kind: "block",
+    text: "{columns: 2}\nColumn text\n{/columns}",
+    placeholder: "Column text",
+  },
+  {
+    label: "is",
+    kind: "block",
+    text: "{is: class-name}\nContent\n{/is: class-name}",
+    placeholder: "class-name",
+  },
+  {
+    label: "illustration",
+    kind: "block",
+    text: "{illustration: slug | placement: inline}\nCaption",
+    placeholder: "slug",
+  },
+  {
+    label: "em",
+    kind: "wrap",
+    text: "{em}",
+    closeText: "{/em}",
+    placeholder: "emphasized",
+  },
+  {
+    label: "footnote",
+    kind: "inline",
+    text: "{footnote: slug}",
+    placeholder: "slug",
+  },
   { label: "ref", kind: "inline", text: "{ref: slug}", placeholder: "slug" },
 ];
 
-export function applySnippet(state: EditorState, snippet: Snippet): TransactionSpec {
+export function applySnippet(
+  state: EditorState,
+  snippet: Snippet,
+): TransactionSpec {
   const { from, to } = state.selection.main;
 
   if (snippet.kind === "wrap") {
@@ -67,7 +156,13 @@ export function applySnippet(state: EditorState, snippet: Snippet): TransactionS
     : after.startsWith("\n")
     ? "\n"
     : "\n\n";
-  return withPlaceholderSelection(from, to, snippet, prefix + snippet.text + suffix, prefix.length);
+  return withPlaceholderSelection(
+    from,
+    to,
+    snippet,
+    prefix + snippet.text + suffix,
+    prefix.length,
+  );
 }
 
 function withPlaceholderSelection(
@@ -77,7 +172,9 @@ function withPlaceholderSelection(
   insert: string,
   textOffset: number,
 ): TransactionSpec {
-  const idx = snippet.placeholder ? snippet.text.indexOf(snippet.placeholder) : -1;
+  const idx = snippet.placeholder
+    ? snippet.text.indexOf(snippet.placeholder)
+    : -1;
   const selection = snippet.placeholder && idx >= 0
     ? {
       anchor: from + textOffset + idx,
