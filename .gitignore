@@ -5,3 +5,7 @@ docs
 .claude/worktrees
 .claude/settings.local.json
 web/app.js
+.playwright-mcp
+.playwright-profile
+.impeccable
+.worktrees

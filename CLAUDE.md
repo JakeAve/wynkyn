@@ -36,5 +36,9 @@ Print: `bml export <slug> --proof` first on a new printer, check one signature b
 
 - Deno only, strict TS, `noUncheckedIndexedAccess`. No new deps without reason.
 - Tests are plain `Deno.test` with `jsr:@std/assert`. Fixture book: `server/testdata/demo-book`.
+  `testdata/common-sense` and `testdata/great-gatsby` are the tracked full-grammar corpus
+  (`books_test.ts`) — public domain, kept in sync by hand with `books/` when styling changes.
+- CI (`.github/workflows/ci.yml`) runs `build:web` + `test` on push/PR; it has no Chrome, so the
+  PDF tests self-skip there.
 - Sample manuscripts start from Project Gutenberg `download.txt` in the book dir; strip the Gutenberg header/footer, never leave it in `manuscript.md`.
 - Commit messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.
