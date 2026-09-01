@@ -219,3 +219,15 @@ export interface RefInline {
 export interface LineBreakInline {
   kind: "linebreak";
 }
+
+// Matter types the generated contents never lists — display pages that carry
+// no entry of their own (spec §3.4.6). Shared with the renderer so the parser
+// can warn about a block that would silently vanish from the contents.
+export const DISPLAY_MATTER: ReadonlySet<string> = new Set([
+  "half-title",
+  "title-page",
+  "copyright",
+  "dedication",
+  "epigraph",
+  "toc",
+]);

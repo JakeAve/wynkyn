@@ -29,13 +29,19 @@ is the reference example; copy its structure.
   {dropcap} before the FIRST paragraph of EVERY chapter (and preface/intro)
   {break} for every source section rule (`---`, `* * *`, extra blank block)
 %% BACK MATTER
-{matter: appendix|notes}? from source
+{matter: appendix|notes}? from source — {title} + prose, same as prose front matter
 {matter: colophon}     {typeface} {paper} {binding} {printer}
                        {printer} = "Text from Project Gutenberg eBook #N (gutenberg.org/ebooks/N), a public-domain transcription of the <year> edition."
 ```
 
 Half-title, title-page, copyright, toc, colophon are always present. Provenance
 lives in `{rights}`/`{printer}`, never in `%%` comments.
+
+Every section with a heading names it with `{title}` — never a bare first line.
+That includes back matter (appendix, notes, bibliography, index, address). The
+generated contents lists only blocks that have a `{title}`, so a bare heading
+silently drops the section from the contents page. `bml check` catches this.
+Exceptions, which carry no heading: copyright, dedication, epigraph, colophon.
 
 ## Source → BML mapping
 

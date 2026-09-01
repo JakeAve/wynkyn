@@ -1,4 +1,5 @@
 // renderer/render.ts — BmlDocument → semantic HTML (spec §5.3). Pure, no I/O.
+import { DISPLAY_MATTER } from "../parser/types.ts";
 import type {
   BmlDocument,
   Chapter,
@@ -367,9 +368,6 @@ function renderMatter(m: MatterBlock, doc: BmlDocument, opts: RenderOptions): st
     return `${open}${inner}</section>`;
   });
 }
-
-// Front-matter types that never appear in the contents (spec §3.4.6).
-const DISPLAY_MATTER = new Set(["half-title", "title-page", "copyright", "dedication", "epigraph", "toc"]);
 
 interface TocRow {
   cls: string; // "toc-front" | "toc-part" | "toc-chapter" | "toc-heading" | "toc-back" (+ " in-part")
