@@ -171,16 +171,16 @@
       "suffix": ""
     },
     "pages": {
+      "css": {
+        "font-family": "body"
+      },
       "front-matter": {
         "style": "roman-lower",
         "show": true
       },
       "body": {
         "style": "arabic",
-        "show": true,
-        "css": {
-          "font-family": "body"
-        }
+        "show": true
       },
       "back-matter": {
         "style": "arabic",

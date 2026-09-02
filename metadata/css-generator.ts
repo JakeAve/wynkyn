@@ -169,7 +169,8 @@ export function generatePagedCSS(
     const show = cfg?.show ?? true;
     if (show && style !== "none") {
       const decls = [`    content: counter(page, ${NUM_STYLE[style]});`];
-      for (const [k, v] of Object.entries(cfg?.css ?? {})) {
+      // Shared folio styling first, the zone's own `css` overrides it (§4.7).
+      for (const [k, v] of Object.entries({ ...pages?.css, ...cfg?.css })) {
         decls.push(
           `    ${k}: ${
             k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
@@ -196,7 +197,11 @@ export function generatePagedCSS(
       ];
       for (const [k, v] of Object.entries(entry)) {
         if (k === "content" || k === "area") continue;
-        decls.push(`    ${k}: ${v};`);
+        decls.push(
+          `    ${k}: ${
+            k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
+          };`,
+        );
       }
       out.push(
         `@page ${side} {\n  @${entry.area} {\n${decls.join("\n")}\n  }\n}\n`,

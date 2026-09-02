@@ -45,6 +45,7 @@ export interface Numbering {
   chapters?: StructureNumbering;
   parts?: StructureNumbering;
   pages?: {
+    css?: CssProps; // shared folio styling; each zone's own `css` overrides it
     "front-matter"?: PageNumbering;
     body?: PageNumbering;
     "back-matter"?: PageNumbering;

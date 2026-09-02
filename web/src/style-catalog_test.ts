@@ -124,3 +124,15 @@ Deno.test("toc: nested catalog entries have three-deep paths and readable labels
     "Back matter rows",
   );
 });
+
+Deno.test("a folio click resolves to its zone, not the shared page-number entry", () => {
+  assertEquals(
+    matchKey(
+      [["pagedjs_margin-bottom-center"], ["pagedjs_margin-bottom"], [
+        "pagedjs_back_page",
+      ]],
+      catalog,
+    ),
+    "numbering.pages.back-matter",
+  );
+});

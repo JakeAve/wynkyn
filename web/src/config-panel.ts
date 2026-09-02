@@ -9,6 +9,7 @@ import type {
   RunningEntry,
 } from "../../metadata/types.ts";
 import {
+  formatCssLines,
   isValidFolios,
   isValidSize,
   makeRunningEntry,
@@ -16,13 +17,18 @@ import {
   NUMBERING_STYLES,
   PAGE_NUMBERING_STYLES,
   PAGE_SIZE_PRESETS,
+  parseCssLines,
   presetFor,
   renameKey,
   RUNNING_CONTENT_CHOICES,
   splitRunningEntry,
 } from "./config-data.ts";
 import { GOOGLE_FONTS } from "./fonts-list.ts";
-import { buildStyleSection, type StyleSection } from "./style-panel.ts";
+import {
+  buildStyleSection,
+  fontControl,
+  type StyleSection,
+} from "./style-panel.ts";
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -550,10 +556,31 @@ function buildRunningSection(
       css.rows = 2;
       css.value = form.extraCss;
       css.placeholder = "font-size: 8pt\nfont-style: italic";
+
+      // The margin box inherits nothing from the book body, so its font has to
+      // be set here. Same picker as the Styles panel, writing font-family into
+      // the same extra-css blob the textarea shows.
+      const setFont = (v: string) => {
+        const extras = parseCssLines(form.extraCss);
+        if (v) extras["font-family"] = v;
+        else delete extras["font-family"];
+        form.extraCss = formatCssLines(extras);
+        css.value = form.extraCss;
+        commit();
+      };
+      const font = fontControl(
+        meta,
+        parseCssLines(form.extraCss)["font-family"],
+        setFont,
+      );
+
       css.oninput = () => {
         form.extraCss = css.value;
         commit();
       };
+      // On blur, rebuild the rows so the font picker reflects a font-family
+      // typed straight into the textarea.
+      css.onchange = () => render();
 
       const rm = document.createElement("button");
       rm.textContent = "✕ remove entry";
@@ -566,6 +593,7 @@ function buildRunningSection(
       row.append(
         field("content", contentSel, literal),
         field("area", areaSel),
+        field("font", font),
         field("extra css", css),
         rm,
       );

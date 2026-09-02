@@ -103,14 +103,24 @@ const ZONES: Array<[string, string]> = [["front-matter", "front"], [
   "body",
   "body",
 ], ["back-matter", "back"]];
-const PAGE_NUMBERS: StyleEntry[] = ZONES.map(([zone, name]) => ({
-  key: `numbering.pages.${zone}`,
-  group: "Page numbers",
-  label: titleCase(zone),
-  path: ["numbering", "pages", zone, "css"],
-  section: "numbering",
-  selector: `.pagedjs_${name}_page .pagedjs_margin-bottom-center`,
-}));
+const PAGE_NUMBERS: StyleEntry[] = [
+  {
+    key: "numbering.pages",
+    group: "Page numbers",
+    label: "All page numbers",
+    path: ["numbering", "pages", "css"],
+    section: "numbering",
+    selector: `.pagedjs_margin-bottom-center`,
+  },
+  ...ZONES.map(([zone, name]) => ({
+    key: `numbering.pages.${zone}`,
+    group: "Page numbers",
+    label: titleCase(zone),
+    path: ["numbering", "pages", zone, "css"],
+    section: "numbering",
+    selector: `.pagedjs_${name}_page .pagedjs_margin-bottom-center`,
+  } as StyleEntry)),
+];
 
 // Per-level spans inside the contents: part and chapter rows get their own
 // number/label/page entries so "Book One" can be small caps while the part

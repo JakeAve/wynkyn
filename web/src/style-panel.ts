@@ -187,7 +187,7 @@ function placeholder(input: HTMLInputElement, text: string): HTMLInputElement {
 }
 
 // Font alias picker with an escape hatch for a literal family name.
-function fontControl(
+export function fontControl(
   meta: Metadata,
   value: string | undefined,
   onChange: (v: string) => void,

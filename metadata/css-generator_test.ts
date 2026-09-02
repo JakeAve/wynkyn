@@ -324,3 +324,43 @@ Deno.test("break content still goes to ::before (unchanged)", () => {
   const css = generateDomCSS({ elements: { break: { content: "✦" } } });
   assertStringIncludes(css, '.break::before {\n  content: "✦";\n}');
 });
+
+Deno.test("pages.css styles every zone's folio; a zone's own css overrides it (§4.7)", () => {
+  const css = generatePagedCSS({
+    fonts: { body: "Crimson Pro", display: "Cormorant Garamond" },
+    numbering: {
+      pages: {
+        css: { "font-size": "9pt", "font-family": "body" },
+        "back-matter": { css: { "font-family": "display" } },
+      },
+    },
+  });
+  for (const zone of ["front", "body", "back"]) {
+    const box = css.slice(css.indexOf(`@page ${zone} {`));
+    assertStringIncludes(box, "font-size: 9pt;");
+  }
+  assertStringIncludes(
+    css.slice(css.indexOf("@page front {")),
+    'font-family: "Crimson Pro";',
+  );
+  assertStringIncludes(
+    css.slice(css.indexOf("@page back {")),
+    'font-family: "Cormorant Garamond";',
+  );
+});
+
+Deno.test("running-entry font aliases resolve like element styles (§4.8)", () => {
+  const css = generatePagedCSS({
+    fonts: { display: "Cormorant Garamond" },
+    running: {
+      odd: [{
+        content: "book-title",
+        area: "top-right",
+        "font-family": "display",
+        "font-size": "8pt",
+      }],
+    },
+  });
+  assertStringIncludes(css, 'font-family: "Cormorant Garamond";');
+  assertStringIncludes(css, "font-size: 8pt;");
+});

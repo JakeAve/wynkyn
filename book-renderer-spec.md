@@ -1304,9 +1304,10 @@ arabic and the configuration panel does not offer it there.
   "chapters": { "style": "roman-upper", "show": true, "prefix": "", "suffix": "." },
   "parts": { "style": "roman-upper", "show": true, "prefix": "Part ", "suffix": "" },
   "pages": {
+    "css": { "font-family": "body", "font-size": "9pt" },
     "front-matter": { "style": "roman-lower", "show": true },
     "body": { "style": "arabic", "show": true },
-    "back-matter": { "style": "arabic", "show": true, "css": { "font-size": "9pt", "font-family": "display" } }
+    "back-matter": { "style": "arabic", "show": true, "css": { "font-family": "display" } }
   }
 }
 ```
@@ -1317,7 +1318,11 @@ arabic and the configuration panel does not offer it there.
   `""` + `IV` + `"."` → "IV."
 - `show` on pages toggles page numbers on/off per section.
 - `css` on pages styles the folio's margin box (CSS properties, font aliases
-  resolved like §4.5). Edited by the Styles panel (§7.4).
+  resolved like §4.5). `pages.css` applies to every zone; a zone's own `css`
+  overrides it property by property. Margin boxes are not descendants of the
+  book body, so they inherit nothing from `elements.body` — without `pages.css`
+  a folio renders in the browser's default font. Edited by the Styles panel
+  (§7.4), which lists "All page numbers" alongside the three zones.
 - **Current implementation note:** body page numbers are emitted via a single
   universal `@page { @bottom-center { content: counter(page, <style>); } }` rule
   (not per-odd/even), because Paged.js support for `@bottom-center` nested
@@ -1345,6 +1350,11 @@ same margin box as a title, but the common case — a plain page number in its o
 box — is handled automatically by `numbering.pages`, not by a `running` entry.)
 
 All other properties in an entry are CSS and apply to that margin box.
+`font-family` accepts a font alias and is resolved like §4.5. A margin box is
+not a descendant of the book body, so it inherits nothing from `elements.body`:
+without an explicit `font-family` a running head renders in the browser's
+default font. The configuration panel offers the same font picker as the Styles
+panel on each running entry (§7.5).
 
 ```json
 "running": {
