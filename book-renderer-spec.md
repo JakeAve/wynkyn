@@ -1633,6 +1633,14 @@ Style edits write CSS property values directly (matching §4.5's CSS-centric
 design — no translation layer), and the live loop (§6) re-renders immediately so
 the effect is visible in the preview pane without a save step.
 
+The font picker's empty option names what the box actually renders in when it
+sets no font of its own — `(unset — Crimson Pro)` for an element inside the book
+body, `(unset — serif)` for the body itself (base.css),
+`(unset — browser
+default)` for a margin box, which is outside the body and
+inherits nothing from it (§4.7, §4.8). "Inherit" would be a lie in the last two
+cases.
+
 ### 7.5 Document Configuration Panel
 
 Form UI mapped 1:1 to `metadata.json`'s `page`, `fonts`, `numbering`, `running`,

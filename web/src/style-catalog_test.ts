@@ -1,5 +1,10 @@
 import { assertEquals } from "@std/assert";
-import { catalogFor, getProps, matchKey } from "./style-catalog.ts";
+import {
+  catalogFor,
+  getProps,
+  inheritedFont,
+  matchKey,
+} from "./style-catalog.ts";
 
 const catalog = catalogFor({
   is: { telegram: { "font-family": "monospace" } },
@@ -136,3 +141,32 @@ Deno.test("a folio click resolves to its zone, not the shared page-number entry"
     "numbering.pages.back-matter",
   );
 });
+
+Deno.test("inheritedFont names what an unset font actually resolves to", () => {
+  const meta = {
+    fonts: { body: "Crimson Pro", display: "Cormorant Garamond" },
+    elements: {
+      body: { "font-family": "body" },
+      toc: { title: {}, "toc-part": { number: {} } },
+      chapter: { "font-family": "display", title: {} },
+    },
+  };
+  const cat = catalogFor(meta);
+  const at = (key: string) => byKey(cat, key);
+  // Margin boxes sit outside the book body — they inherit nothing from it.
+  assertEquals(
+    inheritedFont(meta, at("numbering.pages.body")),
+    "browser default",
+  );
+  // The body itself falls back to base.css's generic serif.
+  assertEquals(inheritedFont(meta, at("body")), "serif");
+  // A sub-element takes the nearest ancestor entry that names a font…
+  assertEquals(inheritedFont(meta, at("chapter.title")), "Cormorant Garamond");
+  // …and the book body when no ancestor does, at any nesting depth.
+  assertEquals(inheritedFont(meta, at("toc.title")), "Crimson Pro");
+  assertEquals(inheritedFont(meta, at("toc.toc-part.number")), "Crimson Pro");
+});
+
+function byKey(catalog: ReturnType<typeof catalogFor>, key: string) {
+  return catalog.find((e) => e.key === key)!;
+}

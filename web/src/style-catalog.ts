@@ -200,7 +200,10 @@ function matchDepth(chain: string[][], tokens: string[]): number | null {
 
 // String-valued props at entry.path (object-valued sub-elements are not
 // exposed — they are their own catalog entries).
-export function getProps(metadata: Metadata, entry: StyleEntry): CssProps {
+export function getProps(
+  metadata: Metadata,
+  entry: Pick<StyleEntry, "path">,
+): CssProps {
   let node: unknown = metadata;
   for (const p of entry.path) {
     if (!node || typeof node !== "object") return {};
@@ -225,4 +228,28 @@ export function ensureProps(
     node = (node[p] ??= {}) as Record<string, unknown>;
   }
   return node;
+}
+
+// What an entry's font actually falls back to when it sets none — shown in the
+// picker, because "inherit" is misleading here: a margin box (folio, running
+// head) is outside the book body and inherits nothing from it, and the body
+// itself falls back to base.css's generic serif.
+export function inheritedFont(
+  metadata: Metadata,
+  entry: Pick<StyleEntry, "key" | "path" | "section">,
+): string {
+  const family = (v: string | undefined) =>
+    v ? (metadata.fonts?.[v] ?? v) : undefined;
+  if (entry.section === "numbering") return "browser default"; // margin box
+  // Nearest ancestor entry that names a font: .toc .toc-part .number → .toc.
+  for (let i = entry.path.length - 1; i > 1; i--) {
+    const at = family(
+      getProps(metadata, { path: entry.path.slice(0, i) })["font-family"],
+    );
+    if (at) return at;
+  }
+  if (entry.key === "body") return "serif";
+  return family(
+    getProps(metadata, { path: ["elements", "body"] })["font-family"],
+  ) ?? "serif";
 }

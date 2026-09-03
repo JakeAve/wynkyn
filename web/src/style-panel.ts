@@ -10,7 +10,12 @@ import {
   textInput,
 } from "./config-panel.ts";
 import { CURATED_PROPS, splitProps } from "./config-data.ts";
-import { catalogFor, ensureProps, getProps } from "./style-catalog.ts";
+import {
+  catalogFor,
+  ensureProps,
+  getProps,
+  inheritedFont,
+} from "./style-catalog.ts";
 
 export interface StyleSection {
   el: HTMLDetailsElement;
@@ -87,7 +92,12 @@ export function buildStyleSection(
     form.append(
       field(
         "font",
-        fontControl(meta, props["font-family"], (v) => set("font-family", v)),
+        fontControl(
+          meta,
+          props["font-family"],
+          (v) => set("font-family", v),
+          inheritedFont(meta, entry),
+        ),
       ),
       field(
         "size",
@@ -191,6 +201,7 @@ export function fontControl(
   meta: Metadata,
   value: string | undefined,
   onChange: (v: string) => void,
+  unsetAs: string, // what the box renders in with no font-family of its own
 ): HTMLElement {
   const wrap = document.createElement("span");
   wrap.className = "cfg-row";
@@ -201,7 +212,7 @@ export function fontControl(
   other.hidden = isAlias;
   const sel = selectInput(
     [
-      { label: "(inherit)", value: INHERIT },
+      { label: `(unset — ${unsetAs})`, value: INHERIT },
       ...aliases.map((a) => ({ label: a, value: a })),
       { label: "other…", value: OTHER },
     ],

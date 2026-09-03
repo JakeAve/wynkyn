@@ -572,6 +572,7 @@ function buildRunningSection(
         meta,
         parseCssLines(form.extraCss)["font-family"],
         setFont,
+        "browser default",
       );
 
       css.oninput = () => {
