@@ -183,7 +183,7 @@ export async function exportBook(
   } catch {
     throw new Error(`no such book: ${book}`);
   }
-  const meta = (await loadMetadata(bookDir)) ?? {};
+  const meta = (await loadMetadata(`${bookDir}/metadata.json`)) ?? {};
   const folios = opts.folios ?? meta.print?.["folios-per-signature"] ?? 4;
   assertWholeNumber(folios, "folios-per-signature");
   if (opts.pages !== undefined) assertWholeNumber(opts.pages, "pages");

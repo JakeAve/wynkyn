@@ -99,7 +99,7 @@ export async function buildBook(
   const bookDir = `${booksRoot}/${book}`;
   const source = await Deno.readTextFile(`${bookDir}/manuscript.md`);
   const doc = parse(source);
-  const meta = (await loadMetadata(bookDir)) ?? {};
+  const meta = (await loadMetadata(`${bookDir}/metadata.json`)) ?? {};
   const images = await resolveImages(bookDir, imageUrlPrefix);
   const bookTitle = extractBookTitle(doc, book);
   return {

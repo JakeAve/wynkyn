@@ -50,7 +50,7 @@ Deno.test("both books parse clean, load metadata, and render", async () => {
     assertEquals(doc.diagnostics, [], `${book}: parse diagnostics`);
     assert(doc.frontMatter.length > 0, `${book}: no front matter`);
     assert(doc.backMatter.length > 0, `${book}: no back matter`);
-    const meta = await loadMetadata(`${DIR}${book}`);
+    const meta = await loadMetadata(`${DIR}${book}/metadata.json`);
     assert(meta !== null, `${book}: missing metadata.json`);
     const html = render(doc, {
       numbering: meta!.numbering,

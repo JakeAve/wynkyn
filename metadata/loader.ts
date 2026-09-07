@@ -1,7 +1,6 @@
 import type { Metadata } from "./types.ts";
 
-export async function loadMetadata(bookDir: string): Promise<Metadata | null> {
-  const path = `${bookDir}/metadata.json`;
+export async function loadMetadata(path: string): Promise<Metadata | null> {
   let text: string;
   try {
     text = await Deno.readTextFile(path);
