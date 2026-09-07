@@ -1066,11 +1066,22 @@ plans.
 books/
   common-sense/
     manuscript.md
-    metadata.json
+    metadata.json          ← the unnamed edition
+    editions/              ← optional: named editions, one complete metadata file each
+      pocket.json
+    images/
   great-gatsby/
     manuscript.md
     metadata.json
 ```
+
+> **Editions.** A book may carry several _editions_: purely styling variants of
+> the same manuscript. `metadata.json` is the unnamed edition; each
+> `editions/<slug>.json` is a named one, and every one is a complete
+> self-contained metadata file (no inheritance). Editions share `manuscript.md`
+> and `images/` byte for byte. Everything that takes a book also takes an
+> optional edition: `?edition=` in the app, `--edition` on the CLI, and
+> `/api/books/:book/editions/:edition/metadata` on the server.
 
 ### 4.2 Full schema
 
@@ -1395,6 +1406,10 @@ in `metadata.json` so a book's entire configuration lives in one file.
 - `duplex` — `short-edge` (book-style turn, default), `long-edge`
   (calendar-style turn), or `none` (separate fronts/backs files). CLI flags
   (`bml export --sheet/--folios/--duplex`) override per run.
+
+> Named editions export to `export/<edition>/` and render to
+> `render.<edition>.html`; the unnamed edition keeps `export/` and
+> `render.html`. Print settings always come from the edition's own metadata.
 
 ### 4.10 Section: `notes`
 

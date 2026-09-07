@@ -1,0 +1,14 @@
+{
+  "page": {
+    "size": "3.5in 5in",
+    "margins": { "top": "12mm", "bottom": "14mm", "inside": "14mm", "outside": "10mm" }
+  },
+  "fonts": { "body": "Crimson Pro" },
+  "elements": {
+    "body": { "font-family": "body", "font-size": "9pt", "line-height": "1.4" }
+  },
+  "numbering": {
+    "chapters": { "style": "arabic", "show": true, "prefix": "", "suffix": "." },
+    "pages": { "body": { "style": "arabic", "show": true } }
+  }
+}
