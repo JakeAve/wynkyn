@@ -57,6 +57,7 @@ const ELEMENTS: Array<[string, string, string[]]> = [
   ["Blocks", "sidebar", []],
   ["Verses", "verses", []],
   ["Verses", "verses", ["number"]],
+  ["Columns", "columns", []],
   ["Illustration", "illustration", ["caption"]],
   ["Colophon", "colophon", []],
   ["Appendix", "appendix", ["title"]],
