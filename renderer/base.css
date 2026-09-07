@@ -42,6 +42,9 @@
 .bml .verses {
   margin: 1em 0;
 }
+.bml .verse .number {
+  padding-right: 0.3em;
+}
 .bml figure {
   margin: 1em 0;
   text-align: center;

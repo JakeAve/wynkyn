@@ -113,7 +113,11 @@ Deno.test("verses render numbers from start (§3.5.7)", () => {
     parse("{chapter: a}\n{verses: gen-1 | start: 3}\nAnd God said.\n{/verses}"),
   );
   assertStringIncludes(html, '<div class="verses" id="gen-1">');
-  assertStringIncludes(html, '<span class="number">3</span>');
+  // no space between the number and the text — a justified line would stretch it
+  assertStringIncludes(
+    html,
+    '<p class="verse"><span class="number">3</span>And God said.</p>',
+  );
 });
 
 Deno.test("a paragraph after a title or a break is marked .lead, not indented", () => {

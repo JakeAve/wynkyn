@@ -339,9 +339,12 @@ function renderContent(
         renderChildren(node.children, ctx, opts)
       }</aside>`;
     case "verses": {
+      // No space after the number: in justified text it is the first stretchable
+      // space on the line, so it soaks up the whole line's justification slack
+      // and reads as a ragged indent. base.css spaces it with padding instead.
       const verses = node.verses.map((v, i) =>
         v.kind === "paragraph"
-          ? `<p class="verse"><span class="number">${node.start + i}</span> ${
+          ? `<p class="verse"><span class="number">${node.start + i}</span>${
             renderInlines(v.inlines, ctx)
           }</p>`
           : ""
