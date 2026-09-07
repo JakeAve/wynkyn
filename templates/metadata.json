@@ -167,7 +167,7 @@
     "chapters": {
       "style": "roman-upper",
       "show": true,
-      "prefix": "Stave ",
+      "prefix": "Chapter ",
       "suffix": ""
     },
     "pages": {
