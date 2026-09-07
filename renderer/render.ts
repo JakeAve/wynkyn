@@ -243,14 +243,35 @@ function componentText(
 }
 
 // ── content rendering ───────────────────────────────────────────────────────
+// A paragraph directly after a title or a break carries no indent. That used to
+// be `h1 + p` / `.break + p` in base.css, but Paged.js drops `+` rules whole
+// (docs/pagedjs-plus-combinator.md), so the class is decided here.
+function opensBlock(prev: ContentNode | undefined): boolean {
+  return prev?.kind === "break" ||
+    (prev?.kind === "component" && prev.name === "title");
+}
+
+function renderChildren(
+  nodes: ContentNode[],
+  ctx: NoteCtx,
+  opts: RenderOptions,
+): string {
+  return nodes.map((n, i) =>
+    renderContent(n, ctx, opts, opensBlock(nodes[i - 1]))
+  ).join("");
+}
+
 function renderContent(
   node: ContentNode,
   ctx: NoteCtx,
   opts: RenderOptions,
+  lead = false,
 ): string {
   switch (node.kind) {
     case "paragraph":
-      return `<p>${renderInlines(node.inlines, ctx)}</p>`;
+      return `<p${lead ? ' class="lead"' : ""}>${
+        renderInlines(node.inlines, ctx)
+      }</p>`;
     case "component": {
       if (node.name === "title") {
         return `<h1 class="title">${renderInlines(node.inlines, ctx)}</h1>`;
@@ -298,9 +319,7 @@ function renderContent(
       }</blockquote>`;
     }
     case "pullquote": {
-      const inner = node.children.map((c) => renderContent(c, ctx, opts)).join(
-        "",
-      );
+      const inner = renderChildren(node.children, ctx, opts);
       return `<aside class="pullquote">${inner}${
         attribution(node.attribution, ctx)
       }</aside>`;
@@ -317,7 +336,7 @@ function renderContent(
     }
     case "sidebar":
       return `<aside class="sidebar">${
-        node.children.map((c) => renderContent(c, ctx, opts)).join("")
+        renderChildren(node.children, ctx, opts)
       }</aside>`;
     case "verses": {
       const verses = node.verses.map((v, i) =>
@@ -333,21 +352,17 @@ function renderContent(
     }
     case "columns": {
       if (node.mode === "flow") {
-        const inner = (node.columns[0] ?? []).map((c) =>
-          renderContent(c, ctx, opts)
-        ).join("");
+        const inner = renderChildren(node.columns[0] ?? [], ctx, opts);
         return `<div class="columns columns-flow" style="column-count: ${node.count}">${inner}</div>`;
       }
       const cols = node.columns.map((col) =>
-        `<div class="col">${
-          col.map((c) => renderContent(c, ctx, opts)).join("")
-        }</div>`
+        `<div class="col">${renderChildren(col, ctx, opts)}</div>`
       ).join("");
       return `<div class="columns columns-parallel" style="grid-template-columns: repeat(${node.count}, 1fr)">${cols}</div>`;
     }
     case "is":
       return `<div class="is-${escapeHtml(node.className)}">${
-        node.children.map((c) => renderContent(c, ctx, opts)).join("")
+        renderChildren(node.children, ctx, opts)
       }</div>`;
     case "illustration": {
       const cls = `illustration${
@@ -453,7 +468,7 @@ function numberDiv(
 
 function renderChapter(ch: Chapter, n: number, opts: RenderOptions): string {
   return renderBlockWithNotes(ch.children, opts, (ctx) => {
-    const inner = ch.children.map((c) => renderContent(c, ctx, opts)).join("");
+    const inner = renderChildren(ch.children, ctx, opts);
     return `<section class="chapter" id="${escapeHtml(ch.slug)}">${
       numberDiv(n, opts.numbering?.chapters)
     }${inner}</section>`;
@@ -481,15 +496,13 @@ function renderMatter(
     );
     if (onlyTitles) {
       return renderBlockWithNotes(m.children, opts, (ctx) => {
-        const title = m.children.map((c) => renderContent(c, ctx, opts)).join(
-          "",
-        );
+        const title = renderChildren(m.children, ctx, opts);
         return `${open}${title}${generateToc(doc, opts)}</section>`;
       });
     }
   }
   return renderBlockWithNotes(m.children, opts, (ctx) => {
-    const inner = m.children.map((c) => renderContent(c, ctx, opts)).join("");
+    const inner = renderChildren(m.children, ctx, opts);
     return `${open}${inner}</section>`;
   });
 }
@@ -580,7 +593,7 @@ function renderPart(
   const head = renderBlockWithNotes(
     contentKids,
     opts,
-    (ctx) => contentKids.map((c) => renderContent(c, ctx, opts)).join(""),
+    (ctx) => renderChildren(contentKids, ctx, opts),
   );
   const chapters = part.children
     .filter((c): c is Chapter => c.kind === "chapter")

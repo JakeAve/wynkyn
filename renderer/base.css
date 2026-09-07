@@ -7,9 +7,12 @@
   margin: 0;
   text-indent: 1.5em;
 }
+/* No `+` combinator anywhere in this file: Paged.js 0.4.3 silently drops every
+   rule whose selector contains one, and it drops the whole grouped rule with
+   it (docs/pagedjs-plus-combinator.md). The paragraph that opens a block after
+   a title or a break is marked `.lead` by the renderer instead. */
 .bml p.has-dropcap,
-.bml h1 + p,
-.bml .break + p,
+.bml p.lead,
 .bml blockquote p,
 .bml .stanza,
 .bml .verse {

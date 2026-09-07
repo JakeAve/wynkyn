@@ -116,6 +116,17 @@ Deno.test("verses render numbers from start (§3.5.7)", () => {
   assertStringIncludes(html, '<span class="number">3</span>');
 });
 
+Deno.test("a paragraph after a title or a break is marked .lead, not indented", () => {
+  const html = render(
+    parse(
+      "{matter: preface}\n{title}\nP\n\nFirst.\n\n{break}\n\nAfter.\n\nPlain.",
+    ),
+  );
+  assertStringIncludes(html, '<p class="lead">First.</p>');
+  assertStringIncludes(html, '<p class="lead">After.</p>');
+  assertStringIncludes(html, "<p>Plain.</p>");
+});
+
 Deno.test("endnotes collect at the end of the structural block", () => {
   const html = render(
     parse(

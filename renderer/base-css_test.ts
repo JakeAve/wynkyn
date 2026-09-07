@@ -24,3 +24,22 @@ Deno.test("TOC rules in base.css keep zero own-specificity via :where() (review 
     );
   }
 });
+
+Deno.test("base.css uses no adjacent-sibling combinator (Paged.js drops those rules)", () => {
+  // Paged.js 0.4.3 silently discards any rule whose selector contains `+`, and
+  // discards the whole grouped rule with it — so one `h1 + p` in a selector
+  // list took `.verse`, `.stanza` and `.has-dropcap` down with it and every
+  // printed book indented paragraphs that should have been flush.
+  // docs/pagedjs-plus-combinator.md.
+  const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url))
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const offenders = [...css.matchAll(/([^{}]+)\{/g)]
+    .map((m) => m[1]!.replace(/\s+/g, " ").trim())
+    .filter((s) => s.includes("+"));
+  assert(
+    offenders.length === 0,
+    `selectors with a "+" combinator are dropped by Paged.js: ${
+      offenders.join(" | ")
+    }`,
+  );
+});
