@@ -491,6 +491,29 @@ Deno.test("verses with start param (§3.5.7)", () => {
   assertEquals(v.start, 3);
 });
 
+Deno.test("{dropcap} opens a verse; other sentinels still rejected (§3.5.7)", () => {
+  const doc = parse([
+    "{chapter: one}",
+    "{verses: genesis-1}",
+    "{dropcap}",
+    "In the beginning God created the heaven and the earth.",
+    "",
+    "And the earth was without form.",
+    "{/verses}",
+  ].join("\n"));
+  const v = (doc.body[0] as Chapter).children[0] as Verses;
+  assertEquals(doc.diagnostics, []);
+  assertEquals(v.verses.map((p) => p.kind), ["dropcap", "paragraph"]);
+
+  const bad = parse(
+    "{chapter: one}\n{verses: genesis-1}\n{heading}\nNope.\n{/verses}",
+  );
+  assertEquals(bad.diagnostics.length, 1);
+
+  const poem = parse("{chapter: one}\n{poem}\n{dropcap}\nNope.\n{/poem}");
+  assertEquals(poem.diagnostics.length, 1);
+});
+
 Deno.test("verses nest inside columns (§3.2.3 example)", () => {
   const doc = parse([
     "{chapter: one}",

@@ -5,6 +5,7 @@ import type {
   Chapter,
   Component,
   ContentNode,
+  DropcapParagraph,
   Inline,
   MatterBlock,
   Note,
@@ -200,6 +201,27 @@ function inlinePlainText(inlines: Inline[]): string {
   return out;
 }
 
+function dropcapHtml(
+  node: DropcapParagraph,
+  ctx: NoteCtx,
+  opts: RenderOptions,
+  extraClass = "",
+  prefix = "",
+): string {
+  const src = node.image ? opts.images?.[node.image] : undefined;
+  const initial = src
+    ? `<img class="dropcap" src="${src}" alt="">${
+      renderInlines(node.inlines, ctx)
+    }`
+    : (() => {
+      const { head, rest } = splitFirstChar(node.inlines);
+      return `<span class="dropcap">${escapeHtml(head)}</span>${
+        renderInlines(rest, ctx)
+      }`;
+    })();
+  return `<p class="has-dropcap${extraClass}">${prefix}${initial}</p>`;
+}
+
 function splitFirstChar(inlines: Inline[]): { head: string; rest: Inline[] } {
   if (!inlines.length) return { head: "", rest: inlines };
   const first = inlines[0]!;
@@ -278,23 +300,8 @@ function renderContent(
       }
       return `<p class="${node.name}">${renderInlines(node.inlines, ctx)}</p>`;
     }
-    case "dropcap": {
-      const { head, rest } = splitFirstChar(node.inlines);
-      if (node.image) {
-        const src = opts.images?.[node.image];
-        if (src) {
-          return `<p class="has-dropcap"><img class="dropcap" src="${src}" alt="">${
-            renderInlines(node.inlines, ctx)
-          }</p>`;
-        }
-        return `<p class="has-dropcap"><span class="dropcap">${
-          escapeHtml(head)
-        }</span>${renderInlines(rest, ctx)}</p>`;
-      }
-      return `<p class="has-dropcap"><span class="dropcap">${
-        escapeHtml(head)
-      }</span>${renderInlines(rest, ctx)}</p>`;
-    }
+    case "dropcap":
+      return dropcapHtml(node, ctx, opts);
     case "heading": {
       const tag = node.level === 1 ? "h3" : "h4";
       const cls = node.level === 1 ? "heading" : "subheading";
@@ -342,13 +349,12 @@ function renderContent(
       // No space after the number: in justified text it is the first stretchable
       // space on the line, so it soaks up the whole line's justification slack
       // and reads as a ragged indent. base.css spaces it with padding instead.
-      const verses = node.verses.map((v, i) =>
-        v.kind === "paragraph"
-          ? `<p class="verse"><span class="number">${node.start + i}</span>${
-            renderInlines(v.inlines, ctx)
-          }</p>`
-          : ""
-      ).join("");
+      const verses = node.verses.map((v, i) => {
+        const num = `<span class="number">${node.start + i}</span>`;
+        return v.kind === "dropcap"
+          ? dropcapHtml(v, ctx, opts, " verse", num)
+          : `<p class="verse">${num}${renderInlines(v.inlines, ctx)}</p>`;
+      }).join("");
       return `<div class="verses" id="${
         escapeHtml(node.slug)
       }">${verses}</div>`;

@@ -186,7 +186,9 @@ export function parse(source: string): BmlDocument {
     const topBlock = blockStack[blockStack.length - 1];
     if (
       topBlock &&
-      (topBlock.node.kind === "poem" || topBlock.node.kind === "verses")
+      (topBlock.node.kind === "poem" || topBlock.node.kind === "verses") &&
+      // a dropcap opens a verse the way it opens any other paragraph (§3.5.7)
+      !(topBlock.node.kind === "verses" && tag.name === "dropcap")
     ) {
       diag(line, `{${tag.name}} is not allowed inside {${topBlock.node.kind}}`);
       return;

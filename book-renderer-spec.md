@@ -662,6 +662,9 @@ And God said, Let there be light: and there was light.
 {/verses}
 ```
 
+A `{dropcap}` may open a verse, for an illuminated initial on the first verse of
+a chapter; the verse keeps its number.
+
 #### 3.5.8 Poems
 
 For poetry set within the text — a poem a character recites, song lyrics, an

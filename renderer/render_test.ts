@@ -120,6 +120,18 @@ Deno.test("verses render numbers from start (§3.5.7)", () => {
   );
 });
 
+Deno.test("a dropcap verse keeps its verse number and class (§3.5.7)", () => {
+  const html = render(
+    parse(
+      "{chapter: a}\n{verses: gen-1 | start: 3}\n{dropcap}\nAnd God said.\n{/verses}",
+    ),
+  );
+  assertStringIncludes(
+    html,
+    '<p class="has-dropcap verse"><span class="number">3</span><span class="dropcap">A</span>nd God said.</p>',
+  );
+});
+
 Deno.test("a paragraph after a title or a break is marked .lead, not indented", () => {
   const html = render(
     parse(

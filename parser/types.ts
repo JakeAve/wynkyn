@@ -147,7 +147,7 @@ export interface Verses {
   kind: "verses";
   slug: string;
   start: number; // default 1; {verses: slug | start: 3}
-  verses: Paragraph[]; // verse number = start + index
+  verses: (Paragraph | DropcapParagraph)[]; // verse number = start + index
   line: number;
 }
 
