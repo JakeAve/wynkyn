@@ -9,6 +9,7 @@ import {
   generatePagedCSS,
 } from "../metadata/css-generator.ts";
 import { render } from "../renderer/render.ts";
+import { metadataPath } from "./editions.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 
 const BASE_CSS = await Deno.readTextFile(
@@ -18,8 +19,14 @@ const BASE_CSS = await Deno.readTextFile(
 // spec §4.11 item 8: try these in order for each {illustration:}/{dropcap|image:} slug.
 const IMAGE_EXT_ORDER = ["svg", "png", "jpg", "jpeg", "webp"];
 
+export interface BuildOptions {
+  imageUrlPrefix?: string; // default /books/<book>/images
+  edition?: string | null; // null/undefined = the unnamed edition (metadata.json)
+}
+
 export interface BuildResult {
   book: string;
+  edition: string | null;
   bookTitle: string;
   html: string; // render() output — body content only, no <html> wrapper
   baseCss: string;
@@ -94,27 +101,36 @@ async function resolveImages(
 export async function buildBook(
   booksRoot: string,
   book: string,
-  imageUrlPrefix = `/books/${book}/images`,
+  opts: BuildOptions = {},
 ): Promise<BuildResult> {
   const bookDir = `${booksRoot}/${book}`;
+  const edition = opts.edition ?? null;
+  const imageUrlPrefix = opts.imageUrlPrefix ?? `/books/${book}/images`;
   const source = await Deno.readTextFile(`${bookDir}/manuscript.md`);
   const doc = parse(source);
-  const meta = (await loadMetadata(`${bookDir}/metadata.json`)) ?? {};
+  const metaPath = metadataPath(booksRoot, book, edition);
+  const meta = await loadMetadata(metaPath);
+  if (meta === null && edition !== null) {
+    // Missing metadata.json is fine (spec §4); a missing named edition is not.
+    throw new Deno.errors.NotFound(`no such edition: ${book}/${edition}`);
+  }
+  const m = meta ?? {};
   const images = await resolveImages(bookDir, imageUrlPrefix);
   const bookTitle = extractBookTitle(doc, book);
   return {
     book,
+    edition,
     bookTitle,
     html: render(doc, {
-      numbering: meta.numbering,
-      notes: meta.notes,
-      toc: meta.toc,
+      numbering: m.numbering,
+      notes: m.notes,
+      toc: m.toc,
       images,
     }),
     baseCss: BASE_CSS,
-    domCss: generateDomCSS(meta),
-    pagedCss: generatePagedCSS(meta, { bookTitle }),
-    fontLinks: generateFontLinks(meta),
+    domCss: generateDomCSS(m),
+    pagedCss: generatePagedCSS(m, { bookTitle }),
+    fontLinks: generateFontLinks(m),
     diagnostics: doc.diagnostics,
   };
 }

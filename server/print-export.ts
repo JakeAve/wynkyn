@@ -207,7 +207,9 @@ export async function exportBook(
     pageCount = opts.pages ?? 4 * folios;
   } else {
     const imagesDir = `file://${await Deno.realPath(bookDir)}/images`;
-    const built = await buildBook(booksRoot, book, imagesDir);
+    const built = await buildBook(booksRoot, book, {
+      imageUrlPrefix: imagesDir,
+    });
     diagnostics = built.diagnostics.length;
     source = await (opts.render ?? renderPdf)(toHtml(built));
     const src = await PDFDocument.load(source);

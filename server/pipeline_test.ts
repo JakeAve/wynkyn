@@ -41,9 +41,26 @@ Deno.test("buildBook rejects for a missing book", async () => {
 });
 
 Deno.test("buildBook accepts an image url prefix override", async () => {
-  const b = await buildBook(ROOT, "demo-book", "file:///abs/images");
+  const b = await buildBook(ROOT, "demo-book", {
+    imageUrlPrefix: "file:///abs/images",
+  });
   assert(
     !b.html.includes('"/books/demo-book/images'),
     "default prefix must not appear",
+  );
+});
+
+Deno.test("buildBook with an edition: same HTML, that edition's CSS", async () => {
+  const base = await buildBook(ROOT, "demo-book");
+  const pocket = await buildBook(ROOT, "demo-book", { edition: "pocket" });
+  assertEquals(base.edition, null);
+  assertEquals(pocket.edition, "pocket");
+  assertEquals(pocket.html, base.html);
+  assert(base.pagedCss.includes("5.5in 8.5in"));
+  assert(pocket.pagedCss.includes("3.5in 5in"));
+  assert(pocket.fontLinks.includes("family=Crimson+Pro"));
+  await assertRejects(
+    () => buildBook(ROOT, "demo-book", { edition: "no-such" }),
+    Deno.errors.NotFound,
   );
 });
