@@ -610,3 +610,68 @@ Deno.test("editions: create copies the source's current metadata; rename; delete
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("editions: ws clients get their own edition's builds; manuscript edits reach all", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
+  const base = `http://localhost:${server.port}`;
+  const unnamed = new WebSocket(
+    `ws://localhost:${server.port}/ws?book=demo-book&client=u`,
+  );
+  const pocket = new WebSocket(
+    `ws://localhost:${server.port}/ws?book=demo-book&edition=pocket&client=p`,
+  );
+  const post = (url: string, body: unknown) =>
+    fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => r.body?.cancel());
+  try {
+    const u0 = await nextMessage(unnamed);
+    const p0 = await nextMessage(pocket);
+    assertEquals(u0.edition, null);
+    assertEquals(p0.edition, "pocket");
+    assert((p0.pagedCss as string).includes("3.5in 5in"));
+    await new Promise((r) => setTimeout(r, 300)); // let the watch warm up
+
+    // Pocket metadata write → only the pocket client hears it.
+    let unnamedHeard = false;
+    unnamed.addEventListener("message", () => unnamedHeard = true, {
+      once: true,
+    });
+    const p1 = nextMessage(pocket);
+    await post(`${base}/api/books/demo-book/editions/pocket/metadata`, {
+      sections: { notes: { placement: "footnote" } },
+      clientId: "p",
+    });
+    const msg = await p1;
+    assertEquals(msg.origin, "p");
+    assertEquals(msg.edition, "pocket");
+    assert((msg.pagedCss as string).includes("float: footnote"));
+    await new Promise((r) => setTimeout(r, 300));
+    assertEquals(unnamedHeard, false);
+
+    // Manuscript write → both clients, each built with its own edition.
+    const u2 = nextMessage(unnamed);
+    const p2 = nextMessage(pocket);
+    await post(`${base}/api/books/demo-book/manuscript`, {
+      text: "{matter: half-title}\n{title}\nRenamed\n",
+      clientId: "u",
+    });
+    const [um, pm] = await Promise.all([u2, p2]);
+    assertEquals(um.origin, "u");
+    assertEquals(pm.origin, "u");
+    assert((um.pagedCss as string).includes("5.5in 8.5in"));
+    assert((pm.pagedCss as string).includes("3.5in 5in"));
+  } finally {
+    unnamed.close();
+    pocket.close();
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});

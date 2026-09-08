@@ -3,6 +3,7 @@
 import { buildBook, listBooks } from "./pipeline.ts";
 import { watchTree } from "./watch.ts";
 import {
+  classifyChange,
   createEdition,
   listEditions,
   metadataPath,
@@ -36,6 +37,7 @@ export interface RunningServer {
 interface Client {
   socket: WebSocket;
   book: string;
+  edition: string | null;
   clientId: string;
 }
 
@@ -350,62 +352,78 @@ export async function startServer(
 
   async function buildMessage(
     book: string,
+    edition: string | null,
     origin: string | null,
   ): Promise<string> {
     try {
-      const build = await buildBook(booksRoot, book);
+      const build = await buildBook(booksRoot, book, { edition });
       return JSON.stringify({ type: "update", origin, ...build });
     } catch (err) {
-      // Bad metadata.json or a mid-write read must never kill the server —
+      // Bad metadata or a mid-write read must never kill the server —
       // push the failure to the preview instead (Global Constraints).
       return JSON.stringify({
         type: "error",
         book,
+        edition,
         origin,
         message: String(err),
       });
     }
   }
 
-  async function broadcast(book: string) {
-    const origin = recentWrites.get(book) ?? null;
-    recentWrites.delete(book);
-    const message = await buildMessage(book, origin);
-    for (const c of clients) {
-      if (c.book === book && c.socket.readyState === WebSocket.OPEN) {
-        c.socket.send(message);
+  // edition === undefined: a shared file changed — every client on the book,
+  // each rebuilt for its own edition. Otherwise only that edition's clients.
+  async function broadcast(book: string, edition: string | null | undefined) {
+    const originKey = edition === undefined ? book : metaKey(book, edition);
+    const origin = recentWrites.get(originKey) ?? null;
+    recentWrites.delete(originKey);
+    const targets = [...clients].filter((c) =>
+      c.book === book && c.socket.readyState === WebSocket.OPEN &&
+      (edition === undefined || c.edition === edition)
+    );
+    const messages = new Map<string | null, string>(); // one build per edition
+    for (const c of targets) {
+      let m = messages.get(c.edition);
+      if (!m) {
+        messages.set(
+          c.edition,
+          m = await buildMessage(book, c.edition, origin),
+        );
       }
+      c.socket.send(m);
     }
   }
 
   const watcher = watchTree(booksRoot, (paths) => {
-    const changed = new Set<string>();
+    // book → set of affected editions; undefined marks "shared: everyone".
+    const changed = new Map<string, Set<string | null | undefined>>();
     for (const p of paths) {
       if (!p.startsWith(absRoot + "/")) continue;
       const [book, ...rest] = p.slice(absRoot.length + 1).split("/");
-      const file = rest.join("/");
-      if (
-        book &&
-        (file === "manuscript.md" || file === "metadata.json" ||
-          rest[0] === "images")
-      ) {
-        changed.add(book);
-      }
+      const change = book ? classifyChange(rest) : null;
+      if (!book || !change) continue;
+      let set = changed.get(book);
+      if (!set) changed.set(book, set = new Set());
+      set.add(change.kind === "shared" ? undefined : change.edition);
     }
-    for (const book of changed) broadcast(book);
+    for (const [book, editions] of changed) {
+      if (editions.has(undefined)) broadcast(book, undefined);
+      else for (const e of editions) broadcast(book, e);
+    }
   });
 
   function handleWebSocket(req: Request, url: URL): Response {
     const book = url.searchParams.get("book");
-    if (!book || !safeName(book)) {
-      return new Response("missing or bad book param", { status: 400 });
+    const edition = url.searchParams.get("edition");
+    if (!book || !safeName(book) || (edition !== null && !safeName(edition))) {
+      return new Response("missing or bad book/edition param", { status: 400 });
     }
     const clientId = url.searchParams.get("client") ?? crypto.randomUUID();
     const { socket, response } = Deno.upgradeWebSocket(req);
-    const client: Client = { socket, book, clientId };
+    const client: Client = { socket, book, edition, clientId };
     socket.onopen = async () => {
       clients.add(client);
-      const message = await buildMessage(book, null);
+      const message = await buildMessage(book, edition, null);
       if (socket.readyState === WebSocket.OPEN) socket.send(message);
     };
     socket.onclose = () => clients.delete(client);
