@@ -2,6 +2,12 @@
 // watches books, rebuilds on change, pushes updates over WebSockets, accepts saves.
 import { buildBook, listBooks } from "./pipeline.ts";
 import { watchTree } from "./watch.ts";
+import {
+  createEdition,
+  listEditions,
+  metadataPath,
+  safeName,
+} from "./editions.ts";
 
 const WEB_DIR = new URL("../web/", import.meta.url);
 
@@ -25,11 +31,6 @@ export interface ServerOptions {
 export interface RunningServer {
   port: number;
   stop(): Promise<void>;
-}
-
-// One path segment: no separators, no dot-dot, no leading dot.
-function safeName(name: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) && !name.includes("..");
 }
 
 interface Client {
@@ -131,20 +132,26 @@ export async function startServer(
   }
   const pendingMetaSaves = new Map<string, PendingMetaSave>();
 
+  // Metadata state is per edition; the manuscript's is per book.
+  const metaKey = (book: string, edition: string | null) =>
+    edition === null ? book : `${book}/editions/${edition}`;
+
   // The authoritative current metadata for serving and merging: a pending
-  // debounced save wins over the disk copy. Returns null when metadata.json
-  // exists but is corrupt JSON — callers turn that into a 409, because
-  // merging over a file we can't parse would silently discard its content.
+  // debounced save wins over the disk copy. Returns null when the file exists
+  // but is corrupt JSON — callers turn that into a 409. Returns undefined
+  // when a *named* edition's file is missing (404); a missing metadata.json
+  // is {} because metadata is optional (spec §4).
   async function currentMetadata(
     book: string,
-  ): Promise<Record<string, unknown> | null> {
-    const pending = pendingMetaSaves.get(book);
+    edition: string | null,
+  ): Promise<Record<string, unknown> | null | undefined> {
+    const pending = pendingMetaSaves.get(metaKey(book, edition));
     if (pending) return pending.metadata;
     let text: string;
     try {
-      text = await Deno.readTextFile(`${booksRoot}/${book}/metadata.json`);
+      text = await Deno.readTextFile(metadataPath(booksRoot, book, edition));
     } catch {
-      return {}; // no metadata.json yet — metadata is optional (spec §4)
+      return edition === null ? {} : undefined;
     }
     try {
       return JSON.parse(text) as Record<string, unknown>;
@@ -153,20 +160,24 @@ export async function startServer(
     }
   }
 
-  async function handleMetadataGet(book: string): Promise<Response> {
+  async function handleMetadataGet(
+    book: string,
+    edition: string | null,
+  ): Promise<Response> {
     if (!safeName(book)) return new Response("bad path", { status: 400 });
     try {
       await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
     } catch {
       return new Response("book not found", { status: 404 });
     }
-    const metadata = await currentMetadata(book);
+    const metadata = await currentMetadata(book, edition);
+    if (metadata === undefined) {
+      return new Response("edition not found", { status: 404 });
+    }
     if (metadata === null) {
       return new Response(
-        "metadata.json is not valid JSON — fix it on disk first",
-        {
-          status: 409,
-        },
+        "metadata is not valid JSON — fix it on disk first",
+        { status: 409 },
       );
     }
     return Response.json({ metadata });
@@ -174,6 +185,7 @@ export async function startServer(
 
   async function handleMetadataSave(
     book: string,
+    edition: string | null,
     req: Request,
   ): Promise<Response> {
     if (!safeName(book)) return new Response("bad path", { status: 400 });
@@ -190,9 +202,7 @@ export async function startServer(
     ) {
       return new Response(
         "body must be { sections: object, clientId?: string }",
-        {
-          status: 400,
-        },
+        { status: 400 },
       );
     }
     try {
@@ -200,13 +210,14 @@ export async function startServer(
     } catch {
       return new Response("book not found", { status: 404 });
     }
-    const base = await currentMetadata(book);
+    const base = await currentMetadata(book, edition);
+    if (base === undefined) {
+      return new Response("edition not found", { status: 404 });
+    }
     if (base === null) {
       return new Response(
-        "metadata.json is not valid JSON — fix it on disk first",
-        {
-          status: 409,
-        },
+        "metadata is not valid JSON — fix it on disk first",
+        { status: 409 },
       );
     }
     // Shallow-merge only the POSTed top-level keys; everything else —
@@ -216,27 +227,124 @@ export async function startServer(
       if (value === null) delete merged[key]; // null removes a section outright
       else merged[key] = value;
     }
-    const existing = pendingMetaSaves.get(book);
+    const key = metaKey(book, edition);
+    const existing = pendingMetaSaves.get(key);
     if (existing) clearTimeout(existing.timer);
     const clientId = typeof body.clientId === "string" ? body.clientId : null;
     const save: PendingMetaSave = { metadata: merged, clientId, timer: 0 };
     save.timer = setTimeout(async () => {
-      pendingMetaSaves.delete(book);
-      recentWrites.set(book, save.clientId);
+      pendingMetaSaves.delete(key);
+      recentWrites.set(key, save.clientId);
       try {
         await Deno.writeTextFile(
-          `${booksRoot}/${book}/metadata.json`,
+          metadataPath(booksRoot, book, edition),
           JSON.stringify(save.metadata, null, 2) + "\n",
         );
         // The watcher sees this write and broadcasts, tagged via recentWrites.
       } catch (err) {
-        // Same reasoning as the manuscript save path: drop the origin tag so
-        // it isn't misattributed to a later broadcast, log, never die.
-        recentWrites.delete(book);
-        console.error(`metadata save failed for book "${book}":`, err);
+        recentWrites.delete(key);
+        console.error(`metadata save failed for "${key}":`, err);
       }
     }, saveDebounceMs);
-    pendingMetaSaves.set(book, save);
+    pendingMetaSaves.set(key, save);
+    return Response.json({ ok: true });
+  }
+
+  async function handleEditionCreate(
+    book: string,
+    req: Request,
+  ): Promise<Response> {
+    if (!safeName(book)) return new Response("bad path", { status: 400 });
+    let body: { slug?: unknown; from?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response("invalid JSON body", { status: 400 });
+    }
+    const slug = body.slug;
+    if (typeof slug !== "string" || !safeName(slug)) {
+      return new Response("bad edition slug", { status: 400 });
+    }
+    const from = typeof body.from === "string" ? body.from : null;
+    if (from !== null && !safeName(from)) {
+      return new Response("bad source edition", { status: 400 });
+    }
+    try {
+      await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
+    } catch {
+      return new Response("book not found", { status: 404 });
+    }
+    const source = await currentMetadata(book, from);
+    if (source === undefined) {
+      return new Response("edition not found", { status: 404 });
+    }
+    if (source === null) {
+      return new Response("source metadata is not valid JSON", {
+        status: 409,
+      });
+    }
+    try {
+      await createEdition(booksRoot, book, slug, source);
+    } catch (err) {
+      if (err instanceof Deno.errors.AlreadyExists) {
+        return new Response("edition already exists", { status: 409 });
+      }
+      throw err;
+    }
+    return Response.json({ ok: true }, { status: 201 });
+  }
+
+  async function handleEditionRename(
+    book: string,
+    edition: string,
+    req: Request,
+  ): Promise<Response> {
+    if (!safeName(book) || !safeName(edition)) {
+      return new Response("bad path", { status: 400 });
+    }
+    let body: { slug?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response("invalid JSON body", { status: 400 });
+    }
+    const target = body.slug;
+    if (typeof target !== "string" || !safeName(target)) {
+      return new Response("bad edition slug", { status: 400 });
+    }
+    const to = metadataPath(booksRoot, book, target);
+    try {
+      await Deno.stat(to);
+      return new Response("edition already exists", { status: 409 });
+    } catch {
+      // free
+    }
+    try {
+      await Deno.rename(metadataPath(booksRoot, book, edition), to);
+    } catch {
+      return new Response("edition not found", { status: 404 });
+    }
+    const pending = pendingMetaSaves.get(metaKey(book, edition));
+    if (pending) clearTimeout(pending.timer); // any unflushed edit dies with the old name
+    pendingMetaSaves.delete(metaKey(book, edition));
+    return Response.json({ ok: true });
+  }
+
+  async function handleEditionDelete(
+    book: string,
+    edition: string,
+  ): Promise<Response> {
+    if (!safeName(book) || !safeName(edition)) {
+      return new Response("bad path", { status: 400 });
+    }
+    const pending = pendingMetaSaves.get(metaKey(book, edition));
+    if (pending) clearTimeout(pending.timer);
+    pendingMetaSaves.delete(metaKey(book, edition));
+    try {
+      await Deno.remove(metadataPath(booksRoot, book, edition));
+    } catch {
+      return new Response("edition not found", { status: 404 });
+    }
     return Response.json({ ok: true });
   }
 
@@ -345,12 +453,15 @@ export async function startServer(
     const bookApi = path.match(/^\/api\/books\/([^/]+)$/);
     if (bookApi && req.method === "GET") {
       const book = bookApi[1]!;
-      if (!safeName(book)) return new Response("bad path", { status: 400 });
+      const edition = url.searchParams.get("edition");
+      if (!safeName(book) || (edition !== null && !safeName(edition))) {
+        return new Response("bad path", { status: 400 });
+      }
       try {
-        return Response.json(await buildBook(booksRoot, book));
+        return Response.json(await buildBook(booksRoot, book, { edition }));
       } catch (err) {
         if (err instanceof Deno.errors.NotFound) {
-          return new Response("book not found", { status: 404 });
+          return new Response("book or edition not found", { status: 404 });
         }
         return new Response(`build failed: ${String(err)}`, { status: 500 });
       }
@@ -366,10 +477,50 @@ export async function startServer(
 
     const metadataApi = path.match(/^\/api\/books\/([^/]+)\/metadata$/);
     if (metadataApi && req.method === "GET") {
-      return handleMetadataGet(metadataApi[1]!);
+      return handleMetadataGet(metadataApi[1]!, null);
     }
     if (metadataApi && req.method === "POST") {
-      return handleMetadataSave(metadataApi[1]!, req);
+      return handleMetadataSave(metadataApi[1]!, null, req);
+    }
+
+    const editionsApi = path.match(/^\/api\/books\/([^/]+)\/editions$/);
+    if (editionsApi && req.method === "GET") {
+      const book = editionsApi[1]!;
+      if (!safeName(book)) return new Response("bad path", { status: 400 });
+      try {
+        await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
+      } catch {
+        return new Response("book not found", { status: 404 });
+      }
+      return Response.json({ editions: await listEditions(booksRoot, book) });
+    }
+    if (editionsApi && req.method === "POST") {
+      return handleEditionCreate(editionsApi[1]!, req);
+    }
+
+    const editionApi = path.match(/^\/api\/books\/([^/]+)\/editions\/([^/]+)$/);
+    if (editionApi && req.method === "DELETE") {
+      return handleEditionDelete(editionApi[1]!, editionApi[2]!);
+    }
+
+    const editionMeta = path.match(
+      /^\/api\/books\/([^/]+)\/editions\/([^/]+)\/metadata$/,
+    );
+    if (editionMeta && !safeName(editionMeta[2]!)) {
+      return new Response("bad path", { status: 400 });
+    }
+    if (editionMeta && req.method === "GET") {
+      return handleMetadataGet(editionMeta[1]!, editionMeta[2]!);
+    }
+    if (editionMeta && req.method === "POST") {
+      return handleMetadataSave(editionMeta[1]!, editionMeta[2]!, req);
+    }
+
+    const editionRename = path.match(
+      /^\/api\/books\/([^/]+)\/editions\/([^/]+)\/rename$/,
+    );
+    if (editionRename && req.method === "POST") {
+      return handleEditionRename(editionRename[1]!, editionRename[2]!, req);
     }
 
     const image = path.match(/^\/books\/([^/]+)\/images\/([^/]+)$/);

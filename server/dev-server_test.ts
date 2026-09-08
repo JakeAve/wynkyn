@@ -1,5 +1,5 @@
 // server/dev-server_test.ts
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { startServer } from "./dev-server.ts";
 
 // Tests copy the fixture into a temp dir: later tasks write to it, and the
@@ -14,6 +14,11 @@ export async function makeBooksRoot(): Promise<string> {
   await Deno.copyFile(
     new URL("images/ornament.svg", src),
     `${root}/demo-book/images/ornament.svg`,
+  );
+  await Deno.mkdir(`${root}/demo-book/editions`);
+  await Deno.copyFile(
+    new URL("editions/pocket.json", src),
+    `${root}/demo-book/editions/pocket.json`,
   );
   return root;
 }
@@ -429,6 +434,178 @@ Deno.test("metadata: debounced write broadcasts an update tagged with origin", a
     assert((msg.pagedCss as string).includes("float: footnote"));
   } finally {
     ws.close();
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("editions: list, build json per edition, metadata GET/POST touch only that file", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
+  const base = `http://localhost:${server.port}`;
+  try {
+    const list = await (await fetch(`${base}/api/books/demo-book/editions`))
+      .json();
+    assertEquals(list, {
+      editions: [
+        { slug: null, summary: "5.5in 8.5in · EB Garamond · 11pt" },
+        { slug: "pocket", summary: "3.5in 5in · Crimson Pro · 9pt" },
+      ],
+    });
+
+    const build =
+      await (await fetch(`${base}/api/books/demo-book?edition=pocket`)).json();
+    assertEquals(build.edition, "pocket");
+    assert(build.pagedCss.includes("3.5in 5in"));
+
+    const missing = await fetch(`${base}/api/books/demo-book?edition=nope`);
+    assertEquals(missing.status, 404);
+    await missing.body?.cancel();
+
+    const get = await (await fetch(
+      `${base}/api/books/demo-book/editions/pocket/metadata`,
+    )).json();
+    assertEquals(get.metadata.page.size, "3.5in 5in");
+
+    const post = await fetch(
+      `${base}/api/books/demo-book/editions/pocket/metadata`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sections: { page: { size: "A6" } },
+          clientId: "t1",
+        }),
+      },
+    );
+    assertEquals((await post.json()).ok, true);
+    await new Promise((r) => setTimeout(r, 150));
+    const pocket = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/editions/pocket.json`),
+    );
+    assertEquals(pocket.page.size, "A6");
+    assertEquals(pocket.fonts, { body: "Crimson Pro" }); // rest preserved
+    const unnamed = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/metadata.json`),
+    );
+    assertEquals(unnamed.page.size, "5.5in 8.5in"); // untouched
+
+    const unknown = await fetch(
+      `${base}/api/books/demo-book/editions/nope/metadata`,
+    );
+    assertEquals(unknown.status, 404);
+    await unknown.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("editions: create copies the source's current metadata; rename; delete", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
+  const base = `http://localhost:${server.port}`;
+  const json = (body: unknown) => ({
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  try {
+    // A pending (not yet flushed) save on the unnamed edition must be what gets copied.
+    await (await fetch(
+      `${base}/api/books/demo-book/metadata`,
+      json({
+        sections: { page: { size: "A5" } },
+      }),
+    )).body?.cancel();
+
+    const created = await fetch(
+      `${base}/api/books/demo-book/editions`,
+      json({ slug: "gift" }),
+    );
+    assertEquals(created.status, 201);
+    await created.body?.cancel();
+    const gift = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/editions/gift.json`),
+    );
+    assertEquals(gift.page.size, "A5");
+    assertEquals(gift.fonts, { body: "EB Garamond" });
+
+    const fromPocket = await fetch(
+      `${base}/api/books/demo-book/editions`,
+      json({
+        slug: "pocket-2",
+        from: "pocket",
+      }),
+    );
+    assertEquals(fromPocket.status, 201);
+    await fromPocket.body?.cancel();
+    const p2 = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/editions/pocket-2.json`),
+    );
+    assertEquals(p2.page.size, "3.5in 5in");
+
+    const dup = await fetch(
+      `${base}/api/books/demo-book/editions`,
+      json({ slug: "gift" }),
+    );
+    assertEquals(dup.status, 409);
+    await dup.body?.cancel();
+    const bad = await fetch(
+      `${base}/api/books/demo-book/editions`,
+      json({ slug: "../x" }),
+    );
+    assertEquals(bad.status, 400);
+    await bad.body?.cancel();
+    const noFrom = await fetch(
+      `${base}/api/books/demo-book/editions`,
+      json({
+        slug: "z",
+        from: "nope",
+      }),
+    );
+    assertEquals(noFrom.status, 404);
+    await noFrom.body?.cancel();
+
+    const renamed = await fetch(
+      `${base}/api/books/demo-book/editions/gift/rename`,
+      json({
+        slug: "deluxe",
+      }),
+    );
+    assertEquals((await renamed.json()).ok, true);
+    await Deno.stat(`${root}/demo-book/editions/deluxe.json`);
+    const clash = await fetch(
+      `${base}/api/books/demo-book/editions/deluxe/rename`,
+      json({
+        slug: "pocket",
+      }),
+    );
+    assertEquals(clash.status, 409);
+    await clash.body?.cancel();
+
+    const del = await fetch(`${base}/api/books/demo-book/editions/deluxe`, {
+      method: "DELETE",
+    });
+    assertEquals((await del.json()).ok, true);
+    await assertRejects(() =>
+      Deno.stat(`${root}/demo-book/editions/deluxe.json`)
+    );
+    const delMissing = await fetch(
+      `${base}/api/books/demo-book/editions/deluxe`,
+      { method: "DELETE" },
+    );
+    assertEquals(delMissing.status, 404);
+    await delMissing.body?.cancel();
+  } finally {
     await server.stop();
     await Deno.remove(root, { recursive: true });
   }
