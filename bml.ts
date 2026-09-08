@@ -17,6 +17,7 @@ import {
 
 export { toHtml } from "./server/pipeline.ts";
 
+// Test seam: lets tests point the CLI at a scratch books root instead of "books".
 const BOOKS = Deno.env.get("BML_BOOKS") ?? "books";
 
 export function formatDiagnostics(

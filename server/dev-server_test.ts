@@ -73,6 +73,27 @@ function nextMessage(
   });
 }
 
+function nextMessageWhere(
+  ws: WebSocket,
+  pred: (m: Record<string, unknown>) => boolean,
+  timeoutMs = 5000,
+): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error("timed out waiting for a matching ws message")),
+      timeoutMs,
+    );
+    const onMessage = (e: Event) => {
+      const m = JSON.parse((e as MessageEvent).data);
+      if (!pred(m)) return;
+      clearTimeout(t);
+      ws.removeEventListener("message", onMessage);
+      resolve(m);
+    };
+    ws.addEventListener("message", onMessage);
+  });
+}
+
 Deno.test("websocket: initial build on connect, rebuild pushed on file change", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });
@@ -644,7 +665,7 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     unnamed.addEventListener("message", () => unnamedHeard = true, {
       once: true,
     });
-    const p1 = nextMessage(pocket);
+    const p1 = nextMessageWhere(pocket, (m) => m.origin === "p");
     await post(`${base}/api/books/demo-book/editions/pocket/metadata`, {
       sections: { notes: { placement: "footnote" } },
       clientId: "p",
@@ -657,8 +678,8 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     assertEquals(unnamedHeard, false);
 
     // Manuscript write → both clients, each built with its own edition.
-    const u2 = nextMessage(unnamed);
-    const p2 = nextMessage(pocket);
+    const u2 = nextMessageWhere(unnamed, (m) => m.origin === "u");
+    const p2 = nextMessageWhere(pocket, (m) => m.origin === "u");
     await post(`${base}/api/books/demo-book/manuscript`, {
       text: "{matter: half-title}\n{title}\nRenamed\n",
       clientId: "u",

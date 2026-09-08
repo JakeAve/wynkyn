@@ -302,7 +302,10 @@ function populateEditionSwitcher(editions: EditionInfo[]): void {
     };
     row.onclick = go;
     row.onkeydown = (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") go();
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault(); // don't let Space scroll the dialog
+        go();
+      }
     };
     list.appendChild(row);
   }

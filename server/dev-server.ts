@@ -131,6 +131,7 @@ export async function startServer(
     metadata: Record<string, unknown>;
     clientId: string | null;
     timer: number;
+    cancelled?: boolean;
   }
   const pendingMetaSaves = new Map<string, PendingMetaSave>();
 
@@ -166,7 +167,9 @@ export async function startServer(
     book: string,
     edition: string | null,
   ): Promise<Response> {
-    if (!safeName(book)) return new Response("bad path", { status: 400 });
+    if (!safeName(book) || (edition !== null && !safeName(edition))) {
+      return new Response("bad path", { status: 400 });
+    }
     try {
       await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
     } catch {
@@ -190,7 +193,9 @@ export async function startServer(
     edition: string | null,
     req: Request,
   ): Promise<Response> {
-    if (!safeName(book)) return new Response("bad path", { status: 400 });
+    if (!safeName(book) || (edition !== null && !safeName(edition))) {
+      return new Response("bad path", { status: 400 });
+    }
     let body: { sections?: unknown; clientId?: unknown };
     try {
       body = await req.json();
@@ -235,6 +240,7 @@ export async function startServer(
     const clientId = typeof body.clientId === "string" ? body.clientId : null;
     const save: PendingMetaSave = { metadata: merged, clientId, timer: 0 };
     save.timer = setTimeout(async () => {
+      if (save.cancelled) return;
       pendingMetaSaves.delete(key);
       recentWrites.set(key, save.clientId);
       try {
@@ -321,14 +327,19 @@ export async function startServer(
     } catch {
       // free
     }
+    const pending = pendingMetaSaves.get(metaKey(book, edition));
+    if (pending) {
+      // Cancel first: a flush already in flight (past its own cancelled
+      // check, awaiting the write) must not resurrect the file after rename.
+      pending.cancelled = true;
+      clearTimeout(pending.timer); // any unflushed edit dies with the old name
+      pendingMetaSaves.delete(metaKey(book, edition));
+    }
     try {
       await Deno.rename(metadataPath(booksRoot, book, edition), to);
     } catch {
       return new Response("edition not found", { status: 404 });
     }
-    const pending = pendingMetaSaves.get(metaKey(book, edition));
-    if (pending) clearTimeout(pending.timer); // any unflushed edit dies with the old name
-    pendingMetaSaves.delete(metaKey(book, edition));
     return Response.json({ ok: true });
   }
 
@@ -340,8 +351,11 @@ export async function startServer(
       return new Response("bad path", { status: 400 });
     }
     const pending = pendingMetaSaves.get(metaKey(book, edition));
-    if (pending) clearTimeout(pending.timer);
-    pendingMetaSaves.delete(metaKey(book, edition));
+    if (pending) {
+      pending.cancelled = true;
+      clearTimeout(pending.timer);
+      pendingMetaSaves.delete(metaKey(book, edition));
+    }
     try {
       await Deno.remove(metadataPath(booksRoot, book, edition));
     } catch {
@@ -374,24 +388,43 @@ export async function startServer(
   // edition === undefined: a shared file changed — every client on the book,
   // each rebuilt for its own edition. Otherwise only that edition's clients.
   async function broadcast(book: string, edition: string | null | undefined) {
-    const originKey = edition === undefined ? book : metaKey(book, edition);
-    const origin = recentWrites.get(originKey) ?? null;
-    recentWrites.delete(originKey);
     const targets = [...clients].filter((c) =>
       c.book === book && c.socket.readyState === WebSocket.OPEN &&
       (edition === undefined || c.edition === edition)
     );
     const messages = new Map<string | null, string>(); // one build per edition
-    for (const c of targets) {
-      let m = messages.get(c.edition);
-      if (!m) {
-        messages.set(
-          c.edition,
-          m = await buildMessage(book, c.edition, origin),
-        );
+    if (edition !== undefined) {
+      // Targeted: one edition, one origin key.
+      const key = metaKey(book, edition);
+      const origin = recentWrites.get(key) ?? null;
+      recentWrites.delete(key);
+      for (const c of targets) {
+        let m = messages.get(c.edition);
+        if (!m) {
+          messages.set(
+            c.edition,
+            m = await buildMessage(book, c.edition, origin),
+          );
+        }
+        c.socket.send(m);
       }
-      c.socket.send(m);
+      return;
     }
+    // Shared: a build (and origin) per distinct edition among the targets,
+    // since a batched shared change may coincide with an edition's own flush.
+    // The shared-file origin (keyed by `book`) applies to every edition, so
+    // it's read once up front rather than deleted after the first edition
+    // consumes it — otherwise later editions in the same batch would miss it.
+    const sharedOrigin = recentWrites.get(book) ?? null;
+    recentWrites.delete(book);
+    for (const c of targets) {
+      if (messages.has(c.edition)) continue;
+      const key = metaKey(book, c.edition);
+      const origin = sharedOrigin ?? recentWrites.get(key) ?? null;
+      recentWrites.delete(key);
+      messages.set(c.edition, await buildMessage(book, c.edition, origin));
+    }
+    for (const c of targets) c.socket.send(messages.get(c.edition)!);
   }
 
   const watcher = watchTree(booksRoot, (paths) => {
