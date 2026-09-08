@@ -309,3 +309,41 @@ Deno.test("formatSummary is one line plus a waste warning when relevant", () => 
     "warning: 1 blank folio slot per signature (cut half is waste)",
   );
 });
+
+Deno.test("exportBook --edition: uses that edition's page size and writes under export/<edition>/", async () => {
+  // Copy the fixture so the default out dir lands in a temp tree, not testdata/.
+  const root = await Deno.makeTempDir();
+  const src = new URL("./testdata/demo-book/", import.meta.url);
+  await Deno.mkdir(`${root}/demo-book/editions`, { recursive: true });
+  for (const f of ["manuscript.md", "metadata.json", "editions/pocket.json"]) {
+    await Deno.copyFile(new URL(f, src), `${root}/demo-book/${f}`);
+  }
+  try {
+    // pocket is 3.5×5in → 4-up on legal (8.5×14): 2 folios = 1 sheet = 2 sides.
+    const s = await exportBook(root, "demo-book", {
+      proof: true,
+      folios: 2,
+      sheet: "legal",
+      duplex: "short-edge",
+      edition: "pocket",
+    });
+    assertEquals(s.imposition.nUp, 4);
+    assertEquals(s.files, [`${root}/demo-book/export/pocket/sheets.pdf`]);
+
+    const base = await exportBook(root, "demo-book", {
+      proof: true,
+      folios: 2,
+      sheet: "legal",
+      duplex: "short-edge",
+    });
+    assertEquals(base.files, [`${root}/demo-book/export/sheets.pdf`]);
+
+    await assertRejects(
+      () => exportBook(root, "demo-book", { proof: true, edition: "nope" }),
+      Error,
+      "no such edition: demo-book/nope",
+    );
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});

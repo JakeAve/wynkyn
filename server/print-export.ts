@@ -15,6 +15,7 @@ import {
   parseDims,
   type Slot,
 } from "./imposition.ts";
+import { metadataPath } from "./editions.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
 import { renderPdf } from "./pdf.ts";
@@ -138,6 +139,7 @@ export interface ExportOptions {
   proof?: boolean;
   pages?: number; // proof only
   out?: string;
+  edition?: string | null; // null/undefined = the unnamed edition
   /** Test seam: swap the Chrome-based renderer for a stub that returns pdf-lib bytes directly. */
   render?: (html: string) => Promise<Uint8Array>;
 }
@@ -183,17 +185,23 @@ export async function exportBook(
   } catch {
     throw new Error(`no such book: ${book}`);
   }
-  const meta = (await loadMetadata(`${bookDir}/metadata.json`)) ?? {};
-  const folios = opts.folios ?? meta.print?.["folios-per-signature"] ?? 4;
+  const edition = opts.edition ?? null;
+  const meta = await loadMetadata(metadataPath(booksRoot, book, edition));
+  if (meta === null && edition !== null) {
+    throw new Error(`no such edition: ${book}/${edition}`);
+  }
+  const m = meta ?? {};
+  const folios = opts.folios ?? m.print?.["folios-per-signature"] ?? 4;
   assertWholeNumber(folios, "folios-per-signature");
   if (opts.pages !== undefined) assertWholeNumber(opts.pages, "pages");
-  const sheetName = opts.sheet ?? meta.print?.["sheet-size"] ?? "letter";
-  const duplex = opts.duplex ?? meta.print?.duplex ?? "short-edge";
+  const sheetName = opts.sheet ?? m.print?.["sheet-size"] ?? "letter";
+  const duplex = opts.duplex ?? m.print?.duplex ?? "short-edge";
   assertOneOf(duplex, DUPLEX_VALUES, "duplex");
   const flip = opts.flip ?? "short-edge";
   assertOneOf(flip, FLIP_VALUES, "flip");
   const sheet = parseDims(sheetName);
-  const out = opts.out ?? `${bookDir}/export`;
+  const out = opts.out ??
+    (edition === null ? `${bookDir}/export` : `${bookDir}/export/${edition}`);
   await Deno.mkdir(out, { recursive: true });
 
   let source: Uint8Array | null = null;
@@ -203,12 +211,13 @@ export async function exportBook(
   const files: string[] = [];
   if (opts.proof) {
     // No PDF exists yet to measure — fall back to the metadata-declared trim size.
-    page = parseDims(meta.page?.size ?? "5.5in 8.5in");
+    page = parseDims(m.page?.size ?? "5.5in 8.5in");
     pageCount = opts.pages ?? 4 * folios;
   } else {
     const imagesDir = `file://${await Deno.realPath(bookDir)}/images`;
     const built = await buildBook(booksRoot, book, {
       imageUrlPrefix: imagesDir,
+      edition,
     });
     diagnostics = built.diagnostics.length;
     source = await (opts.render ?? renderPdf)(toHtml(built));
