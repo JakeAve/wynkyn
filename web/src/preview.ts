@@ -1,6 +1,11 @@
 // web/src/preview.ts — Paged.js re-render + font links (spec §7.6).
 // Paged.js is the CDN global from index.html; there is no npm build to bundle.
 import { matchKey, type StyleEntry } from "./style-catalog.ts";
+import {
+  type CachedRender,
+  renderHash,
+  saveCachedRender,
+} from "./preview-cache.ts";
 declare const Paged: {
   Previewer: new () => {
     preview(html: string, css: string[], el: Element): Promise<unknown>;
@@ -22,15 +27,23 @@ export interface UpdateMessage {
 
 let currentBlobUrl: string | null = null;
 let rendering = false;
-let queuedUpdate: { update: UpdateMessage; container: HTMLElement } | null =
-  null;
+let lastHash: string | null = null;
+let queuedUpdate:
+  | { update: UpdateMessage; container: HTMLElement; cacheKey: string }
+  | null = null;
 
 export async function renderPreview(
   update: UpdateMessage,
   container: HTMLElement,
+  cacheKey: string,
 ): Promise<void> {
+  const hash = await renderHash(update);
+  // Same content as what's on screen (e.g. the first update after a restore):
+  // Paged.js would spend seconds reproducing the identical pages.
+  if (hash === lastHash) return;
   if (rendering) {
-    queuedUpdate = { update, container }; // coalesce: only the latest pending update matters
+    // coalesce: only the latest pending update matters
+    queuedUpdate = { update, container, cacheKey };
     return;
   }
   rendering = true;
@@ -48,18 +61,54 @@ export async function renderPreview(
     const previewer = new Paged.Previewer();
     await previewer.preview(update.html, [blobUrl], stage);
     for (const old of container.children) if (old !== stage) old.remove();
+    // The restored sheets belong to the pages that just went away.
+    for (const s of document.head.querySelectorAll("[data-preview-cache]")) {
+      s.remove();
+    }
     stage.className = "";
     fitPreview(container);
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
+    lastHash = hash;
+    // Paged.js's generated CSS (page counters, running headers, --pagedjs-*)
+    // lives only in the sheets its Polisher inserts, so it caches with the DOM.
+    const styles = [
+      ...document.head.querySelectorAll("style[data-pagedjs-inserted-styles]"),
+    ].map((el) => el.textContent ?? "");
+    void saveCachedRender(cacheKey, {
+      hash,
+      pages: container.innerHTML,
+      styles,
+      fontLinks: update.fontLinks,
+    }); // fire-and-forget: never throws, and the render shouldn't wait on it
   } finally {
     rendering = false;
     if (queuedUpdate) {
       const next = queuedUpdate;
       queuedUpdate = null;
-      renderPreview(next.update, next.container);
+      renderPreview(next.update, next.container, next.cacheKey);
     }
   }
+}
+
+// Put a cached render on screen without Paged.js: its pages plus the sheets
+// Paged.js had inserted for them. lastHash is set so the first WebSocket
+// update, which carries the same content, is skipped.
+export function restoreCachedRender(
+  cached: CachedRender,
+  container: HTMLElement,
+): void {
+  setFontLinks(cached.fontLinks);
+  for (const css of cached.styles) {
+    const el = document.createElement("style");
+    el.setAttribute("data-pagedjs-inserted-styles", "");
+    el.setAttribute("data-preview-cache", "");
+    el.textContent = css;
+    document.head.appendChild(el);
+  }
+  container.innerHTML = cached.pages;
+  lastHash = cached.hash;
+  fitPreview(container);
 }
 
 export function setFontLinks(html: string): void {
