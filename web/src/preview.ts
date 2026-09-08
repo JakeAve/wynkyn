@@ -27,7 +27,11 @@ export interface UpdateMessage {
 
 let currentBlobUrl: string | null = null;
 let rendering = false;
-let lastHash: string | null = null;
+// The hash of the render on screen or being produced for it; every accepted
+// call sets it synchronously, so a queued render can't be skipped as "same".
+let targetHash: string | null = null;
+// The <style> elements Paged.js inserted for the pages currently on screen.
+let liveStyles: Element[] = [];
 let queuedUpdate:
   | { update: UpdateMessage; container: HTMLElement; cacheKey: string }
   | null = null;
@@ -37,10 +41,11 @@ export async function renderPreview(
   container: HTMLElement,
   cacheKey: string,
 ): Promise<void> {
-  const hash = await renderHash(update);
-  // Same content as what's on screen (e.g. the first update after a restore):
-  // Paged.js would spend seconds reproducing the identical pages.
-  if (hash === lastHash) return;
+  const hash = renderHash(update);
+  // Same content as what's on screen or already on its way (e.g. the first
+  // update after a restore): Paged.js would spend seconds reproducing it.
+  if (hash === targetHash) return;
+  targetHash = hash;
   if (rendering) {
     // coalesce: only the latest pending update matters
     queuedUpdate = { update, container, cacheKey };
@@ -59,22 +64,27 @@ export async function renderPreview(
     stage.className = "preview-stage";
     container.appendChild(stage);
     const previewer = new Paged.Previewer();
+    // Paged.js's Polisher inserts its generated CSS (page counters, running
+    // headers, --pagedjs-*) with sheet.insertRule, so the style elements have
+    // no textContent; the only way to spot and serialize them is by diffing
+    // the head around the render and reading el.sheet.cssRules.
+    const before = new Set(document.head.querySelectorAll("style"));
     await previewer.preview(update.html, [blobUrl], stage);
+    const inserted = [...document.head.querySelectorAll("style")].filter((el) =>
+      !before.has(el)
+    );
     for (const old of container.children) if (old !== stage) old.remove();
-    // The restored sheets belong to the pages that just went away.
-    for (const s of document.head.querySelectorAll("[data-preview-cache]")) {
-      s.remove();
-    }
+    // The old sheets belong to the pages that just went away.
+    for (const el of liveStyles) el.remove();
+    liveStyles = inserted;
     stage.className = "";
     fitPreview(container);
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
-    lastHash = hash;
-    // Paged.js's generated CSS (page counters, running headers, --pagedjs-*)
-    // lives only in the sheets its Polisher inserts, so it caches with the DOM.
-    const styles = [
-      ...document.head.querySelectorAll("style[data-pagedjs-inserted-styles]"),
-    ].map((el) => el.textContent ?? "");
+    const styles = inserted.map((el) =>
+      [...(el as HTMLStyleElement).sheet?.cssRules ?? []].map((r) => r.cssText)
+        .join("\n")
+    );
     void saveCachedRender(cacheKey, {
       hash,
       pages: container.innerHTML,
@@ -86,28 +96,30 @@ export async function renderPreview(
     if (queuedUpdate) {
       const next = queuedUpdate;
       queuedUpdate = null;
+      // targetHash is already the queued update's hash; clear it so the
+      // sameness check doesn't skip the very render it was set for.
+      targetHash = null;
       renderPreview(next.update, next.container, next.cacheKey);
     }
   }
 }
 
 // Put a cached render on screen without Paged.js: its pages plus the sheets
-// Paged.js had inserted for them. lastHash is set so the first WebSocket
+// Paged.js had inserted for them. targetHash is set so the first WebSocket
 // update, which carries the same content, is skipped.
 export function restoreCachedRender(
   cached: CachedRender,
   container: HTMLElement,
 ): void {
   setFontLinks(cached.fontLinks);
-  for (const css of cached.styles) {
+  liveStyles = cached.styles.map((css) => {
     const el = document.createElement("style");
-    el.setAttribute("data-pagedjs-inserted-styles", "");
-    el.setAttribute("data-preview-cache", "");
     el.textContent = css;
     document.head.appendChild(el);
-  }
+    return el;
+  });
   container.innerHTML = cached.pages;
-  lastHash = cached.hash;
+  targetHash = cached.hash;
   fitPreview(container);
 }
 

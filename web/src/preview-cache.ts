@@ -11,7 +11,9 @@ const DB_NAME = "preview-cache";
 const STORE = "renders";
 const SEP = "\x1f"; // ASCII unit separator; cannot appear in HTML/CSS.
 
-export async function renderHash(
+// cyrb53: a fast non-cryptographic 53-bit string hash. Sync and available on
+// plain http over a LAN IP, where crypto.subtle is undefined.
+export function renderHash(
   u: {
     html: string;
     baseCss: string;
@@ -19,23 +21,29 @@ export async function renderHash(
     pagedCss: string;
     fontLinks: string;
   },
-): Promise<string> {
+): string {
   const text = [u.html, u.baseCss, u.domCss, u.pagedCss, u.fontLinks].join(SEP);
-  const bytes = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(text),
-  );
-  return Array.from(new Uint8Array(bytes)).map((b) =>
-    b.toString(16).padStart(2, "0")
-  ).join("");
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
+    Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
+    Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
 }
 
 export function cacheId(book: string, edition: string | null): string {
   return `${book}|${edition ?? ""}`;
 }
 
+let dbPromise: Promise<IDBDatabase | null> | null = null;
+
 function openDb(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
+  return dbPromise ??= new Promise((resolve) => {
     if (typeof indexedDB === "undefined") return resolve(null);
     let req: IDBOpenDBRequest;
     try {

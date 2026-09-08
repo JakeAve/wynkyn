@@ -9,17 +9,17 @@ const base = {
   fontLinks: "",
 };
 
-Deno.test("renderHash: same input yields same hash", async () => {
-  assertEquals(await renderHash(base), await renderHash({ ...base }));
+Deno.test("renderHash: same input yields same hash", () => {
+  assertEquals(renderHash(base), renderHash({ ...base }));
 });
 
-Deno.test("renderHash: a one-character change in any field changes the hash", async () => {
-  const original = await renderHash(base);
-  assertNotEquals(original, await renderHash({ ...base, html: "<p>b</p>" }));
-  assertNotEquals(original, await renderHash({ ...base, baseCss: "a{}}" }));
-  assertNotEquals(original, await renderHash({ ...base, domCss: "b{}}" }));
-  assertNotEquals(original, await renderHash({ ...base, pagedCss: "c{}}" }));
-  assertNotEquals(original, await renderHash({ ...base, fontLinks: "x" }));
+Deno.test("renderHash: a one-character change in any field changes the hash", () => {
+  const original = renderHash(base);
+  assertNotEquals(original, renderHash({ ...base, html: "<p>b</p>" }));
+  assertNotEquals(original, renderHash({ ...base, baseCss: "a{}}" }));
+  assertNotEquals(original, renderHash({ ...base, domCss: "b{}}" }));
+  assertNotEquals(original, renderHash({ ...base, pagedCss: "c{}}" }));
+  assertNotEquals(original, renderHash({ ...base, fontLinks: "x" }));
 });
 
 Deno.test("cacheId: book + | + edition-or-empty", () => {
