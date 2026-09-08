@@ -85,6 +85,23 @@ export async function renderPreview(
       [...(el as HTMLStyleElement).sheet?.cssRules ?? []].map((r) => r.cssText)
         .join("\n")
     );
+    // Paged.js writes unset running strings inline as a lone double quote;
+    // that unbalanced quote swallows the next declarations on an innerHTML
+    // round trip, so normalize each to an empty CSS string before caching.
+    for (
+      const el of container.querySelectorAll<HTMLElement>(
+        '[style*="--pagedjs-string"]',
+      )
+    ) {
+      for (const name of el.style) {
+        if (
+          name.startsWith("--pagedjs-string") &&
+          el.style.getPropertyValue(name) === '"'
+        ) {
+          el.style.setProperty(name, '""');
+        }
+      }
+    }
     void saveCachedRender(cacheKey, {
       hash,
       pages: container.innerHTML,
