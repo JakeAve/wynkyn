@@ -69,6 +69,10 @@ if (import.meta.main) {
       Deno.exit(2);
     }
     const from = a.from ?? null;
+    if (from !== null && !safeName(from)) {
+      console.error(`bad edition slug: ${from}`);
+      Deno.exit(2);
+    }
     let source: unknown;
     try {
       source = JSON.parse(
@@ -102,14 +106,28 @@ if (import.meta.main) {
     console.log(
       `created ${dir}/ — drop the source text in as download.txt, then use the convert-manuscript skill`,
     );
-  } else if ((cmd === "check" || cmd === "render") && book) {
-    const b = await buildBook(BOOKS, book, { edition });
+  } else if (cmd === "check" && book) {
+    // check is manuscript-only (spec): never pass edition, so a missing
+    // named edition can't crash it — diagnostics come from the manuscript alone.
+    const b = await buildBook(BOOKS, book);
     if (b.diagnostics.length) {
       console.error(formatDiagnostics(book, b.diagnostics));
     }
-    if (cmd === "check") {
-      console.log(`${book}: ${b.diagnostics.length} diagnostic(s)`);
-      Deno.exit(b.diagnostics.length ? 1 : 0);
+    console.log(`${book}: ${b.diagnostics.length} diagnostic(s)`);
+    Deno.exit(b.diagnostics.length ? 1 : 0);
+  } else if (cmd === "render" && book) {
+    let b;
+    try {
+      b = await buildBook(BOOKS, book, { edition });
+    } catch (e) {
+      if (e instanceof Deno.errors.NotFound) {
+        console.error(`no such edition: ${book}/${edition}`);
+        Deno.exit(1);
+      }
+      throw e;
+    }
+    if (b.diagnostics.length) {
+      console.error(formatDiagnostics(book, b.diagnostics));
     }
     const path = out ??
       `${BOOKS}/${book}/render${edition ? `.${edition}` : ""}.html`;

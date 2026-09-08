@@ -67,6 +67,29 @@ Deno.test("bml cli: edition new, render --edition, list shows editions", async (
 
     const list = await bml(root, "list");
     assertStringIncludes(list.out, "demo-book\n  └ pocket");
+
+    const checkMissing = await bml(
+      root,
+      "check",
+      "demo-book",
+      "--edition",
+      "nosuch",
+    );
+    assertEquals(checkMissing.code, 0, checkMissing.err);
+    assertStringIncludes(checkMissing.out, "demo-book: 0 diagnostic(s)");
+
+    const renderMissing = await bml(
+      root,
+      "render",
+      "demo-book",
+      "--edition",
+      "nosuch",
+    );
+    assertEquals(renderMissing.code, 1);
+    assertStringIncludes(
+      renderMissing.err,
+      "no such edition: demo-book/nosuch",
+    );
   } finally {
     await Deno.remove(root, { recursive: true });
   }
