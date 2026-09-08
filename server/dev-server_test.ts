@@ -653,8 +653,12 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
       body: JSON.stringify(body),
     }).then((r) => r.body?.cancel());
   try {
-    const u0 = await nextMessage(unnamed);
-    const p0 = await nextMessage(pocket);
+    // Attach both listeners before awaiting either, or the second socket's
+    // initial message arrives before anyone is listening and is lost.
+    const u0p = nextMessage(unnamed);
+    const p0p = nextMessage(pocket);
+    const u0 = await u0p;
+    const p0 = await p0p;
     assertEquals(u0.edition, null);
     assertEquals(p0.edition, "pocket");
     assert((p0.pagedCss as string).includes("3.5in 5in"));
