@@ -8,9 +8,11 @@ import {
   installPageIndicator,
   installStyleClicks,
   renderPreview,
+  restoreCachedRender,
   scrollPreviewTo,
   type UpdateMessage,
 } from "./preview.ts";
+import { cacheId, loadCachedRender } from "./preview-cache.ts";
 import {
   applyDiagnostics,
   createEditor,
@@ -743,6 +745,14 @@ async function main(): Promise<void> {
     $("page-indicator"),
   );
   installStyleClicks(previewEl, () => catalogFor(metadata ?? {}), pickStyle);
+  // Restore before opening the socket so the previous render is on screen
+  // when the first update lands, instead of a blank preview.
+  const key = cacheId(book, edition);
+  const cached = await loadCachedRender(key);
+  if (cached) {
+    restoreCachedRender(cached, previewEl);
+    refreshPageIndicator();
+  }
   const ws = new WebSocket(
     `ws://${location.host}/ws${editionHref(book, edition)}&client=${clientId}`,
   );
@@ -761,7 +771,7 @@ async function main(): Promise<void> {
     }
     if (!dirty && !saveInFlight) setStatus("saved");
     // Own-origin: preview only — never the buffer (spec §6 echo suppression).
-    renderPreview(msg, previewEl).then(refreshPageIndicator);
+    renderPreview(msg, previewEl, key).then(refreshPageIndicator);
     if (msg.origin !== clientId) {
       refreshFromRemote();
       refreshConfigFromRemote();
