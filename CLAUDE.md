@@ -29,10 +29,14 @@ polish) is open. `bml export` is the print-export command
   `templates/metadata.json` (house style)
 - `deno task bml check <book>` parse diagnostics as `file:line: msg`; exit 1 on
   any — run after every manuscript edit
-- `deno task bml render <book> [out]` standalone HTML (default
-  `books/<book>/render.html`); open in a browser to paginate
-- `deno task bml export <book> [--proof] [--sheet S] [--folios N] [--duplex M]`
-  → `books/<book>/export/`; needs Google Chrome installed
+- `deno task bml render <book> [out] [--edition e]` standalone HTML (default
+  `books/<book>/render.html`, or `render.<e>.html`); open in a browser to
+  paginate
+- `deno task bml export <book> [--edition e] [--proof] [--sheet S] [--folios N] [--duplex M]`
+  → `books/<book>/export/` (or `export/<e>/`); needs Google Chrome installed
+- `deno task bml edition <book> new <slug> [--from e]` copy an edition under a
+  new name. Editions are styling-only variants: `metadata.json` is the unnamed
+  edition, `editions/<slug>.json` are named ones, manuscript and images shared.
 
 ## Adding a book
 

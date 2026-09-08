@@ -1,16 +1,23 @@
 // bml.ts — headless CLI over server/pipeline.ts, for agents and scripts.
 //   deno task bml check <book>            → diagnostics; exit 1 if any
-//   deno task bml render <book> [out.html] → standalone HTML (Paged.js polyfill paginates on open)
-//   deno task bml list
+//   deno task bml render <book> [out.html] [--edition e] → standalone HTML
+//   deno task bml list                    → books, with their named editions
 //   deno task bml new <slug>              → books/<slug>/ from templates/ (house-style metadata.json)
-//   deno task bml export <book> [--sheet S] [--folios N] [--duplex short-edge|long-edge|none]
+//   deno task bml edition <book> new <slug> [--from <edition>] → copy an edition under a new name
+//   deno task bml export <book> [--edition e] [--sheet S] [--folios N] [--duplex short-edge|long-edge|none]
 //                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir]
 import { parseArgs } from "@std/cli/parse-args";
 import { buildBook, listBooks, toHtml } from "./server/pipeline.ts";
+import {
+  createEdition,
+  listEditions,
+  metadataPath,
+  safeName,
+} from "./server/editions.ts";
 
 export { toHtml } from "./server/pipeline.ts";
 
-const BOOKS = "books";
+const BOOKS = Deno.env.get("BML_BOOKS") ?? "books";
 
 export function formatDiagnostics(
   book: string,
@@ -23,7 +30,16 @@ export function formatDiagnostics(
 
 if (import.meta.main) {
   const a = parseArgs(Deno.args, {
-    string: ["sheet", "duplex", "flip", "out", "folios", "pages"],
+    string: [
+      "sheet",
+      "duplex",
+      "flip",
+      "out",
+      "folios",
+      "pages",
+      "edition",
+      "from",
+    ],
     boolean: ["proof", "reverse-backs"],
     unknown: (_arg, key) => {
       if (key !== undefined) {
@@ -33,9 +49,47 @@ if (import.meta.main) {
       return true;
     },
   });
-  const [cmd, book, out] = a._.map(String);
+  const [cmd, book, out, sub] = a._.map(String);
+  const edition = a.edition ?? null;
+  if (edition !== null && !safeName(edition)) {
+    console.error(`bad edition slug: ${edition}`);
+    Deno.exit(2);
+  }
   if (cmd === "list") {
-    console.log((await listBooks(BOOKS)).join("\n"));
+    for (const b of await listBooks(BOOKS)) {
+      console.log(b);
+      for (const e of await listEditions(BOOKS, b)) {
+        if (e.slug !== null) console.log(`  └ ${e.slug}  ${e.summary}`);
+      }
+    }
+  } else if (cmd === "edition" && book && out === "new" && sub) {
+    // `out` is the positional after <book>: here the sub-command "new".
+    if (!safeName(sub)) {
+      console.error(`bad edition slug: ${sub}`);
+      Deno.exit(2);
+    }
+    const from = a.from ?? null;
+    let source: unknown;
+    try {
+      source = JSON.parse(
+        await Deno.readTextFile(metadataPath(BOOKS, book, from)),
+      );
+    } catch {
+      console.error(
+        `no such book or edition: ${book}${from ? `/${from}` : ""}`,
+      );
+      Deno.exit(1);
+    }
+    try {
+      await createEdition(BOOKS, book, sub, source);
+    } catch (e) {
+      if (e instanceof Deno.errors.AlreadyExists) {
+        console.error(`edition already exists: ${book}/${sub}`);
+        Deno.exit(1);
+      }
+      throw e;
+    }
+    console.log(`created ${metadataPath(BOOKS, book, sub)}`);
   } else if (cmd === "new" && book) {
     const dir = `${BOOKS}/${book}`;
     await Deno.mkdir(`${dir}/images`, { recursive: true });
@@ -49,7 +103,7 @@ if (import.meta.main) {
       `created ${dir}/ — drop the source text in as download.txt, then use the convert-manuscript skill`,
     );
   } else if ((cmd === "check" || cmd === "render") && book) {
-    const b = await buildBook(BOOKS, book);
+    const b = await buildBook(BOOKS, book, { edition });
     if (b.diagnostics.length) {
       console.error(formatDiagnostics(book, b.diagnostics));
     }
@@ -57,7 +111,8 @@ if (import.meta.main) {
       console.log(`${book}: ${b.diagnostics.length} diagnostic(s)`);
       Deno.exit(b.diagnostics.length ? 1 : 0);
     }
-    const path = out ?? `${BOOKS}/${book}/render.html`;
+    const path = out ??
+      `${BOOKS}/${book}/render${edition ? `.${edition}` : ""}.html`;
     await Deno.writeTextFile(path, toHtml(b));
     console.log(`wrote ${path}`);
   } else if (cmd === "export" && book) {
@@ -66,6 +121,7 @@ if (import.meta.main) {
     );
     try {
       const opts = {
+        edition,
         folios: a.folios !== undefined ? Number(a.folios) : undefined,
         pages: a.pages !== undefined ? Number(a.pages) : undefined,
         sheet: a.sheet,
@@ -99,7 +155,7 @@ if (import.meta.main) {
     }
   } else {
     console.error(
-      "usage: bml list | new <slug> | check <book> | render <book> [out.html] | export <book> [--sheet S] [--folios N] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir]",
+      "usage: bml list | new <slug> | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir]",
     );
     Deno.exit(2);
   }
