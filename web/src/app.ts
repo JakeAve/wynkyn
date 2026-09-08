@@ -688,12 +688,19 @@ async function main(): Promise<void> {
   const requested = params.get("book");
   book = requested && books.includes(requested) ? requested : books[0]!;
 
-  const editionsRes = await fetch(
-    `/api/books/${encodeURIComponent(book)}/editions`,
-  );
-  const { editions } = (await editionsRes.json()) as {
-    editions: EditionInfo[];
-  };
+  // A failed editions fetch (old server still running, network blip) must not
+  // keep the whole app from booting — fall back to a single unnamed edition.
+  let editions: EditionInfo[] = [{ slug: null, summary: "" }];
+  try {
+    const editionsRes = await fetch(
+      `/api/books/${encodeURIComponent(book)}/editions`,
+    );
+    if (!editionsRes.ok) throw new Error(`${editionsRes.status}`);
+    editions = ((await editionsRes.json()) as { editions: EditionInfo[] })
+      .editions;
+  } catch (err) {
+    setStatus("error", `editions: ${brief(err)} — restart the dev server?`);
+  }
   const wanted = params.get("edition");
   edition = wanted && editions.some((e) => e.slug === wanted) ? wanted : null;
   document.title = `Book Editor — ${book}${
