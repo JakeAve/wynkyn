@@ -44,6 +44,7 @@ export interface ConfigPanelOptions {
   overlay: HTMLElement;
   metadata: Metadata;
   saveSections(sections: Partial<Metadata>): void;
+  onNewEdition?: () => void; // shown in the head so a single-edition book can branch
 }
 
 type QueueSave = (key: keyof Metadata) => void;
@@ -108,6 +109,12 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     head.className = "cfg-head";
     const title = document.createElement("strong");
     title.textContent = "Document configuration";
+    const newEdition = document.createElement("button");
+    newEdition.className = "cfg-new-edition";
+    newEdition.textContent = "New edition";
+    newEdition.title = "Copy this edition's styling under a new name";
+    newEdition.onclick = () => opts.onNewEdition?.();
+    if (!opts.onNewEdition) newEdition.hidden = true;
     const close = document.createElement("button");
     close.innerHTML =
       '<svg class="tico" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
@@ -116,7 +123,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     close.onclick = () => {
       opts.overlay.hidden = true;
     };
-    head.append(title, saved, close);
+    head.append(title, saved, newEdition, close);
     opts.overlay.append(
       head,
       buildPageSection(meta, queueSave),

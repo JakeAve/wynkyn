@@ -22,6 +22,7 @@ import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
+import { editionHref, editionLabel, slugify } from "./editions.ts";
 
 const PARSE_DEBOUNCE_MS = 250;
 const SAVE_DEBOUNCE_MS = 600;
@@ -56,6 +57,14 @@ function brief(err: unknown): string {
 
 let editor: EditorView;
 let book: string;
+let edition: string | null = null; // null = the unnamed edition (metadata.json)
+
+function metadataUrl(): string {
+  const b = encodeURIComponent(book);
+  return edition === null
+    ? `/api/books/${b}/metadata`
+    : `/api/books/${b}/editions/${encodeURIComponent(edition)}/metadata`;
+}
 let parseTimer = 0;
 let saveTimer = 0;
 let saveInFlight = false;
@@ -152,7 +161,7 @@ function populateSwitcher(books: string[], active: string): void {
       row.onclick = () => {
         // Full navigation, not in-place teardown: clean WS/editor/tree state.
         if (b === active) dialog.close();
-        else location.search = `?book=${encodeURIComponent(b)}`;
+        else location.search = editionHref(b, null);
       };
       list.appendChild(row);
     });
@@ -171,6 +180,153 @@ function populateSwitcher(books: string[], active: string): void {
   };
   dialog.onclick = (e) => {
     if (e.target === dialog) dialog.close(); // backdrop click closes
+  };
+}
+
+interface EditionInfo {
+  slug: string | null;
+  summary: string;
+}
+
+async function api(url: string, init?: RequestInit): Promise<void> {
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error(await res.text());
+}
+
+async function newEdition(): Promise<void> {
+  const name = prompt("Name the new edition (e.g. Pocket, Large print):");
+  if (!name) return;
+  const slug = slugify(name);
+  if (!slug) return setStatus("error", "edition name needs a letter or digit");
+  try {
+    await api(`/api/books/${encodeURIComponent(book)}/editions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug, from: edition }),
+    });
+    location.search = editionHref(book, slug);
+  } catch (err) {
+    setStatus("error", `new edition: ${brief(err)}`);
+  }
+}
+
+// The edition switcher: one row per edition with a one-line summary, and
+// rename/delete on named rows. Hidden for single-edition books — the concept
+// only appears once a second edition exists.
+function populateEditionSwitcher(editions: EditionInfo[]): void {
+  const button = $("edition-switcher");
+  const dialog = $("edition-dialog") as HTMLDialogElement;
+  const list = $("edition-list");
+  const name = $("edition-name");
+  button.hidden = editions.length < 2;
+  name.textContent = editionLabel(edition);
+  if (edition === null) name.dataset.unnamed = "";
+  else delete name.dataset.unnamed;
+
+  const base = `/api/books/${encodeURIComponent(book)}/editions`;
+  list.innerHTML = "";
+  for (const e of editions) {
+    const row = document.createElement("div");
+    row.className = "edition-row";
+    row.setAttribute("role", "button");
+    row.tabIndex = 0;
+    if (e.slug === edition) row.setAttribute("aria-current", "true");
+    const title = document.createElement("span");
+    title.className = "edition-title";
+    title.textContent = editionLabel(e.slug);
+    if (e.slug === null) title.dataset.unnamed = "";
+    row.append(title);
+    if (e.slug !== null) {
+      const slug = e.slug;
+      const rename = document.createElement("button");
+      rename.className = "edition-act";
+      rename.textContent = "Rename";
+      rename.onclick = async (ev) => {
+        ev.stopPropagation();
+        const next = slugify(
+          prompt("Rename edition:", editionLabel(slug)) ?? "",
+        );
+        if (!next || next === slug) return;
+        try {
+          await api(`${base}/${encodeURIComponent(slug)}/rename`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ slug: next }),
+          });
+          location.search = editionHref(
+            book,
+            slug === edition ? next : edition,
+          );
+        } catch (err) {
+          setStatus("error", `rename: ${brief(err)}`);
+        }
+      };
+      const del = document.createElement("button");
+      del.className = "edition-act";
+      del.textContent = "Delete";
+      del.onclick = async (ev) => {
+        ev.stopPropagation();
+        if (
+          !confirm(
+            `Delete the ${
+              editionLabel(slug)
+            } edition? The manuscript is untouched.`,
+          )
+        ) return;
+        try {
+          await api(`${base}/${encodeURIComponent(slug)}`, {
+            method: "DELETE",
+          });
+          location.search = editionHref(
+            book,
+            slug === edition ? null : edition,
+          );
+        } catch (err) {
+          setStatus("error", `delete: ${brief(err)}`);
+        }
+      };
+      row.append(rename, del);
+    } else {
+      row.append(
+        document.createElement("span"),
+        document.createElement("span"),
+      );
+    }
+    const summary = document.createElement("span");
+    summary.className = "edition-summary";
+    summary.textContent = e.summary;
+    row.append(summary);
+    const go = () => {
+      if (e.slug === edition) dialog.close();
+      else location.search = editionHref(book, e.slug);
+    };
+    row.onclick = go;
+    row.onkeydown = (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") go();
+    };
+    list.appendChild(row);
+  }
+  // Re-fetch on open, not just at page load: a page-size edit in the config
+  // panel changes the summary line without a navigation, and the row should
+  // reflect it the next time this dialog opens.
+  button.onclick = async () => {
+    try {
+      const res = await fetch(base);
+      const { editions: fresh } = (await res.json()) as {
+        editions: EditionInfo[];
+      };
+      populateEditionSwitcher(fresh);
+    } catch {
+      // stale summaries beat a switcher that silently fails to open
+    }
+    dialog.showModal();
+  };
+  $("edition-new").onclick = () => {
+    dialog.close();
+    newEdition();
+  };
+  dialog.onclick = (ev) => {
+    if (ev.target === dialog) dialog.close();
   };
 }
 
@@ -229,7 +385,7 @@ function saveMetadataSections(sections: Partial<Metadata>): void {
 
 async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
   try {
-    const res = await fetch(`/api/books/${encodeURIComponent(book)}/metadata`, {
+    const res = await fetch(metadataUrl(), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ sections, clientId }),
@@ -252,7 +408,7 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
 }
 
 async function fetchMetadata(): Promise<Metadata> {
-  const res = await fetch(`/api/books/${encodeURIComponent(book)}/metadata`);
+  const res = await fetch(metadataUrl());
   if (!res.ok) {
     throw new Error(`metadata load failed: ${res.status} ${await res.text()}`);
   }
@@ -269,6 +425,7 @@ async function ensureConfigPanel(): Promise<ConfigPanel | null> {
       overlay: $("config-overlay"),
       metadata,
       saveSections: saveMetadataSections,
+      onNewEdition: newEdition,
     });
     return configPanel;
   } catch (err) {
@@ -527,8 +684,20 @@ async function main(): Promise<void> {
   }
   const requested = params.get("book");
   book = requested && books.includes(requested) ? requested : books[0]!;
-  document.title = `Book Editor — ${book}`;
+
+  const editionsRes = await fetch(
+    `/api/books/${encodeURIComponent(book)}/editions`,
+  );
+  const { editions } = (await editionsRes.json()) as {
+    editions: EditionInfo[];
+  };
+  const wanted = params.get("edition");
+  edition = wanted && editions.some((e) => e.slug === wanted) ? wanted : null;
+  document.title = `Book Editor — ${book}${
+    edition ? ` · ${editionLabel(edition)}` : ""
+  }`;
   populateSwitcher(books, book);
+  populateEditionSwitcher(editions);
 
   const text = await fetchManuscript(book);
   editor = createEditor({
@@ -565,9 +734,7 @@ async function main(): Promise<void> {
   );
   installStyleClicks(previewEl, () => catalogFor(metadata ?? {}), pickStyle);
   const ws = new WebSocket(
-    `ws://${location.host}/ws?book=${
-      encodeURIComponent(book)
-    }&client=${clientId}`,
+    `ws://${location.host}/ws${editionHref(book, edition)}&client=${clientId}`,
   );
   ws.onopen = () => setStatus("saved");
   ws.onclose = () => setStatus("offline");

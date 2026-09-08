@@ -300,6 +300,93 @@
       font-weight: 600;
       letter-spacing: -.01em;
     }
+    /* ---- edition switcher ---- */
+    #edition-switcher .edition-dot {
+      color: var(--muted);
+      margin-right: 2px;
+    }
+    #edition-name[data-unnamed] {
+      color: var(--muted);
+    }
+    #edition-dialog {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0;
+      width: 400px;
+      max-width: 90vw;
+      background: var(--bg);
+      color: var(--fg);
+      box-shadow: 0 14px 36px var(--backdrop);
+    }
+    #edition-dialog::backdrop {
+      background: var(--backdrop);
+    }
+    #edition-list {
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+    .edition-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: baseline;
+      column-gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--soft);
+      cursor: pointer;
+    }
+    .edition-row:hover {
+      background: var(--hover);
+    }
+    .edition-row[aria-current="true"] {
+      background: var(--inv-bg);
+      color: var(--inv-fg);
+    }
+    .edition-row .edition-title {
+      font-weight: 600;
+    }
+    .edition-row .edition-title[data-unnamed] {
+      font-weight: 400;
+      color: var(--muted);
+    }
+    .edition-row[aria-current="true"] .edition-title[data-unnamed],
+    .edition-row[aria-current="true"] .edition-summary {
+      color: inherit;
+      opacity: .65;
+    }
+    .edition-row .edition-summary {
+      grid-column: 1 / -1;
+      font-size: var(--fs-sm);
+      color: var(--muted);
+    }
+    .edition-row .edition-act {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: var(--fs-sm);
+      opacity: .6;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    .edition-row .edition-act:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .edition-foot {
+      padding: 10px 16px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: flex-end;
+    }
+    .cfg-head .cfg-new-edition {
+      margin-left: auto;
+      font-size: var(--fs-sm);
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: inherit;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
     .book-row .book-slug {
       margin-left: auto;
       font-size: var(--fs-sm);
@@ -625,6 +712,13 @@
           <path d="M4 6.5l4 4 4-4" />
         </svg>
       </button>
+      <button id="edition-switcher" class="btn" title="Switch edition" hidden>
+        <span class="edition-dot">·</span>
+        <span id="edition-name"></span>
+        <svg class="chev tico" viewBox="0 0 16 16">
+          <path d="M4 6.5l4 4 4-4" />
+        </svg>
+      </button>
       <span class="spacer"></span>
       <details id="insert-menu">
         <summary>Insert</summary>
@@ -690,6 +784,12 @@
       <input id="book-search" type="search" placeholder="Find a book…"
         autocomplete="off">
       <div id="book-list"></div>
+    </dialog>
+    <dialog id="edition-dialog">
+      <div id="edition-list"></div>
+      <div class="edition-foot">
+        <button id="edition-new" class="btn">New edition</button>
+      </div>
     </dialog>
     <script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.js"></script>
     <script type="module" src="/web/app.js"></script>
