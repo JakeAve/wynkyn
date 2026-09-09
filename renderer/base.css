@@ -22,14 +22,24 @@
   float: left;
   padding-right: 0.05em;
 }
-.bml .chapter,
-.bml .part,
-.bml .matter {
+/* Zero own-specificity (like the TOC rules below) so a book's metadata can say
+   `chapter: { "break-before": "auto" }` and have chapters run on instead of
+   each opening a page — base.css is emitted before domCss, so the override
+   wins on order. A bare `.bml .chapter` here would outrank `.chapter`. */
+:where(.bml .chapter),
+:where(.bml .part),
+:where(.bml .matter) {
   break-before: page;
 }
 .bml .title,
 .bml .number {
   text-indent: 0;
+}
+/* A chapter opener must not strand at the foot of a page or column — matters
+   once a book sets `chapter: { "break-before": "auto" }` and chapters run on. */
+:where(.bml .chapter) > .number,
+:where(.bml .chapter) > .title {
+  break-after: avoid;
 }
 .bml blockquote {
   margin: 1em 2em;
