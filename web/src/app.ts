@@ -12,7 +12,11 @@ import {
   scrollPreviewTo,
   type UpdateMessage,
 } from "./preview.ts";
-import { cacheId, loadCachedRender } from "./preview-cache.ts";
+import {
+  cacheId,
+  deleteCachedRender,
+  loadCachedRender,
+} from "./preview-cache.ts";
 import {
   applyDiagnostics,
   createEditor,
@@ -255,6 +259,7 @@ function populateEditionSwitcher(editions: EditionInfo[]): void {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ slug: next }),
           });
+          await deleteCachedRender(cacheId(book, slug));
           location.search = editionHref(
             book,
             slug === edition ? next : edition,
@@ -279,6 +284,7 @@ function populateEditionSwitcher(editions: EditionInfo[]): void {
           await api(`${base}/${encodeURIComponent(slug)}`, {
             method: "DELETE",
           });
+          await deleteCachedRender(cacheId(book, slug));
           location.search = editionHref(
             book,
             slug === edition ? null : edition,

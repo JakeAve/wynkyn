@@ -97,3 +97,21 @@ export async function saveCachedRender(
     }
   });
 }
+
+// Courtesy cleanup when an edition is renamed or deleted; an orphan row is
+// never read, it just takes up space until the browser evicts it.
+export async function deleteCachedRender(id: string): Promise<void> {
+  const db = await openDb();
+  if (!db) return;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+      tx.onabort = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
