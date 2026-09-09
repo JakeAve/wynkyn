@@ -57,11 +57,34 @@ Deno.test("summaryOf: page size · resolved body font · body size, skipping bla
   );
   assertEquals(summaryOf({ page: { size: "A5" } }), "A5");
   assertEquals(summaryOf({}), "");
+  // With a sheet configured the row leads with the imposition instead (§4.3),
+  // and says so plainly when the page cannot be printed on that sheet.
+  assertEquals(
+    summaryOf({ page: { size: "3.5in 8.5in", sheet: "legal" } }),
+    "3.5in × 8.5in · 4-up on legal",
+  );
+  assertEquals(
+    summaryOf({ page: { size: "6in 9in", sheet: "letter" } }),
+    "6in × 9in · will not print on letter",
+  );
+  // A legacy print section still resolves, via the on-load upgrade.
+  assertEquals(
+    summaryOf({
+      page: { size: "3.5in 8.5in" },
+      print: { "sheet-size": "legal" },
+    }),
+    "3.5in × 8.5in · 4-up on legal",
+  );
 });
 
 Deno.test("listEditions: unnamed first with summary, then named editions sorted", async () => {
   assertEquals(await listEditions(ROOT, "demo-book"), [
-    { slug: null, summary: "5.5in 8.5in · EB Garamond · 11pt" },
+    // demo-book names a sheet, so its row describes the imposition; pocket
+    // does not, so its row stays at the page size.
+    {
+      slug: null,
+      summary: "5.5in × 8.5in · 2-up on letter · EB Garamond · 11pt",
+    },
     { slug: "pocket", summary: "3.5in 5in · Crimson Pro · 9pt" },
   ]);
 });

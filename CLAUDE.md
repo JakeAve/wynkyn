@@ -10,10 +10,17 @@ sentinel styling, print export, table of contents); Plan 6 (integration &
 polish) is open. `bml export` is the print-export command
 (`server/print-export.ts`, `server/imposition.ts`, `server/pdf.ts`).
 
+Page setup lives in one `page` section: `size`, `margins`, `sheet`,
+`folios-per-signature`, `duplex`. The retired `print` section is folded into it
+on load (`metadata/upgrade.ts`), so older books still work and rewrite
+themselves on the next save.
+
 ## Layout
 
 - `parser/` BML → `BmlDocument` tree (pure, `parse(source)`)
-- `metadata/` metadata.json → CSS (`generateDomCSS/PagedCSS/FontLinks`)
+- `metadata/` metadata.json → CSS (`generateDomCSS/PagedCSS/FontLinks`);
+  `page-setup.ts` resolves the `page` section (page + sheet + signature, spec
+  §4.3) into the derived imposition, shared with `web/` and print export
 - `renderer/` tree → HTML body (`render(doc, opts)`), `base.css`
 - `server/` `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket,
   watches book files)

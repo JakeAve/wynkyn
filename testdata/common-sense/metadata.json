@@ -6,7 +6,9 @@
       "bottom": "22mm",
       "inside": "22mm",
       "outside": "16mm"
-    }
+    },
+    "sheet": "legal",
+    "folios-per-signature": 4
   },
   "fonts": {
     "body": "EB Garamond",
@@ -124,7 +126,7 @@
       "line-height": "0.82"
     },
     "break": {
-      "content": "✦"
+      "content": "\u2726"
     },
     "pullquote": {
       "font-size": "13pt",
@@ -239,10 +241,6 @@
         "font-style": "italic"
       }
     ]
-  },
-  "print": {
-    "sheet-size": "legal",
-    "folios-per-signature": 4
   },
   "notes": {
     "placement": "footnote"

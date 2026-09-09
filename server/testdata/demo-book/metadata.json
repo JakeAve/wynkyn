@@ -1,7 +1,9 @@
 {
   "page": {
     "size": "5.5in 8.5in",
-    "margins": { "top": "18mm", "bottom": "22mm", "inside": "22mm", "outside": "16mm" }
+    "margins": { "top": "18mm", "bottom": "22mm", "inside": "22mm", "outside": "16mm" },
+    "sheet": "letter",
+    "folios-per-signature": 4
   },
   "fonts": { "body": "EB Garamond" },
   "elements": {

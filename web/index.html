@@ -640,6 +640,9 @@
       align-items: center;
       gap: 8px;
       margin: 5px 0;
+      /* so a full-width .cfg-error drops to its own line instead of
+         squeezing the control it belongs to down to nothing */
+      flex-wrap: wrap;
     }
     .cfg-label {
       width: 110px;
@@ -675,6 +678,23 @@
     .cfg-error {
       color: var(--err);
       flex-basis: 100%;
+    }
+    /* What the page setup derives to — read-only, updated as fields change. */
+    .cfg-readout {
+      margin-top: 8px;
+      padding: 6px 8px;
+      border-left: 2px solid var(--line);
+      color: var(--muted);
+    }
+    .cfg-readout p {
+      margin: 0 0 2px;
+    }
+    .cfg-readout p:last-child {
+      margin-bottom: 0;
+    }
+    .cfg-readout-bad {
+      border-left-color: var(--err);
+      color: var(--err);
     }
     .cfg-entry {
       border-top: 1px dashed var(--line);

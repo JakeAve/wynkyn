@@ -154,11 +154,11 @@ if (import.meta.main) {
         console.error(`note: --pages is ignored unless --proof`);
       }
       const s = await exportBook(BOOKS, book, opts);
-      // resolved.duplex includes metadata.print.duplex, which the flags alone can't see
-      if (opts.flip !== undefined && s.resolved.duplex !== "none") {
+      // setup.duplex includes metadata's page.duplex, which the flags alone can't see
+      if (opts.flip !== undefined && s.setup.duplex !== "none") {
         console.error(`note: --flip is ignored unless duplex is none`);
       }
-      if (opts.reverseBacks && s.resolved.duplex !== "none") {
+      if (opts.reverseBacks && s.setup.duplex !== "none") {
         console.error(`note: --reverse-backs is ignored unless duplex is none`);
       }
       if (s.diagnostics) {
@@ -166,7 +166,7 @@ if (import.meta.main) {
           `${s.diagnostics} parse diagnostic(s) — run: bml check ${book}`,
         );
       }
-      console.log(formatSummary(book, s, s.resolved));
+      console.log(formatSummary(book, s));
       for (const f of s.files) console.log(`wrote ${f}`);
     } catch (e) {
       console.error(`export failed: ${(e as Error).message}`);

@@ -473,7 +473,10 @@ Deno.test("editions: list, build json per edition, metadata GET/POST touch only 
       .json();
     assertEquals(list, {
       editions: [
-        { slug: null, summary: "5.5in 8.5in · EB Garamond · 11pt" },
+        {
+          slug: null,
+          summary: "5.5in × 8.5in · 2-up on letter · EB Garamond · 11pt",
+        },
         { slug: "pocket", summary: "3.5in 5in · Crimson Pro · 9pt" },
       ],
     });

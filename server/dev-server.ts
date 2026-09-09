@@ -2,6 +2,8 @@
 // watches books, rebuilds on change, pushes updates over WebSockets, accepts saves.
 import { buildBook, listBooks } from "./pipeline.ts";
 import { watchTree } from "./watch.ts";
+import { upgradePageSetup } from "../metadata/upgrade.ts";
+import type { Metadata } from "../metadata/types.ts";
 import {
   classifyChange,
   createEdition,
@@ -157,7 +159,12 @@ export async function startServer(
       return edition === null ? {} : undefined;
     }
     try {
-      return JSON.parse(text) as Record<string, unknown>;
+      // Upgraded on the way out, so the panel edits (and then saves back) the
+      // current shape — that is what retires a legacy `print` section on disk.
+      return upgradePageSetup(JSON.parse(text) as Metadata) as Record<
+        string,
+        unknown
+      >;
     } catch {
       return null;
     }

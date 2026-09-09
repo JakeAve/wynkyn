@@ -2,13 +2,14 @@
 // UI over metadata.json's book-wide sections, one builder per section. DOM
 // assembly only — reusable transforms live in config-data.ts with tests.
 import type {
+  Duplex,
   Metadata,
   NumberingStyle,
   PageConfig,
-  PrintConfig,
   RunningEntry,
 } from "../../metadata/types.ts";
 import {
+  fmtLength,
   formatCssLines,
   isValidFolios,
   isValidSize,
@@ -20,7 +21,11 @@ import {
   parseCssLines,
   presetFor,
   renameKey,
+  resolvePageSetup,
   RUNNING_CONTENT_CHOICES,
+  SETUP_PRESETS,
+  SHEET_PRESETS,
+  type SizePreset,
   splitRunningEntry,
 } from "./config-data.ts";
 import { GOOGLE_FONTS } from "./fonts-list.ts";
@@ -130,7 +135,6 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       buildFontsSection(meta, queueSave),
       buildNumberingSection(meta, queueSave),
       buildRunningSection(meta, queueSave),
-      buildPrintSection(meta, queueSave),
       buildNotesSection(meta, queueSave),
       styles.el,
     );
@@ -266,15 +270,16 @@ function inlineLabel(text: string, control: HTMLElement): HTMLElement {
 }
 
 // Preset dropdown + custom-dimensions input (spec §7.5: named presets and
-// custom dimensions). Used for page.size now and print.sheet-size in Task 7.
+// custom dimensions), over either the book-page or the sheet preset list.
 // Calls onChange only with valid values; invalid custom input shows an error.
 function sizeControl(
   current: string | undefined,
   onChange: (size: string) => void,
+  presets: SizePreset[] = PAGE_SIZE_PRESETS,
 ): HTMLElement {
   const wrap = document.createElement("span");
   wrap.className = "cfg-row";
-  const preset = presetFor(current);
+  const preset = presetFor(current, presets);
   const custom = document.createElement("input");
   custom.type = "text";
   custom.placeholder = "5.5in 8.5in";
@@ -284,7 +289,7 @@ function sizeControl(
   error.className = "cfg-error";
   const sel = selectInput(
     [
-      ...PAGE_SIZE_PRESETS.map((p) => ({ label: p.label, value: p.value })),
+      ...presets.map((p) => ({ label: p.label, value: p.value })),
       { label: "Custom…", value: "custom" },
     ],
     preset,
@@ -311,36 +316,155 @@ function sizeControl(
 
 const MARGIN_KEYS = ["top", "bottom", "inside", "outside"] as const;
 
+// One section for the whole physical setup (§4.3): the book page, the sheet it
+// prints on, and the signature it folds into. They are one decision — a page
+// size only means something against the sheet it has to tile — so the panel
+// keeps them together and shows what they derive to as you change them.
 function buildPageSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
   const page: PageConfig = meta.page ??= {};
-  const box = sectionBox("Page");
-  box.appendChild(
-    field(
-      "size",
-      sizeControl(page.size, (size) => {
-        page.size = size;
+  const box = sectionBox("Page setup");
+  const body = document.createElement("div");
+  const readout = document.createElement("div");
+  readout.className = "cfg-readout";
+  box.append(body, readout);
+
+  const save = () => {
+    queueSave("page");
+    refresh();
+  };
+
+  // The derived half of the setup: what these values actually produce on paper.
+  function refresh(): void {
+    const setup = resolvePageSetup(page);
+    readout.textContent = "";
+    readout.classList.toggle("cfg-readout-bad", setup.error !== null);
+    const line = (text: string) => {
+      const p = document.createElement("p");
+      p.textContent = text;
+      readout.appendChild(p);
+    };
+    if (setup.error !== null) {
+      line(setup.error);
+      return;
+    }
+    const folioWord = setup.foliosPerSheet === 1 ? "folio" : "folios";
+    const cuts = setup.cutsPerSheet === 0
+      ? "fold only, no cuts"
+      : `${setup.cutsPerSheet} cut${setup.cutsPerSheet === 1 ? "" : "s"}`;
+    line(
+      `${setup.nUp}-up on ${setup.sheet} — ${setup.foliosPerSheet} ${folioWord} per sheet (${cuts})`,
+    );
+    line(
+      `${setup.sheetsPerSignature} sheet${
+        setup.sheetsPerSignature === 1 ? "" : "s"
+      } per ${setup.folios}-folio signature = ${setup.pagesPerSignature} book pages`,
+    );
+    const EPS = 5e-4;
+    if (setup.slackAcross > EPS || setup.slackDown > EPS) {
+      line(
+        `leftover paper: ${fmtLength(setup.slackAcross, setup.unit)} across, ${
+          fmtLength(setup.slackDown, setup.unit)
+        } down — trimmed off after folding`,
+      );
+    } else {
+      line("the page tiles the sheet exactly — nothing to trim off");
+    }
+  }
+
+  function render(): void {
+    body.textContent = "";
+    // A shortcut, not a stored value: the setups are just (sheet, pages across)
+    // pairs, so this reflects whatever size and sheet already say (§4.3).
+    const setupSel = selectInput(
+      [
+        ...SETUP_PRESETS.map((p) => ({ label: p.label, value: p.id })),
+        { label: "Custom…", value: "custom" },
+      ],
+      resolvePageSetup(page).preset?.id ?? "custom",
+      (id) => {
+        const preset = SETUP_PRESETS.find((p) => p.id === id);
+        if (!preset) return; // "Custom…" only describes the current values
+        page.size = preset.size;
+        page.sheet = preset.sheet;
         queueSave("page");
-      }),
-    ),
-  );
-  // Read-only snapshot for display — must not eagerly create page.margins,
-  // or an edit to an unrelated field (e.g. size) would persist a spurious
-  // empty margins object on save (the whole "page" section round-trips
-  // together, so any local default-filling here leaks onto disk).
-  const margins = page.margins ?? {};
-  for (const key of MARGIN_KEYS) {
-    box.appendChild(
+        render();
+        refresh();
+      },
+    );
+    body.appendChild(field("setup", setupSel));
+    body.appendChild(
       field(
-        `margin ${key}`,
-        textInput(margins[key] ?? "", (v) => {
-          const m = page.margins ??= {};
-          if (v) m[key] = v;
-          else delete m[key];
-          queueSave("page");
+        "page size",
+        sizeControl(page.size, (size) => {
+          page.size = size;
+          save();
         }),
       ),
     );
+    body.appendChild(
+      field(
+        "sheet",
+        sizeControl(page.sheet, (sheet) => {
+          page.sheet = sheet;
+          save();
+        }, SHEET_PRESETS),
+      ),
+    );
+    const folioError = document.createElement("span");
+    folioError.className = "cfg-error";
+    const folios = textInput(
+      String(page["folios-per-signature"] ?? ""),
+      (v) => {
+        if (isValidFolios(v)) {
+          folioError.textContent = "";
+          page["folios-per-signature"] = Number(v);
+          save();
+        } else {
+          folioError.textContent = v ? "must be a positive integer" : "";
+        }
+      },
+    );
+    folios.placeholder = "4";
+    body.appendChild(field("folios/signature", folios, folioError));
+    body.appendChild(
+      field(
+        "duplex",
+        selectInput(
+          [
+            { label: "short-edge — book-style turn", value: "short-edge" },
+            { label: "long-edge — calendar-style turn", value: "long-edge" },
+            { label: "none — separate fronts/backs files", value: "none" },
+          ],
+          page.duplex ?? "short-edge",
+          (v) => {
+            page.duplex = v as Duplex;
+            save();
+          },
+        ),
+      ),
+    );
+    // Read-only snapshot for display — must not eagerly create page.margins,
+    // or an edit to an unrelated field (e.g. size) would persist a spurious
+    // empty margins object on save (the whole "page" section round-trips
+    // together, so any local default-filling here leaks onto disk).
+    const margins = page.margins ?? {};
+    for (const key of MARGIN_KEYS) {
+      body.appendChild(
+        field(
+          `margin ${key}`,
+          textInput(margins[key] ?? "", (v) => {
+            const m = page.margins ??= {};
+            if (v) m[key] = v;
+            else delete m[key];
+            queueSave("page");
+          }),
+        ),
+      );
+    }
   }
+
+  render();
+  refresh();
   return box;
 }
 
@@ -623,40 +747,6 @@ function buildRunningSection(
     render();
     box.append(head, list);
   }
-  return box;
-}
-
-function buildPrintSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
-  const box = sectionBox("Print (export only)");
-  const print: PrintConfig = meta.print ??= {};
-  box.appendChild(
-    field(
-      "sheet size",
-      sizeControl(print["sheet-size"], (v) => {
-        print["sheet-size"] = v;
-        queueSave("print");
-      }),
-    ),
-  );
-  const error = document.createElement("span");
-  error.className = "cfg-error";
-  const folios = textInput(String(print["folios-per-signature"] ?? ""), (v) => {
-    if (isValidFolios(v)) {
-      error.textContent = "";
-      print["folios-per-signature"] = Number(v);
-      queueSave("print");
-    } else {
-      error.textContent = v ? "must be a positive integer" : "";
-    }
-  });
-  folios.placeholder = "4";
-  box.appendChild(field("folios/signature", folios, error));
-  const note = document.createElement("p");
-  note.style.color = "var(--fg-muted)";
-  note.style.margin = "6px 0 0";
-  note.textContent =
-    "Consumed by print export (Plan 5) — changing these does not affect the preview.";
-  box.appendChild(note);
   return box;
 }
 

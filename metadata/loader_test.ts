@@ -5,8 +5,12 @@ Deno.test("loads a valid metadata file", async () => {
   const meta = await loadMetadata("metadata/testdata/valid/metadata.json");
   assertEquals(meta?.page?.size, "5.5in 8.5in");
   assertEquals(meta?.fonts?.["display"], "Playfair Display");
-  assertEquals(meta?.print?.["folios-per-signature"], 4);
   assertEquals(meta?.notes?.placement, "footnote");
+  // The fixture is deliberately still in the pre-merge shape: loading upgrades
+  // its `print` section into `page` (metadata/upgrade.ts).
+  assertEquals(meta?.page?.sheet, "legal");
+  assertEquals(meta?.page?.["folios-per-signature"], 4);
+  assertEquals(meta?.print, undefined);
 });
 
 Deno.test("returns null when the file is missing (spec §5.2)", async () => {

@@ -1,6 +1,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { PDFDict, PDFDocument, PDFName, PDFPage, PDFStream } from "pdf-lib";
 import { impose, parseDims } from "./imposition.ts";
+import { resolvePageSetup } from "../metadata/page-setup.ts";
 import {
   buildSheetPdf,
   exportBook,
@@ -188,7 +189,7 @@ Deno.test("exportBook: rejects a nonexistent book before writing anything", asyn
   assertEquals(entries, []); // exportBook must not have written into `out` either
 });
 
-Deno.test("exportBook: falls back to metadata.json's print section when no flags are given", async () => {
+Deno.test("exportBook: upgrades a legacy print section when no flags are given", async () => {
   const root = await Deno.makeTempDir();
   const bookDir = `${root}/book`;
   await Deno.mkdir(bookDir, { recursive: true });
@@ -204,7 +205,50 @@ Deno.test("exportBook: falls back to metadata.json's print section when no flags
     }),
   );
   const s = await exportBook(root, "book", { proof: true });
-  assertEquals(s.resolved, { sheet: "legal", duplex: "long-edge", folios: 2 });
+  // A legacy `print` section is folded into `page` on load (metadata/upgrade.ts).
+  assertEquals(
+    [s.setup.sheet, s.setup.duplex, s.setup.folios],
+    ["legal", "long-edge", 2],
+  );
+});
+
+Deno.test("export reads the page setup from the page section", async () => {
+  const root = await Deno.makeTempDir();
+  const bookDir = `${root}/book`;
+  await Deno.mkdir(bookDir, { recursive: true });
+  await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
+  await Deno.writeTextFile(
+    `${bookDir}/metadata.json`,
+    JSON.stringify({
+      page: {
+        size: "3.5in 8.5in",
+        sheet: "legal",
+        "folios-per-signature": 2,
+        duplex: "long-edge",
+      },
+    }),
+  );
+  const s = await exportBook(root, "book", { proof: true });
+  assertEquals(
+    [s.setup.sheet, s.setup.duplex, s.setup.folios, s.setup.nUp],
+    ["legal", "long-edge", 2, 4],
+  );
+});
+
+Deno.test("export rejects a page that cannot be printed on the sheet", async () => {
+  const root = await Deno.makeTempDir();
+  const bookDir = `${root}/book`;
+  await Deno.mkdir(bookDir, { recursive: true });
+  await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
+  await Deno.writeTextFile(
+    `${bookDir}/metadata.json`,
+    JSON.stringify({ page: { size: "6in 9in", sheet: "letter" } }),
+  );
+  await assertRejects(
+    () => exportBook(root, "book", { proof: true }),
+    Error,
+    "does not fit two-up",
+  );
 });
 
 // Reads the /BBox height of each embedded-page XObject on `page`, in the order pdf-lib
@@ -298,8 +342,12 @@ Deno.test("formatSummary is one line plus a waste warning when relevant", () => 
     imposition: imp,
     files: [],
     diagnostics: 0,
-    resolved: { sheet: "legal", duplex: "short-edge", folios: 3 },
-  }, { sheet: "legal", duplex: "short-edge" });
+    setup: resolvePageSetup({
+      size: "3.5in 8.5in",
+      sheet: "legal",
+      "folios-per-signature": 3,
+    }),
+  });
   assertEquals(
     text.split("\n")[0],
     "demo: 12 pages → 12 padded · 1 signature × 3 folios · 4-up on legal · 2 sheets · duplex short-edge",

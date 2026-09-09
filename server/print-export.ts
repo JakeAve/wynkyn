@@ -12,10 +12,10 @@ import {
   type Flip,
   impose,
   type Imposition,
-  parseDims,
   type Slot,
 } from "./imposition.ts";
 import { metadataPath } from "./editions.ts";
+import { type PageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
 import { renderPdf } from "./pdf.ts";
@@ -149,7 +149,7 @@ export interface ExportSummary {
   imposition: Imposition;
   files: string[];
   diagnostics: number;
-  resolved: { sheet: string; duplex: string; folios: number };
+  setup: PageSetup; // the §4.3 page setup this run actually used
 }
 
 function assertWholeNumber(value: number, label: string): void {
@@ -158,21 +158,7 @@ function assertWholeNumber(value: number, label: string): void {
   }
 }
 
-const DUPLEX_VALUES = ["short-edge", "long-edge", "none"] as const;
 const FLIP_VALUES = ["short-edge", "long-edge"] as const;
-
-function assertOneOf<T extends string>(
-  value: T,
-  allowed: readonly T[],
-  label: string,
-): void {
-  if (!allowed.includes(value)) {
-    const list = allowed.length > 2
-      ? `${allowed.slice(0, -1).join(", ")}, or ${allowed[allowed.length - 1]}`
-      : allowed.join(" or ");
-    throw new Error(`${label} must be ${list} (got ${JSON.stringify(value)})`);
-  }
-}
 
 export async function exportBook(
   booksRoot: string,
@@ -191,15 +177,23 @@ export async function exportBook(
     throw new Error(`no such edition: ${book}/${edition}`);
   }
   const m = meta ?? {};
-  const folios = opts.folios ?? m.print?.["folios-per-signature"] ?? 4;
-  assertWholeNumber(folios, "folios-per-signature");
+  // One resolver for the whole §4.3 setup, shared with the config panel, so a
+  // bad setup fails here with the same message the panel shows — and before we
+  // spend a Chrome render on it.
+  const setup = resolvePageSetup(m.page, {
+    sheet: opts.sheet,
+    folios: opts.folios,
+    duplex: opts.duplex,
+  });
+  if (setup.error !== null) throw new Error(setup.error);
+  const { folios, duplex, sheetDims: sheet } = setup;
   if (opts.pages !== undefined) assertWholeNumber(opts.pages, "pages");
-  const sheetName = opts.sheet ?? m.print?.["sheet-size"] ?? "letter";
-  const duplex = opts.duplex ?? m.print?.duplex ?? "short-edge";
-  assertOneOf(duplex, DUPLEX_VALUES, "duplex");
   const flip = opts.flip ?? "short-edge";
-  assertOneOf(flip, FLIP_VALUES, "flip");
-  const sheet = parseDims(sheetName);
+  if (!FLIP_VALUES.includes(flip)) {
+    throw new Error(
+      `flip must be short-edge or long-edge (got ${JSON.stringify(flip)})`,
+    );
+  }
   const out = opts.out ??
     (edition === null ? `${bookDir}/export` : `${bookDir}/export/${edition}`);
   await Deno.mkdir(out, { recursive: true });
@@ -210,8 +204,8 @@ export async function exportBook(
   let diagnostics = 0;
   const files: string[] = [];
   if (opts.proof) {
-    // No PDF exists yet to measure — fall back to the metadata-declared trim size.
-    page = parseDims(m.page?.size ?? "5.5in 8.5in");
+    // No PDF exists yet to measure — fall back to the configured page size.
+    page = setup.page;
     pageCount = opts.pages ?? 4 * folios;
   } else {
     const imagesDir = `file://${await Deno.realPath(bookDir)}/images`;
@@ -224,7 +218,7 @@ export async function exportBook(
     const src = await PDFDocument.load(source);
     pageCount = src.getPageCount();
     const { width, height } = src.getPage(0).getSize();
-    page = { w: width / PT, h: height / PT }; // trim size comes from the rendered PDF, not metadata
+    page = { w: width / PT, h: height / PT }; // page size comes from the rendered PDF, not metadata
     await Deno.writeFile(`${out}/book.pdf`, source);
     files.push(`${out}/book.pdf`);
   }
@@ -262,21 +256,17 @@ export async function exportBook(
     imposition,
     files,
     diagnostics,
-    resolved: { sheet: sheetName, duplex, folios },
+    setup,
   };
 }
 
-export function formatSummary(
-  book: string,
-  s: ExportSummary,
-  cfg: { sheet: string; duplex: string },
-): string {
+export function formatSummary(book: string, s: ExportSummary): string {
   const i = s.imposition;
-  const folios = s.resolved.folios;
+  const { folios, sheet, duplex } = s.setup;
   const lines = [
     `${book}: ${s.pageCount} pages → ${i.paddedCount} padded · ${i.signatures} signature${
       i.signatures === 1 ? "" : "s"
-    } × ${folios} folios · ${i.nUp}-up on ${cfg.sheet} · ${i.sheets.length} sheets · duplex ${cfg.duplex}`,
+    } × ${folios} folios · ${i.nUp}-up on ${sheet} · ${i.sheets.length} sheets · duplex ${duplex}`,
   ];
   if (i.wastedFolioSlots > 0) {
     lines.push(
