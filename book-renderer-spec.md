@@ -1148,13 +1148,15 @@ so the two can never disagree. A setup whose page cannot fit two-up on its sheet
 is an error the panel shows as you pick it, and `bml export` refuses before
 rendering.
 
-Named setups (half letter, quarter legal, A4 folded, …) are just
-`(sheet, cols, rows)` triples with the page size derived from them; the panel
-offers them as a shortcut that writes `size` and `sheet` together. They are a
-convenience, not a stored value — nothing in `metadata.json` names a setup. A
-"half" setup folds the sheet once (2 × 1); a "quarter" setup halves **both** of
-the sheet's dimensions (2 × 2), so a quarter legal is 4.25in × 7in, not a strip
-of one.
+The panel offers `size` and `sheet` as two independent dropdowns — there is no
+third "setup" control, because the pair already is the setup and a page that
+will not tile its sheet is reported inline as you pick it. The page-size list
+includes the folded formats (half letter, quarter legal, A5 folded, …), each
+**derived** from its sheet by `foldedSize(sheet, cols, rows)` rather than
+written out, so a named size can never drift from the paper it comes off.
+Halving folds once and splits the sheet's long side; quartering halves **both**
+of its dimensions, so a quarter legal is 4.25in × 7in — a scaled-down sheet, not
+a strip of one.
 
 > Page setup is what makes one edition different from another, so it is the lead
 > line in the edition picker. Named editions export to `export/<edition>/` and

@@ -23,7 +23,6 @@ import {
   renameKey,
   resolvePageSetup,
   RUNNING_CONTENT_CHOICES,
-  SETUP_PRESETS,
   SHEET_PRESETS,
   type SizePreset,
   splitRunningEntry,
@@ -381,99 +380,77 @@ function buildPageSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
     }
   }
 
-  function render(): void {
-    body.textContent = "";
-    // A shortcut, not a stored value: the setups are just (sheet, pages across)
-    // pairs, so this reflects whatever size and sheet already say (§4.3).
-    const setupSel = selectInput(
-      [
-        ...SETUP_PRESETS.map((p) => ({ label: p.label, value: p.id })),
-        { label: "Custom…", value: "custom" },
-      ],
-      resolvePageSetup(page).preset?.id ?? "custom",
-      (id) => {
-        const preset = SETUP_PRESETS.find((p) => p.id === id);
-        if (!preset) return; // "Custom…" only describes the current values
-        page.size = preset.size;
-        page.sheet = preset.sheet;
-        queueSave("page");
-        render();
-        refresh();
-      },
-    );
-    body.appendChild(field("setup", setupSel));
+  // The stored half: the two sizes, how many folios nest into a signature,
+  // and which way the printer turns the sheet over.
+  body.appendChild(
+    field(
+      "page size",
+      sizeControl(page.size, (size) => {
+        page.size = size;
+        save();
+      }),
+    ),
+  );
+  body.appendChild(
+    field(
+      "sheet",
+      sizeControl(page.sheet, (sheet) => {
+        page.sheet = sheet;
+        save();
+      }, SHEET_PRESETS),
+    ),
+  );
+  const folioError = document.createElement("span");
+  folioError.className = "cfg-error";
+  const folios = textInput(
+    String(page["folios-per-signature"] ?? ""),
+    (v) => {
+      if (isValidFolios(v)) {
+        folioError.textContent = "";
+        page["folios-per-signature"] = Number(v);
+        save();
+      } else {
+        folioError.textContent = v ? "must be a positive integer" : "";
+      }
+    },
+  );
+  folios.placeholder = "4";
+  body.appendChild(field("folios/signature", folios, folioError));
+  body.appendChild(
+    field(
+      "duplex",
+      selectInput(
+        [
+          { label: "short-edge — book-style turn", value: "short-edge" },
+          { label: "long-edge — calendar-style turn", value: "long-edge" },
+          { label: "none — separate fronts/backs files", value: "none" },
+        ],
+        page.duplex ?? "short-edge",
+        (v) => {
+          page.duplex = v as Duplex;
+          save();
+        },
+      ),
+    ),
+  );
+  // Read-only snapshot for display — must not eagerly create page.margins,
+  // or an edit to an unrelated field (e.g. size) would persist a spurious
+  // empty margins object on save (the whole "page" section round-trips
+  // together, so any local default-filling here leaks onto disk).
+  const margins = page.margins ?? {};
+  for (const key of MARGIN_KEYS) {
     body.appendChild(
       field(
-        "page size",
-        sizeControl(page.size, (size) => {
-          page.size = size;
-          save();
+        `margin ${key}`,
+        textInput(margins[key] ?? "", (v) => {
+          const m = page.margins ??= {};
+          if (v) m[key] = v;
+          else delete m[key];
+          queueSave("page");
         }),
       ),
     );
-    body.appendChild(
-      field(
-        "sheet",
-        sizeControl(page.sheet, (sheet) => {
-          page.sheet = sheet;
-          save();
-        }, SHEET_PRESETS),
-      ),
-    );
-    const folioError = document.createElement("span");
-    folioError.className = "cfg-error";
-    const folios = textInput(
-      String(page["folios-per-signature"] ?? ""),
-      (v) => {
-        if (isValidFolios(v)) {
-          folioError.textContent = "";
-          page["folios-per-signature"] = Number(v);
-          save();
-        } else {
-          folioError.textContent = v ? "must be a positive integer" : "";
-        }
-      },
-    );
-    folios.placeholder = "4";
-    body.appendChild(field("folios/signature", folios, folioError));
-    body.appendChild(
-      field(
-        "duplex",
-        selectInput(
-          [
-            { label: "short-edge — book-style turn", value: "short-edge" },
-            { label: "long-edge — calendar-style turn", value: "long-edge" },
-            { label: "none — separate fronts/backs files", value: "none" },
-          ],
-          page.duplex ?? "short-edge",
-          (v) => {
-            page.duplex = v as Duplex;
-            save();
-          },
-        ),
-      ),
-    );
-    // Read-only snapshot for display — must not eagerly create page.margins,
-    // or an edit to an unrelated field (e.g. size) would persist a spurious
-    // empty margins object on save (the whole "page" section round-trips
-    // together, so any local default-filling here leaks onto disk).
-    const margins = page.margins ?? {};
-    for (const key of MARGIN_KEYS) {
-      body.appendChild(
-        field(
-          `margin ${key}`,
-          textInput(margins[key] ?? "", (v) => {
-            const m = page.margins ??= {};
-            if (v) m[key] = v;
-            else delete m[key];
-            queueSave("page");
-          }),
-        ),
-      );
-    }
   }
-
-  render();
   refresh();
   return box;
 }

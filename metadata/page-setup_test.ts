@@ -2,13 +2,11 @@ import { assert, assertEquals, assertFalse } from "@std/assert";
 import {
   describePageSetup,
   fmtLength,
+  foldedSize,
   gridFor,
   isValidSize,
-  pageForSheet,
   parseDims,
   resolvePageSetup,
-  SETUP_PRESETS,
-  setupPresetFor,
   tryParseDims,
 } from "./page-setup.ts";
 
@@ -46,44 +44,32 @@ Deno.test("gridFor: even columns, the orientation that fits the most pages", () 
   assertEquals(grid("letter", 6, 9), null); // fits neither way
 });
 
-Deno.test("every named setup round-trips to its own page count", () => {
-  for (const preset of SETUP_PRESETS) {
-    const setup = resolvePageSetup({ size: preset.size, sheet: preset.sheet });
-    assertEquals(setup.error, null, `${preset.id}: ${setup.error}`);
-    assertEquals(
-      setup.nUp,
-      preset.cols * preset.rows,
-      `${preset.id} pages per sheet side`,
-    );
-    assertEquals([setup.cols, setup.rows], [preset.cols, preset.rows]);
-    assertEquals(setup.preset?.id, preset.id, `${preset.id} matches itself`);
-    // Derived sizes must never round up past the sheet they came from.
-    assert(
-      setup.slackAcross >= 0 && setup.slackAcross < 0.01,
-      `${preset.id} tiles its sheet (slack ${setup.slackAcross})`,
-    );
-  }
-});
-
-Deno.test("pageForSheet: one row splits the long side, rows halve both", () => {
-  assertEquals(pageForSheet(parseDims("legal"), 2, 1), { w: 7, h: 8.5 });
-  assertEquals(pageForSheet(parseDims("letter"), 2, 1), { w: 5.5, h: 8.5 });
+Deno.test("foldedSize halves the long side, quarters both, never rounding up", () => {
+  assertEquals(foldedSize("legal", 2, 1), "7in 8.5in");
+  assertEquals(foldedSize("letter", 2, 1), "5.5in 8.5in");
   // Quartering keeps the sheet's proportions — that is what makes it a quarter
   // rather than a strip: legal 8.5×14 → 4.25×7, the same 1.647 ratio.
-  assertEquals(pageForSheet(parseDims("legal"), 2, 2), { w: 4.25, h: 7 });
-  assertEquals(pageForSheet(parseDims("letter"), 2, 2), { w: 4.25, h: 5.5 });
+  assertEquals(foldedSize("legal", 2, 2), "4.25in 7in");
+  assertEquals(foldedSize("letter", 2, 2), "4.25in 5.5in");
+  // A4 297/2 = 148.5mm exactly. Rounding that up would put the folded page over
+  // the edge of the sheet it came from.
+  assertEquals(foldedSize("A4", 2, 1), "148.5mm 210mm");
+  assertEquals(foldedSize("A4", 2, 2), "105mm 148.5mm");
 });
 
-Deno.test("quarter presets halve the sheet and keep its aspect ratio", () => {
-  for (const preset of SETUP_PRESETS.filter((p) => p.rows === 2)) {
-    const sheet = parseDims(preset.sheet);
-    const page = parseDims(preset.size);
-    const ratio = (d: { w: number; h: number }) =>
-      Math.max(d.w, d.h) / Math.min(d.w, d.h);
-    assert(
-      Math.abs(ratio(sheet) - ratio(page)) < 0.005,
-      `${preset.id}: sheet ${ratio(sheet)} vs page ${ratio(page)}`,
-    );
+Deno.test("every folded size tiles the sheet it came off, with nothing over", () => {
+  for (const sheet of ["letter", "legal", "tabloid", "A3", "A4", "A5"]) {
+    for (const rows of [1, 2] as const) {
+      const size = foldedSize(sheet, 2, rows);
+      const s = resolvePageSetup({ size, sheet });
+      assertEquals(s.error, null, `${sheet} ÷ ${rows}: ${s.error}`);
+      assertEquals([s.cols, s.rows], [2, rows], `${sheet} ÷ ${rows} grid`);
+      assert(
+        s.slackAcross >= 0 && s.slackAcross < 0.01 && s.slackDown >= 0 &&
+          s.slackDown < 0.01,
+        `${sheet} ÷ ${rows} slack ${s.slackAcross}/${s.slackDown}`,
+      );
+    }
   }
 });
 
@@ -104,7 +90,6 @@ Deno.test("resolvePageSetup derives the whole imposition", () => {
   assertEquals(s.duplex, "long-edge");
   assertEquals(s.slackAcross, 0);
   assertEquals(s.slackDown, 0);
-  assertEquals(s.preset?.id, "quarter-legal");
 });
 
 Deno.test("resolvePageSetup still lays strips out in one landscape row", () => {
@@ -114,7 +99,6 @@ Deno.test("resolvePageSetup still lays strips out in one landscape row", () => {
   assertEquals([s.nUp, s.cols, s.rows], [4, 4, 1]);
   assertEquals(s.landscape, true);
   assertEquals(s.foliosPerSheet, 2);
-  assertEquals(s.preset, null);
 });
 
 Deno.test("resolvePageSetup applies §4.3 defaults and flag overrides", () => {
@@ -139,7 +123,6 @@ Deno.test("resolvePageSetup reports leftover paper rather than hiding it", () =>
   const s = resolvePageSetup({ size: "5.25in 8in", sheet: "legal" });
   assertEquals(s.error, null);
   assertEquals(s.nUp, 2);
-  assertEquals(s.preset, null); // not one of the named setups
   assertEquals(+s.slackAcross.toFixed(3), 3.5);
   assertEquals(+s.slackDown.toFixed(3), 0.5);
 });
@@ -160,17 +143,6 @@ Deno.test("resolvePageSetup never throws; every bad input names itself", () => {
     );
     assertEquals(s.nUp, 0);
   }
-});
-
-Deno.test("setupPresetFor recognizes a setup however its sizes are spelled", () => {
-  assertEquals(setupPresetFor("4.25in 7in", "legal")?.id, "quarter-legal");
-  assertEquals(
-    setupPresetFor("107.95mm 177.8mm", "legal")?.id,
-    "quarter-legal",
-  );
-  assertEquals(setupPresetFor("7in 8.5in", "legal")?.id, "half-legal");
-  assertEquals(setupPresetFor("4.25in 7in", "letter"), null);
-  assertEquals(setupPresetFor(undefined, "legal"), null);
 });
 
 Deno.test("describePageSetup stays short on a broken setup", () => {

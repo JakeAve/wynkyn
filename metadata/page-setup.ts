@@ -152,139 +152,24 @@ export function isLandscape(grid: Grid): boolean {
   return grid.sheet.w >= grid.sheet.h;
 }
 
-// ---------- setup presets ----------
-
-// A setup is a sheet plus the grid of book pages on one side of it: the page
-// size follows from those, so the presets never carry stale arithmetic. Halving
-// means one fold (2 × 1); quartering means one cut and two folds (2 × 2), which
-// halves both sides of the sheet and so keeps its proportions.
-interface SetupSpec {
-  id: string;
-  name: string;
-  sheet: string;
-  cols: number;
-  rows: number;
-}
-
-const SETUP_SPECS: SetupSpec[] = [
-  { id: "half-letter", name: "Half letter", sheet: "letter", cols: 2, rows: 1 },
-  {
-    id: "quarter-letter",
-    name: "Quarter letter",
-    sheet: "letter",
-    cols: 2,
-    rows: 2,
-  },
-  { id: "half-legal", name: "Half legal", sheet: "legal", cols: 2, rows: 1 },
-  {
-    id: "quarter-legal",
-    name: "Quarter legal",
-    sheet: "legal",
-    cols: 2,
-    rows: 2,
-  },
-  {
-    id: "half-tabloid",
-    name: "Half tabloid",
-    sheet: "tabloid",
-    cols: 2,
-    rows: 1,
-  },
-  {
-    id: "quarter-tabloid",
-    name: "Quarter tabloid",
-    sheet: "tabloid",
-    cols: 2,
-    rows: 2,
-  },
-  {
-    id: "a3-folded",
-    name: "A3 folded (A4 pages)",
-    sheet: "A3",
-    cols: 2,
-    rows: 1,
-  },
-  {
-    id: "a4-folded",
-    name: "A4 folded (A5 pages)",
-    sheet: "A4",
-    cols: 2,
-    rows: 1,
-  },
-  {
-    id: "a4-quartered",
-    name: "A4 quartered (A6 pages)",
-    sheet: "A4",
-    cols: 2,
-    rows: 2,
-  },
-  {
-    id: "a5-folded",
-    name: "A5 folded (A6 pages)",
-    sheet: "A5",
-    cols: 2,
-    rows: 1,
-  },
-];
-
-export interface SetupPreset {
-  id: string;
-  label: string; // "Quarter legal — 4.25in × 7in, 4-up on legal (2 × 2)"
-  sheet: string;
-  size: string;
-  cols: number;
-  rows: number;
-}
+// ---------- folded sizes ----------
 
 /**
- * The book page a sheet yields under a `cols` × `rows` grid. A single row runs
- * across the sheet's long side; stacked rows run down it, which is what makes a
- * quartered page a scaled-down sheet rather than a strip of one.
+ * The book page a sheet yields under a `cols` × `rows` grid, as a size string.
+ * A single row runs across the sheet's long side; stacked rows run down it,
+ * which is what makes a quartered page a scaled-down sheet rather than a strip
+ * of one — legal 8.5in × 14in quarters to 4.25in × 7in.
+ *
+ * Never rounds up, so a size derived by dividing a sheet still fits on it:
+ * rounding 74.25mm to 74.3mm would put four pages over the edge of an A4 sheet.
  */
-export function pageForSheet(sheet: Dims, cols: number, rows: number): Dims {
-  const long = Math.max(sheet.w, sheet.h);
-  const short = Math.min(sheet.w, sheet.h);
+export function foldedSize(sheet: string, cols: number, rows: number): string {
+  const dims = parseDims(sheet);
+  const unit = unitOf(sheet);
+  const long = Math.max(dims.w, dims.h);
+  const short = Math.min(dims.w, dims.h);
   const [w, h] = rows === 1 ? [long, short] : [short, long];
-  return { w: w / cols, h: h / rows };
-}
-
-function toPreset(spec: SetupSpec): SetupPreset {
-  const unit = unitOf(spec.sheet);
-  const leaf = pageForSheet(parseDims(spec.sheet), spec.cols, spec.rows);
-  const size = `${floorLength(leaf.w, unit)} ${floorLength(leaf.h, unit)}`;
-  const grid = spec.rows === 1 ? "" : ` (${spec.cols} × ${spec.rows})`;
-  return {
-    id: spec.id,
-    label: `${spec.name} — ${size.replace(" ", " × ")}, ${
-      spec.cols * spec.rows
-    }-up on ${spec.sheet}${grid}`,
-    sheet: spec.sheet,
-    size,
-    cols: spec.cols,
-    rows: spec.rows,
-  };
-}
-
-/** Every named setup, page size derived from its sheet (§4.3). */
-export const SETUP_PRESETS: SetupPreset[] = SETUP_SPECS.map(toPreset);
-
-/** The named setup a stored (size, sheet) pair is, or null when it is a custom one. */
-export function setupPresetFor(
-  size: string | undefined,
-  sheet: string | undefined,
-): SetupPreset | null {
-  if (!size || !sheet) return null;
-  const page = tryParseDims(size);
-  const paper = tryParseDims(sheet);
-  if (!page || !paper) return null;
-  const EPS = 1e-6;
-  return SETUP_PRESETS.find((p) => {
-    const other = tryParseDims(p.sheet);
-    if (!other || Math.abs(other.w - paper.w) > EPS) return false;
-    if (Math.abs(other.h - paper.h) > EPS) return false;
-    const want = tryParseDims(p.size)!;
-    return Math.abs(want.w - page.w) < EPS && Math.abs(want.h - page.h) < EPS;
-  }) ?? null;
+  return `${floorLength(w / cols, unit)} ${floorLength(h / rows, unit)}`;
 }
 
 // ---------- resolving a setup ----------
@@ -307,7 +192,6 @@ interface PageSetupCommon {
   folios: number;
   duplex: Duplex;
   unit: Unit;
-  preset: SetupPreset | null;
   // Derived. All zero when the setup is unusable — callers show `error` instead.
   nUp: number; // book pages on one sheet side = cols × rows
   cols: number; // pages across the sheet
@@ -376,7 +260,6 @@ export function resolvePageSetup(
     unit,
     page: pageDims,
     sheetDims,
-    preset: setupPresetFor(size, sheet),
   };
   const fail = (error: string): PageSetup => ({ ...base, ...EMPTY, error });
 

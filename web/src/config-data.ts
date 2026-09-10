@@ -5,19 +5,27 @@ import type {
   NumberingStyle,
   RunningEntry,
 } from "../../metadata/types.ts";
-// Size parsing and the setup catalog are shared with the print exporter so the
-// panel and `bml export` can never disagree about the geometry (§4.3).
+// Size parsing and derivation are shared with the print exporter so the panel
+// and `bml export` can never disagree about the geometry (§4.3).
+import { foldedSize } from "../../metadata/page-setup.ts";
 export {
   describePageSetup,
   fmtLength,
   isValidSize,
   resolvePageSetup,
-  SETUP_PRESETS,
 } from "../../metadata/page-setup.ts";
 
 export interface SizePreset {
   label: string;
   value: string;
+}
+
+// A folded sheet, named. The size is derived rather than written out, so these
+// can never drift from the sheet they come off: halving folds once and splits
+// the long side, quartering cuts across and folds, halving both sides.
+function folded(name: string, sheet: string, rows: 1 | 2): SizePreset {
+  const value = foldedSize(sheet, 2, rows);
+  return { label: `${name} (${value.replace(" ", " × ")})`, value };
 }
 
 // The book page sizes offered in the panel: the named CSS sizes worth reaching
@@ -26,10 +34,13 @@ export interface SizePreset {
 export const PAGE_SIZE_PRESETS: SizePreset[] = [
   { label: "A4 (210mm × 297mm)", value: "A4" },
   { label: "A5 (148mm × 210mm)", value: "A5" },
+  folded("A5 folded", "A5", 1),
   { label: "US Letter (8.5in × 11in)", value: "letter" },
+  folded("Half Letter", "letter", 1),
+  folded("Quarter Letter", "letter", 2),
   { label: "US Legal (8.5in × 14in)", value: "legal" },
-  { label: "Half Letter (5.5in × 8.5in)", value: "5.5in 8.5in" },
-  { label: "Quarter Legal (3.5in × 8.5in)", value: "3.5in 8.5in" },
+  folded("Half Legal", "legal", 1),
+  folded("Quarter Legal", "legal", 2),
   { label: "US Trade (6in × 9in)", value: "6in 9in" },
 ];
 
