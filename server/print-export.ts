@@ -25,7 +25,9 @@ const PT = 72; // points per inch
 export interface SheetGeometry {
   sheet: Dims;
   page: Dims;
-  nUp: number;
+  nUp: number; // pages per sheet side; cols × rows
+  cols: number;
+  rows: number;
 }
 
 export interface Side {
@@ -63,12 +65,14 @@ export async function buildSheetPdf(
 ): Promise<Uint8Array> {
   const out = await PDFDocument.create();
   const font = await out.embedFont(StandardFonts.Helvetica);
-  const W = Math.max(geom.sheet.w, geom.sheet.h) * PT;
-  const H = Math.min(geom.sheet.w, geom.sheet.h) * PT;
+  // The grid already fixed the sheet's orientation — a quartered setup prints
+  // portrait, a 2-up one landscape — so take these dimensions as given.
+  const W = geom.sheet.w * PT;
+  const H = geom.sheet.h * PT;
   const pw = geom.page.w * PT;
   const ph = geom.page.h * PT;
-  const x0 = (W - geom.nUp * pw) / 2; // row of pages centred on the sheet
-  const y0 = (H - ph) / 2;
+  const x0 = (W - geom.cols * pw) / 2; // grid of pages centred on the sheet
+  const y0 = (H - geom.rows * ph) / 2;
 
   let embedded: PDFEmbeddedPage[] = [];
   if (source) {
@@ -77,8 +81,9 @@ export async function buildSheetPdf(
   }
 
   const drawSlot = (page: PDFPage, slot: Slot, i: number, label: string) => {
-    const x = x0 + i * pw;
-    const y = y0;
+    // Slots arrive row-major; PDF y grows upward, so row 0 is the top one.
+    const x = x0 + (i % geom.cols) * pw;
+    const y = y0 + (geom.rows - 1 - Math.floor(i / geom.cols)) * ph;
     // pdf-lib rotates about (x, y); a 180° turn needs the opposite corner as origin.
     const at = slot.rotate === 180
       ? { x: x + pw, y: y + ph, rotate: degrees(180) }
@@ -224,7 +229,13 @@ export async function exportBook(
   }
 
   const imposition = impose(pageCount, { folios, sheet, page, duplex, flip });
-  const geom: SheetGeometry = { sheet, page, nUp: imposition.nUp };
+  const geom: SheetGeometry = {
+    sheet: imposition.sheet, // oriented by the grid, not by `sheet` as parsed
+    page,
+    nUp: imposition.nUp,
+    cols: imposition.cols,
+    rows: imposition.rows,
+  };
   if (duplex === "none") {
     for (
       const [name, mode] of [["sheets-fronts.pdf", "fronts"], [

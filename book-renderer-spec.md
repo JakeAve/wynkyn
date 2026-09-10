@@ -88,13 +88,14 @@ document (§3). The user previews their book layout identical to how it will
 appear in print. Once the document is ready, the user prints using a specified
 number of folios per signature. The "sheet" and "page" are not necessarily 1:1 —
 how many book pages fit on each sheet side is derived from the sheet and
-book-page dimensions (§7.7). A 3.5in-wide book page on US Legal prints 4-up (8
-book pages per duplex sheet); a 5.5in-wide page on the same sheet prints 2-up (4
-book pages per sheet). All folds are vertical, parallel to the spine: a 2-up
-sheet is folded once at its center, while a 4-up sheet is first cut at its
-vertical center and each half is then folded. Every folded piece is a **folio**
-— 2 leaves, 4 book pages — and folios nest inside one another to form
-signatures. This is the only binding style in scope for v1 (see §8, Non-Goals).
+book-page dimensions (§7.7). A 4.25in × 7in book page quarters US Legal and
+prints 4-up (8 book pages per duplex sheet); a 5.5in × 8.5in page on the same
+sheet prints 2-up (4 book pages per sheet). All folds are vertical, parallel to
+the spine: a 2-up sheet is folded once at its center, while a 4-up sheet is
+first cut — across or down, whichever the grid calls for — and each piece is
+then folded. Every folded piece is a **folio** — 2 leaves, 4 book pages — and
+folios nest inside one another to form signatures. This is the only binding
+style in scope for v1 (see §8, Non-Goals).
 
 ---
 
@@ -1138,19 +1139,22 @@ in one section.
   (calendar-style turn), or `none` (separate fronts/backs files). CLI flags
   (`bml export --sheet/--folios/--duplex`) override per run.
 
-Everything else about the setup is **derived**, never stored: pages across a
-sheet side (§7.7's _n_), folios and cuts per sheet, sheets per signature, and
-the leftover paper trimmed off after folding. `metadata/page-setup.ts` resolves
-a `page` section into all of it, and is shared by the configuration panel (§7.5)
-and print export (§7.7) so the two can never disagree. A setup whose page cannot
-fit two-up on its sheet is an error the panel shows as you pick it, and
-`bml export` refuses before rendering.
+Everything else about the setup is **derived**, never stored: the grid of pages
+on a sheet side and which orientation it prints in (§7.7's `cols` × `rows`),
+folios and cuts per sheet, sheets per signature, and the leftover paper trimmed
+off after folding. `metadata/page-setup.ts` resolves a `page` section into all
+of it, and is shared by the configuration panel (§7.5) and print export (§7.7)
+so the two can never disagree. A setup whose page cannot fit two-up on its sheet
+is an error the panel shows as you pick it, and `bml export` refuses before
+rendering.
 
 Named setups (half letter, quarter legal, A4 folded, …) are just
-`(sheet,
-pages across)` pairs with the page size derived from them; the panel
+`(sheet, cols, rows)` triples with the page size derived from them; the panel
 offers them as a shortcut that writes `size` and `sheet` together. They are a
-convenience, not a stored value — nothing in `metadata.json` names a setup.
+convenience, not a stored value — nothing in `metadata.json` names a setup. A
+"half" setup folds the sheet once (2 × 1); a "quarter" setup halves **both** of
+the sheet's dimensions (2 × 2), so a quarter legal is 4.25in × 7in, not a strip
+of one.
 
 > Page setup is what makes one edition different from another, so it is the lead
 > line in the edition picker. Named editions export to `export/<edition>/` and
@@ -1727,23 +1731,35 @@ book pages. Folios nest inside one another to form a **signature** of
 `folios-per-signature` folios (= `folios-per-signature` × 4 book pages); the
 book is a sequence of signatures.
 
-**Layout derivation.** Book pages sit in a single row on each sheet side. The
-n-up count is derived, not configured: _n_ = the largest even number such that
-_n_ × page-width ≤ the sheet's long side and page-height ≤ the sheet's short
-side.
+**Layout derivation.** Book pages tile one side of a sheet in a grid of `cols` ×
+`rows`, derived and never configured: `cols` is the largest **even** number of
+page-widths that fit across the sheet, `rows` the number of page-heights that
+fit down it, evaluated in **both sheet orientations** with the one yielding more
+pages winning. A tie goes to the single-row landscape layout, which needs fewer
+cuts. _n_ (the "n-up" count, pages per sheet side) is `cols × rows`.
 
-- _n_ = 2 — the sheet is folded once at its center; one sheet = one folio.
-- _n_ = 4 — the sheet is cut at its vertical center, and each half is folded;
-  one sheet = two folios.
-- In general, _n_/2 folios per sheet, separated by _n_/2 − 1 cuts. _n_ = 2 and
-  _n_ = 4 are the expected v1 cases; the math generalizes but higher counts are
-  untested.
-- If _n_ < 2 (two book pages don't fit on the sheet), export fails with a clear
-  configuration error.
+Each pair of columns is one folio, so a sheet carries `rows × cols/2` folios,
+separated by `rows − 1` cuts across and `cols/2 − 1` cuts down each row —
+`rows × cols/2 − 1` cuts in all. Cutting is what a grid adds; **the folds
+themselves stay vertical and parallel to the spine**, which is what §8 rules out
+changing.
 
-Example: a 3.5in × 8.5in book page on US Legal (14in × 8.5in) gives _n_ = 4
-(cut + fold, 8 pages per duplex sheet); a 5.5in × 8.5in page on the same sheet
-gives _n_ = 2 (fold only, 4 pages per sheet).
+- 2 × 1 — the sheet is folded once at its center; one sheet = one folio.
+- 4 × 1 — the sheet is cut at its vertical center and each half folded; one
+  sheet = two folios. The page is a narrow strip of the sheet.
+- 2 × 2 (**quartering**) — the sheet is cut at its horizontal center and each
+  half folded. Both sheet dimensions are halved, so the page keeps the sheet's
+  proportions: US Legal 8.5in × 14in quarters to 4.25in × 7in, and the sheet
+  prints portrait rather than landscape.
+- 2 × 1, 4 × 1 and 2 × 2 are the expected v1 cases; the math generalizes but
+  larger grids are untested.
+- If no orientation fits two book pages, export fails with a clear configuration
+  error.
+
+Example: a 4.25in × 7in book page on US Legal quarters it (2 × 2, 8 pages per
+duplex sheet); a 3.5in × 8.5in page on the same sheet gives 4 × 1 strips (also 8
+pages, but a very different book); a 5.5in × 8.5in page gives 2 × 1 (fold only,
+4 pages per sheet).
 
 **Imposition algorithm (`server/imposition.ts`, Plan 5):**
 
@@ -1756,11 +1772,16 @@ gives _n_ = 2 (fold only, 4 pages per sheet).
    fold) and, on its back face, [2_k_ | _P_−2_k_+1] — so that folding and
    nesting reconstructs reading order. (Check, _P_ = 16: folio 1 is [16 | 1]
    front, [2 | 15] back.)
-3. Pack folios onto physical sheets, _n_/2 folios per sheet side by side.
-   Back-side layout follows `print.duplex`: `short-edge` (book-style turn on a
-   landscape sheet) mirrors the folio column order with each `[2k | P−2k+1]`
-   pair intact; `long-edge` (calendar-style turn) is that layout rotated 180° as
-   a whole.
+3. Pack folios onto physical sheets row-major, `cols/2` folios per row.
+   Back-side layout follows `page.duplex`, whose effect depends on the sheet
+   orientation the grid chose: turning the sheet about a left/right edge mirrors
+   the folio **column** order (each `[2k | P−2k+1]` pair intact), turning it
+   about a top/bottom edge mirrors the **rows** — which is that same layout
+   rotated 180° as a whole. Those left/right edges are the short ones on a
+   landscape sheet and the long ones on a portrait sheet, so `short-edge`
+   mirrors columns on a 2-up landscape job and rows on a quartered portrait one.
+   The exporter maps this; `duplex` always names the setting to pick on the
+   printer.
 4. Emit the final print file via `print-export.ts` (§5.4, §6) — one output page
    per sheet side, at the sheet's physical dimensions, with the
    already-paginated book pages positioned at their exact trim size.
@@ -1776,8 +1797,9 @@ gives _n_ = 2 (fold only, 4 pages per sheet).
 Explicitly out of scope, to bound the work below:
 
 - Binding styles other than the §7.7 model — vertical folds parallel to the
-  spine, folios nested into signatures (no horizontal folds/quarto-style
-  imposition, no perfect binding with spine text, etc.)
+  spine, folios nested into signatures (no horizontal _folds_; a quartered sheet
+  is cut across and each half folded vertically, never folded twice as a true
+  quarto, and there is no perfect binding with spine text, etc.)
 - Fonts from anywhere other than Google Fonts
 - Multi-user/collaborative real-time editing
 - Structural editing via drag-and-drop in the project tree (§7.2) — tree is

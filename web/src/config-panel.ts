@@ -351,9 +351,19 @@ function buildPageSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
     const cuts = setup.cutsPerSheet === 0
       ? "fold only, no cuts"
       : `${setup.cutsPerSheet} cut${setup.cutsPerSheet === 1 ? "" : "s"}`;
+    // The grid only earns a mention once it has more than one row — that is
+    // where the sheet turns portrait and gets cut across before folding.
+    const grid = setup.rows === 1 ? "" : ` (${setup.cols} × ${setup.rows})`;
     line(
-      `${setup.nUp}-up on ${setup.sheet} — ${setup.foliosPerSheet} ${folioWord} per sheet (${cuts})`,
+      `${setup.nUp}-up on ${setup.sheet}${grid} — ${setup.foliosPerSheet} ${folioWord} per sheet (${cuts})`,
     );
+    if (setup.rows > 1) {
+      line(
+        `sheet prints ${
+          setup.landscape ? "landscape" : "portrait"
+        } — cut across, then fold each piece down its center`,
+      );
+    }
     line(
       `${setup.sheetsPerSignature} sheet${
         setup.sheetsPerSignature === 1 ? "" : "s"

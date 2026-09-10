@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { impose, type ImposeConfig, nUp, parseDims } from "./imposition.ts";
+import { gridFor, impose, type ImposeConfig, parseDims } from "./imposition.ts";
 
 Deno.test("parseDims: named sizes and explicit in/mm", () => {
   assertEquals(parseDims("legal"), { w: 8.5, h: 14 });
@@ -10,14 +10,24 @@ Deno.test("parseDims: named sizes and explicit in/mm", () => {
   assertThrows(() => parseDims("huge"), Error, 'unknown size "huge"');
 });
 
-Deno.test("nUp: derived from sheet long side / page width, even only", () => {
+Deno.test("gridFor: even columns, rows only when they earn more pages", () => {
   const legal = parseDims("legal");
-  assertEquals(nUp(legal, { w: 3.5, h: 8.5 }), 4); // spec §7.7 example
-  assertEquals(nUp(legal, { w: 5.5, h: 8.5 }), 2); // spec §7.7 example
-  assertEquals(nUp(legal, { w: 4.5, h: 8.5 }), 2); // floor(14/4.5)=3 → 2
-  assertEquals(nUp(parseDims("letter"), { w: 5.5, h: 8.5 }), 2); // 11/5.5 = 2 exactly
-  assertEquals(nUp(parseDims("letter"), { w: 6, h: 8.5 }), 0); // only 1 fits
-  assertEquals(nUp(parseDims("letter"), { w: 4, h: 9 }), 0); // too tall
+  const cells = (
+    sheet: { w: number; h: number },
+    page: { w: number; h: number },
+  ) => {
+    const g = gridFor(sheet, page);
+    return g === null ? null : [g.cols, g.rows];
+  };
+  assertEquals(cells(legal, { w: 3.5, h: 8.5 }), [4, 1]); // spec §7.7 example
+  assertEquals(cells(legal, { w: 5.5, h: 8.5 }), [2, 1]); // spec §7.7 example
+  assertEquals(cells(legal, { w: 4.5, h: 8.5 }), [2, 1]); // floor(14/4.5)=3 → 2
+  assertEquals(cells(legal, { w: 4.25, h: 7 }), [2, 2]); // quartered
+  assertEquals(cells(parseDims("letter"), { w: 5.5, h: 8.5 }), [2, 1]); // 11/5.5 exactly
+  assertEquals(cells(parseDims("letter"), { w: 6, h: 8.5 }), null); // only 1 fits
+  // Too tall to sit across letter's long side, but it fits 2-up down the short
+  // one — a page the single-row rule used to reject outright.
+  assertEquals(cells(parseDims("letter"), { w: 4, h: 9 }), [2, 1]);
 });
 
 const LEGAL = parseDims("legal");
@@ -115,4 +125,51 @@ Deno.test("impose: page too wide for 2-up is a configuration error", () => {
     Error,
     "page 8×8.5in does not fit 2-up on sheet 8.5×14in",
   );
+});
+
+// ---------- quartered sheets (2 columns × 2 rows) ----------
+
+const QUARTER: ImposeConfig = {
+  ...base,
+  page: { w: 4.25, h: 7 }, // legal halved on both sides
+  folios: 4,
+};
+
+Deno.test("impose: a quartered sheet stacks two folios, one per row", () => {
+  const r = impose(16, QUARTER);
+  assertEquals([r.nUp, r.cols, r.rows], [4, 2, 2]);
+  assertEquals(r.sheet, { w: 8.5, h: 14 }); // portrait: long side runs down
+  assertEquals(r.sheetsPerSignature, 2);
+  // Row-major: row 0 is folio 1 [16|1], row 1 is folio 2 [14|3].
+  assertEquals(pages(r.sheets[0]!.front), [16, 1, 14, 3]);
+  assertEquals(r.sheets[0]!.front.map((s) => s.folio), [1, 1, 2, 2]);
+  assertEquals(pages(r.sheets[1]!.front), [12, 5, 10, 7]);
+});
+
+Deno.test("impose: on a portrait sheet it is long-edge that mirrors columns", () => {
+  // Turning about a left/right edge mirrors columns, and on a portrait sheet
+  // those are the long edges — the opposite of the 2-up landscape case.
+  const r = impose(16, { ...QUARTER, duplex: "long-edge" });
+  // Each row keeps its folio and its own rows: folio 1 backs to [2|15].
+  assertEquals(pages(r.sheets[0]!.back), [2, 15, 4, 13]);
+  assertEquals(r.sheets[0]!.back.map((s) => s.folio), [1, 1, 2, 2]);
+  assertEquals(r.sheets[0]!.back.every((s) => s.rotate === 0), true);
+  // Page 2 must land behind page 1: back column 0 sits behind front column 1.
+  assertEquals(pages(r.sheets[0]!.front), [16, 1, 14, 3]);
+});
+
+Deno.test("impose: short-edge on a portrait sheet mirrors rows instead", () => {
+  const r = impose(16, { ...QUARTER, duplex: "short-edge" });
+  // The column-mirroring layout rotated 180° as a whole — rows swap, and every
+  // slot turns with the sheet.
+  assertEquals(pages(r.sheets[0]!.back), [13, 4, 15, 2]);
+  assertEquals(r.sheets[0]!.back.map((s) => s.folio), [2, 2, 1, 1]);
+  assertEquals(r.sheets[0]!.back.every((s) => s.rotate === 180), true);
+});
+
+Deno.test("impose: a quartered sheet wastes a folio slot on an odd count", () => {
+  const r = impose(12, { ...QUARTER, folios: 3 });
+  assertEquals(r.sheetsPerSignature, 2);
+  assertEquals(r.wastedFolioSlots, 1);
+  assertEquals(pages(r.sheets[1]!.front), [8, 5, null, null]);
 });

@@ -9,14 +9,23 @@ import {
   sidesFor,
 } from "./print-export.ts";
 
-const geom = { sheet: parseDims("legal"), page: { w: 3.5, h: 8.5 }, nUp: 4 };
+const page = { w: 3.5, h: 8.5 };
 const imp = impose(8, {
   folios: 2,
-  sheet: geom.sheet,
-  page: geom.page,
+  sheet: parseDims("legal"),
+  page,
   duplex: "short-edge",
   flip: "short-edge",
 });
+// Derived from the imposition, exactly as exportBook does it, so the sheet
+// orientation and grid can never drift from what the slots were laid out for.
+const geom = {
+  sheet: imp.sheet,
+  page,
+  nUp: imp.nUp,
+  cols: imp.cols,
+  rows: imp.rows,
+};
 
 Deno.test("sidesFor: duplex interleaves front/back per sheet; fronts/backs split; backs can reverse", () => {
   const two = impose(8, {
@@ -394,4 +403,28 @@ Deno.test("exportBook --edition: uses that edition's page size and writes under 
   } finally {
     await Deno.remove(root, { recursive: true });
   }
+});
+
+Deno.test("buildSheetPdf: a quartered setup prints a portrait sheet, 2 × 2", async () => {
+  const qpage = { w: 4.25, h: 7 }; // legal halved on both sides
+  const q = impose(16, {
+    folios: 4,
+    sheet: parseDims("legal"),
+    page: qpage,
+    duplex: "long-edge",
+    flip: "short-edge",
+  });
+  const bytes = await buildSheetPdf(sidesFor(q, "duplex", false), {
+    sheet: q.sheet,
+    page: qpage,
+    nUp: q.nUp,
+    cols: q.cols,
+    rows: q.rows,
+  }, null);
+  const doc = await PDFDocument.load(bytes);
+  // Portrait, at the sheet's real dimensions — not the landscape 2-up shape.
+  assertEquals(doc.getPage(0).getSize(), { width: 8.5 * 72, height: 14 * 72 });
+  // Four sides for two sheets, and the grid tiles the sheet with nothing over.
+  assertEquals(doc.getPageCount(), 4);
+  assertEquals([q.cols * qpage.w, q.rows * qpage.h], [8.5, 14]);
 });

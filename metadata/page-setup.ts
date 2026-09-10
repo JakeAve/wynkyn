@@ -109,77 +109,159 @@ export function fmtDims(d: Dims): string {
   return `${+d.w.toFixed(2)}×${+d.h.toFixed(2)}in`;
 }
 
+export interface Grid {
+  cols: number; // book pages across a sheet side; always even (2 per folio)
+  rows: number; // rows of pages down the sheet, one folio per pair per row
+  sheet: Dims; // the sheet in the orientation this grid lays out
+}
+
+const EPS = 1e-9; // "11/5.5" style exact fits must count
+
+function gridIn(sheet: Dims, page: Dims): Grid | null {
+  const across = Math.floor(sheet.w / page.w + EPS);
+  const cols = across - (across % 2); // odd pages can't be folded into folios
+  const rows = Math.floor(sheet.h / page.h + EPS);
+  if (cols < 2 || rows < 1) return null;
+  return { cols, rows, sheet };
+}
+
 /**
- * Book pages across one sheet side: the largest even n with n·page.w ≤ the
- * sheet's long side and page.h ≤ its short side (§7.7). 0 when none fits.
+ * How book pages tile one side of a sheet (§7.7): `cols` across by `rows` down,
+ * in whichever sheet orientation fits more of them. Null when two pages do not
+ * fit either way.
+ *
+ * A row of pages is cut apart and each pair folded down its center, so rows > 1
+ * means a horizontal cut before folding — the folds themselves stay vertical
+ * and parallel to the spine, which is what §8 rules out changing.
  */
-export function nUp(sheet: Dims, page: Dims): number {
+export function gridFor(sheet: Dims, page: Dims): Grid | null {
   const long = Math.max(sheet.w, sheet.h);
   const short = Math.min(sheet.w, sheet.h);
-  const EPS = 1e-9; // "11/5.5" style exact fits must count
-  if (page.h > short + EPS) return 0;
-  const n = Math.floor(long / page.w + EPS);
-  return n - (n % 2);
+  const landscape = gridIn({ w: long, h: short }, page);
+  const portrait = gridIn({ w: short, h: long }, page);
+  if (!landscape) return portrait;
+  if (!portrait) return landscape;
+  // Ties go to the single-row landscape layout: fewer cuts, and it keeps every
+  // setup that predates 2-D grids laid out exactly as it was.
+  const gain = portrait.cols * portrait.rows - landscape.cols * landscape.rows;
+  return gain > 0 ? portrait : landscape;
+}
+
+/** True when `grid` lays the sheet out with its long side across. */
+export function isLandscape(grid: Grid): boolean {
+  return grid.sheet.w >= grid.sheet.h;
 }
 
 // ---------- setup presets ----------
 
-// A setup is a sheet plus how many book pages sit across one side of it: the
-// page size follows from those two, so the presets never carry stale arithmetic.
-// Only even counts are meaningful (§7.7: n/2 folios per sheet).
+// A setup is a sheet plus the grid of book pages on one side of it: the page
+// size follows from those, so the presets never carry stale arithmetic. Halving
+// means one fold (2 × 1); quartering means one cut and two folds (2 × 2), which
+// halves both sides of the sheet and so keeps its proportions.
 interface SetupSpec {
   id: string;
   name: string;
   sheet: string;
-  across: number;
+  cols: number;
+  rows: number;
 }
 
 const SETUP_SPECS: SetupSpec[] = [
-  { id: "half-letter", name: "Half letter", sheet: "letter", across: 2 },
-  { id: "quarter-letter", name: "Quarter letter", sheet: "letter", across: 4 },
-  { id: "half-legal", name: "Half legal", sheet: "legal", across: 2 },
-  { id: "quarter-legal", name: "Quarter legal", sheet: "legal", across: 4 },
-  { id: "half-tabloid", name: "Half tabloid", sheet: "tabloid", across: 2 },
+  { id: "half-letter", name: "Half letter", sheet: "letter", cols: 2, rows: 1 },
+  {
+    id: "quarter-letter",
+    name: "Quarter letter",
+    sheet: "letter",
+    cols: 2,
+    rows: 2,
+  },
+  { id: "half-legal", name: "Half legal", sheet: "legal", cols: 2, rows: 1 },
+  {
+    id: "quarter-legal",
+    name: "Quarter legal",
+    sheet: "legal",
+    cols: 2,
+    rows: 2,
+  },
+  {
+    id: "half-tabloid",
+    name: "Half tabloid",
+    sheet: "tabloid",
+    cols: 2,
+    rows: 1,
+  },
   {
     id: "quarter-tabloid",
     name: "Quarter tabloid",
     sheet: "tabloid",
-    across: 4,
+    cols: 2,
+    rows: 2,
   },
-  { id: "a3-folded", name: "A3 folded (A4 pages)", sheet: "A3", across: 2 },
-  { id: "a4-folded", name: "A4 folded (A5 pages)", sheet: "A4", across: 2 },
-  { id: "a4-quartered", name: "A4 quartered", sheet: "A4", across: 4 },
-  { id: "a5-folded", name: "A5 folded (A6 pages)", sheet: "A5", across: 2 },
+  {
+    id: "a3-folded",
+    name: "A3 folded (A4 pages)",
+    sheet: "A3",
+    cols: 2,
+    rows: 1,
+  },
+  {
+    id: "a4-folded",
+    name: "A4 folded (A5 pages)",
+    sheet: "A4",
+    cols: 2,
+    rows: 1,
+  },
+  {
+    id: "a4-quartered",
+    name: "A4 quartered (A6 pages)",
+    sheet: "A4",
+    cols: 2,
+    rows: 2,
+  },
+  {
+    id: "a5-folded",
+    name: "A5 folded (A6 pages)",
+    sheet: "A5",
+    cols: 2,
+    rows: 1,
+  },
 ];
 
 export interface SetupPreset {
   id: string;
-  label: string; // "Quarter legal — 3.5in × 8.5in, 4-up on legal"
+  label: string; // "Quarter legal — 4.25in × 7in, 4-up on legal (2 × 2)"
   sheet: string;
   size: string;
-  across: number;
+  cols: number;
+  rows: number;
 }
 
-/** The book page a sheet yields when `across` of them sit side by side. */
-export function pageForSheet(sheet: Dims, across: number): Dims {
-  return {
-    w: Math.max(sheet.w, sheet.h) / across,
-    h: Math.min(sheet.w, sheet.h),
-  };
+/**
+ * The book page a sheet yields under a `cols` × `rows` grid. A single row runs
+ * across the sheet's long side; stacked rows run down it, which is what makes a
+ * quartered page a scaled-down sheet rather than a strip of one.
+ */
+export function pageForSheet(sheet: Dims, cols: number, rows: number): Dims {
+  const long = Math.max(sheet.w, sheet.h);
+  const short = Math.min(sheet.w, sheet.h);
+  const [w, h] = rows === 1 ? [long, short] : [short, long];
+  return { w: w / cols, h: h / rows };
 }
 
 function toPreset(spec: SetupSpec): SetupPreset {
   const unit = unitOf(spec.sheet);
-  const leaf = pageForSheet(parseDims(spec.sheet), spec.across);
+  const leaf = pageForSheet(parseDims(spec.sheet), spec.cols, spec.rows);
   const size = `${floorLength(leaf.w, unit)} ${floorLength(leaf.h, unit)}`;
+  const grid = spec.rows === 1 ? "" : ` (${spec.cols} × ${spec.rows})`;
   return {
     id: spec.id,
-    label: `${spec.name} — ${
-      size.replace(" ", " × ")
-    }, ${spec.across}-up on ${spec.sheet}`,
+    label: `${spec.name} — ${size.replace(" ", " × ")}, ${
+      spec.cols * spec.rows
+    }-up on ${spec.sheet}${grid}`,
     sheet: spec.sheet,
     size,
-    across: spec.across,
+    cols: spec.cols,
+    rows: spec.rows,
   };
 }
 
@@ -227,13 +309,16 @@ interface PageSetupCommon {
   unit: Unit;
   preset: SetupPreset | null;
   // Derived. All zero when the setup is unusable — callers show `error` instead.
-  nUp: number; // book pages across one sheet side
+  nUp: number; // book pages on one sheet side = cols × rows
+  cols: number; // pages across the sheet
+  rows: number; // rows of pages down it; > 1 means a cut before folding
+  landscape: boolean; // whether the sheet prints with its long side across
   foliosPerSheet: number;
   cutsPerSheet: number;
   sheetsPerSignature: number;
   pagesPerSignature: number;
-  slackAcross: number; // inches of sheet left over across the long side
-  slackDown: number; // inches left over down the short side
+  slackAcross: number; // inches of sheet left over across the printed width
+  slackDown: number; // inches left over down the printed height
 }
 
 /**
@@ -250,6 +335,9 @@ export type PageSetup =
 
 const EMPTY = {
   nUp: 0,
+  cols: 0,
+  rows: 0,
+  landscape: true,
   foliosPerSheet: 0,
   cutsPerSheet: 0,
   sheetsPerSignature: 0,
@@ -304,27 +392,33 @@ export function resolvePageSetup(
       `duplex must be short-edge, long-edge, or none (got "${duplex}")`,
     );
   }
-  const n = nUp(sheetDims, pageDims);
-  if (n < 2) {
+  const grid = gridFor(sheetDims, pageDims);
+  if (!grid) {
     return fail(
       `a ${fmtDims(pageDims)} page does not fit two-up on a ${
         fmtDims(sheetDims)
       } sheet`,
     );
   }
-  const foliosPerSheet = n / 2;
+  const { cols, rows } = grid;
+  // One folio per column pair per row. The cut count is the same whichever way
+  // the pieces are separated: (rows − 1) across plus rows × (cols/2 − 1) down.
+  const foliosPerSheet = rows * (cols / 2);
   return {
     ...base,
     page: pageDims, // re-stated so the `error: null` branch keeps non-null dims
     sheetDims,
     error: null,
-    nUp: n,
+    nUp: cols * rows,
+    cols,
+    rows,
+    landscape: isLandscape(grid),
     foliosPerSheet,
     cutsPerSheet: foliosPerSheet - 1,
     sheetsPerSignature: Math.ceil(folios / foliosPerSheet),
     pagesPerSignature: folios * 4,
-    slackAcross: Math.max(sheetDims.w, sheetDims.h) - n * pageDims.w,
-    slackDown: Math.min(sheetDims.w, sheetDims.h) - pageDims.h,
+    slackAcross: grid.sheet.w - cols * pageDims.w,
+    slackDown: grid.sheet.h - rows * pageDims.h,
   };
 }
 

@@ -2,8 +2,8 @@ import { assert, assertEquals, assertFalse } from "@std/assert";
 import {
   describePageSetup,
   fmtLength,
+  gridFor,
   isValidSize,
-  nUp,
   pageForSheet,
   parseDims,
   resolvePageSetup,
@@ -28,18 +28,34 @@ Deno.test("isValidSize matches the value space parseDims accepts", () => {
   assertFalse(isValidSize("5.5 8.5")); // unitless
 });
 
-Deno.test("nUp: largest even count that fits, 0 when two do not", () => {
-  assertEquals(nUp(parseDims("legal"), { w: 3.5, h: 8.5 }), 4);
-  assertEquals(nUp(parseDims("legal"), { w: 7, h: 8.5 }), 2); // exact fit counts
-  assertEquals(nUp(parseDims("legal"), { w: 5, h: 8.5 }), 2); // 2.8 rounds down to 2
-  assertEquals(nUp(parseDims("letter"), { w: 6, h: 9 }), 0); // too tall for the short side
+Deno.test("gridFor: even columns, the orientation that fits the most pages", () => {
+  const grid = (sheet: string, w: number, h: number) => {
+    const g = gridFor(parseDims(sheet), { w, h });
+    return g === null ? null : [g.cols, g.rows, g.sheet.w > g.sheet.h];
+  };
+  // One row across the long side — unchanged by the move to a 2-D grid.
+  assertEquals(grid("legal", 7, 8.5), [2, 1, true]); // exact fit counts
+  assertEquals(grid("legal", 5, 8.5), [2, 1, true]); // 2.8 columns rounds to 2
+  assertEquals(grid("legal", 3.5, 8.5), [4, 1, true]); // 4 across, still one row
+  // Quartering: both sides halved, so the sheet turns portrait and stacks rows.
+  assertEquals(grid("legal", 4.25, 7), [2, 2, false]);
+  assertEquals(grid("letter", 4.25, 5.5), [2, 2, false]);
+  // A tie goes to the single row: 2.75×5.5 on letter is 4-up either as 4×1
+  // landscape or 2×2 portrait, and the single row needs no cut across.
+  assertEquals(grid("letter", 2.75, 5.5), [4, 1, true]);
+  assertEquals(grid("letter", 6, 9), null); // fits neither way
 });
 
 Deno.test("every named setup round-trips to its own page count", () => {
   for (const preset of SETUP_PRESETS) {
     const setup = resolvePageSetup({ size: preset.size, sheet: preset.sheet });
     assertEquals(setup.error, null, `${preset.id}: ${setup.error}`);
-    assertEquals(setup.nUp, preset.across, `${preset.id} pages across`);
+    assertEquals(
+      setup.nUp,
+      preset.cols * preset.rows,
+      `${preset.id} pages per sheet side`,
+    );
+    assertEquals([setup.cols, setup.rows], [preset.cols, preset.rows]);
     assertEquals(setup.preset?.id, preset.id, `${preset.id} matches itself`);
     // Derived sizes must never round up past the sheet they came from.
     assert(
@@ -49,20 +65,38 @@ Deno.test("every named setup round-trips to its own page count", () => {
   }
 });
 
-Deno.test("pageForSheet divides the long side, keeps the short one", () => {
-  assertEquals(pageForSheet(parseDims("legal"), 4), { w: 3.5, h: 8.5 });
-  assertEquals(pageForSheet(parseDims("letter"), 2), { w: 5.5, h: 8.5 });
+Deno.test("pageForSheet: one row splits the long side, rows halve both", () => {
+  assertEquals(pageForSheet(parseDims("legal"), 2, 1), { w: 7, h: 8.5 });
+  assertEquals(pageForSheet(parseDims("letter"), 2, 1), { w: 5.5, h: 8.5 });
+  // Quartering keeps the sheet's proportions — that is what makes it a quarter
+  // rather than a strip: legal 8.5×14 → 4.25×7, the same 1.647 ratio.
+  assertEquals(pageForSheet(parseDims("legal"), 2, 2), { w: 4.25, h: 7 });
+  assertEquals(pageForSheet(parseDims("letter"), 2, 2), { w: 4.25, h: 5.5 });
+});
+
+Deno.test("quarter presets halve the sheet and keep its aspect ratio", () => {
+  for (const preset of SETUP_PRESETS.filter((p) => p.rows === 2)) {
+    const sheet = parseDims(preset.sheet);
+    const page = parseDims(preset.size);
+    const ratio = (d: { w: number; h: number }) =>
+      Math.max(d.w, d.h) / Math.min(d.w, d.h);
+    assert(
+      Math.abs(ratio(sheet) - ratio(page)) < 0.005,
+      `${preset.id}: sheet ${ratio(sheet)} vs page ${ratio(page)}`,
+    );
+  }
 });
 
 Deno.test("resolvePageSetup derives the whole imposition", () => {
   const s = resolvePageSetup({
-    size: "3.5in 8.5in",
+    size: "4.25in 7in",
     sheet: "legal",
     "folios-per-signature": 4,
     duplex: "long-edge",
   });
   assertEquals(s.error, null);
-  assertEquals(s.nUp, 4);
+  assertEquals([s.nUp, s.cols, s.rows], [4, 2, 2]); // quartered: cut once, fold twice
+  assertEquals(s.landscape, false); // both sides halved, so the sheet prints portrait
   assertEquals(s.foliosPerSheet, 2);
   assertEquals(s.cutsPerSheet, 1);
   assertEquals(s.sheetsPerSignature, 2);
@@ -71,6 +105,16 @@ Deno.test("resolvePageSetup derives the whole imposition", () => {
   assertEquals(s.slackAcross, 0);
   assertEquals(s.slackDown, 0);
   assertEquals(s.preset?.id, "quarter-legal");
+});
+
+Deno.test("resolvePageSetup still lays strips out in one landscape row", () => {
+  // 3.5×8.5 on legal is 4-up as four strips across — a valid custom setup, but
+  // no longer one of the named ones, which quarter the sheet instead.
+  const s = resolvePageSetup({ size: "3.5in 8.5in", sheet: "legal" });
+  assertEquals([s.nUp, s.cols, s.rows], [4, 4, 1]);
+  assertEquals(s.landscape, true);
+  assertEquals(s.foliosPerSheet, 2);
+  assertEquals(s.preset, null);
 });
 
 Deno.test("resolvePageSetup applies §4.3 defaults and flag overrides", () => {
@@ -119,9 +163,13 @@ Deno.test("resolvePageSetup never throws; every bad input names itself", () => {
 });
 
 Deno.test("setupPresetFor recognizes a setup however its sizes are spelled", () => {
-  assertEquals(setupPresetFor("3.5in 8.5in", "legal")?.id, "quarter-legal");
-  assertEquals(setupPresetFor("88.9mm 215.9mm", "legal")?.id, "quarter-legal");
-  assertEquals(setupPresetFor("3.5in 8.5in", "letter"), null);
+  assertEquals(setupPresetFor("4.25in 7in", "legal")?.id, "quarter-legal");
+  assertEquals(
+    setupPresetFor("107.95mm 177.8mm", "legal")?.id,
+    "quarter-legal",
+  );
+  assertEquals(setupPresetFor("7in 8.5in", "legal")?.id, "half-legal");
+  assertEquals(setupPresetFor("4.25in 7in", "letter"), null);
   assertEquals(setupPresetFor(undefined, "legal"), null);
 });
 
