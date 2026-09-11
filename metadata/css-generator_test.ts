@@ -23,6 +23,15 @@ Deno.test("nested page-type elements become descendant selectors", () => {
   assertStringIncludes(css, "font-size: 26pt;");
 });
 
+Deno.test("a nested em styles the emphasis element, not an .em class (§4.5)", () => {
+  const css = generateDomCSS({
+    elements: {
+      "title-page": { subtitle: { em: { "font-style": "normal" } } },
+    },
+  });
+  assertStringIncludes(css, ".matter-title-page .subtitle em {");
+});
+
 Deno.test("flat and nested props may mix on one key", () => {
   const css = generateDomCSS({
     elements: {

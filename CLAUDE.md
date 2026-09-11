@@ -21,7 +21,9 @@ themselves on the next save.
 - `metadata/` metadata.json → CSS (`generateDomCSS/PagedCSS/FontLinks`);
   `page-setup.ts` resolves the `page` section (page + sheet + signature, spec
   §4.3) into the derived imposition, shared with `web/` and print export
-- `renderer/` tree → HTML body (`render(doc, opts)`), `base.css`
+- `renderer/` tree → HTML body (`render(doc, opts)`), `base.css`; `plates.js` is
+  the one Paged.js handler (full-page illustrations as plates), inlined by
+  `toHtml` and imported by `web/src/app.ts`
 - `server/` `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket,
   watches book files)
 - `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored).

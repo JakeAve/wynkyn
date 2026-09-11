@@ -81,8 +81,10 @@ function emitStyle(
   }
   if (Object.keys(flat).length) out.push(rule(selector, flat, fonts));
   for (const [sub, subStyle] of nested) {
+    // `em` is the emphasis element ({em}, §3.2.7); every other key a class.
+    const part = sub === "em" ? "em" : `.${sub}`;
     emitStyle(
-      selector.split(", ").map((s) => `${s} .${sub}`).join(", "),
+      selector.split(", ").map((s) => `${s} ${part}`).join(", "),
       subStyle,
       fonts,
       out,

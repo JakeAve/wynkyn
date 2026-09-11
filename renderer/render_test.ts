@@ -181,6 +181,28 @@ Deno.test("ref renders as an empty anchor for target-counter (§3.8)", () => {
   assertStringIncludes(html, '<a class="ref" href="#thaw"></a>');
 });
 
+Deno.test("title page: publisher, place and year render last, together in .imprint (§3.4.2)", () => {
+  const html = render(parse(
+    [
+      "{matter: title-page}",
+      "{title}",
+      "The Book",
+      "{publisher}",
+      "Thornfield Press",
+      "{publisher-location}",
+      "Edinburgh",
+      "{author}",
+      "Jane Ellory",
+      "{year}",
+      "2024",
+    ].join("\n"),
+  ));
+  assertStringIncludes(
+    html,
+    '<p class="author">Jane Ellory</p><div class="imprint"><p class="publisher">Thornfield Press</p><p class="publisher-location">Edinburgh</p><p class="year">2024</p></div></section>',
+  );
+});
+
 const TOC_BOOK = [
   "{matter: title-page}",
   "{title}",
