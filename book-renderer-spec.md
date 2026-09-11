@@ -391,6 +391,10 @@ Edinburgh
 2024
 ```
 
+The renderer gathers `{publisher}`, `{publisher-location}` and `{year}` into one
+`imprint` block after the rest of the title page, keeping their source order;
+`title-page.imprint` styles it (§4.5).
+
 For multiple authors, repeat `{author}`:
 
 ```
@@ -1199,7 +1203,9 @@ becomes a descendant selector (`toc → toc-part → number` is
 `.matter-toc .toc-part .number`). One property is special: `content` on
 `toc.leader` is emitted as the `--leader` custom property that the base
 stylesheet repeats across the row (§4.5 recipes); everywhere else `content` sets
-the element's `::before`, as for `break`.
+the element's `::before`, as for `break`. One sub-element key is special: `em`
+styles the emphasis element (§3.2.7) inside its parent, so
+`title-page → subtitle → em` is `.matter-title-page .subtitle em`.
 
 ```json
 "elements": {

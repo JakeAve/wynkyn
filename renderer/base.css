@@ -166,3 +166,12 @@
 .bml .matter-epigraph {
   page: display;
 }
+/* Title and copyright pages set lines, not prose: no paragraph indent, and a
+   title page is centred unless the book says otherwise. :where() keeps these
+   under any two-class override from metadata. */
+.bml :where(.matter-title-page, .matter-copyright) p {
+  text-indent: 0;
+}
+.bml :where(.matter-title-page) {
+  text-align: center;
+}

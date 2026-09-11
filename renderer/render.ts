@@ -490,6 +490,10 @@ function matterId(m: MatterBlock): string {
   return `matter-${m.type}${m.label ? `-${m.label.toLowerCase()}` : ""}`;
 }
 
+// A title page's publisher, place and year form one imprint block, set after
+// the rest of the page (§3.4.2).
+const IMPRINT = new Set(["publisher", "publisher-location", "year"]);
+
 function renderMatter(
   m: MatterBlock,
   doc: BmlDocument,
@@ -511,8 +515,18 @@ function renderMatter(
     }
   }
   return renderBlockWithNotes(m.children, opts, (ctx) => {
-    const inner = renderChildren(m.children, ctx, opts);
-    return `${open}${inner}</section>`;
+    if (m.type !== "title-page") {
+      return `${open}${renderChildren(m.children, ctx, opts)}</section>`;
+    }
+    const inImprint = (c: ContentNode) =>
+      c.kind === "component" && IMPRINT.has(c.name);
+    const imprint = m.children.filter(inImprint);
+    const rest = m.children.filter((c) => !inImprint(c));
+    return `${open}${renderChildren(rest, ctx, opts)}${
+      imprint.length
+        ? `<div class="imprint">${renderChildren(imprint, ctx, opts)}</div>`
+        : ""
+    }</section>`;
   });
 }
 
