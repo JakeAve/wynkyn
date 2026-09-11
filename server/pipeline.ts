@@ -15,6 +15,9 @@ import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 const BASE_CSS = await Deno.readTextFile(
   new URL("../renderer/base.css", import.meta.url),
 );
+const PLATES_JS = await Deno.readTextFile(
+  new URL("../renderer/plates.js", import.meta.url),
+);
 
 // spec §4.11 item 8: try these in order for each {illustration:}/{dropcap|image:} slug.
 const IMAGE_EXT_ORDER = ["svg", "png", "jpg", "jpeg", "webp"];
@@ -42,6 +45,7 @@ ${b.fontLinks}
 <style>${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
 <script>window.PagedConfig = { after() { document.documentElement.dataset.paged = "done"; } };</script>
 <script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js"></script>
+<script>${PLATES_JS}</script>
 </head><body>${b.html}</body></html>`;
 }
 

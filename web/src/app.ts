@@ -29,6 +29,7 @@ import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
 import { editionHref, editionLabel, slugify } from "./editions.ts";
+import "../../renderer/plates.js"; // registers the Paged.js plate handler
 
 const PARSE_DEBOUNCE_MS = 250;
 const SAVE_DEBOUNCE_MS = 600;

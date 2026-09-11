@@ -708,6 +708,11 @@ The Voronin district, showing field boundaries
 Valid placement values: `inline`, `half-page`, `full-page`, `full-spread`,
 `margin`
 
+`full-page` makes the illustration a plate: it goes on a page of its own right
+after the page where its sentinel falls, centred in the text block and shrunk to
+fit, with no running head or folio. The text keeps filling whole pages around
+it, even when that splits a paragraph across the plate (`renderer/plates.js`).
+
 If no placement is specified, the renderer decides:
 
 ```
