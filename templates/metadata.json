@@ -6,7 +6,9 @@
       "bottom": "22mm",
       "inside": "22mm",
       "outside": "16mm"
-    }
+    },
+    "sheet": "legal",
+    "folios-per-signature": 4
   },
   "fonts": {
     "body": "Crimson Pro",
@@ -120,7 +122,7 @@
       "line-height": "0.82"
     },
     "break": {
-      "content": "•"
+      "content": "\u2022"
     },
     "pullquote": {
       "font-size": "13pt",
@@ -208,10 +210,6 @@
         "font-style": "italic"
       }
     ]
-  },
-  "print": {
-    "sheet-size": "legal",
-    "folios-per-signature": 4
   },
   "notes": {
     "placement": "endnote"

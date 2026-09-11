@@ -48,6 +48,8 @@ parser/
 metadata/
   types.ts            — Metadata schema types (see §4)
   loader.ts           — loadMetadata(bookDir): Promise<Metadata | null>
+  upgrade.ts          — on-load schema upgrades for books written against an older shape
+  page-setup.ts       — page/sheet geometry and the named setups (see §4.3); shared with web/
   css-generator.ts     — generatePagedCSS / generateDomCSS / generateFontLinks (see §5.2)
   css-generator_test.ts
 
@@ -86,13 +88,14 @@ document (§3). The user previews their book layout identical to how it will
 appear in print. Once the document is ready, the user prints using a specified
 number of folios per signature. The "sheet" and "page" are not necessarily 1:1 —
 how many book pages fit on each sheet side is derived from the sheet and
-book-page dimensions (§7.7). A 3.5in-wide book page on US Legal prints 4-up (8
-book pages per duplex sheet); a 5.5in-wide page on the same sheet prints 2-up (4
-book pages per sheet). All folds are vertical, parallel to the spine: a 2-up
-sheet is folded once at its center, while a 4-up sheet is first cut at its
-vertical center and each half is then folded. Every folded piece is a **folio**
-— 2 leaves, 4 book pages — and folios nest inside one another to form
-signatures. This is the only binding style in scope for v1 (see §8, Non-Goals).
+book-page dimensions (§7.7). A 4.25in × 7in book page quarters US Legal and
+prints 4-up (8 book pages per duplex sheet); a 5.5in × 8.5in page on the same
+sheet prints 2-up (4 book pages per sheet). All folds are vertical, parallel to
+the spine: a 2-up sheet is folded once at its center, while a 4-up sheet is
+first cut — across or down, whichever the grid calls for — and each piece is
+then folded. Every folded piece is a **folio** — 2 leaves, 4 book pages — and
+folios nest inside one another to form signatures. This is the only binding
+style in scope for v1 (see §8, Non-Goals).
 
 ---
 
@@ -461,11 +464,11 @@ Contents
 ```
 
 When the block holds nothing but a `{title}`, the renderer generates the
-contents from the document tree (§4.11 item 10): front matter that has a
+contents from the document tree (§4.10 item 10): front matter that has a
 `{title}` (except the display pages — half-title, title page, copyright,
 dedication, epigraph, and the contents itself), every part and chapter with its
 number when `numbering` shows one and its `{subtitle}` if present, level-1
-headings that carry a slug when metadata `toc.headings` is `true` (§4.12), and
+headings that carry a slug when metadata `toc.headings` is `true` (§4.11), and
 back matter that has a `{title}`. An untitled chapter lists as its number alone,
 or its slug if numbers are off. Page numbers come from `target-counter()`;
 front- and back-matter rows use their zone's page-number style (§4.7), so a
@@ -853,7 +856,7 @@ leading `\` (§3.2.8).
 The footnote anchor sits inline in the prose, immediately after the word or
 punctuation it attaches to, with no space. The note content lives separately
 with a matching slug. Whether notes render as footnotes or endnotes is a
-rendering decision (configured in `metadata.json`, §4.10). The anchor and its
+rendering decision (configured in `metadata.json`, §4.9). The anchor and its
 note may appear anywhere within the same structural block — the enclosing
 chapter or matter block — so front and back matter can carry notes too. The slug
 is the link between them.
@@ -1093,7 +1096,6 @@ books/
   "is": { ... },
   "numbering": { ... },
   "running": { ... },
-  "print": { ... },
   "notes": { ... },
   "toc": { ... }
 }
@@ -1101,26 +1103,65 @@ books/
 
 ### 4.3 Section: `page`
 
-Controls the physical page canvas.
+The physical setup of the edition: the book page, the sheet it is printed on,
+and how those sheets fold into signatures. These are one decision, not two — a
+page size only means something against the paper it has to tile — so they live
+in one section.
 
 ```json
 "page": {
-  "size": "5.5in 8.5in",
+  "size": "3.5in 8.5in",
   "margins": {
-    "top": "18mm",
-    "bottom": "22mm",
-    "inside": "22mm",
-    "outside": "16mm"
-  }
+    "top": "12mm",
+    "bottom": "14mm",
+    "inside": "14mm",
+    "outside": "10mm"
+  },
+  "sheet": "legal",
+  "folios-per-signature": 4,
+  "duplex": "short-edge"
 }
 ```
 
-- `size` accepts any value valid in CSS `@page { size: ... }`: named sizes
-  (`"A5"`, `"A4"`, `"letter"`) or explicit dimensions (`"5.5in 8.5in"`,
-  `"148mm 210mm"`). This handles half-letter, quarter-legal, and any custom trim
-  size.
-- Margins use `inside`/`outside` rather than `left`/`right` so the renderer can
-  mirror them correctly for verso/recto pages.
+- `size` — the book page, and the only part of this section the preview sees.
+  Accepts any value valid in CSS `@page { size: ... }`: named sizes (`"A5"`,
+  `"A4"`, `"letter"`) or explicit dimensions (`"5.5in 8.5in"`, `"148mm 210mm"`).
+  This handles half-letter, quarter-legal, and any custom size.
+- `margins` use `inside`/`outside` rather than `left`/`right` so the renderer
+  can mirror them correctly for verso/recto pages. The fore edge of a folded
+  signature is trimmed by hand after binding; compensate for that here rather
+  than by shrinking `size`.
+- `sheet` — the physical paper the printer loads. Same value space as `size`.
+- `folios-per-signature` — signature thickness in folios (one folio = one folded
+  piece = 4 book pages, §7.7). Signature page count = `folios-per-signature`
+  × 4.
+- `duplex` — `short-edge` (book-style turn, default), `long-edge`
+  (calendar-style turn), or `none` (separate fronts/backs files). CLI flags
+  (`bml export --sheet/--folios/--duplex`) override per run.
+
+Everything else about the setup is **derived**, never stored: the grid of pages
+on a sheet side and which orientation it prints in (§7.7's `cols` × `rows`),
+folios and cuts per sheet, sheets per signature, and the leftover paper trimmed
+off after folding. `metadata/page-setup.ts` resolves a `page` section into all
+of it, and is shared by the configuration panel (§7.5) and print export (§7.7)
+so the two can never disagree. A setup whose page cannot fit two-up on its sheet
+is an error the panel shows as you pick it, and `bml export` refuses before
+rendering.
+
+The panel offers `size` and `sheet` as two independent dropdowns — there is no
+third "setup" control, because the pair already is the setup and a page that
+will not tile its sheet is reported inline as you pick it. The page-size list
+includes the folded formats (half letter, quarter legal, A5 folded, …), each
+**derived** from its sheet by `foldedSize(sheet, cols, rows)` rather than
+written out, so a named size can never drift from the paper it comes off.
+Halving folds once and splits the sheet's long side; quartering halves **both**
+of its dimensions, so a quarter legal is 4.25in × 7in — a scaled-down sheet, not
+a strip of one.
+
+> Page setup is what makes one edition different from another, so it is the lead
+> line in the edition picker. Named editions export to `export/<edition>/` and
+> render to `render.<edition>.html`; the unnamed edition keeps `export/` and
+> `render.html`. Setup always comes from the edition's own metadata.
 
 ### 4.4 Section: `fonts`
 
@@ -1385,33 +1426,7 @@ Implemented via Paged.js `string-set`/`string()` for dynamic content values
 (`book-title`, `chapter-title`, etc.). Paged.js is the single pagination engine
 for both preview and export (§5.4, §6), so no native-Chrome fallback is needed.
 
-### 4.9 Section: `print`
-
-Physical print/imposition settings, consumed only by print export (§7.7). Kept
-in `metadata.json` so a book's entire configuration lives in one file.
-
-```json
-"print": {
-  "sheet-size": "legal",
-  "folios-per-signature": 4,
-  "duplex": "short-edge"
-}
-```
-
-- `sheet-size` — the physical paper the printer loads. Same value space as
-  `page.size` (§4.3): named sizes or explicit dimensions.
-- `folios-per-signature` — signature thickness, counted in folios (one folio =
-  one folded piece = 4 book pages, §7.7). Signature page count =
-  `folios-per-signature` × 4.
-- `duplex` — `short-edge` (book-style turn, default), `long-edge`
-  (calendar-style turn), or `none` (separate fronts/backs files). CLI flags
-  (`bml export --sheet/--folios/--duplex`) override per run.
-
-> Named editions export to `export/<edition>/` and render to
-> `render.<edition>.html`; the unnamed edition keeps `export/` and
-> `render.html`. Print settings always come from the edition's own metadata.
-
-### 4.10 Section: `notes`
+### 4.9 Section: `notes`
 
 Controls how `{note:}` content (§3.6.8) is placed.
 
@@ -1424,7 +1439,7 @@ Controls how `{note:}` content (§3.6.8) is placed.
 - `placement` — `"footnote"` (bottom of the page carrying the anchor) or
   `"endnote"` (collected at the end of the enclosing chapter or matter block).
 
-### 4.11 Renderer responsibilities
+### 4.10 Renderer responsibilities
 
 When `metadata.json` is present, the renderer:
 
@@ -1452,9 +1467,9 @@ When `metadata.json` is present, the renderer:
     `target-counter()`. If the toc block contains manuscript prose, that prose
     is used verbatim instead.
 11. Places `{note:}` content as footnotes or endnotes per `notes.placement`
-    (§4.10).
+    (§4.9).
 
-### 4.12 Section: `toc`
+### 4.11 Section: `toc`
 
 What the generated contents (§3.4.6) lists beyond the structure it always lists.
 Everything _visual_ about the contents is CSS under `elements.toc` (§4.5).
@@ -1496,9 +1511,15 @@ implements the print-export half.
 
 ### 5.2 `metadata/` — styling config → CSS
 
-- `loadMetadata(bookDir: string): Promise<Metadata | null>` in `loader.ts`.
+- `loadMetadata(bookDir: string): Promise<Metadata | null>` in `loader.ts`,
+  applying `upgrade.ts`'s on-load schema upgrades so a book written against an
+  older shape keeps working and converges on the current one when next saved.
 - `Metadata` type tree in `types.ts` mirrors §4's schema one-to-one
   (`PageConfig`, `Elements`, `Numbering`, `Running`, etc.).
+- `page-setup.ts` resolves a `page` section into the full physical setup of §4.3
+  — sizes parsed, named setups matched, imposition derived, unusable
+  combinations named. Pure and free of Deno APIs so the browser-side
+  configuration panel and the print exporter share it (§7.5, §7.7).
 - `css-generator.ts` exports three functions, all consumed by both preview and
   export since Paged.js is the single pagination engine (§6):
   - `generatePagedCSS(metadata, { bookTitle }): string` — `@page`, numbering,
@@ -1662,16 +1683,19 @@ cases.
 ### 7.5 Document Configuration Panel
 
 Form UI mapped 1:1 to `metadata.json`'s `page`, `fonts`, `numbering`, `running`,
-`print`, and `notes` sections (§4.3, §4.4, §4.7–§4.10) — replacing hand-editing
-JSON for the settings that apply to the whole book rather than one sentinel
-type. Opens as a panel/overlay, not a permanent pane (§7.1). Includes:
+and `notes` sections (§4.3, §4.4, §4.7–§4.9) — replacing hand-editing JSON for
+the settings that apply to the whole book rather than one sentinel type. Opens
+as a panel/overlay, not a permanent pane (§7.1). Includes:
 
-- Book page size (named presets and custom dimensions) and margins
+- Page setup as one unit (§4.3): the book page size (named presets and custom
+  dimensions), its margins, the sheet, folios per signature and duplex — with
+  the derived imposition (pages across a sheet, folios and cuts per sheet,
+  sheets per signature, leftover paper) shown live as those change, and an
+  unprintable combination reported here rather than at export time
 - Font aliases (name → Google Fonts family, with a searchable picker)
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
-- Print setup: sheet size and folios per signature (§4.9, consumed by §7.7)
-- Note placement: footnotes vs. endnotes (§4.10)
+- Note placement: footnotes vs. endnotes (§4.9)
 
 ### 7.6 Preview Pane
 
@@ -1699,8 +1723,9 @@ manuscript is laid out at, e.g. 5.5in × 8.5in) get imposed onto physical
 "sheets" (what the printer/binder actually prints on, e.g. US Legal) for
 hand-binding.
 
-**Configuration** (from `metadata.json`'s `print` section, §4.9): `sheet-size`
-and `folios-per-signature`.
+**Configuration** (from `metadata.json`'s `page` section, §4.3): `sheet` and
+`folios-per-signature`, resolved together with `size` by
+`metadata/page-setup.ts`.
 
 **Binding model (fixed, not configurable in v1, §8).** All folds are vertical,
 parallel to the spine. A **folio** is one folded piece of paper: 2 leaves, 4
@@ -1708,23 +1733,35 @@ book pages. Folios nest inside one another to form a **signature** of
 `folios-per-signature` folios (= `folios-per-signature` × 4 book pages); the
 book is a sequence of signatures.
 
-**Layout derivation.** Book pages sit in a single row on each sheet side. The
-n-up count is derived, not configured: _n_ = the largest even number such that
-_n_ × page-width ≤ the sheet's long side and page-height ≤ the sheet's short
-side.
+**Layout derivation.** Book pages tile one side of a sheet in a grid of `cols` ×
+`rows`, derived and never configured: `cols` is the largest **even** number of
+page-widths that fit across the sheet, `rows` the number of page-heights that
+fit down it, evaluated in **both sheet orientations** with the one yielding more
+pages winning. A tie goes to the single-row landscape layout, which needs fewer
+cuts. _n_ (the "n-up" count, pages per sheet side) is `cols × rows`.
 
-- _n_ = 2 — the sheet is folded once at its center; one sheet = one folio.
-- _n_ = 4 — the sheet is cut at its vertical center, and each half is folded;
-  one sheet = two folios.
-- In general, _n_/2 folios per sheet, separated by _n_/2 − 1 cuts. _n_ = 2 and
-  _n_ = 4 are the expected v1 cases; the math generalizes but higher counts are
-  untested.
-- If _n_ < 2 (two book pages don't fit on the sheet), export fails with a clear
-  configuration error.
+Each pair of columns is one folio, so a sheet carries `rows × cols/2` folios,
+separated by `rows − 1` cuts across and `cols/2 − 1` cuts down each row —
+`rows × cols/2 − 1` cuts in all. Cutting is what a grid adds; **the folds
+themselves stay vertical and parallel to the spine**, which is what §8 rules out
+changing.
 
-Example: a 3.5in × 8.5in book page on US Legal (14in × 8.5in) gives _n_ = 4
-(cut + fold, 8 pages per duplex sheet); a 5.5in × 8.5in page on the same sheet
-gives _n_ = 2 (fold only, 4 pages per sheet).
+- 2 × 1 — the sheet is folded once at its center; one sheet = one folio.
+- 4 × 1 — the sheet is cut at its vertical center and each half folded; one
+  sheet = two folios. The page is a narrow strip of the sheet.
+- 2 × 2 (**quartering**) — the sheet is cut at its horizontal center and each
+  half folded. Both sheet dimensions are halved, so the page keeps the sheet's
+  proportions: US Legal 8.5in × 14in quarters to 4.25in × 7in, and the sheet
+  prints portrait rather than landscape.
+- 2 × 1, 4 × 1 and 2 × 2 are the expected v1 cases; the math generalizes but
+  larger grids are untested.
+- If no orientation fits two book pages, export fails with a clear configuration
+  error.
+
+Example: a 4.25in × 7in book page on US Legal quarters it (2 × 2, 8 pages per
+duplex sheet); a 3.5in × 8.5in page on the same sheet gives 4 × 1 strips (also 8
+pages, but a very different book); a 5.5in × 8.5in page gives 2 × 1 (fold only,
+4 pages per sheet).
 
 **Imposition algorithm (`server/imposition.ts`, Plan 5):**
 
@@ -1737,11 +1774,16 @@ gives _n_ = 2 (fold only, 4 pages per sheet).
    fold) and, on its back face, [2_k_ | _P_−2_k_+1] — so that folding and
    nesting reconstructs reading order. (Check, _P_ = 16: folio 1 is [16 | 1]
    front, [2 | 15] back.)
-3. Pack folios onto physical sheets, _n_/2 folios per sheet side by side.
-   Back-side layout follows `print.duplex`: `short-edge` (book-style turn on a
-   landscape sheet) mirrors the folio column order with each `[2k | P−2k+1]`
-   pair intact; `long-edge` (calendar-style turn) is that layout rotated 180° as
-   a whole.
+3. Pack folios onto physical sheets row-major, `cols/2` folios per row.
+   Back-side layout follows `page.duplex`, whose effect depends on the sheet
+   orientation the grid chose: turning the sheet about a left/right edge mirrors
+   the folio **column** order (each `[2k | P−2k+1]` pair intact), turning it
+   about a top/bottom edge mirrors the **rows** — which is that same layout
+   rotated 180° as a whole. Those left/right edges are the short ones on a
+   landscape sheet and the long ones on a portrait sheet, so `short-edge`
+   mirrors columns on a 2-up landscape job and rows on a quartered portrait one.
+   The exporter maps this; `duplex` always names the setting to pick on the
+   printer.
 4. Emit the final print file via `print-export.ts` (§5.4, §6) — one output page
    per sheet side, at the sheet's physical dimensions, with the
    already-paginated book pages positioned at their exact trim size.
@@ -1757,8 +1799,9 @@ gives _n_ = 2 (fold only, 4 pages per sheet).
 Explicitly out of scope, to bound the work below:
 
 - Binding styles other than the §7.7 model — vertical folds parallel to the
-  spine, folios nested into signatures (no horizontal folds/quarto-style
-  imposition, no perfect binding with spine text, etc.)
+  spine, folios nested into signatures (no horizontal _folds_; a quartered sheet
+  is cut across and each half folded vertically, never folded twice as a true
+  quarto, and there is no perfect binding with spine text, etc.)
 - Fonts from anywhere other than Google Fonts
 - Multi-user/collaborative real-time editing
 - Structural editing via drag-and-drop in the project tree (§7.2) — tree is
@@ -1826,14 +1869,16 @@ any time after Plan 0.
 ### Plan 3 — Document Configuration Panel
 
 - **Depends on:** Plan 1 (can run parallel to Plan 2).
-- **Goal:** §7.5 — forms over `page`, `fonts`, `numbering`, `running`, `print`,
-  and `notes`.
+- **Goal:** §7.5 — forms over `page`, `fonts`, `numbering`, `running`, and
+  `notes`.
 - **Deliverables:** panel UI reading/writing `metadata.json`'s book-wide
-  sections; live-loop re-render on save. (The `print` fields feed Plan 5's
-  export but are just more form fields here.)
-- **Definition of done:** every field in §4.3/4.4/4.7–4.10 is editable without
-  hand-touching JSON, and edits are visible in the preview immediately (print
-  fields excepted — they only affect export).
+  sections; live-loop re-render on save. (`page`'s sheet, folios and duplex feed
+  Plan 5's export; the panel resolves them alongside `size` and shows the
+  derived imposition, §4.3.)
+- **Definition of done:** every field in §4.3/4.4/4.7–4.9 is editable without
+  hand-touching JSON, and edits are visible in the preview immediately (the
+  page-setup fields that only affect export excepted — those report what they
+  derive to in the panel instead).
 
 ### Plan 4 — Sentinel Styling UI
 
@@ -1853,8 +1898,8 @@ any time after Plan 0.
 
 - **Depends on:** Plan 0 only.
 - **Goal:** §7.7 and `server/print-export.ts` (§5.4) — the imposition algorithm
-  and print-ready export, configured by `metadata.json`'s `print` section
-  (§4.9). (The form UI for those settings lives in Plan 3's config panel.)
+  and print-ready export, configured by `metadata.json`'s `page` section (§4.3).
+  (The form UI for those settings lives in Plan 3's config panel.)
 - **Deliverables:** imposition module deriving the n-up layout from sheet/page
   dimensions and computing the folio page-position mapping of §7.7, generalized
   to F folios per signature, with unit tests hand-verified against at least one
@@ -1879,7 +1924,7 @@ any time after Plan 0.
 ### Plan 7 — Table of Contents
 
 - **Depends on:** Plans 0 and 4.
-- **Goal:** §3.4.6, §4.5 (contents sub-elements and recipes), §4.12 — a
+- **Goal:** §3.4.6, §4.5 (contents sub-elements and recipes), §4.11 — a
   generated contents page whose every visual choice is a CSS block in
   `metadata.json`, edited live in the style panel.
 - **Deliverables:** row/span markup with level classes; right-anchored

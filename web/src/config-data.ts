@@ -5,52 +5,65 @@ import type {
   NumberingStyle,
   RunningEntry,
 } from "../../metadata/types.ts";
+// Size parsing and derivation are shared with the print exporter so the panel
+// and `bml export` can never disagree about the geometry (§4.3).
+import { foldedSize } from "../../metadata/page-setup.ts";
+export {
+  describePageSetup,
+  fmtLength,
+  isValidSize,
+  resolvePageSetup,
+} from "../../metadata/page-setup.ts";
 
 export interface SizePreset {
   label: string;
   value: string;
 }
 
-// Named CSS @page sizes plus common hand-binding trim sizes (§4.3's value space).
+// A folded sheet, named. The size is derived rather than written out, so these
+// can never drift from the sheet they come off: halving folds once and splits
+// the long side, quartering cuts across and folds, halving both sides.
+function folded(name: string, sheet: string, rows: 1 | 2): SizePreset {
+  const value = foldedSize(sheet, 2, rows);
+  return { label: `${name} (${value.replace(" ", " × ")})`, value };
+}
+
+// The book page sizes offered in the panel: the named CSS sizes worth reaching
+// for plus the common hand-binding formats. Any size in §4.3's value space can
+// still be typed in as a custom one.
 export const PAGE_SIZE_PRESETS: SizePreset[] = [
   { label: "A4 (210mm × 297mm)", value: "A4" },
   { label: "A5 (148mm × 210mm)", value: "A5" },
+  folded("A5 folded", "A5", 1),
   { label: "US Letter (8.5in × 11in)", value: "letter" },
+  folded("Half Letter", "letter", 1),
+  folded("Quarter Letter", "letter", 2),
   { label: "US Legal (8.5in × 14in)", value: "legal" },
-  { label: "Half Letter (5.5in × 8.5in)", value: "5.5in 8.5in" },
-  { label: "Quarter Legal (3.5in × 8.5in)", value: "3.5in 8.5in" },
+  folded("Half Legal", "legal", 1),
+  folded("Quarter Legal", "legal", 2),
   { label: "US Trade (6in × 9in)", value: "6in 9in" },
 ];
 
-// Which preset a stored size corresponds to; "custom" when none matches
-// (including undefined — no size configured yet).
-export function presetFor(size: string | undefined): string {
+// The paper a printer actually loads — sheets, not book pages.
+export const SHEET_PRESETS: SizePreset[] = [
+  { label: "US Letter (8.5in × 11in)", value: "letter" },
+  { label: "US Legal (8.5in × 14in)", value: "legal" },
+  { label: "US Tabloid (11in × 17in)", value: "tabloid" },
+  { label: "A3 (297mm × 420mm)", value: "A3" },
+  { label: "A4 (210mm × 297mm)", value: "A4" },
+  { label: "A5 (148mm × 210mm)", value: "A5" },
+];
+
+// Which preset in `presets` a stored size corresponds to; "custom" when none
+// matches (including undefined — nothing configured yet).
+export function presetFor(
+  size: string | undefined,
+  presets: SizePreset[] = PAGE_SIZE_PRESETS,
+): string {
   if (!size) return "custom";
   const norm = size.trim().toLowerCase();
-  const hit = PAGE_SIZE_PRESETS.find((p) => p.value.toLowerCase() === norm);
+  const hit = presets.find((p) => p.value.toLowerCase() === norm);
   return hit ? hit.value : "custom";
-}
-
-const LENGTH = /^\d+(\.\d+)?(in|mm|cm|pt|pc|px)$/;
-const NAMED_SIZES = new Set([
-  "a3",
-  "a4",
-  "a5",
-  "b4",
-  "b5",
-  "jis-b4",
-  "jis-b5",
-  "letter",
-  "legal",
-  "ledger",
-]);
-
-// A size is a CSS named page size or "<length> <length>" (§4.3).
-export function isValidSize(value: string): boolean {
-  const parts = value.trim().split(/\s+/);
-  if (parts.length === 1) return NAMED_SIZES.has(parts[0]!.toLowerCase());
-  if (parts.length === 2) return parts.every((p) => LENGTH.test(p));
-  return false;
 }
 
 export function isValidFolios(value: string): boolean {

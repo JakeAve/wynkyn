@@ -14,9 +14,19 @@ export interface PageMargins {
   outside?: string;
 }
 
+export type Duplex = "short-edge" | "long-edge" | "none";
+
+// The physical setup of the edition (§4.3): the book page, the sheet it is
+// printed on, and how those sheets are folded into signatures. `size`/`margins`
+// drive the preview; `sheet`/`folios-per-signature`/`duplex` drive imposition.
+// Everything else about the setup (pages across a sheet, sheets per signature,
+// slack to trim off) is derived — see metadata/page-setup.ts.
 export interface PageConfig {
   size?: string; // any CSS @page size value (§4.3)
   margins?: PageMargins;
+  sheet?: string; // physical paper the printer loads; same value space as `size`
+  "folios-per-signature"?: number;
+  duplex?: Duplex;
 }
 
 export type NumberingStyle =
@@ -65,10 +75,12 @@ export interface Running {
   even?: RunningEntry[];
 }
 
-export interface PrintConfig {
+// Pre-merge shape of the print settings, read only by the upgrade in
+// metadata/loader.ts. Nothing else may consume it; the live keys are on `page`.
+export interface LegacyPrintConfig {
   "sheet-size"?: string;
   "folios-per-signature"?: number;
-  duplex?: "short-edge" | "long-edge" | "none";
+  duplex?: Duplex;
 }
 
 export interface NotesConfig {
@@ -88,7 +100,7 @@ export interface Metadata {
   is?: Record<string, CssProps>;
   numbering?: Numbering;
   running?: Running;
-  print?: PrintConfig;
+  print?: LegacyPrintConfig; // legacy; folded into `page` on load
   notes?: NotesConfig;
   toc?: TocConfig;
 }

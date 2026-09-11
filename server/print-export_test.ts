@@ -1,6 +1,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { PDFDict, PDFDocument, PDFName, PDFPage, PDFStream } from "pdf-lib";
 import { impose, parseDims } from "./imposition.ts";
+import { resolvePageSetup } from "../metadata/page-setup.ts";
 import {
   buildSheetPdf,
   exportBook,
@@ -8,14 +9,23 @@ import {
   sidesFor,
 } from "./print-export.ts";
 
-const geom = { sheet: parseDims("legal"), page: { w: 3.5, h: 8.5 }, nUp: 4 };
+const page = { w: 3.5, h: 8.5 };
 const imp = impose(8, {
   folios: 2,
-  sheet: geom.sheet,
-  page: geom.page,
+  sheet: parseDims("legal"),
+  page,
   duplex: "short-edge",
   flip: "short-edge",
 });
+// Derived from the imposition, exactly as exportBook does it, so the sheet
+// orientation and grid can never drift from what the slots were laid out for.
+const geom = {
+  sheet: imp.sheet,
+  page,
+  nUp: imp.nUp,
+  cols: imp.cols,
+  rows: imp.rows,
+};
 
 Deno.test("sidesFor: duplex interleaves front/back per sheet; fronts/backs split; backs can reverse", () => {
   const two = impose(8, {
@@ -188,7 +198,7 @@ Deno.test("exportBook: rejects a nonexistent book before writing anything", asyn
   assertEquals(entries, []); // exportBook must not have written into `out` either
 });
 
-Deno.test("exportBook: falls back to metadata.json's print section when no flags are given", async () => {
+Deno.test("exportBook: upgrades a legacy print section when no flags are given", async () => {
   const root = await Deno.makeTempDir();
   const bookDir = `${root}/book`;
   await Deno.mkdir(bookDir, { recursive: true });
@@ -204,7 +214,50 @@ Deno.test("exportBook: falls back to metadata.json's print section when no flags
     }),
   );
   const s = await exportBook(root, "book", { proof: true });
-  assertEquals(s.resolved, { sheet: "legal", duplex: "long-edge", folios: 2 });
+  // A legacy `print` section is folded into `page` on load (metadata/upgrade.ts).
+  assertEquals(
+    [s.setup.sheet, s.setup.duplex, s.setup.folios],
+    ["legal", "long-edge", 2],
+  );
+});
+
+Deno.test("export reads the page setup from the page section", async () => {
+  const root = await Deno.makeTempDir();
+  const bookDir = `${root}/book`;
+  await Deno.mkdir(bookDir, { recursive: true });
+  await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
+  await Deno.writeTextFile(
+    `${bookDir}/metadata.json`,
+    JSON.stringify({
+      page: {
+        size: "3.5in 8.5in",
+        sheet: "legal",
+        "folios-per-signature": 2,
+        duplex: "long-edge",
+      },
+    }),
+  );
+  const s = await exportBook(root, "book", { proof: true });
+  assertEquals(
+    [s.setup.sheet, s.setup.duplex, s.setup.folios, s.setup.nUp],
+    ["legal", "long-edge", 2, 4],
+  );
+});
+
+Deno.test("export rejects a page that cannot be printed on the sheet", async () => {
+  const root = await Deno.makeTempDir();
+  const bookDir = `${root}/book`;
+  await Deno.mkdir(bookDir, { recursive: true });
+  await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
+  await Deno.writeTextFile(
+    `${bookDir}/metadata.json`,
+    JSON.stringify({ page: { size: "6in 9in", sheet: "letter" } }),
+  );
+  await assertRejects(
+    () => exportBook(root, "book", { proof: true }),
+    Error,
+    "does not fit two-up",
+  );
 });
 
 // Reads the /BBox height of each embedded-page XObject on `page`, in the order pdf-lib
@@ -298,8 +351,12 @@ Deno.test("formatSummary is one line plus a waste warning when relevant", () => 
     imposition: imp,
     files: [],
     diagnostics: 0,
-    resolved: { sheet: "legal", duplex: "short-edge", folios: 3 },
-  }, { sheet: "legal", duplex: "short-edge" });
+    setup: resolvePageSetup({
+      size: "3.5in 8.5in",
+      sheet: "legal",
+      "folios-per-signature": 3,
+    }),
+  });
   assertEquals(
     text.split("\n")[0],
     "demo: 12 pages → 12 padded · 1 signature × 3 folios · 4-up on legal · 2 sheets · duplex short-edge",
@@ -346,4 +403,28 @@ Deno.test("exportBook --edition: uses that edition's page size and writes under 
   } finally {
     await Deno.remove(root, { recursive: true });
   }
+});
+
+Deno.test("buildSheetPdf: a quartered setup prints a portrait sheet, 2 × 2", async () => {
+  const qpage = { w: 4.25, h: 7 }; // legal halved on both sides
+  const q = impose(16, {
+    folios: 4,
+    sheet: parseDims("legal"),
+    page: qpage,
+    duplex: "long-edge",
+    flip: "short-edge",
+  });
+  const bytes = await buildSheetPdf(sidesFor(q, "duplex", false), {
+    sheet: q.sheet,
+    page: qpage,
+    nUp: q.nUp,
+    cols: q.cols,
+    rows: q.rows,
+  }, null);
+  const doc = await PDFDocument.load(bytes);
+  // Portrait, at the sheet's real dimensions — not the landscape 2-up shape.
+  assertEquals(doc.getPage(0).getSize(), { width: 8.5 * 72, height: 14 * 72 });
+  // Four sides for two sheets, and the grid tiles the sheet with nothing over.
+  assertEquals(doc.getPageCount(), 4);
+  assertEquals([q.cols * qpage.w, q.rows * qpage.h], [8.5, 14]);
 });

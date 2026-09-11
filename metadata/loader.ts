@@ -1,4 +1,5 @@
 import type { Metadata } from "./types.ts";
+import { upgradePageSetup } from "./upgrade.ts";
 
 export async function loadMetadata(path: string): Promise<Metadata | null> {
   let text: string;
@@ -9,8 +10,11 @@ export async function loadMetadata(path: string): Promise<Metadata | null> {
     throw e;
   }
   try {
-    return JSON.parse(text) as Metadata;
+    return upgradePageSetup(JSON.parse(text) as Metadata);
   } catch (e) {
-    throw new Error(`Invalid JSON in ${path}: ${(e as Error).message}`);
+    if (e instanceof SyntaxError) {
+      throw new Error(`Invalid JSON in ${path}: ${e.message}`);
+    }
+    throw e;
   }
 }

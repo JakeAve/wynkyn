@@ -3,6 +3,8 @@
 // `metadata.json` is the unnamed edition (edition === null); named editions
 // are `editions/<slug>.json`. The manuscript and images are shared.
 import type { Metadata } from "../metadata/types.ts";
+import { describePageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
+import { upgradePageSetup } from "../metadata/upgrade.ts";
 
 // One path segment: no separators, no dot-dot, no leading dot.
 export function safeName(name: string): boolean {
@@ -36,7 +38,8 @@ export function classifyChange(rest: string[]): Change | null {
   return null;
 }
 
-// The one line the edition picker shows per row.
+// The one line the edition picker shows per row. Page setup leads: the physical
+// format is what makes one edition different from another (§4.3).
 export function summaryOf(meta: Metadata): string {
   const body = (meta.elements?.body ?? {}) as Record<string, unknown>;
   const family = body["font-family"];
@@ -44,7 +47,14 @@ export function summaryOf(meta: Metadata): string {
     ? meta.fonts?.[family] ?? family
     : undefined;
   const size = body["font-size"];
-  return [meta.page?.size, font, typeof size === "string" ? size : undefined]
+  // Only describe the imposition once a sheet is actually configured — the
+  // resolver's default sheet is right for export, but a picker row must not
+  // claim a setup the file never chose.
+  const page = upgradePageSetup(meta).page;
+  const setup = page?.sheet
+    ? describePageSetup(resolvePageSetup(page))
+    : page?.size;
+  return [setup, font, typeof size === "string" ? size : undefined]
     .filter(Boolean).join(" · ");
 }
 
