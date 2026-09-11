@@ -59,6 +59,7 @@ export const GOOGLE_FONTS: string[] = [
   "Literata",
   "Lora",
   "Manrope",
+  "Manufacturing Consent",
   "Marcellus",
   "Merriweather",
   "Montserrat",
