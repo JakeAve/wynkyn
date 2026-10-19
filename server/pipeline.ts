@@ -18,7 +18,7 @@ import type { Seed } from "../renderer/page-map-types.ts";
 const BASE_CSS = await Deno.readTextFile(
   new URL("../renderer/base.css", import.meta.url),
 );
-// Paged.js 0.4.3, vendored (see vendor/pagedjs_test.ts). Shared by toHtml and
+// Paged.js 0.4.3, vendored (see server/vendor_test.ts). Shared by toHtml and
 // the browser tests so nothing loads it from a CDN.
 export const PAGED_JS = await Deno.readTextFile(
   new URL("../vendor/pagedjs/paged.js", import.meta.url),

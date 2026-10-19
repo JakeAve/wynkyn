@@ -173,15 +173,18 @@ function assertWholeNumber(value: number, label: string): void {
 const FLIP_VALUES = ["short-edge", "long-edge"] as const;
 
 /**
- * The last export's settled folios (`page-map.json`), so an unchanged book
- * renders once. Missing, corrupt or another edition's (a shared --out) → {};
- * a stale seed only costs passes, since the driver re-renders to a fixed point.
+ * The last export's settled folios (`page-map.json`), used only when it was
+ * saved for this exact page (`inputHash`, see exportBook) — so an unchanged
+ * book renders once and reproduces that export exactly, and anything else
+ * (another book or edition in a shared --out, any edit, a corrupt file)
+ * starts clean from {}, landing where a clean run would.
  */
-async function readSeed(path: string, edition: string | null): Promise<Seed> {
+async function readSeed(path: string, inputHash: string): Promise<Seed> {
   try {
-    const { edition: e, seed } = JSON.parse(await Deno.readTextFile(path));
+    const saved = JSON.parse(await Deno.readTextFile(path));
+    const seed = saved?.seed;
     if (
-      e === edition && seed && typeof seed === "object" &&
+      saved?.inputHash === inputHash && seed && typeof seed === "object" &&
       !Array.isArray(seed) &&
       Object.values(seed).every((v) => typeof v === "string")
     ) return seed;
@@ -189,6 +192,13 @@ async function readSeed(path: string, edition: string | null): Promise<Seed> {
     // missing or unreadable — start fresh
   }
   return {};
+}
+
+/** Hex SHA-256 of `text`. */
+async function sha256(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text);
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return Array.from(hash, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export async function exportBook(
@@ -247,8 +257,13 @@ export async function exportBook(
     });
     diagnostics = built.diagnostics.length;
     const pageMapPath = `${out}/page-map.json`;
+    // The unseeded page is every layout input (book HTML, CSS, font links,
+    // numbering, title, Paged.js and the handlers), so its hash keys the seed.
+    // ponytail: image bytes aren't hashed; a replaced image with new
+    // dimensions under the same name keeps the old seed. Hash them if that bites.
+    const inputHash = await sha256(toHtml(built));
     const rendered = await (opts.render ?? renderPdf)(
-      toHtml(built, { seed: await readSeed(pageMapPath, edition) }),
+      toHtml(built, { seed: await readSeed(pageMapPath, inputHash) }),
     );
     pagination = rendered.problems;
     if (pagination.length && !opts.force) {
@@ -265,11 +280,14 @@ export async function exportBook(
     page = { w: width / PT, h: height / PT }; // page size comes from the rendered PDF, not metadata
     await Deno.writeFile(`${out}/book.pdf`, source);
     files.push(`${out}/book.pdf`);
-    await Deno.writeTextFile(
-      pageMapPath,
-      JSON.stringify({ edition, seed: rendered.seed }, null, 2) + "\n",
-    );
-    files.push(pageMapPath);
+    // Only a clean render's seed is a fixed point worth starting from.
+    if (!pagination.length) {
+      await Deno.writeTextFile(
+        pageMapPath,
+        JSON.stringify({ inputHash, seed: rendered.seed }, null, 2) + "\n",
+      );
+      files.push(pageMapPath);
+    }
   }
 
   const imposition = impose(pageCount, { folios, sheet, page, duplex, flip });

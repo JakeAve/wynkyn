@@ -9,6 +9,7 @@ import {
   sidesFor,
 } from "./print-export.ts";
 import { renderPdf } from "./pdf.ts";
+import type { PageProblem } from "../renderer/page-map-types.ts";
 import { hasChrome } from "../testing/chrome.ts";
 
 const page = { w: 3.5, h: 8.5 };
@@ -367,33 +368,48 @@ Deno.test("exportBook: pagination problems fail the export unless force", async 
   await Deno.stat(`${out}/book.pdf`);
 });
 
-Deno.test("exportBook: starts from this edition's page-map.json, writes the settled seed back", async () => {
+Deno.test("exportBook: reuses page-map.json only for the identical input, and only a clean render's", async () => {
   const root = await Deno.makeTempDir();
-  await Deno.mkdir(`${root}/book`);
-  await Deno.writeTextFile(`${root}/book/manuscript.md`, "{title}\nBook\n");
+  for (const book of ["book", "other"]) {
+    await Deno.mkdir(`${root}/${book}`);
+    await Deno.writeTextFile(
+      `${root}/${book}/manuscript.md`,
+      `{title}\n${book}\n`,
+    );
+  }
   const out = await Deno.makeTempDir();
+  const map = `${out}/page-map.json`;
   const seedIn: string[] = []; // the BOOK_SEED each render started from
+  let problems: PageProblem[] = [];
   const render = async (html: string) => {
     seedIn.push(html.match(/const BOOK_SEED = (.*);/)![1]!);
     const doc = await PDFDocument.create();
     for (let i = 0; i < 4; i++) doc.addPage([396, 612]).drawText(String(i + 1));
-    return { pdf: await doc.save(), problems: [], passes: 1, seed: { a: "7" } };
+    return { pdf: await doc.save(), problems, passes: 1, seed: { a: "7" } };
   };
   const opts = { sheet: "legal", duplex: "short-edge" as const, out, render };
   const s = await exportBook(root, "book", opts);
-  assertEquals(s.files.includes(`${out}/page-map.json`), true);
-  await exportBook(root, "book", opts);
-  // A shared --out must not hand one edition's folios to another.
-  await Deno.writeTextFile(`${out}/page-map.json`, "{ not json");
-  await exportBook(root, "book", opts);
-  await Deno.mkdir(`${root}/book/editions`);
-  await Deno.writeTextFile(`${root}/book/editions/pocket.json`, "{}");
-  await exportBook(root, "book", { ...opts, edition: "pocket" });
-  assertEquals(seedIn, ["{}", '{"a":"7"}', "{}", "{}"]);
-  assertEquals(
-    JSON.parse(await Deno.readTextFile(`${out}/page-map.json`)),
-    { edition: "pocket", seed: { a: "7" } },
+  assertEquals(s.files.includes(map), true);
+  await exportBook(root, "book", opts); // unchanged -> seeded
+  await Deno.writeTextFile(
+    `${root}/book/metadata.json`,
+    JSON.stringify({ elements: { body: { "font-size": "12pt" } } }),
   );
+  await exportBook(root, "book", opts); // changed metadata -> clean
+  await exportBook(root, "other", opts); // another book in a shared --out
+  await Deno.writeTextFile(map, "{ not json");
+  await exportBook(root, "other", opts);
+  assertEquals(seedIn, ["{}", '{"a":"7"}', "{}", "{}", "{}"]);
+  assertEquals(Object.keys(JSON.parse(await Deno.readTextFile(map))), [
+    "inputHash",
+    "seed",
+  ]);
+  // --force with problems (e.g. no fixed point) saves no seed.
+  await Deno.remove(map);
+  problems = [{ page: null, message: "no fixed point after 3 passes" }];
+  const forced = await exportBook(root, "book", { ...opts, force: true });
+  assertEquals(forced.files.includes(map), false);
+  await assertRejects(() => Deno.stat(map), Deno.errors.NotFound);
 });
 
 Deno.test({
@@ -423,7 +439,13 @@ Deno.test({
     };
     await exportBook(root, "book", opts);
     await exportBook(root, "book", opts);
-    assertEquals(passes, [2, 1]);
+    // Any change to the layout inputs starts clean, so takes 2 again.
+    await Deno.writeTextFile(
+      `${root}/book/metadata.json`,
+      JSON.stringify({ elements: { body: { "font-size": "12pt" } } }),
+    );
+    await exportBook(root, "book", opts);
+    assertEquals(passes, [2, 1, 2]);
     await Deno.stat(`${out}/page-map.json`);
   },
 });

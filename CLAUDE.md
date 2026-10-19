@@ -31,8 +31,8 @@ themselves on the next save.
   Paged.js paginates the preview.
 
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
-update the checksum in `vendor/pagedjs_test.ts`, then read the golden page-map
-diff.
+update the checksum in `server/vendor_test.ts`, then read the golden page-map
+diff and re-check the no-reflow note on `layOut` in `renderer/folios.js`.
 
 ## Commands
 
@@ -48,8 +48,9 @@ diff.
   paginate
 - `deno task bml export <book> [--edition e] [--proof] [--sheet S] [--folios N] [--duplex M]`
   → `books/<book>/export/` (or `export/<e>/`): `book.pdf`, the sheet PDFs and
-  `page-map.json` (the settled page map, so a re-export takes one pass); needs
-  Google Chrome installed; fails on page-map problems unless `--force`
+  `page-map.json` (the settled seed, keyed by a hash of the render's inputs, so
+  a re-export of an unchanged book takes one pass); needs Google Chrome
+  installed; fails on page-map problems unless `--force`
 - `deno task bml edition <book> new <slug> [--from e]` copy an edition under a
   new name. Editions are styling-only variants: `metadata.json` is the unnamed
   edition, `editions/<slug>.json` are named ones, manuscript and images shared.

@@ -283,9 +283,10 @@
       display: page.classList.contains("pagedjs_display_page"),
       blank: page.classList.contains("pagedjs_blank_page"),
       empty: !(area.textContent ?? "").trim() && !area.querySelector("img"),
+      // The element itself starts here, titled or not: a continued chapter's
+      // fragment (and every rebuilt ancestor) carries data-split-from.
       opener: !!area.querySelector(
-        ".chapter > .title:not([data-split-from]), " +
-          ".part > .title:not([data-split-from])",
+        ".chapter:not([data-split-from]), .part:not([data-split-from])",
       ),
       chapterTitles: texts(".chapter .title"),
       // `>`: a chapter's title inside a part isn't the part's.
@@ -359,7 +360,12 @@
 
       // Each page's entry is computed once, from the previous page element's
       // stored entry (the object itself: carried titles key on it), and never
-      // rewritten.
+      // rewritten. That holds because a laid-out page never changes in 0.4.3:
+      // its after-layout reflow (Page.checkOverflowAfterResize, the only path
+      // to onOverflow and removePages) passes the start token as
+      // findBreakToken's `bounds`, so never finds overflow. A Paged.js that
+      // fixes this needs afterRendered to re-read each page's facts and
+      // rebuild the map if they changed.
       /** @param {Element} page */
       layOut(page) {
         let prev = page.previousElementSibling;

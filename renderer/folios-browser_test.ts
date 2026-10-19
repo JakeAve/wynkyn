@@ -388,3 +388,31 @@ Deno.test({
       );
     }),
 });
+
+Deno.test({
+  name: "folios: a chapter without a title is still an opener",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      const literal = [{ content: "~", area: "top-right" as const }];
+      const book = build(
+        [
+          "{chapter: one}",
+          "{title}",
+          "Chapter One",
+          "",
+          prose(4),
+          "{chapter: two}",
+          "",
+          prose(4),
+        ].join("\n"),
+        { ...metadata, running: { odd: literal, even: literal } },
+      );
+      const { result, heads } = await pass(page, book, {});
+      assertEquals(result.problems, []);
+      const two = result.map.findIndex((p) => p.anchors.includes("two"));
+      const { opener, head } = result.map[two];
+      assertEquals([opener, head, heads[two]], [true, false, []]);
+      assert(heads[two + 1]!.length > 0, "the page after it runs");
+    }),
+});

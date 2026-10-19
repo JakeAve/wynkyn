@@ -9,7 +9,7 @@ const PAGED_JS_SHA256 =
 
 Deno.test("vendored Paged.js matches the pinned checksum", async () => {
   const bytes = await Deno.readFile(
-    new URL("./pagedjs/paged.js", import.meta.url),
+    new URL("../vendor/pagedjs/paged.js", import.meta.url),
   );
   const hash = await crypto.subtle.digest("SHA-256", bytes);
   assertEquals(

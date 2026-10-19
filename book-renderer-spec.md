@@ -1459,10 +1459,10 @@ Running entries apply to body pages only (`@page body:right` /
 body:left`): front and back matter keep their folios (§4.7) but carry no
 running head, and display matter carries neither. Following Chicago, running
 heads are also omitted on chapter and part openers (a page holding the start of
-a chapter or part title; the folio stays) and on blank padding pages (which also
-lose their folio). `page-number` entries are folios and follow §4.7 instead. The
-page map leaves the title variables empty outside the body, so a head can't
-carry the final chapter's title into the back matter.
+a chapter or part, titled or not; the folio stays) and on blank padding pages
+(which also lose their folio). `page-number` entries are folios and follow §4.7
+instead. The page map leaves the title variables empty outside the body, so a
+head can't carry the final chapter's title into the back matter.
 
 ### 4.9 Section: `notes`
 

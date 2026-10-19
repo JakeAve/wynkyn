@@ -1,5 +1,6 @@
 // web/src/preview.ts — Paged.js re-render + font links (spec §7.6).
-// Paged.js is the CDN global from index.html; there is no npm build to bundle.
+// Paged.js is the global from the vendored /vendor/paged.js (index.html loads
+// it, dev-server.ts serves it); there is no npm build to bundle.
 import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
 import { matchKey, type StyleEntry } from "./style-catalog.ts";
 import {
