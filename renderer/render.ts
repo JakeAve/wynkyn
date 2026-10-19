@@ -475,12 +475,24 @@ function numberDiv(
   return t ? `<div class="number">${escapeHtml(t)}</div>` : "";
 }
 
-function renderChapter(ch: Chapter, n: number, opts: RenderOptions): string {
+// The zone class sits on each top-level block, never on a wrapper: an empty
+// zone wrapper would be the first node on the zone's page, and Paged.js counts
+// any element as content, so the first chapter's break-before would strand it
+// on a blank page. A chapter inside a part gets no zone; the part carries it.
+type Zone = "front" | "body" | "back";
+const zoneClass = (zone?: Zone) => zone ? ` zone-${zone}` : "";
+
+function renderChapter(
+  ch: Chapter,
+  n: number,
+  opts: RenderOptions,
+  zone?: Zone,
+): string {
   return renderBlockWithNotes(ch.children, opts, (ctx) => {
     const inner = renderChildren(ch.children, ctx, opts);
-    return `<section class="chapter" id="${escapeHtml(ch.slug)}">${
-      numberDiv(n, opts.numbering?.chapters)
-    }${inner}</section>`;
+    return `<section class="chapter${zoneClass(zone)}" id="${
+      escapeHtml(ch.slug)
+    }">${numberDiv(n, opts.numbering?.chapters)}${inner}</section>`;
   });
 }
 
@@ -498,10 +510,11 @@ function renderMatter(
   m: MatterBlock,
   doc: BmlDocument,
   opts: RenderOptions,
+  zone: Zone,
 ): string {
   const id = escapeHtml(matterId(m));
-  const open = `<section class="matter matter-${
-    escapeHtml(m.type)
+  const open = `<section class="matter matter-${escapeHtml(m.type)}${
+    zoneClass(zone)
   }" id="${id}">`;
   if (m.type === "toc") {
     const onlyTitles = m.children.every((c) =>
@@ -609,6 +622,7 @@ function renderPart(
   partNo: number,
   chapterNo: { n: number },
   opts: RenderOptions,
+  zone: Zone,
 ): string {
   const contentKids = part.children.filter((c) =>
     c.kind !== "chapter"
@@ -622,33 +636,24 @@ function renderPart(
     .filter((c): c is Chapter => c.kind === "chapter")
     .map((ch) => renderChapter(ch, ++chapterNo.n, opts))
     .join("");
-  return `<section class="part" id="${escapeHtml(part.slug)}">${
-    numberDiv(partNo, opts.numbering?.parts)
-  }${head}${chapters}</section>`;
+  return `<section class="part${zoneClass(zone)}" id="${
+    escapeHtml(part.slug)
+  }">${numberDiv(partNo, opts.numbering?.parts)}${head}${chapters}</section>`;
 }
 
 export function render(doc: BmlDocument, opts: RenderOptions = {}): string {
   const out: string[] = [`<article class="bml">`];
-  if (doc.frontMatter.length) {
-    out.push(`<div class="zone zone-front">`);
-    for (const m of doc.frontMatter) out.push(renderMatter(m, doc, opts));
-    out.push(`</div>`);
+  for (const m of doc.frontMatter) {
+    out.push(renderMatter(m, doc, opts, "front"));
   }
-  if (doc.body.length) {
-    out.push(`<div class="zone zone-body">`);
-    let partNo = 0;
-    const chapterNo = { n: 0 };
-    for (const b of doc.body) {
-      if (b.kind === "part") out.push(renderPart(b, ++partNo, chapterNo, opts));
-      else out.push(renderChapter(b, ++chapterNo.n, opts));
-    }
-    out.push(`</div>`);
+  let partNo = 0;
+  const chapterNo = { n: 0 };
+  for (const b of doc.body) {
+    if (b.kind === "part") {
+      out.push(renderPart(b, ++partNo, chapterNo, opts, "body"));
+    } else out.push(renderChapter(b, ++chapterNo.n, opts, "body"));
   }
-  if (doc.backMatter.length) {
-    out.push(`<div class="zone zone-back">`);
-    for (const m of doc.backMatter) out.push(renderMatter(m, doc, opts));
-    out.push(`</div>`);
-  }
+  for (const m of doc.backMatter) out.push(renderMatter(m, doc, opts, "back"));
   out.push(`</article>`);
   return out.join("");
 }

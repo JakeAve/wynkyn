@@ -1,7 +1,7 @@
 // base-css_test.ts — structural regression test for base.css's TOC rules.
 // Placed beside base.css (not a .ts module, so no import — just a text-based
 // structural check), following the repo's X_test.ts-next-to-X convention.
-import { assert } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 
 Deno.test("TOC rules in base.css keep zero own-specificity via :where() (review fix, plan 7 task 4)", () => {
   const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url))
@@ -44,21 +44,23 @@ Deno.test("base.css uses no adjacent-sibling combinator (Paged.js drops those ru
   );
 });
 
-Deno.test("base.css names the zone pages before any break-before rule (Paged.js only dedups the zone break then)", () => {
-  // Paged.js drops an explicit `break-before: page` when the element already
-  // starts a differently named page — but it reads the break rule with the
-  // page names already on the tree only if those rules came first. Any later
-  // and every zone opened with a blank page (an empty verso folio "1" before
-  // chapter one, a blank recto with a running head before the colophon).
+Deno.test("display matter's page rule outranks the zone rules regardless of CSS order", () => {
   const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url))
     .replace(/\/\*[\s\S]*?\*\//g, "");
-  const firstBreak = css.indexOf("break-before");
-  assert(firstBreak > 0, "expected a break-before rule in base.css");
+  const classCount = (sel: string) => (sel.match(/\.[\w-]+/g) ?? []).length;
+  const pageRule = (name: string) =>
+    [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter((m) => new RegExp(`page:\\s*${name}\\s*;`).test(m[2]!))
+      .flatMap((m) => m[1]!.split(",").map((x) => x.trim()));
+  const display = pageRule("display");
+  assert(display.length > 0, "expected a `page: display` rule");
   for (const zone of ["front", "body", "back"]) {
-    const at = css.indexOf(`.zone-${zone} {\n  page: ${zone};`);
+    assertEquals(pageRule(zone), [`.zone-${zone}`]);
+  }
+  for (const sel of display) {
     assert(
-      at >= 0 && at < firstBreak,
-      `.zone-${zone} { page: ${zone} } must precede the first break-before rule`,
+      classCount(sel) > classCount(".zone-front"),
+      `"${sel}" must outrank .zone-front`,
     );
   }
 });

@@ -22,11 +22,8 @@
   float: left;
   padding-right: 0.05em;
 }
-/* Zone page names (spec §4.7). Paged.js drops an explicit `break-before: page`
-   between two differently named pages — the name change already breaks there —
-   but only if the names are on the tree when it reads the break rule. So these
-   must come before the break rules below; any later and every zone opens with
-   a blank page (an empty folio "1" before chapter one). */
+/* These name the zone pages (spec §4.7); the class sits on each top-level
+   block, not a wrapper. Display matter's `page: display` below outranks them. */
 .zone-front {
   page: front;
 }
@@ -165,7 +162,7 @@
 
 /* Paged.js stamps data-align-last-split-element="justify" on the deepest
    element continued from the previous page and sets text-align-last: justify
-   on it. After a forced page break that element is a container (.bml, .zone),
+   on it. After a forced page break that element is a container (.bml),
    not a paragraph, and the property inherits into every intact <p> below it
    (docs/pagedjs-justify-leak.md). Only honor the mark on a real paragraph. */
 [data-align-last-split-element="justify"]:not(p) {

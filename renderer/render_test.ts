@@ -22,13 +22,23 @@ Deno.test("zones, matter classes and ids", () => {
     ),
   );
   assertStringIncludes(html, '<article class="bml">');
-  assertStringIncludes(html, '<div class="zone zone-front">');
   assertStringIncludes(
     html,
-    '<section class="matter matter-half-title" id="matter-half-title">',
+    '<section class="matter matter-half-title zone-front" id="matter-half-title">',
   );
-  assertStringIncludes(html, '<div class="zone zone-body">');
-  assertStringIncludes(html, '<div class="zone zone-back">');
+  assertStringIncludes(html, '<section class="chapter zone-body" id="one">');
+  assertStringIncludes(
+    html,
+    '<section class="matter matter-colophon zone-back" id="matter-colophon">',
+  );
+  assert(!html.includes('class="zone'), "no zone wrapper divs");
+});
+
+Deno.test("zone class goes on parts, not on the chapters inside them", () => {
+  const html = render(parse("{part: p}\n{chapter: a}\nX\n{chapter: b}\nY"));
+  assertStringIncludes(html, '<section class="part zone-body" id="p">');
+  assertStringIncludes(html, '<section class="chapter" id="a">');
+  assertEquals(html.match(/zone-body/g)?.length, 1);
 });
 
 Deno.test("chapter: id from slug, numbered title per opts.numbering", () => {
@@ -40,7 +50,7 @@ Deno.test("chapter: id from slug, numbered title per opts.numbering", () => {
       },
     },
   );
-  assertStringIncludes(html, '<section class="chapter" id="thaw">');
+  assertStringIncludes(html, '<section class="chapter zone-body" id="thaw">');
   assertStringIncludes(html, '<div class="number">I.</div>');
   assertStringIncludes(html, '<h1 class="title">The First Thaw</h1>');
 });
@@ -57,7 +67,7 @@ Deno.test("chapter numbers continue across parts; parts numbered separately", ()
       },
     },
   );
-  assertStringIncludes(html, '<section class="part" id="one">');
+  assertStringIncludes(html, '<section class="part zone-body" id="one">');
   assertStringIncludes(html, '<div class="number">Part I</div>');
   assertStringIncludes(html, '<div class="number">Part II</div>');
   // chapter c is the third chapter overall

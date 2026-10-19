@@ -56,7 +56,7 @@ Deno.test("both books parse clean, load metadata, and render", async () => {
       numbering: meta!.numbering,
       notes: meta!.notes,
     });
-    assert(html.includes('class="chapter"'), `${book}: rendered no chapters`);
+    assert(html.includes('class="chapter'), `${book}: rendered no chapters`);
   }
 });
 
