@@ -164,7 +164,9 @@ Deno.test("endnotes collect at the end of the structural block", () => {
     html,
     '<sup class="footnote-anchor" id="fnref-h43"><a href="#note-h43">1</a></sup>',
   );
-  assertStringIncludes(html, '<aside class="notes">');
+  // A top-level sibling of the chapter, so it carries the zone (page name) too:
+  // without it Paged.js breaks before the notes on the page-name change.
+  assertStringIncludes(html, '<aside class="notes zone-body">');
   assertStringIncludes(html, '<div class="note" id="note-h43">');
 });
 

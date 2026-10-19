@@ -6,11 +6,11 @@
     ],
     "body": [
       7,
-      206
+      205
     ],
     "back": [
-      207,
-      207
+      206,
+      206
     ]
   },
   "anchors": {
@@ -23,16 +23,16 @@
     "one": "1",
     "fnref-eggs": "5",
     "gatsbys-mansion": "",
-    "note-eggs": "25",
-    "two": "26",
-    "three": "43",
-    "four": "67",
-    "five": "89",
-    "six": "107",
-    "seven": "124",
-    "eight": "162",
-    "nine": "180",
-    "matter-colophon": "201"
+    "note-eggs": "24",
+    "two": "25",
+    "three": "42",
+    "four": "66",
+    "five": "88",
+    "six": "106",
+    "seven": "123",
+    "eight": "161",
+    "nine": "179",
+    "matter-colophon": "200"
   },
   "blanks": []
 }

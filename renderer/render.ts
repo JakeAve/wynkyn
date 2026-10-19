@@ -420,6 +420,7 @@ function renderBlockWithNotes(
   children: ContentNode[],
   opts: RenderOptions,
   body: (ctx: NoteCtx) => string,
+  zone?: Zone,
 ): string {
   const ctx: NoteCtx = {
     placement: opts.notes?.placement ?? "endnote",
@@ -441,7 +442,9 @@ function renderBlockWithNotes(
             renderInlines(ctx.notes.get(s)!.inlines, ctx)
           }</div>`
         ).join("");
-      if (rendered) html += `<aside class="notes">${rendered}</aside>`;
+      if (rendered) {
+        html += `<aside class="notes${zoneClass(zone)}">${rendered}</aside>`;
+      }
     }
   }
   return html;
@@ -479,6 +482,9 @@ function numberDiv(
 // zone wrapper would be the first node on the zone's page, and Paged.js counts
 // any element as content, so the first chapter's break-before would strand it
 // on a blank page. A chapter inside a part gets no zone; the part carries it.
+// A block's endnotes follow it as a top-level sibling and need the zone too:
+// an element with no page name after one with `page: body` is a page-name
+// change, which Paged.js breaks on, stranding the notes on a page of their own.
 type Zone = "front" | "body" | "back";
 const zoneClass = (zone?: Zone) => zone ? ` zone-${zone}` : "";
 
@@ -493,7 +499,7 @@ function renderChapter(
     return `<section class="chapter${zoneClass(zone)}" id="${
       escapeHtml(ch.slug)
     }">${numberDiv(n, opts.numbering?.chapters)}${inner}</section>`;
-  });
+  }, zone);
 }
 
 // Raw (unescaped) id — callers escape once at their own interpolation site
@@ -524,7 +530,7 @@ function renderMatter(
       return renderBlockWithNotes(m.children, opts, (ctx) => {
         const title = renderChildren(m.children, ctx, opts);
         return `${open}${title}${generateToc(doc, opts)}</section>`;
-      });
+      }, zone);
     }
   }
   return renderBlockWithNotes(m.children, opts, (ctx) => {
@@ -540,7 +546,7 @@ function renderMatter(
         ? `<div class="imprint">${renderChildren(imprint, ctx, opts)}</div>`
         : ""
     }</section>`;
-  });
+  }, zone);
 }
 
 interface TocRow {
