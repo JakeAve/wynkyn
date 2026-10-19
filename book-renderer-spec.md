@@ -1383,6 +1383,13 @@ offer it there.
 - `prefix`/`suffix` wrap the number: `"Chapter "` + `1` + `""` → "Chapter 1", or
   `""` + `IV` + `"."` → "IV."
 - `show` on pages toggles page numbers on/off per section.
+- Page counting follows the Chicago Manual of Style: front matter counts from 1
+  in its own style, the body restarts at 1, and back matter continues the body's
+  count (no restart). Every page counts, including display pages, plates and
+  blank padding pages, but display pages (half-title, title page, copyright,
+  dedication, epigraph, colophon, plates) and blank pages print no folio.
+  Chapter and part openers keep theirs. TOC and `{ref}` numbers are the page's
+  number regardless of whether its folio prints.
 - `css` on pages styles the folio's margin box (CSS properties, font aliases
   resolved like §4.5). `pages.css` applies to every zone; a zone's own `css`
   overrides it property by property. Margin boxes are not descendants of the
@@ -1442,16 +1449,20 @@ each body page's chapter and part title (the first on the page, else carried
 over from the previous page) and writes them to the page as `--chapter-title`
 and `--part-title`. `chapter-title`, `part-title` and `page-number` read
 `var(--chapter-title)`, `var(--part-title)` and `var(--folio)` in the margin
-box; `book-title` and literal strings are emitted as plain strings. Paged.js
-does the fragmentation for both preview and export (§5.4, §6), so no
-native-Chrome fallback is needed.
+box; `book-title` and literal strings are emitted as
+`var(--running-off, "<string>")`, and the page map sets `--running-off: ""` on
+every page that carries no running head. Paged.js does the fragmentation for
+both preview and export (§5.4, §6), so no native-Chrome fallback is needed.
 
 Running entries apply to body pages only (`@page body:right` /
 `@page
 body:left`): front and back matter keep their folios (§4.7) but carry no
-running head, and display matter carries neither. The page map leaves the title
-variables empty outside the body, so a head can't carry the final chapter's
-title into the back matter.
+running head, and display matter carries neither. Following Chicago, running
+heads are also omitted on chapter and part openers (a page holding the start of
+a chapter or part title; the folio stays) and on blank padding pages (which also
+lose their folio). `page-number` entries are folios and follow §4.7 instead. The
+page map leaves the title variables empty outside the body, so a head can't
+carry the final chapter's title into the back matter.
 
 ### 4.9 Section: `notes`
 

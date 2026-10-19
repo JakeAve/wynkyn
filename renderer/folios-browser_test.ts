@@ -99,6 +99,7 @@ interface Pass {
   // deno-lint-ignore no-explicit-any
   result: { map: any[]; seed: Record<string, string>; problems: unknown[] };
   margins: string[]; // computed bottom-center ::after content per page
+  heads: string[][]; // non-empty top margin box ::after contents per page
   toc: Record<string, string>; // TOC target id → printed number
   ref: string;
 }
@@ -144,13 +145,18 @@ function pass(
           return box ? getComputedStyle(box, "::after").content : "none";
         },
       );
+      const heads = [...out.querySelectorAll(".pagedjs_page")].map((p) =>
+        [...p.querySelectorAll(".pagedjs_margin-top .pagedjs_margin-content")]
+          .map((box) => getComputedStyle(box, "::after").content)
+          .filter((c) => c !== "none" && c !== '""')
+      );
       const toc: Record<string, string> = {};
       for (const a of out.querySelectorAll(".toc a.page")) {
         toc[a.getAttribute("href")!.slice(1)] = a.textContent!;
       }
       const ref = out.querySelector("a.ref")?.textContent ?? "";
       previewer.polisher.destroy();
-      return { result: chunker.pageMapResult, margins, toc, ref };
+      return { result: chunker.pageMapResult, margins, heads, toc, ref };
     },
     { ...book, seed },
   ) as Promise<Pass>;
@@ -193,10 +199,64 @@ Deno.test({
       assert(plate > one, "plate page in the body");
       assertEquals(map[plate].folioText, "");
       assertEquals(map[plate + 1].folio, map[plate - 1].folio + 2);
-      assertEquals(
-        map.find((p) => p.anchors.includes("two")).chapterTitle,
-        "Chapter Two",
+      // An opener carries no running title; the page after it does.
+      const two = map.findIndex((p) => p.anchors.includes("two"));
+      assertEquals([map[two].opener, map[two].chapterTitle], [true, ""]);
+      assertEquals(map[two + 1].chapterTitle, "Chapter Two");
+    }),
+});
+
+Deno.test({
+  name: "folios: openers keep the folio but no head, blanks and the " +
+    "colophon show neither (Chicago)",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      const chapter = (slug: string, title: string, n: number) =>
+        [`{chapter: ${slug}}`, "{title}", title, "", prose(n)].join("\n");
+      const book = build(
+        [
+          chapter("one", "Chapter One", 3),
+          chapter("two", "Chapter Two", 4),
+          chapter("three", "Chapter Three", 3),
+          "{matter: colophon}",
+          "Set by hand.",
+        ].join("\n"),
+        {
+          ...metadata,
+          elements: { chapter: { "break-before": "right" } },
+          running: {
+            odd: [{ content: "book-title", area: "top-right" }],
+            even: [
+              { content: "chapter-title", area: "top-left" },
+              { content: "~", area: "top-right" },
+            ],
+          },
+        },
       );
+      const { result, margins, heads } = await pass(page, book, {});
+      assertEquals(result.problems, []);
+      const { map } = result;
+      const folio = (i: number) =>
+        margins[i] === "none" ? "" : JSON.parse(margins[i]!);
+
+      const openers = map.flatMap((p, i) => p.opener ? [i] : []);
+      assertEquals(openers.length, 3);
+      for (const i of openers) {
+        assertEquals(heads[i], [], `opener page ${i + 1} has no head`);
+        assert(folio(i) !== "", `opener page ${i + 1} keeps its folio`);
+      }
+      const blanks = map.flatMap((p, i) => p.blank ? [i] : []);
+      assert(blanks.length > 0, "a forced-recto blank page");
+      for (const i of blanks) {
+        assertEquals([heads[i], folio(i)], [[], ""], `blank page ${i + 1}`);
+      }
+      // Running pages still show both, literals included.
+      const running = map.findIndex((p) => p.head);
+      assert(running >= 0 && heads[running]!.length > 0, "a running head");
+      const colophon = map.length - 1;
+      assertEquals(map[colophon].display, true);
+      assertEquals([heads[colophon], folio(colophon)], [[], ""]);
     }),
 });
 

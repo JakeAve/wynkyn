@@ -129,10 +129,13 @@ export function pageNumberingConfig(metadata: Metadata): PageNumberingConfig {
   }])) as Record<keyof PageNumberingConfig, ZoneNumbering>;
 }
 
+// Strings read through --running-off, which the page map sets on pages that
+// carry no running head (openers, blanks, display pages; §4.8).
 function runningContent(value: string, bookTitle?: string): string {
+  const off = (s: string) => `var(--running-off, ${JSON.stringify(s)})`;
   switch (value) {
     case "book-title":
-      return JSON.stringify(bookTitle ?? "");
+      return off(bookTitle ?? "");
     case "chapter-title":
       return "var(--chapter-title)";
     case "part-title":
@@ -142,7 +145,7 @@ function runningContent(value: string, bookTitle?: string): string {
     case "none":
       return "none";
     default:
-      return JSON.stringify(value);
+      return off(value);
   }
 }
 

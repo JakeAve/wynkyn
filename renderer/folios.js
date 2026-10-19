@@ -9,12 +9,15 @@
  * @typedef {"front" | "body" | "back"} Zone
  * @typedef {{ style: NumberingStyle; show: boolean }} ZoneNumbering
  * @typedef {{ front: ZoneNumbering; body: ZoneNumbering; back: ZoneNumbering }} PageNumberingConfig
- * @typedef {{ zone: Zone | null; display: boolean; blank: boolean; empty: boolean; chapterTitles: string[]; partTitles: string[]; anchors: string[] }} PageFacts
+ * @typedef {{ zone: Zone | null; display: boolean; blank: boolean; empty: boolean; opener: boolean; chapterTitles: string[]; partTitles: string[]; anchors: string[] }} PageFacts
+ * `opener`: the page holds the start of a chapter or part.
  * `index` is the 0-based position in the map; problems and digests use
  * 1-based physical pages.
- * `folioText` is what the margin box shows ("" when hidden or a display
- * page); `refText` is the page's number regardless, for TOC rows and `{ref}`.
- * @typedef {{ index: number; zone: Zone; display: boolean; blank: boolean; empty: boolean; folio: number; folioText: string; refText: string; chapterTitle: string; partTitle: string; anchors: string[] }} PageEntry
+ * `folioText` is what the margin box shows ("" when hidden, a display page or
+ * a blank); `refText` is the page's number regardless, for TOC rows and
+ * `{ref}`. `head`: the page carries a running head — a body page that is not
+ * display, blank or an opener (Chicago).
+ * @typedef {{ index: number; zone: Zone; display: boolean; blank: boolean; empty: boolean; opener: boolean; head: boolean; folio: number; folioText: string; refText: string; chapterTitle: string; partTitle: string; anchors: string[] }} PageEntry
  * Seed and PageProblem are defined in ./page-map-types.ts; restated here for
  * this file's own checking.
  * @typedef {Record<string, string>} Seed anchor id → refText
@@ -110,18 +113,23 @@
       chapter: facts.chapterTitles[0] ?? before.chapter,
       part: facts.partTitles[0] ?? before.part,
     };
-    const running = zone === "body" && !facts.display;
+    const head = zone === "body" && !facts.display && !facts.blank &&
+      !facts.opener;
     const entry = {
       index: prev ? prev.index + 1 : 0,
       zone,
       display: facts.display,
       blank: facts.blank,
       empty: facts.empty,
+      opener: facts.opener,
+      head,
       folio,
-      folioText: show && !facts.display ? formatFolio(folio, style) : "",
+      folioText: show && !facts.display && !facts.blank
+        ? formatFolio(folio, style)
+        : "",
       refText: formatFolio(folio, style === "none" ? "arabic" : style),
-      chapterTitle: running ? titles.chapter : "",
-      partTitle: running ? titles.part : "",
+      chapterTitle: head ? titles.chapter : "",
+      partTitle: head ? titles.part : "",
       anchors: facts.anchors,
     };
     carried.set(entry, titles);
@@ -275,6 +283,10 @@
       display: page.classList.contains("pagedjs_display_page"),
       blank: page.classList.contains("pagedjs_blank_page"),
       empty: !(area.textContent ?? "").trim() && !area.querySelector("img"),
+      opener: !!area.querySelector(
+        ".chapter > .title:not([data-split-from]), " +
+          ".part > .title:not([data-split-from])",
+      ),
       chapterTitles: texts(".chapter .title"),
       // `>`: a chapter's title inside a part isn't the part's.
       partTitles: texts(".part > .title"),
@@ -292,6 +304,10 @@
     style.setProperty("--folio", JSON.stringify(entry.folioText));
     style.setProperty("--chapter-title", JSON.stringify(entry.chapterTitle));
     style.setProperty("--part-title", JSON.stringify(entry.partTitle));
+    // Literal and book-title running entries read var(--running-off, "…")
+    // (metadata/css-generator.ts); set, it blanks them.
+    if (entry.head) style.removeProperty("--running-off");
+    else style.setProperty("--running-off", '""');
   }
 
   Paged.registerHandlers(

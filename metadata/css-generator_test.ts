@@ -169,7 +169,7 @@ Deno.test("running header entries: odd→body:right, even→body:left, page-map 
   assert(!css.includes("string("));
   assertStringIncludes(
     css,
-    '@page body:right {\n  @top-right {\n    content: "Common Sense";\n    font-size: 8pt;',
+    '@page body:right {\n  @top-right {\n    content: var(--running-off, "Common Sense");\n    font-size: 8pt;',
   );
   assertStringIncludes(
     css,
@@ -187,7 +187,9 @@ Deno.test("running content vocabulary: page-number, none, literal (§4.8)", () =
     },
   });
   assertStringIncludes(css, "content: var(--folio);");
-  assertStringIncludes(css, 'content: "· 1943 ·";');
+  // Literals go through --running-off so the page map can blank them on
+  // openers and blank pages; page-number is a folio and keeps showing.
+  assertStringIncludes(css, 'content: var(--running-off, "· 1943 ·");');
 });
 
 Deno.test("TOC and ref numbers are written by the page map, not CSS (§4.11)", () => {

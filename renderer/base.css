@@ -174,7 +174,8 @@
 .bml .matter-title-page,
 .bml .matter-copyright,
 .bml .matter-dedication,
-.bml .matter-epigraph {
+.bml .matter-epigraph,
+.bml .matter-colophon {
   page: display;
 }
 /* Title and copyright pages set lines, not prose: no paragraph indent, and a

@@ -11,6 +11,7 @@ type PageFacts = {
   display: boolean;
   blank: boolean;
   empty: boolean;
+  opener: boolean;
   chapterTitles: string[];
   partTitles: string[];
   anchors: string[];
@@ -18,6 +19,7 @@ type PageFacts = {
 type PageEntry = Omit<PageFacts, "zone" | "chapterTitles" | "partTitles"> & {
   index: number;
   zone: Zone;
+  head: boolean;
   folio: number;
   folioText: string;
   refText: string;
@@ -62,6 +64,7 @@ const page = (p: Partial<PageFacts> = {}): PageFacts => ({
   display: false,
   blank: false,
   empty: false,
+  opener: false,
   chapterTitles: [],
   partTitles: [],
   anchors: [],
@@ -142,7 +145,7 @@ Deno.test("a plate counts, shows no folio, and titles carry past it", () => {
       ["body", "", "", ""],
       ["body", "3", "One", "Part"],
       ["body", "4", "Two", "Part"],
-      ["body", "5", "Two", "Part"],
+      ["body", "", "", ""], // blank: neither folio nor head
       ["back", "6", "", ""],
     ],
   );
@@ -152,6 +155,29 @@ Deno.test("a plate counts, shows no folio, and titles carry past it", () => {
     anchors: { x: "3" },
     blanks: [5],
   });
+});
+
+Deno.test("openers keep their folio but no running head; blanks lose both (Chicago)", () => {
+  const map = buildPageMap([
+    page({ zone: "body", opener: true, partTitles: ["Part"] }),
+    page({ zone: "body" }),
+    page({ blank: true, empty: true }), // forced recto
+    page({ zone: "body", opener: true, chapterTitles: ["One"] }),
+    page({ zone: "body" }),
+    page({ zone: "back", opener: true }),
+  ], numbering);
+  assertEquals(
+    map.map((p) => [p.folioText, p.refText, p.head, p.chapterTitle]),
+    [
+      ["1", "1", false, ""],
+      ["2", "2", true, ""],
+      ["", "3", false, ""],
+      ["4", "4", false, ""],
+      ["5", "5", true, "One"],
+      ["6", "6", false, ""],
+    ],
+  );
+  assertEquals(map[1]?.partTitle, "Part");
 });
 
 Deno.test("checkPageMap flags stranded pages and missing anchors", () => {
