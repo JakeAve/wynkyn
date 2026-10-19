@@ -6,11 +6,7 @@ import { chromium } from "playwright";
 import { buildBook, toHtml } from "./pipeline.ts";
 import type { PageProblem } from "../renderer/page-map-types.ts";
 import type { Metadata } from "../metadata/types.ts";
-
-const hasChrome = await Deno.stat("/Applications/Google Chrome.app").then(
-  () => true,
-  () => false,
-);
+import { hasChrome } from "../testing/chrome.ts";
 
 const ROOT = new URL("../testdata/", import.meta.url).pathname;
 const BOOKS = ["common-sense", "great-gatsby"];

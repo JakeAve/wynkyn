@@ -2,11 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { pageNumberingConfig } from "../metadata/css-generator.ts";
 import { PAGED_JS, toHtml } from "../server/pipeline.ts";
-
-const hasChrome = await Deno.stat("/Applications/Google Chrome.app").then(
-  () => true,
-  () => false,
-);
+import { hasChrome } from "../testing/chrome.ts";
 
 const para = (n: number) =>
   `<p>${

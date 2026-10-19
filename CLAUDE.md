@@ -66,8 +66,10 @@ printer, check one signature by hand, then the real export.
   `server/testdata/demo-book`. `testdata/common-sense` and
   `testdata/great-gatsby` are the tracked full-grammar corpus (`books_test.ts`)
   — public domain, kept in sync by hand with `books/` when styling changes.
-- CI (`.github/workflows/ci.yml`) runs `build:web` + `test` on push/PR; it has
-  no Chrome, so the PDF tests self-skip there.
+- CI (`.github/workflows/ci.yml`) runs `check`, `build:web` + `test` on macOS
+  (Chrome preinstalled; golden page maps need macOS font rasterisation). Chrome
+  tests gate on `hasChrome` from `testing/chrome.ts`, which launches Chrome once
+  and skips the tests only if that fails.
 - Sample manuscripts start from Project Gutenberg `download.txt` in the book
   dir; strip the Gutenberg header/footer, never leave it in `manuscript.md`.
 - Commit messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.

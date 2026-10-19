@@ -10,11 +10,7 @@ import type { Metadata } from "../metadata/types.ts";
 import { PAGED_JS } from "../server/pipeline.ts";
 import { render } from "./render.ts";
 import "./folios.js";
-
-const hasChrome = await Deno.stat("/Applications/Google Chrome.app").then(
-  () => true,
-  () => false,
-);
+import { hasChrome } from "../testing/chrome.ts";
 
 // deno-lint-ignore no-explicit-any
 const { anchorFolios } = (globalThis as any).BookPageMap;

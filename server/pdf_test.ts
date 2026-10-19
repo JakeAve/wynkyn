@@ -2,13 +2,9 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { renderPdf } from "./pdf.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
+import { hasChrome } from "../testing/chrome.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;
-const hasChrome = await Deno.stat("/Applications/Google Chrome.app").then(
-  () => true,
-  () => false,
-);
-
 Deno.test({
   name: "renderPdf paginates the demo book at trim size",
   ignore: !hasChrome,
