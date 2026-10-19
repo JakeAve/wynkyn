@@ -96,6 +96,7 @@ interface Pass {
   result: { map: any[]; seed: Record<string, string>; problems: unknown[] };
   margins: string[]; // computed bottom-center ::after content per page
   heads: string[][]; // non-empty top margin box ::after contents per page
+  widths: number[][]; // top-left/center/right margin box widths per page
   toc: Record<string, string>; // TOC target id → printed number
   ref: string;
 }
@@ -146,13 +147,26 @@ function pass(
           .map((box) => getComputedStyle(box, "::after").content)
           .filter((c) => c !== "none" && c !== '""')
       );
+      const widths = [...out.querySelectorAll(".pagedjs_page")].map((p) =>
+        ["left", "center", "right"].map((pos) =>
+          (p.querySelector(`.pagedjs_margin-top-${pos}`) as HTMLElement)
+            .offsetWidth
+        )
+      );
       const toc: Record<string, string> = {};
       for (const a of out.querySelectorAll(".toc a.page")) {
         toc[a.getAttribute("href")!.slice(1)] = a.textContent!;
       }
       const ref = out.querySelector("a.ref")?.textContent ?? "";
       previewer.polisher.destroy();
-      return { result: chunker.pageMapResult, margins, heads, toc, ref };
+      return {
+        result: chunker.pageMapResult,
+        margins,
+        heads,
+        widths,
+        toc,
+        ref,
+      };
     },
     { ...book, seed },
   ) as Promise<Pass>;
@@ -288,6 +302,89 @@ Deno.test({
       assert(
         result.map.length > notePage + 1,
         "the note continues on the next page",
+      );
+    }),
+});
+
+// A centre box beside a side box: Paged.js sizes the row from the boxes' text
+// in Margins.finalizePage, so the page map must have set it by then.
+const title = "A Chapter Title Long Enough to Measure";
+const centred = build(
+  [
+    "{chapter: one}",
+    "{title}",
+    title,
+    "",
+    prose(4),
+    "{illustration: a | placement: full-page}",
+    "Plate A",
+    "{illustration: b | placement: full-page}",
+    "Plate B",
+    "",
+    prose(6),
+  ].join("\n"),
+  {
+    ...metadata,
+    running: {
+      odd: [
+        { content: "chapter-title", area: "top-center" },
+        { content: "~", area: "top-right" },
+      ],
+    },
+  },
+);
+
+Deno.test({
+  name: "folios: margin boxes are sized as if the page map's text were " +
+    "literal CSS",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      const fromMap = await pass(page, centred, {});
+      assertEquals(fromMap.result.problems, []);
+      const literal = await pass(page, {
+        ...centred,
+        css: centred.css
+          .replaceAll("var(--chapter-title)", JSON.stringify(title))
+          .replaceAll('var(--running-off, "~")', '"~"'),
+      }, {});
+      const { map } = fromMap.result;
+      assertEquals(literal.widths.length, map.length);
+      // Both plates on one page get an entry, in order.
+      const plates = map.flatMap((p, i) => p.display ? [i] : []);
+      assertEquals(plates.length, 2);
+      assertEquals(plates[1], plates[0]! + 1);
+      // Openers and plates blank the head in the page-map render only.
+      const heads = map.flatMap((p, i) => p.head && i % 2 === 0 ? [i] : []);
+      assert(heads.length >= 3, "several recto running pages");
+      for (const i of heads) {
+        assertEquals(fromMap.heads[i]!.length, 2, `page ${i + 1} head`);
+        assertEquals(fromMap.widths[i], literal.widths[i], `page ${i + 1}`);
+      }
+    }),
+});
+
+Deno.test({
+  name: "folios: a page whose margins are sized before its entry is a problem",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      await page.evaluate(() => {
+        // deno-lint-ignore no-explicit-any
+        const { registeredHandlers } = (globalThis as any).Paged;
+        // deno-lint-ignore no-explicit-any
+        registeredHandlers.find((h: any) => h.name === "Folios")
+          .prototype.afterPageLayout = () => {};
+      });
+      const { result } = await pass(page, centred, {});
+      assertEquals(result.problems[0], {
+        page: 1,
+        message: "margins were sized before the page map reached this page",
+      });
+      // Still entered, so the map is whole.
+      assert(
+        // deno-lint-ignore no-explicit-any
+        !result.problems.some((p: any) => p.message === "no page-map entry"),
       );
     }),
 });

@@ -323,6 +323,9 @@
           { front: ARABIC, body: ARABIC, back: ARABIC };
         /** @type {string[]} */
         this.expected = [];
+        /** @type {PageProblem[]} */
+        this.problems = [];
+        this.chunker?.on("renderedPage", this.enterAppended.bind(this));
       }
 
       // Numbers are written before layout, from the seed, so nothing in the
@@ -348,46 +351,87 @@
         this.expected = [...targets];
       }
 
-      // Entries chain from the previous page element, not the previous
-      // afterPageLayout call: plates.js adds plate pages in finalizePage.
-      /** @param {Element} page @returns {PageEntry} */
-      entryFor(page) {
-        return /** @type {any} */ (page)[PAGE_ENTRY] ?? this.layOut(page);
+      /** @param {Element} page */
+      pageNumber(page) {
+        return [...this.chunker.pagesArea.querySelectorAll(".pagedjs_page")]
+          .indexOf(page) + 1;
       }
 
-      /** @param {Element} page @returns {PageEntry} */
+      // Each page's entry is computed once, from the previous page element's
+      // stored entry (the object itself: carried titles key on it), and never
+      // rewritten.
+      /** @param {Element} page */
       layOut(page) {
-        let prevEl = page.previousElementSibling;
-        while (prevEl && !prevEl.classList.contains("pagedjs_page")) {
-          prevEl = prevEl.previousElementSibling;
+        let prev = page.previousElementSibling;
+        while (prev && !prev.classList.contains("pagedjs_page")) {
+          prev = prev.previousElementSibling;
         }
-        const entry = pageEntry(
-          prevEl ? this.entryFor(prevEl) : null,
-          pageFacts(page),
-          this.numbering,
+        writeEntry(
+          page,
+          pageEntry(
+            /** @type {any} */ (prev)?.[PAGE_ENTRY] ?? null,
+            pageFacts(page),
+            this.numbering,
+          ),
         );
-        writeEntry(page, entry);
-        return entry;
       }
 
-      // Not redundant with afterRendered: Paged.js sizes the margin boxes in
-      // Margins.finalizePage right after afterPageLayout, so --folio and the
-      // titles must be on the page by then. afterRendered only covers pages
-      // added outside the flow (plates.js) and rewrites the rest unchanged.
+      // Paged.js sizes the margin boxes in Margins.finalizePage, right after
+      // afterPageLayout and before our finalizePage, measuring their text when
+      // a row has a centre box and a side box: --folio and the titles must be
+      // on the page by then. Flow pages and padding blanks get them here.
       /** @param {Element} pageElement */
       afterPageLayout(pageElement) {
         this.layOut(pageElement);
       }
 
+      // Runs after Margins.finalizePage for the same page: a page without its
+      // entry here had its margins sized from empty variables (a Paged.js that
+      // reorders these hooks). Entered anyway so the map stays whole.
+      /** @param {Element} pageElement */
+      finalizePage(pageElement) {
+        if (/** @type {any} */ (pageElement)[PAGE_ENTRY]) return;
+        this.problems.push({
+          page: this.pageNumber(pageElement),
+          message: "margins were sized before the page map reached this page",
+        });
+        this.layOut(pageElement);
+      }
+
+      // Plate pages: plates.js appends them in its own finalizePage, which
+      // Paged.js runs alongside ours (the second plate on a page lands after
+      // an await), so they're entered once every finalizePage has settled.
+      // They're display pages: no margin content to size.
+      /** @param {{ element: Element }} page */
+      enterAppended({ element }) {
+        for (
+          let el = element.nextElementSibling;
+          el;
+          el = el.nextElementSibling
+        ) {
+          if (
+            el.classList.contains("pagedjs_page") &&
+            !(/** @type {any} */ (el)[PAGE_ENTRY])
+          ) this.layOut(el);
+        }
+      }
+
       afterRendered() {
         const pages = this.chunker.pagesArea.querySelectorAll(".pagedjs_page");
-        const map = buildPageMap([...pages].map(pageFacts), this.numbering);
-        map.forEach((entry, i) => writeEntry(pages[i], entry));
+        /** @type {PageEntry[]} */
+        const map = [];
+        [...pages].forEach((page, i) => {
+          const entry = /** @type {any} */ (page)[PAGE_ENTRY];
+          if (entry) map.push(entry);
+          else {
+            this.problems.push({ page: i + 1, message: "no page-map entry" });
+          }
+        });
         /** @type {RenderResult} */
         this.chunker.pageMapResult = {
           map,
           seed: anchorFolios(map),
-          problems: checkPageMap(map, this.expected),
+          problems: [...this.problems, ...checkPageMap(map, this.expected)],
         };
       }
     },
