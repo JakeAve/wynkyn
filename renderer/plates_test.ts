@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { pageNumberingConfig } from "../metadata/css-generator.ts";
-import { toHtml } from "../server/pipeline.ts";
+import { PAGED_JS, toHtml } from "../server/pipeline.ts";
 
 const hasChrome = await Deno.stat("/Applications/Google Chrome.app").then(
   () => true,
@@ -92,7 +92,7 @@ Deno.test({
   fn: () =>
     withChrome(async (page) => {
       await page.setContent(
-        `<!doctype html><script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.js"></script><script>${platesJs}</script><div id="out"></div>`,
+        `<!doctype html><script>${PAGED_JS}</script><script>${platesJs}</script><div id="out"></div>`,
       );
       await page.evaluate(`(async () => {
         const css = URL.createObjectURL(new Blob([${

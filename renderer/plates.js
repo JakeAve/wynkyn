@@ -3,7 +3,7 @@
 // layout and gets a page of its own right after the page its anchor lands on:
 // the text around it still fills whole pages, and the plate interrupts the
 // text mid-paragraph like a tipped-in plate. Plain JS on the global `Paged`:
-// server/pipeline.ts inlines it after paged.polyfill.js, web/src/app.ts
+// server/pipeline.ts inlines it after paged.js, web/src/app.ts
 // imports it.
 Paged.registerHandlers(
   class Plates extends Paged.Handler {

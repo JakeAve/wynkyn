@@ -9,7 +9,7 @@ Deno.test("bml cli: diagnostics format and standalone html", async () => {
   );
   const html = toHtml(await buildBook("server/testdata", "demo-book"));
   assertStringIncludes(html, "<!doctype html>");
-  assertStringIncludes(html, "paged.polyfill.js");
+  assertStringIncludes(html, "@license Paged.js v0.4.3");
   assertStringIncludes(html, "@page");
 });
 

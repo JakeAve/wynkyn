@@ -69,7 +69,8 @@ Deno.test("buildBook with an edition: same HTML, that edition's CSS", async () =
 Deno.test("toHtml drives Paged.js itself, through the page map", async () => {
   const b = await buildBook(ROOT, "demo-book");
   const html = toHtml(b);
-  assert(html.includes("PagedConfig = { auto: false }"));
+  assert(html.includes("@license Paged.js v0.4.3")); // vendored, inlined
+  assert(!html.includes("<script src="), "no external script loads");
   assert(html.includes("globalThis).BookPageMap")); // folios.js inlined
   assert(html.includes("BookPageMap.settle("));
   assert(html.includes(JSON.stringify(b.pageNumbering)));

@@ -13,6 +13,7 @@ import {
 } from "./editions.ts";
 
 const WEB_DIR = new URL("../web/", import.meta.url);
+const PAGED_DIR = new URL("../vendor/pagedjs/", import.meta.url);
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -500,6 +501,7 @@ export async function startServer(
     if (path === "/" || path === "/index.html") {
       return serveStatic(WEB_DIR, "index.html");
     }
+    if (path === "/vendor/paged.js") return serveStatic(PAGED_DIR, "paged.js");
     if (path.startsWith("/web/")) {
       return serveStatic(WEB_DIR, path.slice("/web/".length));
     }

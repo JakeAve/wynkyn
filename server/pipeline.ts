@@ -17,6 +17,11 @@ import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 const BASE_CSS = await Deno.readTextFile(
   new URL("../renderer/base.css", import.meta.url),
 );
+// Paged.js 0.4.3, vendored (see vendor/pagedjs_test.ts). Shared by toHtml and
+// the browser tests so nothing loads it from a CDN.
+export const PAGED_JS = await Deno.readTextFile(
+  new URL("../vendor/pagedjs/paged.js", import.meta.url),
+);
 const PLATES_JS = await Deno.readTextFile(
   new URL("../renderer/plates.js", import.meta.url),
 );
@@ -83,11 +88,10 @@ export function toHtml(b: BuildResult): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${b.bookTitle}</title>
 ${b.fontLinks}
 <style id="book-css">${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
-<script>window.PagedConfig = { auto: false };
-const BOOK_NUMBERING = ${
+<script>const BOOK_NUMBERING = ${
     JSON.stringify(b.pageNumbering).replaceAll("<", "\\u003c")
   };</script>
-<script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js"></script>
+<script>${PAGED_JS}</script>
 <script>${PLATES_JS}</script>
 <script>${FOLIOS_JS}</script>
 <script>${DRIVER_JS}</script>

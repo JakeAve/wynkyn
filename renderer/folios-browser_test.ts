@@ -7,6 +7,7 @@ import {
   pageNumberingConfig,
 } from "../metadata/css-generator.ts";
 import type { Metadata } from "../metadata/types.ts";
+import { PAGED_JS } from "../server/pipeline.ts";
 import { render } from "./render.ts";
 import "./folios.js";
 
@@ -107,7 +108,7 @@ async function withPage(fn: (page: Page) => Promise<void>) {
   try {
     const page = await browser.newPage();
     await page.setContent(
-      `<!doctype html><script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.js"></script>${
+      `<!doctype html><script>${PAGED_JS}</script>${
         scripts.map((s) => `<script>${s}</script>`).join("")
       }<div id="out"></div>`,
     );

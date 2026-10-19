@@ -30,6 +30,10 @@ themselves on the next save.
 - `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored).
   Paged.js paginates the preview.
 
+Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
+update the checksum in `vendor/pagedjs_test.ts`, then read the golden page-map
+diff.
+
 ## Commands
 
 - `deno task test` all tests (`*_test.ts` next to each module)
