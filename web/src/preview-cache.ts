@@ -20,9 +20,18 @@ export function renderHash(
     domCss: string;
     pagedCss: string;
     fontLinks: string;
+    // Folio styles no longer show up in pagedCss; they change the render too.
+    pageNumbering?: unknown;
   },
 ): string {
-  const text = [u.html, u.baseCss, u.domCss, u.pagedCss, u.fontLinks].join(SEP);
+  const text = [
+    u.html,
+    u.baseCss,
+    u.domCss,
+    u.pagedCss,
+    u.fontLinks,
+    JSON.stringify(u.pageNumbering ?? null),
+  ].join(SEP);
   let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
   for (let i = 0; i < text.length; i++) {
     const ch = text.charCodeAt(i);

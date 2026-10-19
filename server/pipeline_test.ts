@@ -17,6 +17,7 @@ Deno.test("buildBook produces html, css, font links, and title", async () => {
   assert(b.baseCss.length > 0);
   assert(b.domCss.length > 0);
   assert(b.pagedCss.includes("@page"));
+  assertEquals(b.pageNumbering.body.show, true);
   assert(b.fontLinks.includes("family=EB+Garamond"));
   assertEquals(b.diagnostics, []);
 });

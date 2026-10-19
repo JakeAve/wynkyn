@@ -1,5 +1,6 @@
 // web/src/preview.ts — Paged.js re-render + font links (spec §7.6).
 // Paged.js is the CDN global from index.html; there is no npm build to bundle.
+import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
 import { matchKey, type StyleEntry } from "./style-catalog.ts";
 import {
   type CachedRender,
@@ -21,6 +22,7 @@ export interface UpdateMessage {
   baseCss: string;
   domCss: string;
   pagedCss: string;
+  pageNumbering: PageNumberingConfig;
   fontLinks: string;
   diagnostics: { line: number; message: string }[];
 }

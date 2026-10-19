@@ -1,7 +1,7 @@
 // metadata/css-generator_test.ts
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { generateDomCSS } from "./css-generator.ts";
-import { generatePagedCSS } from "./css-generator.ts";
+import { generatePagedCSS, pageNumberingConfig } from "./css-generator.ts";
 
 Deno.test("body maps to .bml with font alias resolved", () => {
   const css = generateDomCSS({
@@ -115,14 +115,43 @@ Deno.test("page numbering per zone with style mapping (§4.7)", () => {
   assert(!css.includes("page: front")); // zone page names live in base.css
   assertStringIncludes(
     css,
-    "@page front {\n  @bottom-center {\n    content: counter(page, lower-roman);",
+    "@page front {\n  @bottom-center {\n    content: var(--folio);",
   );
-  assertStringIncludes(css, "content: counter(page, decimal);");
+  assertStringIncludes(
+    css,
+    "@page body {\n  @bottom-center {\n    content: var(--folio);",
+  );
   assert(!css.includes("@page back {")); // show:false → no margin box for back
-  assertStringIncludes(css, ".zone-body { counter-reset: page 1; }");
+  // Numbers come from the page map, not Paged.js counters.
+  assert(!css.includes("counter-reset: page"));
+  assert(!css.includes("counter(page"));
 });
 
-Deno.test("running header entries: odd→body:right, even→body:left, string-set hooks (§4.8)", () => {
+Deno.test("pageNumberingConfig: per-zone style and show, defaulting to arabic/shown (§4.7)", () => {
+  assertEquals(pageNumberingConfig({}), {
+    front: { style: "arabic", show: true },
+    body: { style: "arabic", show: true },
+    back: { style: "arabic", show: true },
+  });
+  assertEquals(
+    pageNumberingConfig({
+      numbering: {
+        pages: {
+          "front-matter": { style: "roman-lower" },
+          body: { show: false },
+          "back-matter": { style: "none", show: true },
+        },
+      },
+    }),
+    {
+      front: { style: "roman-lower", show: true },
+      body: { style: "arabic", show: false },
+      back: { style: "none", show: true },
+    },
+  );
+});
+
+Deno.test("running header entries: odd→body:right, even→body:left, page-map variables (§4.8)", () => {
   const css = generatePagedCSS(
     {
       running: {
@@ -136,21 +165,15 @@ Deno.test("running header entries: odd→body:right, even→body:left, string-se
     },
     { bookTitle: "Common Sense" },
   );
-  assertStringIncludes(
-    css,
-    ".chapter .title { string-set: chapter-title content(text); }",
-  );
-  assertStringIncludes(
-    css,
-    ".part .title { string-set: part-title content(text); }",
-  );
+  assert(!css.includes("string-set"));
+  assert(!css.includes("string("));
   assertStringIncludes(
     css,
     '@page body:right {\n  @top-right {\n    content: "Common Sense";\n    font-size: 8pt;',
   );
   assertStringIncludes(
     css,
-    "@page body:left {\n  @top-left {\n    content: string(chapter-title);\n    font-style: italic;",
+    "@page body:left {\n  @top-left {\n    content: var(--chapter-title);\n    font-style: italic;",
   );
 });
 
@@ -163,64 +186,16 @@ Deno.test("running content vocabulary: page-number, none, literal (§4.8)", () =
       ],
     },
   });
-  assertStringIncludes(css, "content: counter(page);");
+  assertStringIncludes(css, "content: var(--folio);");
   assertStringIncludes(css, 'content: "· 1943 ·";');
 });
 
-Deno.test("TOC folios: page link, zone styles; ref unchanged (§4.11)", () => {
+Deno.test("TOC and ref numbers are written by the page map, not CSS (§4.11)", () => {
   const css = generatePagedCSS({
-    numbering: {
-      pages: {
-        "front-matter": { style: "roman-lower" },
-        "back-matter": { style: "alpha-upper" },
-      },
-    },
+    numbering: { pages: { "front-matter": { style: "roman-lower" } } },
   });
-  assertStringIncludes(
-    css,
-    ".toc a.page::after { content: target-counter(attr(href url), page, decimal); }",
-  );
-  assertStringIncludes(
-    css,
-    ".toc .toc-front a.page::after { content: target-counter(attr(href url), page, lower-roman); }",
-  );
-  assertStringIncludes(
-    css,
-    ".toc .toc-back a.page::after { content: target-counter(attr(href url), page, upper-alpha); }",
-  );
-  assertStringIncludes(
-    css,
-    "a.ref::after { content: target-counter(attr(href url), page); }",
-  );
-  assert(!css.includes("a.entry::after"));
-});
-
-Deno.test("TOC zone folios default to decimal when a zone has no style or 'none'", () => {
-  const css = generatePagedCSS({
-    numbering: { pages: { "front-matter": { style: "none" } } },
-  });
-  assertStringIncludes(
-    css,
-    ".toc a.page::after { content: target-counter(attr(href url), page, decimal); }",
-  );
-  assertStringIncludes(
-    css,
-    ".toc .toc-front a.page::after { content: target-counter(attr(href url), page, decimal); }",
-  );
-  assertStringIncludes(
-    css,
-    ".toc .toc-back a.page::after { content: target-counter(attr(href url), page, decimal); }",
-  );
-});
-
-Deno.test("TOC generic folio rule honors body page style (§4.11)", () => {
-  const css = generatePagedCSS({
-    numbering: { pages: { body: { style: "roman-lower" } } },
-  });
-  assertStringIncludes(
-    css,
-    ".toc a.page::after { content: target-counter(attr(href url), page, lower-roman); }",
-  );
+  assert(!css.includes("target-counter"));
+  assert(!css.includes("::after"));
 });
 
 Deno.test("footnote float only when placement is footnote (§4.10)", () => {
@@ -285,18 +260,18 @@ Deno.test("page-number css props are emitted in the zone's @bottom-center box", 
     },
   });
   const box = css.slice(css.indexOf("@page body {"));
-  assertStringIncludes(box, "content: counter(page, decimal);");
+  assertStringIncludes(box, "content: var(--folio);");
   assertStringIncludes(box, "font-size: 9pt;");
   assertStringIncludes(box, 'font-family: "Cormorant Garamond";');
 });
 
-Deno.test("page numbering 'words' falls back to decimal — CSS counters have no spelled form (§4.7)", () => {
+Deno.test("page numbering 'words' still emits the folio box — formatting is the page map's (§4.7)", () => {
   const css = generatePagedCSS({
     numbering: { pages: { body: { style: "words" } } },
   });
   assertStringIncludes(
     css,
-    "@page body {\n  @bottom-center {\n    content: counter(page, decimal);",
+    "@page body {\n  @bottom-center {\n    content: var(--folio);",
   );
 });
 

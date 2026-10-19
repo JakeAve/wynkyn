@@ -1361,9 +1361,9 @@ since CSS has no direct equivalent.
 
 **`style` options:** `"arabic"`, `"roman-upper"`, `"roman-lower"`,
 `"alpha-upper"`, `"alpha-lower"`, `"words"` (One, Two … Ninety-Nine; digits from
-100), `"none"`. `"words"` applies to `chapters` and `parts` only — page counters
-are CSS counters with no spelled form, so `pages.*.style: "words"` renders as
-arabic and the configuration panel does not offer it there.
+100), `"none"`. `"words"` applies to `chapters` and `parts` only —
+`pages.*.style: "words"` renders as arabic and the configuration panel does not
+offer it there.
 
 ```json
 "numbering": {
@@ -1389,12 +1389,16 @@ arabic and the configuration panel does not offer it there.
   book body, so they inherit nothing from `elements.body` — without `pages.css`
   a folio renders in the browser's default font. Edited by the Styles panel
   (§7.4), which lists "All page numbers" alongside the three zones.
-- **Current implementation note:** body page numbers are emitted via a single
-  universal `@page { @bottom-center { content: counter(page, <style>); } }` rule
-  (not per-odd/even), because Paged.js support for `@bottom-center` nested
-  inside `@page :left`/`:right` is unreliable across versions. Front-matter and
-  back-matter numbering restarts are handled with separate counter-reset rules
-  keyed to the first page of each section.
+- **Current implementation note:** folios are not Paged.js counters. A handler
+  (`renderer/folios.js`) builds a page map after layout: for every page its
+  zone, its folio (counted per zone, body restarting at 1, formatted in the
+  zone's `style`) and its running titles. It writes the folio to the page as the
+  CSS variable `--folio`, and generated CSS reads it in one
+  `@page front|body|back { @bottom-center { content: var(--folio); } }` rule per
+  shown zone (not per-odd/even, because Paged.js support for `@bottom-center`
+  nested inside `@page :left`/`:right` is unreliable across versions). A zone
+  with `show: false` or style `"none"` gets no rule. The per-zone `style` and
+  `show` reach the handler as the build's `pageNumbering`.
 
 ### 4.8 Section: `running`
 
@@ -1433,16 +1437,21 @@ panel on each running entry (§7.5).
 }
 ```
 
-Implemented via Paged.js `string-set`/`string()` for dynamic content values
-(`book-title`, `chapter-title`, etc.). Paged.js is the single pagination engine
-for both preview and export (§5.4, §6), so no native-Chrome fallback is needed.
+Implemented from the page map (§4.7): after layout, `renderer/folios.js` records
+each body page's chapter and part title (the first on the page, else carried
+over from the previous page) and writes them to the page as `--chapter-title`
+and `--part-title`. `chapter-title`, `part-title` and `page-number` read
+`var(--chapter-title)`, `var(--part-title)` and `var(--folio)` in the margin
+box; `book-title` and literal strings are emitted as plain strings. Paged.js
+does the fragmentation for both preview and export (§5.4, §6), so no
+native-Chrome fallback is needed.
 
 Running entries apply to body pages only (`@page body:right` /
 `@page
 body:left`): front and back matter keep their folios (§4.7) but carry no
-running head, and display matter carries neither. A `string()` keeps its last
-value, so an unscoped head would carry the final chapter's title into the back
-matter.
+running head, and display matter carries neither. The page map leaves the title
+variables empty outside the body, so a head can't carry the final chapter's
+title into the back matter.
 
 ### 4.9 Section: `notes`
 
@@ -1470,20 +1479,21 @@ When `metadata.json` is present, the renderer:
 5. Generates `.is-*` classes from `is`.
 6. Applies chapter/part number formatting from `numbering`.
 7. Emits page-number `@page` rules from `numbering.pages`, and margin-box rules
-   from `running`.
+   from `running`; both read the page map's CSS variables (§4.7, §4.8).
 8. Resolves image slugs (`{illustration: slug}`, `{dropcap | image: slug}`)
    against the book's `images/` directory, trying `<slug>.svg`, `.png`, `.jpg`,
    `.jpeg`, `.webp` in that order and using the first match; an unresolved slug
    renders a visible placeholder, not an error.
-9. Resolves `{ref: slug}` to the target's page number via Paged.js
-   `target-counter()`.
+9. Resolves `{ref: slug}` to the target's page number: the page map (§4.7)
+   records the page each anchor lands on, and its folio is written into the
+   `a.ref` link as text.
 10. Generates the table of contents for a `{matter: toc}` block from the
     document tree (§3.4.6): one `.entry` row per item, classed `toc-front`,
     `toc-part`, `toc-chapter`, `toc-heading` or `toc-back` (rows under a part
     also `in-part`), each holding optional `.number` and `.subtitle`, a `.label`
-    link, an empty `.leader`, and an empty `.page` link whose `::after` is
-    `target-counter()`. If the toc block contains manuscript prose, that prose
-    is used verbatim instead.
+    link, an empty `.leader`, and a `.page` link whose text is the target's
+    folio from the page map, in its zone's page-number style (§4.7). If the toc
+    block contains manuscript prose, that prose is used verbatim instead.
 11. Places `{note:}` content as footnotes or endnotes per `notes.placement`
     (§4.9).
 

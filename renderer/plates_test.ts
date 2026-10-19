@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
+import { pageNumberingConfig } from "../metadata/css-generator.ts";
 import { toHtml } from "../server/pipeline.ts";
 
 const hasChrome = await Deno.stat("/Applications/Google Chrome.app").then(
@@ -77,6 +78,7 @@ Deno.test({
         baseCss,
         domCss: "",
         pagedCss,
+        pageNumbering: pageNumberingConfig({}),
       }));
       await page.waitForSelector("html[data-paged=done]", { timeout: 60_000 });
       await assertPlate(page);

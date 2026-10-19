@@ -9,6 +9,12 @@ const base = {
   fontLinks: "",
 };
 
+Deno.test("renderHash: a folio style change alone changes the hash", () => {
+  const a = { ...base, pageNumbering: { body: { style: "arabic" } } };
+  const b = { ...base, pageNumbering: { body: { style: "roman-lower" } } };
+  assertNotEquals(renderHash(a), renderHash(b));
+});
+
 Deno.test("renderHash: same input yields same hash", () => {
   assertEquals(renderHash(base), renderHash({ ...base }));
 });

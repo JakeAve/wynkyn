@@ -7,6 +7,8 @@ import {
   generateDomCSS,
   generateFontLinks,
   generatePagedCSS,
+  type PageNumberingConfig,
+  pageNumberingConfig,
 } from "../metadata/css-generator.ts";
 import { render } from "../renderer/render.ts";
 import { metadataPath } from "./editions.ts";
@@ -35,6 +37,7 @@ export interface BuildResult {
   baseCss: string;
   domCss: string;
   pagedCss: string;
+  pageNumbering: PageNumberingConfig; // per-zone folio style, for the page map
   fontLinks: string; // <link> tags for Google Fonts
   diagnostics: Diagnostic[];
 }
@@ -134,6 +137,7 @@ export async function buildBook(
     baseCss: BASE_CSS,
     domCss: generateDomCSS(m),
     pagedCss: generatePagedCSS(m, { bookTitle }),
+    pageNumbering: pageNumberingConfig(m),
     fontLinks: generateFontLinks(m),
     diagnostics: doc.diagnostics,
   };

@@ -1,6 +1,6 @@
 // metadata/css-generator.ts — Metadata → CSS strings (spec §5.2). Pure, no I/O.
 import type { CssProps, ElementStyle, Metadata } from "./types.ts";
-import type { PageNumbering, RunningEntry } from "./types.ts";
+import type { NumberingStyle, PageNumbering, RunningEntry } from "./types.ts";
 
 const MATTER_KEYS = new Set([
   "half-title",
@@ -104,25 +104,43 @@ export function generateDomCSS(metadata: Metadata): string {
   return out.join("");
 }
 
-const NUM_STYLE: Record<string, string> = {
-  "arabic": "decimal",
-  "roman-upper": "upper-roman",
-  "roman-lower": "lower-roman",
-  "alpha-upper": "upper-alpha",
-  "alpha-lower": "lower-alpha",
-  "words": "decimal",
-};
+export interface ZoneNumbering {
+  style: NumberingStyle;
+  show: boolean;
+}
+
+export interface PageNumberingConfig {
+  front: ZoneNumbering;
+  body: ZoneNumbering;
+  back: ZoneNumbering;
+}
+
+// What the page map (renderer/folios.js) formats folios from, per zone (§4.7).
+export function pageNumberingConfig(metadata: Metadata): PageNumberingConfig {
+  const pages = metadata.numbering?.pages;
+  const zone = (
+    cfg: { style?: NumberingStyle; show?: boolean } | undefined,
+  ) => ({
+    style: cfg?.style ?? "arabic",
+    show: cfg?.show ?? true,
+  });
+  return {
+    front: zone(pages?.["front-matter"]),
+    body: zone(pages?.body),
+    back: zone(pages?.["back-matter"]),
+  };
+}
 
 function runningContent(value: string, bookTitle?: string): string {
   switch (value) {
     case "book-title":
       return JSON.stringify(bookTitle ?? "");
     case "chapter-title":
-      return "string(chapter-title)";
+      return "var(--chapter-title)";
     case "part-title":
-      return "string(part-title)";
+      return "var(--part-title)";
     case "page-number":
-      return "counter(page)";
+      return "var(--folio)";
     case "none":
       return "none";
     default:
@@ -158,19 +176,20 @@ export function generatePagedCSS(
     }
   }
 
-  // 2. Page numbers per zone (§4.7). The zone → named-page mapping itself is
-  // in base.css, ahead of the break rules (see the note there).
+  // 2. Page numbers per zone (§4.7). The folio text is in --folio, set on each
+  // page by the page map (renderer/folios.js); the zone → named-page mapping
+  // is in base.css.
   const pages = metadata.numbering?.pages;
-  const zones: Array<[string, PageNumbering | undefined]> = [
+  const numbering = pageNumberingConfig(metadata);
+  const zones: Array<[keyof PageNumberingConfig, PageNumbering | undefined]> = [
     ["front", pages?.["front-matter"]],
     ["body", pages?.body],
     ["back", pages?.["back-matter"]],
   ];
   for (const [name, cfg] of zones) {
-    const style = cfg?.style ?? "arabic";
-    const show = cfg?.show ?? true;
+    const { style, show } = numbering[name];
     if (show && style !== "none") {
-      const decls = [`    content: counter(page, ${NUM_STYLE[style]});`];
+      const decls = [`    content: var(--folio);`];
       // Shared folio styling first, the zone's own `css` overrides it (§4.7).
       for (const [k, v] of Object.entries({ ...pages?.css, ...cfg?.css })) {
         decls.push(
@@ -184,13 +203,10 @@ export function generatePagedCSS(
       );
     }
   }
-  out.push(`.zone-body { counter-reset: page 1; }\n`);
 
   // 3. Running headers (§4.8) — body pages only, odd pages are recto (:right).
-  // A string() keeps its last value, so an unscoped head would carry the final
-  // chapter's title into the back matter.
-  out.push(`.chapter .title { string-set: chapter-title content(text); }\n`);
-  out.push(`.part .title { string-set: part-title content(text); }\n`);
+  // The titles come from --chapter-title / --part-title (page map), which are
+  // empty outside the body.
   const emitEntries = (
     side: "body:right" | "body:left",
     entries: RunningEntry[] | undefined,
@@ -232,28 +248,7 @@ export function generatePagedCSS(
     }\n}\n`,
   );
 
-  // 4. TOC + cross-reference page numbers (§4.11 items 9–10). Front/back rows
-  // show the folio in their zone's own style (a preface is "v", not "5").
-  const tocStyle = (cfg: PageNumbering | undefined) =>
-    NUM_STYLE[cfg?.style ?? "arabic"] ?? "decimal";
-  out.push(
-    `.toc a.page::after { content: target-counter(attr(href url), page, ${
-      tocStyle(pages?.body)
-    }); }\n`,
-  );
-  out.push(
-    `.toc .toc-front a.page::after { content: target-counter(attr(href url), page, ${
-      tocStyle(pages?.["front-matter"])
-    }); }\n`,
-  );
-  out.push(
-    `.toc .toc-back a.page::after { content: target-counter(attr(href url), page, ${
-      tocStyle(pages?.["back-matter"])
-    }); }\n`,
-  );
-  out.push(`a.ref::after { content: target-counter(attr(href url), page); }\n`);
-
-  // 5. Footnote placement (§4.10)
+  // 4. Footnote placement (§4.10)
   if (metadata.notes?.placement === "footnote") {
     out.push(`.note { float: footnote; }\n`);
   }
