@@ -112,7 +112,7 @@ Deno.test("page numbering per zone with style mapping (§4.7)", () => {
       },
     },
   });
-  assertStringIncludes(css, ".zone-front { page: front; }");
+  assert(!css.includes("page: front")); // zone page names live in base.css
   assertStringIncludes(
     css,
     "@page front {\n  @bottom-center {\n    content: counter(page, lower-roman);",
@@ -122,7 +122,7 @@ Deno.test("page numbering per zone with style mapping (§4.7)", () => {
   assertStringIncludes(css, ".zone-body { counter-reset: page 1; }");
 });
 
-Deno.test("running header entries: odd→:right, even→:left, string-set hooks (§4.8)", () => {
+Deno.test("running header entries: odd→body:right, even→body:left, string-set hooks (§4.8)", () => {
   const css = generatePagedCSS(
     {
       running: {
@@ -146,11 +146,11 @@ Deno.test("running header entries: odd→:right, even→:left, string-set hooks 
   );
   assertStringIncludes(
     css,
-    '@page :right {\n  @top-right {\n    content: "Common Sense";\n    font-size: 8pt;',
+    '@page body:right {\n  @top-right {\n    content: "Common Sense";\n    font-size: 8pt;',
   );
   assertStringIncludes(
     css,
-    "@page :left {\n  @top-left {\n    content: string(chapter-title);\n    font-style: italic;",
+    "@page body:left {\n  @top-left {\n    content: string(chapter-title);\n    font-style: italic;",
   );
 });
 

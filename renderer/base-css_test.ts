@@ -43,3 +43,22 @@ Deno.test("base.css uses no adjacent-sibling combinator (Paged.js drops those ru
     }`,
   );
 });
+
+Deno.test("base.css names the zone pages before any break-before rule (Paged.js only dedups the zone break then)", () => {
+  // Paged.js drops an explicit `break-before: page` when the element already
+  // starts a differently named page — but it reads the break rule with the
+  // page names already on the tree only if those rules came first. Any later
+  // and every zone opened with a blank page (an empty verso folio "1" before
+  // chapter one, a blank recto with a running head before the colophon).
+  const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url))
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const firstBreak = css.indexOf("break-before");
+  assert(firstBreak > 0, "expected a break-before rule in base.css");
+  for (const zone of ["front", "body", "back"]) {
+    const at = css.indexOf(`.zone-${zone} {\n  page: ${zone};`);
+    assert(
+      at >= 0 && at < firstBreak,
+      `.zone-${zone} { page: ${zone} } must precede the first break-before rule`,
+    );
+  }
+});

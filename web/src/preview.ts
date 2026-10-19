@@ -69,6 +69,23 @@ export async function renderPreview(
     // no textContent; the only way to spot and serialize them is by diffing
     // the head around the render and reading el.sheet.cssRules.
     const before = new Set(document.head.querySelectorAll("style"));
+    // The old pages' sheets stay attached while the new render runs, and
+    // Paged.js wrote their page-counter resets as bare `[data-page-number="6"]`
+    // rules. Those match the new pages too, and target-counter reads each
+    // page's computed counter-reset to number the TOC — so a TOC folio came
+    // out wrong whenever the reset moved to an earlier page than the last
+    // render's. Pin the old rules to the old pages before rendering.
+    for (const el of liveStyles) {
+      for (const r of (el as HTMLStyleElement).sheet?.cssRules ?? []) {
+        if (
+          r instanceof CSSStyleRule &&
+          r.selectorText.includes("[data-page-number")
+        ) {
+          r.selectorText =
+            `:not(.preview-stage) > .pagedjs_pages > ${r.selectorText}`;
+        }
+      }
+    }
     await previewer.preview(update.html, [blobUrl], stage);
     const inserted = [...document.head.querySelectorAll("style")].filter((el) =>
       !before.has(el)
@@ -85,20 +102,20 @@ export async function renderPreview(
       [...(el as HTMLStyleElement).sheet?.cssRules ?? []].map((r) => r.cssText)
         .join("\n")
     );
-    // Paged.js writes unset running strings inline as a lone double quote;
-    // that unbalanced quote swallows the next declarations on an innerHTML
-    // round trip, so normalize each to an empty CSS string before caching.
+    // Paged.js writes running strings inline without a closing quote
+    // (`--pagedjs-string-first-x: "Title`, or a lone `"` when unset). On an
+    // innerHTML round trip that string runs on to the next quote and swallows
+    // the declarations after it, so close each one before caching.
     for (
       const el of container.querySelectorAll<HTMLElement>(
         '[style*="--pagedjs-string"]',
       )
     ) {
       for (const name of el.style) {
-        if (
-          name.startsWith("--pagedjs-string") &&
-          el.style.getPropertyValue(name) === '"'
-        ) {
-          el.style.setProperty(name, '""');
+        if (!name.startsWith("--pagedjs-string")) continue;
+        const v = el.style.getPropertyValue(name);
+        if (v.startsWith('"') && !/[^\\]"$/.test(v)) {
+          el.style.setProperty(name, v + '"');
         }
       }
     }

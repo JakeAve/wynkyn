@@ -1437,6 +1437,13 @@ Implemented via Paged.js `string-set`/`string()` for dynamic content values
 (`book-title`, `chapter-title`, etc.). Paged.js is the single pagination engine
 for both preview and export (§5.4, §6), so no native-Chrome fallback is needed.
 
+Running entries apply to body pages only (`@page body:right` /
+`@page
+body:left`): front and back matter keep their folios (§4.7) but carry no
+running head, and display matter carries neither. A `string()` keeps its last
+value, so an unscoped head would carry the final chapter's title into the back
+matter.
+
 ### 4.9 Section: `notes`
 
 Controls how `{note:}` content (§3.6.8) is placed.

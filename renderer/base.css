@@ -22,6 +22,20 @@
   float: left;
   padding-right: 0.05em;
 }
+/* Zone page names (spec §4.7). Paged.js drops an explicit `break-before: page`
+   between two differently named pages — the name change already breaks there —
+   but only if the names are on the tree when it reads the break rule. So these
+   must come before the break rules below; any later and every zone opens with
+   a blank page (an empty folio "1" before chapter one). */
+.zone-front {
+  page: front;
+}
+.zone-body {
+  page: body;
+}
+.zone-back {
+  page: back;
+}
 /* Zero own-specificity (like the TOC rules below) so a book's metadata can say
    `chapter: { "break-before": "auto" }` and have chapters run on instead of
    each opening a page — base.css is emitted before domCss, so the override

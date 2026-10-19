@@ -158,15 +158,15 @@ export function generatePagedCSS(
     }
   }
 
-  // 2. Zone-named pages + page numbers (§4.7)
+  // 2. Page numbers per zone (§4.7). The zone → named-page mapping itself is
+  // in base.css, ahead of the break rules (see the note there).
   const pages = metadata.numbering?.pages;
-  const zones: Array<[string, string, PageNumbering | undefined]> = [
-    ["zone-front", "front", pages?.["front-matter"]],
-    ["zone-body", "body", pages?.body],
-    ["zone-back", "back", pages?.["back-matter"]],
+  const zones: Array<[string, PageNumbering | undefined]> = [
+    ["front", pages?.["front-matter"]],
+    ["body", pages?.body],
+    ["back", pages?.["back-matter"]],
   ];
-  for (const [cls, name, cfg] of zones) {
-    out.push(`.${cls} { page: ${name}; }\n`);
+  for (const [name, cfg] of zones) {
     const style = cfg?.style ?? "arabic";
     const show = cfg?.show ?? true;
     if (show && style !== "none") {
@@ -186,11 +186,13 @@ export function generatePagedCSS(
   }
   out.push(`.zone-body { counter-reset: page 1; }\n`);
 
-  // 3. Running headers (§4.8) — odd pages are recto (:right)
+  // 3. Running headers (§4.8) — body pages only, odd pages are recto (:right).
+  // A string() keeps its last value, so an unscoped head would carry the final
+  // chapter's title into the back matter.
   out.push(`.chapter .title { string-set: chapter-title content(text); }\n`);
   out.push(`.part .title { string-set: part-title content(text); }\n`);
   const emitEntries = (
-    side: ":right" | ":left",
+    side: "body:right" | "body:left",
     entries: RunningEntry[] | undefined,
   ) => {
     for (const entry of entries ?? []) {
@@ -210,8 +212,8 @@ export function generatePagedCSS(
       );
     }
   };
-  emitEntries(":right", metadata.running?.odd);
-  emitEntries(":left", metadata.running?.even);
+  emitEntries("body:right", metadata.running?.odd);
+  emitEntries("body:left", metadata.running?.even);
   // Display matter (half-title, title page, …) sits on the named page
   // "display" (base.css) and carries no running head or folio: blank every
   // margin box the running/page-number rules above populate.
