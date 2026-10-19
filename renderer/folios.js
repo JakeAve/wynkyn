@@ -241,4 +241,122 @@
     digest,
     settle,
   };
+
+  /** @type {any} */
+  const Paged = /** @type {any} */ (globalThis).Paged;
+  if (!Paged) return; // Deno unit tests import only the pure core
+
+  /** @type {ZoneNumbering} */
+  const ARABIC = { style: "arabic", show: true };
+  const PAGE_ENTRY = Symbol("pageEntry");
+
+  /** @param {Element} page @returns {PageFacts} */
+  function pageFacts(page) {
+    const area = page.querySelector(".pagedjs_page_content") ?? page;
+    const zoneEl = area.querySelector(".zone-front, .zone-body, .zone-back");
+    const zone = /** @type {Zone | undefined} */ (zoneEl?.className.match(
+      /\bzone-(front|body|back)\b/,
+    )?.[1]);
+    // Continuation fragments repeat their element's title and lose its id.
+    /** @param {string} sel */
+    const texts = (sel) =>
+      [...area.querySelectorAll(`${sel}:not([data-split-from])`)]
+        .map((el) => (el.textContent ?? "").trim());
+    return {
+      zone: zone ?? null,
+      display: page.classList.contains("pagedjs_display_page"),
+      blank: page.classList.contains("pagedjs_blank_page"),
+      empty: !(area.textContent ?? "").trim() && !area.querySelector("img"),
+      chapterTitles: texts(".chapter .title"),
+      // `>`: a chapter's title inside a part isn't the part's.
+      partTitles: texts(".part > .title"),
+      anchors: [...area.querySelectorAll("[id]:not([data-split-from])")]
+        .map((el) => el.id),
+    };
+  }
+
+  /** @param {Element} page @param {PageEntry} entry */
+  function writeEntry(page, entry) {
+    /** @type {any} */ (page)[PAGE_ENTRY] = entry;
+    const style = /** @type {HTMLElement} */ (page).style;
+    style.setProperty("--folio", JSON.stringify(entry.folioText));
+    style.setProperty("--chapter-title", JSON.stringify(entry.chapterTitle));
+    style.setProperty("--part-title", JSON.stringify(entry.partTitle));
+  }
+
+  Paged.registerHandlers(
+    class Folios extends Paged.Handler {
+      /** @param {any[]} args */
+      constructor(...args) {
+        super(...args);
+        const settings = this.chunker?.settings?.pageMap ?? {};
+        /** @type {Seed} */
+        this.seed = settings.seed ?? {};
+        /** @type {PageNumberingConfig} */
+        this.numbering = settings.numbering ??
+          { front: ARABIC, body: ARABIC, back: ARABIC };
+        /** @type {string[] | undefined} */
+        this.expected = settings.expected;
+      }
+
+      // Numbers are written before layout, from the seed, so nothing in the
+      // flow changes once it's paginated.
+      /** @param {DocumentFragment} parsed */
+      afterParsed(parsed) {
+        /** @type {Set<string>} */
+        const targets = new Set();
+        for (const a of parsed.querySelectorAll(".toc a.page, a.ref")) {
+          const id = (a.getAttribute("href") ?? "").replace(/^#/, "");
+          a.textContent = this.seed[id] ?? "000";
+          targets.add(id);
+        }
+        if (this.expected) return;
+        const last = [...parsed.querySelectorAll("[id]")].at(-1)?.id;
+        if (last) {
+          targets.delete(last);
+          targets.add(last);
+        }
+        this.expected = [...targets];
+      }
+
+      // Entries chain from the previous page element, not the previous
+      // afterPageLayout call: plates.js adds plate pages in finalizePage.
+      /** @param {Element} page @returns {PageEntry} */
+      entryFor(page) {
+        return /** @type {any} */ (page)[PAGE_ENTRY] ?? this.layOut(page);
+      }
+
+      /** @param {Element} page @returns {PageEntry} */
+      layOut(page) {
+        let prevEl = page.previousElementSibling;
+        while (prevEl && !prevEl.classList.contains("pagedjs_page")) {
+          prevEl = prevEl.previousElementSibling;
+        }
+        const entry = pageEntry(
+          prevEl ? this.entryFor(prevEl) : null,
+          pageFacts(page),
+          this.numbering,
+        );
+        writeEntry(page, entry);
+        return entry;
+      }
+
+      /** @param {Element} pageElement */
+      afterPageLayout(pageElement) {
+        this.layOut(pageElement);
+      }
+
+      afterRendered() {
+        const pages = this.chunker.pagesArea.querySelectorAll(".pagedjs_page");
+        const map = buildPageMap([...pages].map(pageFacts), this.numbering);
+        map.forEach((entry, i) => writeEntry(pages[i], entry));
+        /** @type {RenderResult} */
+        this.chunker.pageMapResult = {
+          map,
+          seed: anchorFolios(map),
+          problems: checkPageMap(map, this.expected ?? []),
+        };
+      }
+    },
+  );
 })();

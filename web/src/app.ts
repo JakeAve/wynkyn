@@ -30,6 +30,7 @@ import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
 import { editionHref, editionLabel, slugify } from "./editions.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
+import "../../renderer/folios.js"; // registers the page-map handler
 
 const PARSE_DEBOUNCE_MS = 250;
 const SAVE_DEBOUNCE_MS = 600;
