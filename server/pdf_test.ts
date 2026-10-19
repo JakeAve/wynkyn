@@ -14,11 +14,10 @@ Deno.test({
   ignore: !hasChrome,
   fn: async () => {
     const html = toHtml(await buildBook(ROOT, "demo-book"));
-    assert(
-      html.includes("PagedConfig"),
-      "toHtml must signal when Paged.js finishes",
-    );
-    const doc = await PDFDocument.load(await renderPdf(html));
+    const { pdf, problems, passes } = await renderPdf(html);
+    assertEquals(problems, []);
+    assert(passes === 1 || passes === 2, `settled in ${passes} passes`);
+    const doc = await PDFDocument.load(pdf);
     assert(doc.getPageCount() >= 2);
     const { width, height } = doc.getPage(0).getSize();
     assertEquals(Math.round(width), Math.round(5.5 * 72)); // demo-book page.size is 5.5in 8.5in

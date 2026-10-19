@@ -18,7 +18,7 @@ import { metadataPath } from "./editions.ts";
 import { type PageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
-import { renderPdf } from "./pdf.ts";
+import { type PageProblem, type RenderedPdf, renderPdf } from "./pdf.ts";
 
 const PT = 72; // points per inch
 
@@ -145,8 +145,9 @@ export interface ExportOptions {
   pages?: number; // proof only
   out?: string;
   edition?: string | null; // null/undefined = the unnamed edition
+  force?: boolean; // export despite pagination problems
   /** Test seam: swap the Chrome-based renderer for a stub that returns pdf-lib bytes directly. */
-  render?: (html: string) => Promise<Uint8Array>;
+  render?: (html: string) => Promise<RenderedPdf>;
 }
 
 export interface ExportSummary {
@@ -155,6 +156,11 @@ export interface ExportSummary {
   files: string[];
   diagnostics: number;
   setup: PageSetup; // the §4.3 page setup this run actually used
+  pagination: PageProblem[]; // page map problems, exported anyway under force
+}
+
+export function formatProblem(p: PageProblem): string {
+  return p.page === null ? p.message : `page ${p.page}: ${p.message}`;
 }
 
 function assertWholeNumber(value: number, label: string): void {
@@ -207,6 +213,7 @@ export async function exportBook(
   let page: Dims;
   let pageCount: number;
   let diagnostics = 0;
+  let pagination: PageProblem[] = [];
   const files: string[] = [];
   if (opts.proof) {
     // No PDF exists yet to measure — fall back to the configured page size.
@@ -219,7 +226,16 @@ export async function exportBook(
       edition,
     });
     diagnostics = built.diagnostics.length;
-    source = await (opts.render ?? renderPdf)(toHtml(built));
+    const rendered = await (opts.render ?? renderPdf)(toHtml(built));
+    pagination = rendered.problems;
+    if (pagination.length && !opts.force) {
+      throw new Error(
+        `pagination problems (--force to export anyway):\n${
+          pagination.map((p) => `  ${formatProblem(p)}`).join("\n")
+        }`,
+      );
+    }
+    source = rendered.pdf;
     const src = await PDFDocument.load(source);
     pageCount = src.getPageCount();
     const { width, height } = src.getPage(0).getSize();
@@ -268,6 +284,7 @@ export async function exportBook(
     files,
     diagnostics,
     setup,
+    pagination,
   };
 }
 

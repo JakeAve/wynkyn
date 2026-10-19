@@ -5,7 +5,8 @@
 //   deno task bml new <slug>              → books/<slug>/ from templates/ (house-style metadata.json)
 //   deno task bml edition <book> new <slug> [--from <edition>] → copy an edition under a new name
 //   deno task bml export <book> [--edition e] [--sheet S] [--folios N] [--duplex short-edge|long-edge|none]
-//                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir]
+//                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]
+//                                → exit 1 on pagination problems unless --force
 import { parseArgs } from "@std/cli/parse-args";
 import { buildBook, listBooks, toHtml } from "./server/pipeline.ts";
 import {
@@ -41,7 +42,7 @@ if (import.meta.main) {
       "edition",
       "from",
     ],
-    boolean: ["proof", "reverse-backs"],
+    boolean: ["proof", "reverse-backs", "force"],
     unknown: (_arg, key) => {
       if (key !== undefined) {
         console.error(`unknown flag --${key}`);
@@ -135,7 +136,7 @@ if (import.meta.main) {
     await Deno.writeTextFile(path, toHtml(b));
     console.log(`wrote ${path}`);
   } else if (cmd === "export" && book) {
-    const { exportBook, formatSummary } = await import(
+    const { exportBook, formatProblem, formatSummary } = await import(
       "./server/print-export.ts"
     );
     try {
@@ -149,6 +150,7 @@ if (import.meta.main) {
         reverseBacks: a["reverse-backs"],
         proof: a.proof,
         out: a.out,
+        force: a.force,
       };
       if (opts.pages !== undefined && !opts.proof) {
         console.error(`note: --pages is ignored unless --proof`);
@@ -166,6 +168,9 @@ if (import.meta.main) {
           `${s.diagnostics} parse diagnostic(s) — run: bml check ${book}`,
         );
       }
+      for (const p of s.pagination) {
+        console.error(`warning: ${formatProblem(p)}`);
+      }
       console.log(formatSummary(book, s));
       for (const f of s.files) console.log(`wrote ${f}`);
     } catch (e) {
@@ -174,7 +179,7 @@ if (import.meta.main) {
     }
   } else {
     console.error(
-      "usage: bml list | new <slug> | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir]",
+      "usage: bml list | new <slug> | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]",
     );
     Deno.exit(2);
   }

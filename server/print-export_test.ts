@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { PDFDict, PDFDocument, PDFName, PDFPage, PDFStream } from "pdf-lib";
 import { impose, parseDims } from "./imposition.ts";
 import { resolvePageSetup } from "../metadata/page-setup.ts";
@@ -323,7 +323,7 @@ Deno.test("exportBook: trim size comes from book.pdf, not metadata.page.size", a
         size: 12,
       }); // 8.5×11in in points
     }
-    return await doc.save();
+    return { pdf: await doc.save(), problems: [], passes: 1 };
   };
 
   const s = await exportBook(root, "book", {
@@ -335,6 +335,32 @@ Deno.test("exportBook: trim size comes from book.pdf, not metadata.page.size", a
   });
   assertEquals(s.pageCount, 4);
   assertEquals(s.imposition.nUp, 2); // 8.5×11in pages, 2-up on tabloid (only fits at Letter size, not the 5.5×8.5in default)
+  await Deno.stat(`${out}/book.pdf`);
+});
+
+Deno.test("exportBook: pagination problems fail the export unless force", async () => {
+  const root = await Deno.makeTempDir();
+  await Deno.mkdir(`${root}/book`);
+  await Deno.writeTextFile(`${root}/book/manuscript.md`, "{title}\nBook\n");
+  const out = await Deno.makeTempDir();
+  const render = async () => {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < 4; i++) doc.addPage([396, 612]).drawText(String(i + 1));
+    return {
+      pdf: await doc.save(),
+      problems: [{ page: 3, message: "stranded page: no text or image" }],
+      passes: 2,
+    };
+  };
+  const opts = { sheet: "legal", duplex: "short-edge" as const, out, render };
+  const err = await assertRejects(() => exportBook(root, "book", opts));
+  assertStringIncludes(
+    (err as Error).message,
+    "page 3: stranded page: no text or image",
+  );
+  await assertRejects(() => Deno.stat(`${out}/book.pdf`), Deno.errors.NotFound);
+  const s = await exportBook(root, "book", { ...opts, force: true });
+  assertEquals(s.pagination.length, 1);
   await Deno.stat(`${out}/book.pdf`);
 });
 
@@ -351,6 +377,7 @@ Deno.test("formatSummary is one line plus a waste warning when relevant", () => 
     imposition: imp,
     files: [],
     diagnostics: 0,
+    pagination: [],
     setup: resolvePageSetup({
       size: "3.5in 8.5in",
       sheet: "legal",

@@ -20,6 +20,40 @@ const BASE_CSS = await Deno.readTextFile(
 const PLATES_JS = await Deno.readTextFile(
   new URL("../renderer/plates.js", import.meta.url),
 );
+const FOLIOS_JS = await Deno.readTextFile(
+  new URL("../renderer/folios.js", import.meta.url),
+);
+
+// Export driver (spec §5.4): re-render until the page map's folios are the
+// ones the render was seeded with, then leave the outcome on <html> for
+// pdf.ts — data-paged=done|error plus a JSON report in data-paged-report.
+// The book's <style> is fed to Paged.js explicitly and removed, so it isn't
+// also applied unpolished; Paged.js's removeStyles is never called.
+const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
+  const root = document.documentElement;
+  const styleEl = document.getElementById("book-css");
+  const css = { [location.href]: styleEl.textContent };
+  styleEl.remove();
+  const html = document.body.innerHTML;
+  document.body.innerHTML = "";
+  let previewer = null;
+  let passes = 0;
+  let report;
+  try {
+    const r = await BookPageMap.settle(async (seed) => {
+      previewer?.polisher.destroy();
+      document.querySelector(".pagedjs_pages")?.remove();
+      passes++;
+      previewer = new Paged.Previewer({ pageMap: { seed, numbering: BOOK_NUMBERING } });
+      return (await previewer.preview(html, [css], document.body)).pageMapResult;
+    }, {});
+    report = { problems: r.problems, passes: r.passes, digest: BookPageMap.digest(r.map) };
+  } catch (err) {
+    report = { problems: [{ page: null, message: String(err) }], passes, digest: null };
+  }
+  root.dataset.pagedReport = JSON.stringify(report);
+  root.dataset.paged = report.problems.length ? "error" : "done";
+});`;
 
 // spec §4.11 item 8: try these in order for each {illustration:}/{dropcap|image:} slug.
 const IMAGE_EXT_ORDER = ["svg", "png", "jpg", "jpeg", "webp"];
@@ -45,10 +79,15 @@ export interface BuildResult {
 export function toHtml(b: BuildResult): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${b.bookTitle}</title>
 ${b.fontLinks}
-<style>${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
-<script>window.PagedConfig = { after() { document.documentElement.dataset.paged = "done"; } };</script>
+<style id="book-css">${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
+<script>window.PagedConfig = { auto: false };
+const BOOK_NUMBERING = ${
+    JSON.stringify(b.pageNumbering).replaceAll("<", "\\u003c")
+  };</script>
 <script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js"></script>
 <script>${PLATES_JS}</script>
+<script>${FOLIOS_JS}</script>
+<script>${DRIVER_JS}</script>
 </head><body>${b.html}</body></html>`;
 }
 

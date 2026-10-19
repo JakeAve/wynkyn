@@ -1,6 +1,6 @@
 // server/pipeline_test.ts
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { buildBook, listBooks } from "./pipeline.ts";
+import { buildBook, listBooks, toHtml } from "./pipeline.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;
 
@@ -63,5 +63,18 @@ Deno.test("buildBook with an edition: same HTML, that edition's CSS", async () =
   await assertRejects(
     () => buildBook(ROOT, "demo-book", { edition: "no-such" }),
     Deno.errors.NotFound,
+  );
+});
+
+Deno.test("toHtml drives Paged.js itself, through the page map", async () => {
+  const b = await buildBook(ROOT, "demo-book");
+  const html = toHtml(b);
+  assert(html.includes("PagedConfig = { auto: false }"));
+  assert(html.includes("globalThis).BookPageMap")); // folios.js inlined
+  assert(html.includes("BookPageMap.settle("));
+  assert(html.includes(JSON.stringify(b.pageNumbering)));
+  assert(
+    !html.includes("after()"),
+    "the driver, not PagedConfig.after, ends it",
   );
 });

@@ -1586,6 +1586,31 @@ layout engine, the preview is the export by construction.
   (pdf-lib) onto sheet-sized pages. Preview == export still holds: the pages are
   Paged.js's own, untouched.
 
+**Page map and the multi-pass driver.** Paged.js only fragments; folios, TOC and
+`{ref}` numbers and running heads come from the page map (§4.7) that
+`renderer/folios.js` builds from the finished pages. TOC and ref numbers are
+written into the flow before layout from a _seed_ (anchor id → folio text), so a
+render is only right once the folios it produces are the ones it was seeded
+with. `toHtml` (shared by `bml render` and print export) sets
+`PagedConfig.auto = false` and inlines a driver that runs on load: it takes the
+book's `<style>` and body once, then renders with a fresh `Paged.Previewer` per
+pass — first seed `{}`, each next pass seeded from the last — until the seed
+settles (normally two passes), at most three. It then sets
+`html[data-paged=done|error]` and a JSON report in `html[data-paged-report]`:
+`{ problems, passes, digest }`.
+
+**Checks** run on the map after every pass; each problem names its 1-based
+physical page where it has one:
+
+- a stranded page: no text and no image, and not a deliberate blank;
+- a `{ref}` or TOC target that is on no page;
+- the book's last anchor on no page — the render was cut short;
+- no fixed point after three passes.
+
+Print export fails on any problem, listing each as `page N: message`, before
+`book.pdf` is written; `bml export --force` prints them as warnings and exports
+anyway.
+
 ---
 
 ## 6. Web Application Architecture
