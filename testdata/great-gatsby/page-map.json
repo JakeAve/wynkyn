@@ -1,0 +1,38 @@
+{
+  "zones": {
+    "front": [
+      1,
+      6
+    ],
+    "body": [
+      7,
+      206
+    ],
+    "back": [
+      207,
+      207
+    ]
+  },
+  "anchors": {
+    "matter-half-title": "",
+    "matter-title-page": "",
+    "matter-copyright": "",
+    "matter-toc": "iv",
+    "matter-dedication": "",
+    "matter-epigraph": "",
+    "one": "1",
+    "fnref-eggs": "5",
+    "gatsbys-mansion": "",
+    "note-eggs": "25",
+    "two": "26",
+    "three": "43",
+    "four": "67",
+    "five": "89",
+    "six": "107",
+    "seven": "124",
+    "eight": "162",
+    "nine": "180",
+    "matter-colophon": "201"
+  },
+  "blanks": []
+}

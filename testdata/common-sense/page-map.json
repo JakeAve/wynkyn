@@ -1,0 +1,37 @@
+{
+  "zones": {
+    "front": [
+      1,
+      6
+    ],
+    "body": [
+      7,
+      58
+    ],
+    "back": [
+      59,
+      76
+    ]
+  },
+  "anchors": {
+    "matter-preface": "i",
+    "matter-half-title": "",
+    "matter-title-page": "",
+    "matter-toc": "iv",
+    "matter-introduction": "v",
+    "part-one": "1",
+    "origin-of-government": "2",
+    "monarchy": "9",
+    "1-samuel-8": "12",
+    "part-two": "20",
+    "american-affairs": "21",
+    "fnref-massanello": "39",
+    "american-ability": "41",
+    "fnref-burgh-representation": "51",
+    "matter-appendix": "53",
+    "matter-address": "63",
+    "fnref-barclay-address": "65",
+    "matter-colophon": "70"
+  },
+  "blanks": []
+}
