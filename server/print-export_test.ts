@@ -8,6 +8,8 @@ import {
   formatSummary,
   sidesFor,
 } from "./print-export.ts";
+import { renderPdf } from "./pdf.ts";
+import { hasChrome } from "../testing/chrome.ts";
 
 const page = { w: 3.5, h: 8.5 };
 const imp = impose(8, {
@@ -323,7 +325,7 @@ Deno.test("exportBook: trim size comes from book.pdf, not metadata.page.size", a
         size: 12,
       }); // 8.5×11in in points
     }
-    return { pdf: await doc.save(), problems: [], passes: 1 };
+    return { pdf: await doc.save(), problems: [], passes: 1, seed: {} };
   };
 
   const s = await exportBook(root, "book", {
@@ -350,6 +352,7 @@ Deno.test("exportBook: pagination problems fail the export unless force", async 
       pdf: await doc.save(),
       problems: [{ page: 3, message: "stranded page: no text or image" }],
       passes: 2,
+      seed: {},
     };
   };
   const opts = { sheet: "legal", duplex: "short-edge" as const, out, render };
@@ -362,6 +365,67 @@ Deno.test("exportBook: pagination problems fail the export unless force", async 
   const s = await exportBook(root, "book", { ...opts, force: true });
   assertEquals(s.pagination.length, 1);
   await Deno.stat(`${out}/book.pdf`);
+});
+
+Deno.test("exportBook: starts from this edition's page-map.json, writes the settled seed back", async () => {
+  const root = await Deno.makeTempDir();
+  await Deno.mkdir(`${root}/book`);
+  await Deno.writeTextFile(`${root}/book/manuscript.md`, "{title}\nBook\n");
+  const out = await Deno.makeTempDir();
+  const seedIn: string[] = []; // the BOOK_SEED each render started from
+  const render = async (html: string) => {
+    seedIn.push(html.match(/const BOOK_SEED = (.*);/)![1]!);
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < 4; i++) doc.addPage([396, 612]).drawText(String(i + 1));
+    return { pdf: await doc.save(), problems: [], passes: 1, seed: { a: "7" } };
+  };
+  const opts = { sheet: "legal", duplex: "short-edge" as const, out, render };
+  const s = await exportBook(root, "book", opts);
+  assertEquals(s.files.includes(`${out}/page-map.json`), true);
+  await exportBook(root, "book", opts);
+  // A shared --out must not hand one edition's folios to another.
+  await Deno.writeTextFile(`${out}/page-map.json`, "{ not json");
+  await exportBook(root, "book", opts);
+  await Deno.mkdir(`${root}/book/editions`);
+  await Deno.writeTextFile(`${root}/book/editions/pocket.json`, "{}");
+  await exportBook(root, "book", { ...opts, edition: "pocket" });
+  assertEquals(seedIn, ["{}", '{"a":"7"}', "{}", "{}"]);
+  assertEquals(
+    JSON.parse(await Deno.readTextFile(`${out}/page-map.json`)),
+    { edition: "pocket", seed: { a: "7" } },
+  );
+});
+
+Deno.test({
+  name: "exportBook: an unchanged book re-exports in one pass (real Chrome)",
+  ignore: !hasChrome,
+  fn: async () => {
+    const root = await Deno.makeTempDir();
+    await Deno.mkdir(`${root}/book`);
+    // A TOC: pass 1 from {} prints 000, so a fresh export takes 2 passes.
+    await Deno.writeTextFile(
+      `${root}/book/manuscript.md`,
+      "{matter: toc}\n{title}\nContents\n\n{chapter: one}\n{title}\nOne\n\nText.\n\n{chapter: two}\n{title}\nTwo\n\nMore.\n",
+    );
+    const out = await Deno.makeTempDir();
+    const passes: number[] = [];
+    const render = async (html: string) => {
+      const r = await renderPdf(html);
+      passes.push(r.passes);
+      return r;
+    };
+    // No metadata → Letter pages, 2-up on tabloid.
+    const opts = {
+      sheet: "tabloid",
+      duplex: "short-edge" as const,
+      out,
+      render,
+    };
+    await exportBook(root, "book", opts);
+    await exportBook(root, "book", opts);
+    assertEquals(passes, [2, 1]);
+    await Deno.stat(`${out}/page-map.json`);
+  },
 });
 
 Deno.test("formatSummary is one line plus a waste warning when relevant", () => {

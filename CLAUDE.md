@@ -47,7 +47,9 @@ diff.
   `books/<book>/render.html`, or `render.<e>.html`); open in a browser to
   paginate
 - `deno task bml export <book> [--edition e] [--proof] [--sheet S] [--folios N] [--duplex M]`
-  → `books/<book>/export/` (or `export/<e>/`); needs Google Chrome installed
+  → `books/<book>/export/` (or `export/<e>/`): `book.pdf`, the sheet PDFs and
+  `page-map.json` (the settled page map, so a re-export takes one pass); needs
+  Google Chrome installed; fails on page-map problems unless `--force`
 - `deno task bml edition <book> new <slug> [--from e]` copy an edition under a
   new name. Editions are styling-only variants: `metadata.json` is the unnamed
   edition, `editions/<slug>.json` are named ones, manuscript and images shared.

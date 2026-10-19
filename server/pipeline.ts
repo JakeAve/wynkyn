@@ -13,6 +13,7 @@ import {
 import { render } from "../renderer/render.ts";
 import { metadataPath } from "./editions.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
+import type { Seed } from "../renderer/page-map-types.ts";
 
 const BASE_CSS = await Deno.readTextFile(
   new URL("../renderer/base.css", import.meta.url),
@@ -29,8 +30,9 @@ const FOLIOS_JS = await Deno.readTextFile(
   new URL("../renderer/folios.js", import.meta.url),
 );
 
-// Export driver (spec §5.4): re-render until the page map's folios are the
-// ones the render was seeded with, then leave the outcome on <html> for
+// Export driver (spec §5.4): starting from BOOK_SEED (the last export's settled
+// folios, or {}), re-render until the page map's folios are the ones the
+// render was seeded with, then leave the outcome on <html> for
 // pdf.ts — data-paged=done|error|fatal plus a JSON report in
 // data-paged-report. "error" is pagination problems (--force exports anyway);
 // "fatal" is the driver itself failing (e.g. Paged.js didn't load), which
@@ -54,8 +56,13 @@ const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
       passes++;
       previewer = new Paged.Previewer({ pageMap: { seed, numbering: BOOK_NUMBERING } });
       return (await previewer.preview(html, [css], document.body)).pageMapResult;
-    }, {});
-    report = { problems: r.problems, passes: r.passes, digest: BookPageMap.digest(r.map) };
+    }, BOOK_SEED);
+    report = {
+      problems: r.problems,
+      passes: r.passes,
+      digest: BookPageMap.digest(r.map),
+      seed: r.seed,
+    };
   } catch (err) {
     report = { fatal: String(err), passes };
   }
@@ -84,13 +91,14 @@ export interface BuildResult {
   diagnostics: Diagnostic[];
 }
 
-export function toHtml(b: BuildResult): string {
+/** `seed`: the page map's starting folios (default {}); print export passes the last one. */
+export function toHtml(b: BuildResult, opts: { seed?: Seed } = {}): string {
+  const json = (v: unknown) => JSON.stringify(v).replaceAll("<", "\\u003c");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${b.bookTitle}</title>
 ${b.fontLinks}
 <style id="book-css">${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
-<script>const BOOK_NUMBERING = ${
-    JSON.stringify(b.pageNumbering).replaceAll("<", "\\u003c")
-  };</script>
+<script>const BOOK_NUMBERING = ${json(b.pageNumbering)};
+const BOOK_SEED = ${json(opts.seed ?? {})};</script>
 <script>${PAGED_JS}</script>
 <script>${PLATES_JS}</script>
 <script>${FOLIOS_JS}</script>

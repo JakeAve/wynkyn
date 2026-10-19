@@ -1,11 +1,12 @@
 // server/pdf.ts — Paged.js-paginated HTML → PDF via headless Google Chrome.
 import { type Browser, chromium } from "playwright";
-import type { PageProblem } from "../renderer/page-map-types.ts";
+import type { PageProblem, Seed } from "../renderer/page-map-types.ts";
 
 export interface RenderedPdf {
   pdf: Uint8Array;
   problems: PageProblem[]; // from the page map checks (spec §5.4)
   passes: number; // renders it took to reach a fixed point
+  seed: Seed; // the folios it settled on, to start the next render from
 }
 
 export async function renderPdf(html: string): Promise<RenderedPdf> {
@@ -28,7 +29,12 @@ export async function renderPdf(html: string): Promise<RenderedPdf> {
     await page.waitForSelector("html[data-paged]", { timeout: 540_000 });
     const report = JSON.parse(
       await page.getAttribute("html", "data-paged-report") ?? "{}",
-    ) as { problems?: PageProblem[]; passes?: number; fatal?: string };
+    ) as {
+      problems?: PageProblem[];
+      passes?: number;
+      seed?: Seed;
+      fatal?: string;
+    };
     // Not a pagination problem: there is nothing to export, --force or not.
     if (report.fatal) {
       throw new Error(`Paged.js render failed: ${report.fatal}`);
@@ -39,6 +45,7 @@ export async function renderPdf(html: string): Promise<RenderedPdf> {
       ),
       problems: report.problems ?? [],
       passes: report.passes ?? 0,
+      seed: report.seed ?? {},
     };
   } finally {
     await browser?.close();

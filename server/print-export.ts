@@ -19,7 +19,11 @@ import { type PageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
 import { type RenderedPdf, renderPdf } from "./pdf.ts";
-import { formatProblem, type PageProblem } from "../renderer/page-map-types.ts";
+import {
+  formatProblem,
+  type PageProblem,
+  type Seed,
+} from "../renderer/page-map-types.ts";
 
 const PT = 72; // points per inch
 
@@ -168,6 +172,25 @@ function assertWholeNumber(value: number, label: string): void {
 
 const FLIP_VALUES = ["short-edge", "long-edge"] as const;
 
+/**
+ * The last export's settled folios (`page-map.json`), so an unchanged book
+ * renders once. Missing, corrupt or another edition's (a shared --out) → {};
+ * a stale seed only costs passes, since the driver re-renders to a fixed point.
+ */
+async function readSeed(path: string, edition: string | null): Promise<Seed> {
+  try {
+    const { edition: e, seed } = JSON.parse(await Deno.readTextFile(path));
+    if (
+      e === edition && seed && typeof seed === "object" &&
+      !Array.isArray(seed) &&
+      Object.values(seed).every((v) => typeof v === "string")
+    ) return seed;
+  } catch {
+    // missing or unreadable — start fresh
+  }
+  return {};
+}
+
 export async function exportBook(
   booksRoot: string,
   book: string,
@@ -223,7 +246,10 @@ export async function exportBook(
       edition,
     });
     diagnostics = built.diagnostics.length;
-    const rendered = await (opts.render ?? renderPdf)(toHtml(built));
+    const pageMapPath = `${out}/page-map.json`;
+    const rendered = await (opts.render ?? renderPdf)(
+      toHtml(built, { seed: await readSeed(pageMapPath, edition) }),
+    );
     pagination = rendered.problems;
     if (pagination.length && !opts.force) {
       throw new Error(
@@ -239,6 +265,11 @@ export async function exportBook(
     page = { w: width / PT, h: height / PT }; // page size comes from the rendered PDF, not metadata
     await Deno.writeFile(`${out}/book.pdf`, source);
     files.push(`${out}/book.pdf`);
+    await Deno.writeTextFile(
+      pageMapPath,
+      JSON.stringify({ edition, seed: rendered.seed }, null, 2) + "\n",
+    );
+    files.push(pageMapPath);
   }
 
   const imposition = impose(pageCount, { folios, sheet, page, duplex, flip });
