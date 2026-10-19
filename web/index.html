@@ -418,6 +418,22 @@
       text-overflow: ellipsis;
       cursor: pointer;
     }
+    #page-problems {
+      display: flex;
+      gap: 12px;
+      overflow: hidden;
+    }
+    #page-problems button {
+      font: inherit;
+      color: var(--warn);
+      background: none;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+    }
+    #page-problems button:disabled {
+      cursor: default;
+    }
     #status {
       margin-left: auto;
       display: flex;
@@ -801,6 +817,7 @@
     <div id="footer">
       <span id="page-indicator"></span>
       <span id="diagnostics"></span>
+      <span id="page-problems"></span>
       <span id="status">Connecting…</span>
     </div>
     <dialog id="book-dialog">

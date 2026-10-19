@@ -4,13 +4,44 @@ import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
 import { matchKey, type StyleEntry } from "./style-catalog.ts";
 import {
   type CachedRender,
+  type PageProblem,
   renderHash,
   saveCachedRender,
+  type Seed,
 } from "./preview-cache.ts";
-declare const Paged: {
-  Previewer: new () => {
-    preview(html: string, css: string[], el: Element): Promise<unknown>;
+export type { PageProblem } from "./preview-cache.ts";
+
+interface RenderResult {
+  seed: Seed;
+  problems: PageProblem[];
+}
+interface Previewer {
+  // Polisher: styleEl holds the rules Paged.js generates (insertRule, so no
+  // textContent); inserted holds its base sheet and the converted book CSS.
+  polisher: {
+    styleEl: HTMLStyleElement;
+    inserted: HTMLStyleElement[];
+    destroy(): void;
   };
+  // preview() resolves to the chunker; folios.js leaves the result on it.
+  preview(
+    html: string,
+    css: string[],
+    el: Element,
+  ): Promise<{ pageMapResult: RenderResult }>;
+}
+declare const Paged: {
+  Previewer: new (
+    options: { pageMap: { seed: Seed; numbering: PageNumberingConfig } },
+  ) => Previewer;
+};
+// renderer/folios.js, imported by app.ts.
+declare const BookPageMap: {
+  settle(
+    renderOnce: (seed: Seed) => Promise<RenderResult>,
+    seed: Seed,
+    maxPasses?: number,
+  ): Promise<RenderResult & { passes: number }>;
 };
 
 export interface UpdateMessage {
@@ -32,32 +63,48 @@ let rendering = false;
 // The hash of the render on screen or being produced for it; every accepted
 // call sets it synchronously, so a queued render can't be skipped as "same".
 let targetHash: string | null = null;
-// The <style> elements Paged.js inserted for the pages currently on screen.
-let liveStyles: Element[] = [];
-let queuedUpdate:
-  | { update: UpdateMessage; container: HTMLElement; cacheKey: string }
-  | null = null;
+// The Previewer whose pages are on screen; its polisher owns their sheets.
+let livePreviewer: Previewer | null = null;
+// The sheets of a render restored from the cache, which has no Previewer.
+let restoredStyles: Element[] = [];
+// The on-screen render's anchor folios seed the next render, so it usually
+// settles in one pass.
+let seed: Seed = {};
+let problems: PageProblem[] = [];
+let queuedUpdate: {
+  update: UpdateMessage;
+  container: HTMLElement;
+  cacheKey: string;
+  done: PromiseWithResolvers<PageProblem[]>;
+} | null = null;
 
+// Resolves to the page-map problems of the render that ends up on screen.
 export async function renderPreview(
   update: UpdateMessage,
   container: HTMLElement,
   cacheKey: string,
-): Promise<void> {
+): Promise<PageProblem[]> {
   const hash = renderHash(update);
   // Same content as what's on screen or already on its way (e.g. the first
   // update after a restore): Paged.js would spend seconds reproducing it.
-  if (hash === targetHash) return;
+  if (hash === targetHash) return problems;
   targetHash = hash;
   if (rendering) {
-    // coalesce: only the latest pending update matters
-    queuedUpdate = { update, container, cacheKey };
-    return;
+    // coalesce: only the latest pending update matters, and every caller
+    // waiting on the queue gets its result
+    queuedUpdate = {
+      update,
+      container,
+      cacheKey,
+      done: queuedUpdate?.done ?? Promise.withResolvers(),
+    };
+    return queuedUpdate.done.promise;
   }
   rendering = true;
   try {
     setFontLinks(update.fontLinks);
-    // pagedCss must go through the Previewer so Paged.js processes @page /
-    // string-set / target-counter; base + dom CSS ride along in the same sheet.
+    // pagedCss must go through the Previewer so Paged.js processes @page;
+    // base + dom CSS ride along in the same sheet.
     const css = [update.baseCss, update.domCss, update.pagedCss].join("\n");
     const blobUrl = URL.createObjectURL(new Blob([css], { type: "text/css" }));
     // Stage the new render invisibly next to the live pages, then swap — the
@@ -65,68 +112,56 @@ export async function renderPreview(
     const stage = document.createElement("div");
     stage.className = "preview-stage";
     container.appendChild(stage);
-    const previewer = new Paged.Previewer();
-    // Paged.js's Polisher inserts its generated CSS (page counters, running
-    // headers, --pagedjs-*) with sheet.insertRule, so the style elements have
-    // no textContent; the only way to spot and serialize them is by diffing
-    // the head around the render and reading el.sheet.cssRules.
-    const before = new Set(document.head.querySelectorAll("style"));
-    // The old pages' sheets stay attached while the new render runs, and
-    // Paged.js wrote their page-counter resets as bare `[data-page-number="6"]`
-    // rules. Those match the new pages too, and target-counter reads each
-    // page's computed counter-reset to number the TOC — so a TOC folio came
-    // out wrong whenever the reset moved to an earlier page than the last
-    // render's. Pin the old rules to the old pages before rendering.
-    for (const el of liveStyles) {
-      for (const r of (el as HTMLStyleElement).sheet?.cssRules ?? []) {
-        if (
-          r instanceof CSSStyleRule &&
-          r.selectorText.includes("[data-page-number")
-        ) {
-          r.selectorText =
-            `:not(.preview-stage) > .pagedjs_pages > ${r.selectorText}`;
+    // `as`: keeps TS from narrowing this to undefined past the closure.
+    let previewer = undefined as Previewer | undefined;
+    let result: RenderResult;
+    try {
+      // Each pass renders into the stage; a pass that didn't settle leaves
+      // its pages and sheets behind for the next one to clear.
+      result = await BookPageMap.settle(async (passSeed) => {
+        if (previewer) {
+          previewer.polisher.destroy();
+          stage.replaceChildren();
         }
-      }
+        previewer = new Paged.Previewer({
+          pageMap: { seed: passSeed, numbering: update.pageNumbering },
+        });
+        return (await previewer.preview(update.html, [blobUrl], stage))
+          .pageMapResult;
+      }, seed);
+    } catch (err) {
+      previewer?.polisher.destroy();
+      stage.remove();
+      URL.revokeObjectURL(blobUrl);
+      throw err;
     }
-    await previewer.preview(update.html, [blobUrl], stage);
-    const inserted = [...document.head.querySelectorAll("style")].filter((el) =>
-      !before.has(el)
-    );
     for (const old of container.children) if (old !== stage) old.remove();
     // The old sheets belong to the pages that just went away.
-    for (const el of liveStyles) el.remove();
-    liveStyles = inserted;
+    livePreviewer?.polisher.destroy();
+    for (const el of restoredStyles) el.remove();
+    restoredStyles = [];
+    livePreviewer = previewer!;
     stage.className = "";
     fitPreview(container);
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
-    const styles = inserted.map((el) =>
-      [...(el as HTMLStyleElement).sheet?.cssRules ?? []].map((r) => r.cssText)
-        .join("\n")
-    );
-    // Paged.js writes running strings inline without a closing quote
-    // (`--pagedjs-string-first-x: "Title`, or a lone `"` when unset). On an
-    // innerHTML round trip that string runs on to the next quote and swallows
-    // the declarations after it, so close each one before caching.
-    for (
-      const el of container.querySelectorAll<HTMLElement>(
-        '[style*="--pagedjs-string"]',
-      )
-    ) {
-      for (const name of el.style) {
-        if (!name.startsWith("--pagedjs-string")) continue;
-        const v = el.style.getPropertyValue(name);
-        if (v.startsWith('"') && !/[^\\]"$/.test(v)) {
-          el.style.setProperty(name, v + '"');
-        }
-      }
-    }
+    ({ seed, problems } = result);
+    const { styleEl, inserted } = livePreviewer.polisher;
+    // Head order is cascade order: the base sheet, styleEl, then the book CSS.
+    const styles = [...document.head.querySelectorAll("style")]
+      .filter((el) => el === styleEl || inserted.includes(el))
+      .map((el) =>
+        [...el.sheet?.cssRules ?? []].map((r) => r.cssText).join("\n")
+      );
     void saveCachedRender(cacheKey, {
       hash,
       pages: container.innerHTML,
       styles,
       fontLinks: update.fontLinks,
+      seed,
+      problems,
     }); // fire-and-forget: never throws, and the render shouldn't wait on it
+    return problems;
   } finally {
     rendering = false;
     if (queuedUpdate) {
@@ -135,7 +170,10 @@ export async function renderPreview(
       // targetHash is already the queued update's hash; clear it so the
       // sameness check doesn't skip the very render it was set for.
       targetHash = null;
-      renderPreview(next.update, next.container, next.cacheKey);
+      renderPreview(next.update, next.container, next.cacheKey).then(
+        next.done.resolve,
+        next.done.reject,
+      );
     }
   }
 }
@@ -148,7 +186,7 @@ export function restoreCachedRender(
   container: HTMLElement,
 ): void {
   setFontLinks(cached.fontLinks);
-  liveStyles = cached.styles.map((css) => {
+  restoredStyles = cached.styles.map((css) => {
     const el = document.createElement("style");
     el.textContent = css;
     document.head.appendChild(el);
@@ -156,6 +194,8 @@ export function restoreCachedRender(
   });
   container.innerHTML = cached.pages;
   targetHash = cached.hash;
+  seed = cached.seed ?? {};
+  problems = cached.problems ?? [];
   fitPreview(container);
 }
 

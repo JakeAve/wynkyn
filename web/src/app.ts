@@ -7,6 +7,7 @@ import {
   fitPreview,
   installPageIndicator,
   installStyleClicks,
+  type PageProblem,
   renderPreview,
   restoreCachedRender,
   scrollPreviewTo,
@@ -105,6 +106,22 @@ function reparse(text: string): void {
   diag.title = first ? "click to jump to the first note" : "";
   diag.onclick = first ? () => scrollEditorToLine(editor, first.line) : null;
   refreshTree(doc);
+}
+
+// Page-map problems from the last render; each scrolls to its page.
+function showPageProblems(problems: PageProblem[]): void {
+  $("page-problems").replaceChildren(...problems.map(({ page, message }) => {
+    const item = document.createElement("button");
+    item.textContent = page === null ? message : `page ${page}: ${message}`;
+    if (page !== null) {
+      item.title = "click to show the page";
+      item.onclick = () =>
+        $("preview").querySelector(
+          `:scope > :not(.preview-stage) .pagedjs_page[data-page-number="${page}"]`,
+        )?.scrollIntoView({ block: "start", behavior: "auto" });
+    } else item.disabled = true;
+    return item;
+  }));
 }
 
 let treeLines: number[] = []; // start line of every tree node, ascending
@@ -779,7 +796,10 @@ async function main(): Promise<void> {
     }
     if (!dirty && !saveInFlight) setStatus("saved");
     // Own-origin: preview only — never the buffer (spec §6 echo suppression).
-    renderPreview(msg, previewEl, key).then(refreshPageIndicator);
+    renderPreview(msg, previewEl, key).then((problems) => {
+      showPageProblems(problems);
+      refreshPageIndicator();
+    });
     if (msg.origin !== clientId) {
       refreshFromRemote();
       refreshConfigFromRemote();
