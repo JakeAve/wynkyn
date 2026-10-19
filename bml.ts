@@ -136,9 +136,10 @@ if (import.meta.main) {
     await Deno.writeTextFile(path, toHtml(b));
     console.log(`wrote ${path}`);
   } else if (cmd === "export" && book) {
-    const { exportBook, formatProblem, formatSummary } = await import(
+    const { exportBook, formatSummary } = await import(
       "./server/print-export.ts"
     );
+    const { formatProblem } = await import("./renderer/page-map-types.ts");
     try {
       const opts = {
         edition,

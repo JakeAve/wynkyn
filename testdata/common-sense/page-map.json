@@ -15,8 +15,8 @@
   },
   "anchors": {
     "matter-preface": "i",
-    "matter-half-title": "",
-    "matter-title-page": "",
+    "matter-half-title": "ii",
+    "matter-title-page": "iii",
     "matter-toc": "iv",
     "matter-introduction": "v",
     "part-one": "1",
@@ -26,11 +26,14 @@
     "part-two": "20",
     "american-affairs": "21",
     "fnref-massanello": "39",
+    "note-massanello": "39",
     "american-ability": "41",
     "fnref-burgh-representation": "51",
+    "note-burgh-representation": "51",
     "matter-appendix": "53",
     "matter-address": "63",
     "fnref-barclay-address": "65",
+    "note-barclay-address": "65",
     "matter-colophon": "70"
   },
   "blanks": []

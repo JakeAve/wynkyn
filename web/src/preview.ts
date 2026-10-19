@@ -4,12 +4,10 @@ import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
 import { matchKey, type StyleEntry } from "./style-catalog.ts";
 import {
   type CachedRender,
-  type PageProblem,
   renderHash,
   saveCachedRender,
-  type Seed,
 } from "./preview-cache.ts";
-export type { PageProblem } from "./preview-cache.ts";
+import type { PageProblem, Seed } from "../../renderer/page-map-types.ts";
 
 interface RenderResult {
   seed: Seed;
@@ -71,6 +69,8 @@ let restoredStyles: Element[] = [];
 // settles in one pass.
 let seed: Seed = {};
 let problems: PageProblem[] = [];
+// The render for targetHash (in flight, queued or done); null after a restore.
+let pending: Promise<PageProblem[]> | null = null;
 let queuedUpdate: {
   update: UpdateMessage;
   container: HTMLElement;
@@ -79,15 +79,16 @@ let queuedUpdate: {
 } | null = null;
 
 // Resolves to the page-map problems of the render that ends up on screen.
-export async function renderPreview(
+export function renderPreview(
   update: UpdateMessage,
   container: HTMLElement,
   cacheKey: string,
 ): Promise<PageProblem[]> {
   const hash = renderHash(update);
   // Same content as what's on screen or already on its way (e.g. the first
-  // update after a restore): Paged.js would spend seconds reproducing it.
-  if (hash === targetHash) return problems;
+  // update after a restore): Paged.js would spend seconds reproducing it, so
+  // share that render's outcome.
+  if (hash === targetHash) return pending ?? Promise.resolve(problems);
   targetHash = hash;
   if (rendering) {
     // coalesce: only the latest pending update matters, and every caller
@@ -98,8 +99,17 @@ export async function renderPreview(
       cacheKey,
       done: queuedUpdate?.done ?? Promise.withResolvers(),
     };
-    return queuedUpdate.done.promise;
+    return pending = queuedUpdate.done.promise;
   }
+  return pending = runRender(update, container, cacheKey, hash);
+}
+
+async function runRender(
+  update: UpdateMessage,
+  container: HTMLElement,
+  cacheKey: string,
+  hash: string,
+): Promise<PageProblem[]> {
   rendering = true;
   try {
     setFontLinks(update.fontLinks);
@@ -194,6 +204,7 @@ export function restoreCachedRender(
   });
   container.innerHTML = cached.pages;
   targetHash = cached.hash;
+  pending = null;
   seed = cached.seed ?? {};
   problems = cached.problems ?? [];
   fitPreview(container);

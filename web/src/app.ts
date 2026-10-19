@@ -7,7 +7,6 @@ import {
   fitPreview,
   installPageIndicator,
   installStyleClicks,
-  type PageProblem,
   renderPreview,
   restoreCachedRender,
   scrollPreviewTo,
@@ -18,6 +17,10 @@ import {
   deleteCachedRender,
   loadCachedRender,
 } from "./preview-cache.ts";
+import {
+  formatProblem,
+  type PageProblem,
+} from "../../renderer/page-map-types.ts";
 import {
   applyDiagnostics,
   createEditor,
@@ -110,9 +113,10 @@ function reparse(text: string): void {
 
 // Page-map problems from the last render; each scrolls to its page.
 function showPageProblems(problems: PageProblem[]): void {
-  $("page-problems").replaceChildren(...problems.map(({ page, message }) => {
+  $("page-problems").replaceChildren(...problems.map((p) => {
+    const { page } = p;
     const item = document.createElement("button");
-    item.textContent = page === null ? message : `page ${page}: ${message}`;
+    item.textContent = formatProblem(p);
     if (page !== null) {
       item.title = "click to show the page";
       item.onclick = () =>
@@ -799,6 +803,10 @@ async function main(): Promise<void> {
     renderPreview(msg, previewEl, key).then((problems) => {
       showPageProblems(problems);
       refreshPageIndicator();
+    }, (err) => {
+      // The old pages stay up; their problems no longer describe this book.
+      setStatus("error", `preview: ${brief(err)}`);
+      showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
     });
     if (msg.origin !== clientId) {
       refreshFromRemote();

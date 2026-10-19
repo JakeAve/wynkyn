@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import type { NumberingStyle } from "../metadata/types.ts";
+import type { PageProblem, Seed } from "./page-map-types.ts";
 import "./folios.js";
 
 type Zone = "front" | "body" | "back";
@@ -19,11 +20,10 @@ type PageEntry = Omit<PageFacts, "zone" | "chapterTitles" | "partTitles"> & {
   zone: Zone;
   folio: number;
   folioText: string;
+  refText: string;
   chapterTitle: string;
   partTitle: string;
 };
-type Seed = Record<string, string>;
-type PageProblem = { page: number | null; message: string };
 type RenderResult = { map: PageEntry[]; seed: Seed; problems: PageProblem[] };
 
 const {
@@ -102,6 +102,28 @@ Deno.test("front counts in roman, body restarts at 1, back continues", () => {
     body: { style: "arabic", show: false },
   });
   assertEquals(hidden[0]?.folioText, "");
+});
+
+Deno.test("TOC/ref numbers ignore show: false, display pages and style none", () => {
+  const map = buildPageMap([
+    page({ zone: "front", display: true, anchors: ["title-page"] }),
+    page({ zone: "front", anchors: ["preface"] }),
+    page({ zone: "body", anchors: ["one"] }),
+    page({ display: true, anchors: ["plate"] }),
+    page({ zone: "back", anchors: ["notes"] }),
+  ], {
+    front: { style: "roman-lower", show: false },
+    body: { style: "arabic", show: true },
+    back: { style: "none", show: true },
+  });
+  assertEquals(map.map((p) => p.folioText), ["", "", "1", "", ""]);
+  assertEquals(anchorFolios(map), {
+    "title-page": "i",
+    preface: "ii",
+    one: "1",
+    plate: "2",
+    notes: "3",
+  });
 });
 
 Deno.test("a plate counts, shows no folio, and titles carry past it", () => {

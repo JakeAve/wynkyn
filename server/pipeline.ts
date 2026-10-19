@@ -26,7 +26,10 @@ const FOLIOS_JS = await Deno.readTextFile(
 
 // Export driver (spec §5.4): re-render until the page map's folios are the
 // ones the render was seeded with, then leave the outcome on <html> for
-// pdf.ts — data-paged=done|error plus a JSON report in data-paged-report.
+// pdf.ts — data-paged=done|error|fatal plus a JSON report in
+// data-paged-report. "error" is pagination problems (--force exports anyway);
+// "fatal" is the driver itself failing (e.g. Paged.js didn't load), which
+// never exports.
 // The book's <style> is fed to Paged.js explicitly and removed, so it isn't
 // also applied unpolished; Paged.js's removeStyles is never called.
 const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
@@ -49,10 +52,10 @@ const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
     }, {});
     report = { problems: r.problems, passes: r.passes, digest: BookPageMap.digest(r.map) };
   } catch (err) {
-    report = { problems: [{ page: null, message: String(err) }], passes, digest: null };
+    report = { fatal: String(err), passes };
   }
   root.dataset.pagedReport = JSON.stringify(report);
-  root.dataset.paged = report.problems.length ? "error" : "done";
+  root.dataset.paged = report.fatal ? "fatal" : report.problems.length ? "error" : "done";
 });`;
 
 // spec §4.11 item 8: try these in order for each {illustration:}/{dropcap|image:} slug.

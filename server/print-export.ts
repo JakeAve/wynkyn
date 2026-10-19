@@ -18,7 +18,8 @@ import { metadataPath } from "./editions.ts";
 import { type PageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
-import { type PageProblem, type RenderedPdf, renderPdf } from "./pdf.ts";
+import { type RenderedPdf, renderPdf } from "./pdf.ts";
+import { formatProblem, type PageProblem } from "../renderer/page-map-types.ts";
 
 const PT = 72; // points per inch
 
@@ -157,10 +158,6 @@ export interface ExportSummary {
   diagnostics: number;
   setup: PageSetup; // the §4.3 page setup this run actually used
   pagination: PageProblem[]; // page map problems, exported anyway under force
-}
-
-export function formatProblem(p: PageProblem): string {
-  return p.page === null ? p.message : `page ${p.page}: ${p.message}`;
 }
 
 function assertWholeNumber(value: number, label: string): void {

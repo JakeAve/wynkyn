@@ -1,12 +1,5 @@
 // web/src/preview-cache.ts — pure hash + IndexedDB store for one cached render per book+edition.
-
-// Anchor id → folio text, from the page map (renderer/folios.js).
-export type Seed = Record<string, string>;
-// `page` is the 1-based physical page, null for a book-wide problem.
-export interface PageProblem {
-  page: number | null;
-  message: string;
-}
+import type { PageProblem, Seed } from "../../renderer/page-map-types.ts";
 
 export interface CachedRender {
   hash: string;

@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { renderPdf } from "./pdf.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
@@ -22,5 +22,26 @@ Deno.test({
     const { width, height } = doc.getPage(0).getSize();
     assertEquals(Math.round(width), Math.round(5.5 * 72)); // demo-book page.size is 5.5in 8.5in
     assert(height > width);
+  },
+});
+
+Deno.test({
+  name: "renderPdf throws a driver failure instead of reporting a problem",
+  ignore: !hasChrome,
+  fn: async () => {
+    // What the toHtml driver leaves when e.g. Paged.js failed to load.
+    const html = `<!doctype html><script>
+      const r = document.documentElement;
+      r.dataset.pagedReport = JSON.stringify({
+        fatal: "ReferenceError: Paged is not defined",
+        passes: 1,
+      });
+      r.dataset.paged = "fatal";
+    </script>`;
+    await assertRejects(
+      () => renderPdf(html),
+      Error,
+      "Paged.js render failed: ReferenceError: Paged is not defined",
+    );
   },
 });

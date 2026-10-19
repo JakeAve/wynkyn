@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { chromium } from "playwright";
+import { chromium, type Page } from "playwright";
 import { parse } from "../parser/parser.ts";
 import {
   generateDomCSS,
@@ -72,14 +72,22 @@ const metadata: Metadata = {
     },
   },
 };
-const doc = parse(manuscript);
-const html = render(doc, { numbering: metadata.numbering });
-const css = [
-  await Deno.readTextFile(new URL("./base.css", import.meta.url)),
-  generateDomCSS(metadata),
-  generatePagedCSS(metadata, { bookTitle: "The Book" }),
-].join("\n");
-const numbering = pageNumberingConfig(metadata);
+const baseCss = await Deno.readTextFile(new URL("./base.css", import.meta.url));
+// What the pipeline hands Paged.js for a manuscript + metadata.
+function build(manuscript: string, metadata: Metadata) {
+  return {
+    html: render(parse(manuscript), {
+      numbering: metadata.numbering,
+      notes: metadata.notes,
+    }),
+    css: [
+      baseCss,
+      generateDomCSS(metadata),
+      generatePagedCSS(metadata, { bookTitle: "The Book" }),
+    ].join("\n"),
+    numbering: pageNumberingConfig(metadata),
+  };
+}
 const scripts = await Promise.all(
   ["./plates.js", "./folios.js"].map((f) =>
     Deno.readTextFile(new URL(f, import.meta.url))
@@ -94,56 +102,71 @@ interface Pass {
   ref: string;
 }
 
+async function withPage(fn: (page: Page) => Promise<void>) {
+  const browser = await chromium.launch({ channel: "chrome" });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(
+      `<!doctype html><script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.js"></script>${
+        scripts.map((s) => `<script>${s}</script>`).join("")
+      }<div id="out"></div>`,
+    );
+    await fn(page);
+  } finally {
+    await browser.close();
+  }
+}
+
+// One Paged.js render of `book` from `seed`.
+function pass(
+  page: Page,
+  book: ReturnType<typeof build>,
+  seed: Record<string, string>,
+) {
+  return page.evaluate(
+    async ({ html, css, seed, numbering }) => {
+      const out = document.getElementById("out")!;
+      out.innerHTML = "";
+      const url = URL.createObjectURL(
+        new Blob([css], { type: "text/css" }),
+      );
+      // deno-lint-ignore no-explicit-any
+      const previewer = new (globalThis as any).Paged.Previewer({
+        pageMap: { seed, numbering },
+      });
+      const chunker = await previewer.preview(html, [url], out);
+      const margins = [...out.querySelectorAll(".pagedjs_page")].map(
+        (p) => {
+          const box = p.querySelector(
+            ".pagedjs_margin-bottom-center .pagedjs_margin-content",
+          );
+          return box ? getComputedStyle(box, "::after").content : "none";
+        },
+      );
+      const toc: Record<string, string> = {};
+      for (const a of out.querySelectorAll(".toc a.page")) {
+        toc[a.getAttribute("href")!.slice(1)] = a.textContent!;
+      }
+      const ref = out.querySelector("a.ref")?.textContent ?? "";
+      previewer.polisher.destroy();
+      return { result: chunker.pageMapResult, margins, toc, ref };
+    },
+    { ...book, seed },
+  ) as Promise<Pass>;
+}
+
 Deno.test({
   name:
     "folios: the handler writes folios into margins, and the seed into the TOC",
   ignore: !hasChrome,
-  fn: async () => {
-    const browser = await chromium.launch({ channel: "chrome" });
-    try {
-      const page = await browser.newPage();
-      await page.setContent(
-        `<!doctype html><script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.js"></script>${
-          scripts.map((s) => `<script>${s}</script>`).join("")
-        }<div id="out"></div>`,
-      );
-      const pass = (seed: Record<string, string>) =>
-        page.evaluate(
-          async ({ html, css, seed, numbering }) => {
-            const out = document.getElementById("out")!;
-            out.innerHTML = "";
-            const url = URL.createObjectURL(
-              new Blob([css], { type: "text/css" }),
-            );
-            // deno-lint-ignore no-explicit-any
-            const previewer = new (globalThis as any).Paged.Previewer({
-              pageMap: { seed, numbering },
-            });
-            const chunker = await previewer.preview(html, [url], out);
-            const margins = [...out.querySelectorAll(".pagedjs_page")].map(
-              (p) => {
-                const box = p.querySelector(
-                  ".pagedjs_margin-bottom-center .pagedjs_margin-content",
-                );
-                return box ? getComputedStyle(box, "::after").content : "none";
-              },
-            );
-            const toc: Record<string, string> = {};
-            for (const a of out.querySelectorAll(".toc a.page")) {
-              toc[a.getAttribute("href")!.slice(1)] = a.textContent!;
-            }
-            const ref = out.querySelector("a.ref")!.textContent!;
-            previewer.polisher.destroy();
-            return { result: chunker.pageMapResult, margins, toc, ref };
-          },
-          { html, css, seed, numbering },
-        ) as Promise<Pass>;
-
-      const first = await pass({});
+  fn: () =>
+    withPage(async (page) => {
+      const book = build(manuscript, metadata);
+      const first = await pass(page, book, {});
       assertEquals(first.result.problems, []);
       assertEquals(Object.keys(first.toc), ["matter-preface", "one", "two"]);
       assert(Object.values(first.toc).every((t) => t === "000"));
-      const second = await pass(first.result.seed);
+      const second = await pass(page, book, first.result.seed);
       const { map, seed, problems } = second.result;
       assertEquals(problems, []);
       assertEquals(seed, first.result.seed); // settled in two passes
@@ -173,8 +196,41 @@ Deno.test({
         map.find((p) => p.anchors.includes("two")).chapterTitle,
         "Chapter Two",
       );
-    } finally {
-      await browser.close();
-    }
-  },
+    }),
+});
+
+Deno.test({
+  name: "folios: a book ending in a long footnote is neither cut short nor " +
+    "stranded",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      // The last id in the book is the note's; Paged.js moves it out of the
+      // page content into the footnote area and continues it overleaf.
+      const book = build(
+        [
+          "{chapter: one}",
+          "{title}",
+          "Chapter One",
+          "",
+          prose(3),
+          "",
+          "The end.{footnote: last}",
+          "",
+          "{note: last}",
+          prose(6).replaceAll("\n\n", " "),
+        ].join("\n"),
+        { ...metadata, notes: { placement: "footnote" } },
+      );
+      const { result } = await pass(page, book, {});
+      assertEquals(result.problems, []);
+      const notePage = result.map.findIndex((p) =>
+        p.anchors.includes("note-last")
+      );
+      assert(notePage >= 0, "the note's own id is on a page");
+      assert(
+        result.map.length > notePage + 1,
+        "the note continues on the next page",
+      );
+    }),
 });

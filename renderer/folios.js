@@ -12,8 +12,12 @@
  * @typedef {{ zone: Zone | null; display: boolean; blank: boolean; empty: boolean; chapterTitles: string[]; partTitles: string[]; anchors: string[] }} PageFacts
  * `index` is the 0-based position in the map; problems and digests use
  * 1-based physical pages.
- * @typedef {{ index: number; zone: Zone; display: boolean; blank: boolean; empty: boolean; folio: number; folioText: string; chapterTitle: string; partTitle: string; anchors: string[] }} PageEntry
- * @typedef {Record<string, string>} Seed anchor id → folio text
+ * `folioText` is what the margin box shows ("" when hidden or a display
+ * page); `refText` is the page's number regardless, for TOC rows and `{ref}`.
+ * @typedef {{ index: number; zone: Zone; display: boolean; blank: boolean; empty: boolean; folio: number; folioText: string; refText: string; chapterTitle: string; partTitle: string; anchors: string[] }} PageEntry
+ * Seed and PageProblem are defined in ./page-map-types.ts; restated here for
+ * this file's own checking.
+ * @typedef {Record<string, string>} Seed anchor id → refText
  * @typedef {{ page: number | null; message: string }} PageProblem
  * @typedef {{ map: PageEntry[]; seed: Seed; problems: PageProblem[] }} RenderResult
  */
@@ -115,6 +119,7 @@
       empty: facts.empty,
       folio,
       folioText: show && !facts.display ? formatFolio(folio, style) : "",
+      refText: formatFolio(folio, style === "none" ? "arabic" : style),
       chapterTitle: running ? titles.chapter : "",
       partTitle: running ? titles.part : "",
       anchors: facts.anchors,
@@ -142,7 +147,7 @@
     /** @type {Seed} */
     const seed = {};
     for (const page of map) {
-      for (const id of page.anchors) seed[id] ??= page.folioText;
+      for (const id of page.anchors) seed[id] ??= page.refText;
     }
     return seed;
   }
@@ -252,7 +257,10 @@
 
   /** @param {Element} page @returns {PageFacts} */
   function pageFacts(page) {
-    const area = page.querySelector(".pagedjs_page_content") ?? page;
+    // The content and, with `notes.placement: "footnote"`, the footnote area
+    // Paged.js moves `.note`s into: a page holding only a continued footnote
+    // isn't stranded.
+    const area = page.querySelector(".pagedjs_area") ?? page;
     const zoneEl = area.querySelector(".zone-front, .zone-body, .zone-back");
     const zone = /** @type {Zone | undefined} */ (zoneEl?.className.match(
       /\bzone-(front|body|back)\b/,
@@ -270,8 +278,10 @@
       chapterTitles: texts(".chapter .title"),
       // `>`: a chapter's title inside a part isn't the part's.
       partTitles: texts(".part > .title"),
+      // Paged.js renames a footnote to `note-<data-ref>`; afterParsed kept
+      // its own id.
       anchors: [...area.querySelectorAll("[id]:not([data-split-from])")]
-        .map((el) => el.id),
+        .map((el) => /** @type {HTMLElement} */ (el).dataset.noteId ?? el.id),
     };
   }
 
@@ -295,14 +305,18 @@
         /** @type {PageNumberingConfig} */
         this.numbering = settings.numbering ??
           { front: ARABIC, body: ARABIC, back: ARABIC };
-        /** @type {string[] | undefined} */
-        this.expected = settings.expected;
+        /** @type {string[]} */
+        this.expected = [];
       }
 
       // Numbers are written before layout, from the seed, so nothing in the
-      // flow changes once it's paginated.
+      // flow changes once it's paginated. Runs after Paged.js's own Footnotes
+      // handler has marked the notes.
       /** @param {DocumentFragment} parsed */
       afterParsed(parsed) {
+        for (const n of parsed.querySelectorAll("[data-note=footnote][id]")) {
+          /** @type {HTMLElement} */ (n).dataset.noteId = n.id;
+        }
         /** @type {Set<string>} */
         const targets = new Set();
         for (const a of parsed.querySelectorAll(".toc a.page, a.ref")) {
@@ -310,7 +324,6 @@
           a.textContent = this.seed[id] ?? "000";
           targets.add(id);
         }
-        if (this.expected) return;
         const last = [...parsed.querySelectorAll("[id]")].at(-1)?.id;
         if (last) {
           targets.delete(last);
@@ -341,6 +354,10 @@
         return entry;
       }
 
+      // Not redundant with afterRendered: Paged.js sizes the margin boxes in
+      // Margins.finalizePage right after afterPageLayout, so --folio and the
+      // titles must be on the page by then. afterRendered only covers pages
+      // added outside the flow (plates.js) and rewrites the rest unchanged.
       /** @param {Element} pageElement */
       afterPageLayout(pageElement) {
         this.layOut(pageElement);
@@ -354,7 +371,7 @@
         this.chunker.pageMapResult = {
           map,
           seed: anchorFolios(map),
-          problems: checkPageMap(map, this.expected ?? []),
+          problems: checkPageMap(map, this.expected),
         };
       }
     },

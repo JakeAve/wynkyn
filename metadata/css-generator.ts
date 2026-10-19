@@ -1,6 +1,6 @@
 // metadata/css-generator.ts — Metadata → CSS strings (spec §5.2). Pure, no I/O.
 import type { CssProps, ElementStyle, Metadata } from "./types.ts";
-import type { NumberingStyle, PageNumbering, RunningEntry } from "./types.ts";
+import type { NumberingStyle, RunningEntry } from "./types.ts";
 
 const MATTER_KEYS = new Set([
   "half-title",
@@ -115,20 +115,18 @@ export interface PageNumberingConfig {
   back: ZoneNumbering;
 }
 
+// Page zone (named page, page map) → its key under numbering.pages.
+const ZONE_KEYS: ReadonlyArray<
+  [keyof PageNumberingConfig, "front-matter" | "body" | "back-matter"]
+> = [["front", "front-matter"], ["body", "body"], ["back", "back-matter"]];
+
 // What the page map (renderer/folios.js) formats folios from, per zone (§4.7).
 export function pageNumberingConfig(metadata: Metadata): PageNumberingConfig {
   const pages = metadata.numbering?.pages;
-  const zone = (
-    cfg: { style?: NumberingStyle; show?: boolean } | undefined,
-  ) => ({
-    style: cfg?.style ?? "arabic",
-    show: cfg?.show ?? true,
-  });
-  return {
-    front: zone(pages?.["front-matter"]),
-    body: zone(pages?.body),
-    back: zone(pages?.["back-matter"]),
-  };
+  return Object.fromEntries(ZONE_KEYS.map(([zone, key]) => [zone, {
+    style: pages?.[key]?.style ?? "arabic",
+    show: pages?.[key]?.show ?? true,
+  }])) as Record<keyof PageNumberingConfig, ZoneNumbering>;
 }
 
 function runningContent(value: string, bookTitle?: string): string {
@@ -181,12 +179,8 @@ export function generatePagedCSS(
   // is in base.css.
   const pages = metadata.numbering?.pages;
   const numbering = pageNumberingConfig(metadata);
-  const zones: Array<[keyof PageNumberingConfig, PageNumbering | undefined]> = [
-    ["front", pages?.["front-matter"]],
-    ["body", pages?.body],
-    ["back", pages?.["back-matter"]],
-  ];
-  for (const [name, cfg] of zones) {
+  for (const [name, key] of ZONE_KEYS) {
+    const cfg = pages?.[key];
     const { style, show } = numbering[name];
     if (show && style !== "none") {
       const decls = [`    content: var(--folio);`];

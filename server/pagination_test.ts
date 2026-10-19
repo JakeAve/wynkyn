@@ -4,7 +4,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
 import { buildBook, toHtml } from "./pipeline.ts";
-import type { PageProblem } from "./pdf.ts";
+import type { PageProblem } from "../renderer/page-map-types.ts";
 import type { Metadata } from "../metadata/types.ts";
 
 const hasChrome = await Deno.stat("/Applications/Google Chrome.app").then(
@@ -41,9 +41,13 @@ async function paginate(
     const page = await browser.newPage();
     await page.goto(`file://${file}`);
     await page.waitForSelector("html[data-paged]", { timeout: 540_000 });
-    const report: Report = JSON.parse(
+    const report: Report & { fatal?: string } = JSON.parse(
       (await page.getAttribute("html", "data-paged-report"))!,
     );
+    // A driver failure has no digest; show its error, not a TypeError.
+    if (report.fatal) {
+      throw new Error(`${book}: render failed: ${report.fatal}`);
+    }
     const firsts = Object.fromEntries(
       Object.entries(report.digest.zones).map(([z, [first]]) => [z, first]),
     );
