@@ -198,3 +198,27 @@ export function splitProps(
   }
   return { curated, extra };
 }
+
+// ---------- length steppers (style panel controls) ----------
+
+// "9pt" -> { n: 9, unit: "pt" }; "1.5" -> unit ""; anything else -> null.
+export function parseLength(v: string): { n: number; unit: string } | null {
+  const m = /^(-?(?:\d+\.?\d*|\.\d+))([a-z%]*)$/i.exec(v.trim());
+  return m ? { n: Number(m[1]), unit: m[2]! } : null;
+}
+
+// How far one arrow-key press moves a value in this unit.
+export function stepFor(unit: string): number {
+  return ({ pt: 0.5, em: 0.05, mm: 1, lh: 0.25, px: 1, "%": 1 } as Record<
+    string,
+    number
+  >)[unit] ?? 1;
+}
+
+// Bump a CSS length one step, keeping its unit. An empty or invalid `v`
+// bumps `fallback` instead (the inherited value the field is showing).
+export function bumpLength(v: string, dir: 1 | -1, fallback: string): string {
+  const p = parseLength(v) ?? parseLength(fallback) ?? { n: 0, unit: "" };
+  const n = Math.round((p.n + dir * stepFor(p.unit)) * 1000) / 1000;
+  return `${n}${p.unit}`;
+}

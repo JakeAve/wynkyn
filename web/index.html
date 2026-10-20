@@ -734,6 +734,499 @@
     .pagedjs_margin-content {
       cursor: pointer;
     }
+    /* ---- style panel controls (web/src/panel-controls.ts), scoped so they cannot collide ---- */
+    #config-overlay svg.i {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex: none;
+    }
+    #config-overlay .phead {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 10px 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    #config-overlay .tabs {
+      display: flex;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+    #config-overlay .tabs button {
+      background: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 4px 11px;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #config-overlay .tabs button:hover {
+      color: var(--fg);
+      background: var(--hover);
+    }
+    #config-overlay .tabs button[aria-selected="true"] {
+      background: var(--inv-bg);
+      color: var(--inv-fg);
+    }
+    #config-overlay .pbody {
+      overflow-y: auto;
+      padding: 4px 16px 28px;
+      flex: 1;
+      min-height: 0;
+    }
+    #config-overlay .sec {
+      padding: 14px 0 12px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      gap: 4px;
+      border-radius: 4px;
+      transition: background-color .8s cubic-bezier(.16,1,.3,1);
+    }
+    #config-overlay .sec:last-child {
+      border-bottom: 0;
+    }
+    #config-overlay .sec.flash {
+      background: var(--hover);
+      transition: none;
+    }
+    #config-overlay .sech {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 4px;
+    }
+    #config-overlay .sech h3 {
+      margin: 0;
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: -.005em;
+    }
+    #config-overlay .where {
+      background: none;
+      border: 0;
+      padding: 2px 6px;
+      margin-right: -6px;
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    #config-overlay .where:hover {
+      color: var(--fg);
+      background: var(--hover);
+    }
+    #config-overlay .where svg.i {
+      width: 13px;
+      height: 13px;
+    }
+    #config-overlay .row {
+      display: grid;
+      grid-template-columns: 116px minmax(0,1fr);
+      align-items: center;
+      gap: 10px;
+      min-height: 32px;
+    }
+    #config-overlay .row[hidden] {
+      display: none;
+    }
+    #config-overlay .lbl {
+      color: var(--muted);
+      position: relative;
+      padding-left: 11px;
+    }
+    #config-overlay .row.set .lbl {
+      color: var(--fg);
+    }
+    #config-overlay .row.set .lbl::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: .55em;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--fg);
+    }
+    #config-overlay .ctl {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+    #config-overlay .from {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    #config-overlay .st {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg);
+    }
+    #config-overlay .st:focus-within {
+      border-color: var(--muted);
+    }
+    #config-overlay .st button {
+      background: none;
+      border: 0;
+      height: 100%;
+      width: 26px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: var(--radius);
+    }
+    #config-overlay .st button:hover {
+      color: var(--fg);
+      background: var(--hover);
+    }
+    #config-overlay .st input {
+      width: 44px;
+      border: 0;
+      background: none;
+      text-align: right;
+      padding: 0 2px;
+      font-variant-numeric: tabular-nums;
+      outline: none;
+    }
+    #config-overlay .st input::placeholder {
+      color: var(--muted);
+      opacity: .75;
+    }
+    #config-overlay .st .u {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0 4px 0 2px;
+      min-width: 18px;
+    }
+    #config-overlay .seg {
+      display: inline-flex;
+      gap: 2px;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 2px);
+      flex-wrap: wrap;
+    }
+    #config-overlay .seg button {
+      background: none;
+      border: 0;
+      border-radius: var(--radius);
+      padding: 2px 9px;
+      min-height: 22px;
+      color: var(--muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    #config-overlay .seg button:hover {
+      color: var(--fg);
+      background: var(--hover);
+    }
+    #config-overlay .seg button[aria-checked="true"],
+    #config-overlay .tog[aria-pressed="true"] {
+      background: var(--inv-bg);
+      color: var(--inv-fg);
+    }
+    #config-overlay .tog {
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 2px 10px;
+      min-height: 28px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    #config-overlay .tog:hover {
+      color: var(--fg);
+    }
+    #config-overlay .tog[aria-pressed="true"] {
+      border-color: var(--inv-bg);
+    }
+    #config-overlay select.sel,
+    #config-overlay input.txt {
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg);
+      padding: 0 8px;
+      min-width: 0;
+      max-width: 100%;
+    }
+    #config-overlay select.sel {
+      padding-right: 4px;
+      cursor: pointer;
+    }
+    #config-overlay input.txt {
+      width: 140px;
+    }
+    #config-overlay .fontpick {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+    #config-overlay .fontpick select {
+      flex: 1;
+    }
+    #config-overlay .spec {
+      font-size: 22px;
+      line-height: 1;
+      width: 30px;
+      text-align: center;
+      color: var(--fg);
+    }
+    #config-overlay .sample {
+      margin: 6px 0 2px 11px;
+      font-size: 21px;
+      line-height: 1.3;
+      color: var(--fg);
+      text-wrap: pretty;
+    }
+    #config-overlay .uses {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 6px;
+      padding: 6px 0 2px 11px;
+    }
+    #config-overlay .uses .from {
+      margin-right: 2px;
+    }
+    #config-overlay .chip {
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 1px 9px;
+      font-size: 12px;
+      color: var(--fg);
+      cursor: pointer;
+    }
+    #config-overlay .chip:hover {
+      background: var(--hover);
+    }
+    #config-overlay .range {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+    #config-overlay .range input {
+      flex: 1;
+      min-width: 80px;
+      accent-color: var(--fg);
+    }
+    #config-overlay .range output {
+      font-variant-numeric: tabular-nums;
+      min-width: 34px;
+    }
+    #config-overlay details.more {
+      margin-top: 2px;
+    }
+    #config-overlay details.more summary {
+      cursor: pointer;
+      color: var(--muted);
+      padding: 6px 0;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+    }
+    #config-overlay details.more summary::-webkit-details-marker {
+      display: none;
+    }
+    #config-overlay details.more summary:hover {
+      color: var(--fg);
+    }
+    #config-overlay details.more summary svg {
+      transition: transform .2s cubic-bezier(.16,1,.3,1);
+    }
+    #config-overlay details.more[open] summary svg {
+      transform: rotate(90deg);
+    }
+    #config-overlay details.more textarea {
+      width: 100%;
+      min-height: 62px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg);
+      padding: 6px 8px;
+      font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+      resize: vertical;
+    }
+    #config-overlay .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 2px 0 0;
+    }
+    #config-overlay .foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+    }
+    #config-overlay .crumb {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 0 6px;
+      border-bottom: 1px solid var(--line);
+    }
+    #config-overlay .crumb .ghost {
+      padding: 4px 6px 4px 2px;
+      font-size: 13.5px;
+    }
+    #config-overlay .crumb strong {
+      font-weight: 600;
+    }
+    #config-overlay .group {
+      padding: 14px 0 4px;
+    }
+    #config-overlay .group h3 {
+      margin: 0 0 4px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+    #config-overlay .part {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: 0;
+      border-bottom: 1px solid var(--soft);
+      padding: 8px 4px 8px 2px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--fg);
+    }
+    #config-overlay .part:hover {
+      background: var(--hover);
+    }
+    #config-overlay .part .n {
+      flex: 1;
+    }
+    #config-overlay .part .c {
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    #config-overlay .part svg {
+      color: var(--muted);
+    }
+    #config-overlay .tip {
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    #config-overlay .mdiag {
+      display: grid;
+      grid-template-columns: auto minmax(0,1fr) auto;
+      grid-template-rows: auto auto auto;
+      gap: 6px 8px;
+      align-items: center;
+      justify-items: center;
+      padding: 6px 0 2px;
+    }
+    #config-overlay .mdiag .stage {
+      grid-area: 2 / 2;
+      display: flex;
+      align-items: stretch;
+    }
+    #config-overlay .mpage {
+      position: relative;
+      height: 138px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+    }
+    #config-overlay .mpage.v {
+      opacity: .45;
+      border-right: 0;
+    }
+    #config-overlay .mblock {
+      position: absolute;
+      background: repeating-linear-gradient(var(--hover) 0 3px, transparent 3px
+        7px);
+    }
+    #config-overlay .mdiag .mt {
+      grid-area: 1 / 2;
+    }
+    #config-overlay .mdiag .mb {
+      grid-area: 3 / 2;
+    }
+    #config-overlay .mdiag .mi {
+      grid-area: 2 / 1;
+    }
+    #config-overlay .mdiag .mo {
+      grid-area: 2 / 3;
+    }
+    #config-overlay .mlab {
+      display: grid;
+      justify-items: center;
+      gap: 2px;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    #config-overlay .readout {
+      color: var(--muted);
+      display: grid;
+      gap: 4px;
+      padding: 4px 0 0 11px;
+    }
+    #config-overlay .readout p {
+      margin: 0;
+    }
+    #config-overlay .readout p:first-child {
+      color: var(--fg);
+    }
+    #config-overlay button,
+    #config-overlay select,
+    #config-overlay input,
+    #config-overlay textarea {
+      font: inherit;
+    }
+    #config-overlay .ghost {
+      background: none;
+      border: 0;
+      border-radius: var(--radius);
+      color: var(--muted);
+      padding: 6px 9px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    #config-overlay .ghost:hover {
+      background: var(--hover);
+      color: var(--fg);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #config-overlay * {
+        transition: none !important;
+      }
+    }
     </style>
   </head>
   <body>
