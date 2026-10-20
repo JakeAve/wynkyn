@@ -275,7 +275,8 @@ export function routeFor(key: string, metadata: Metadata): Route {
   const part = bookParts(metadata).find((p) => p.keys.includes(key));
   if (!part) return { tab: "parts" };
   if (part.id === "body") {
-    return { tab: "parts", part: "body", focus: "paragraphs" };
+    const focus = key === "em" ? "emphasis" : "paragraphs";
+    return { tab: "parts", part: "body", focus };
   }
   if (part.group === "custom") return { tab: "parts", part: part.id };
   // chapter.number → "number"; a flat type (heading, quote) is its own block.

@@ -109,6 +109,16 @@ Deno.test("routeFor sends folios and running heads to the Page tab", () => {
     part: "body",
     focus: "paragraphs",
   });
+  assertEquals(routeFor("em", book), {
+    tab: "parts",
+    part: "body",
+    focus: "emphasis",
+  });
+  assertEquals(routeFor("body", book), {
+    tab: "parts",
+    part: "body",
+    focus: "paragraphs",
+  });
   assertEquals(routeFor("chapter.number", book), {
     tab: "parts",
     part: "chapter",
