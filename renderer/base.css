@@ -24,6 +24,13 @@
 .bml p.has-dropcap {
   margin-top: 0;
 }
+/* Nor does a paragraph that starts a page: it is the first child down the
+   page's own copy of the tree (in a chapter, or a chapter in a part / a quote).
+   Paged.js already unsets the margin on one continued from the page before. */
+.pagedjs_page_content > div > .bml > :first-child > p:first-child,
+.pagedjs_page_content > div > .bml > :first-child > :first-child > p:first-child {
+  margin-top: 0;
+}
 .bml .dropcap {
   float: left;
   padding-right: 0.05em;
