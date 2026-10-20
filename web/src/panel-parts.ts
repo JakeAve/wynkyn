@@ -9,6 +9,7 @@ import type {
 import {
   crumb,
   icon,
+  makeView,
   moreCss,
   row,
   section,
@@ -16,6 +17,7 @@ import {
   select,
   stepper,
   toggle,
+  type View,
 } from "./panel-controls.ts";
 import {
   type BookPart,
@@ -144,30 +146,6 @@ function replaceOthers(
     }
   }
   Object.assign(live, next);
-}
-
-// A view's dots follow the values live: every write re-checks every mark.
-interface View {
-  mark(r: HTMLElement, isSet: () => boolean): HTMLElement;
-  changed(section: Section): void;
-}
-
-function makeView(ctx: PanelContext, after: () => void): View {
-  const marks: Array<[HTMLElement, () => boolean]> = [];
-  const paint = ([r, f]: [HTMLElement, () => boolean]) =>
-    r.classList.toggle("set", f());
-  return {
-    mark(r, isSet) {
-      marks.push([r, isSet]);
-      paint([r, isSet]);
-      return r;
-    },
-    changed(section) {
-      ctx.queueSave(section);
-      marks.forEach(paint);
-      after();
-    },
-  };
 }
 
 function footer(

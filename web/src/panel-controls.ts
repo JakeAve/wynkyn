@@ -1,13 +1,14 @@
 // web/src/panel-controls.ts — DOM controls for the style panel (rows, steppers,
 // segments, toggles, selects, sections). Styled by the `#config-overlay` rules
 // in index.html. DOM assembly only; length maths lives in config-data.ts.
-import type { CssProps } from "../../metadata/types.ts";
+import type { CssProps, Metadata } from "../../metadata/types.ts";
 import {
   bumpLength,
   formatCssLines,
   parseCssLines,
   parseLength,
 } from "./config-data.ts";
+import type { PanelContext } from "./style-catalog.ts";
 
 const ICONS = {
   minus: '<path d="M4 8h8"/>',
@@ -48,13 +49,38 @@ function h<K extends keyof HTMLElementTagNameMap>(
   return e;
 }
 
+// A view's "set" dots follow the values live: every write re-checks every mark.
+export interface View {
+  mark(r: HTMLElement, isSet: () => boolean): HTMLElement;
+  changed(section: keyof Metadata): void;
+}
+
+export function makeView(ctx: PanelContext, after = () => {}): View {
+  const marks: Array<[HTMLElement, () => boolean]> = [];
+  const paint = ([r, f]: [HTMLElement, () => boolean]) =>
+    r.classList.toggle("set", f());
+  return {
+    mark(r, isSet) {
+      marks.push([r, isSet]);
+      paint([r, isSet]);
+      return r;
+    },
+    changed(section) {
+      ctx.queueSave(section);
+      marks.forEach(paint);
+      after();
+    },
+  };
+}
+
 // Length field: takes and emits CSS lengths ("9pt"). The unit is shown beside
 // the number and kept; empty means unset. `placeholder` is the inherited value.
+// onChange returning false rejects the value: the field shows the old one.
 export function stepper(o: {
   value: string | undefined;
   placeholder?: string;
   label: string;
-  onChange(v: string | undefined): void;
+  onChange(v: string | undefined): void | false;
 }): HTMLElement {
   let value = o.value;
   let unit = parseLength(value ?? o.placeholder ?? "")?.unit ?? "";
@@ -75,11 +101,11 @@ export function stepper(o: {
     u.textContent = unit;
   };
   const commit = (v: string | undefined) => {
+    if (o.onChange(v) === false) return show();
     value = v;
     const p = v === undefined ? null : parseLength(v);
     if (p) unit = p.unit;
     show();
-    o.onChange(v);
   };
   const bump = (dir: 1 | -1) =>
     commit(bumpLength(value ?? "", dir, o.placeholder ?? `0${unit}`));

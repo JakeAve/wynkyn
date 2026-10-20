@@ -657,46 +657,14 @@
       align-items: center;
       flex-wrap: wrap;
     }
-    .cfg-inline {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      flex: none;
-      color: var(--muted);
-    }
     .cfg-error {
       color: var(--err);
       flex-basis: 100%;
-    }
-    /* What the page setup derives to — read-only, updated as fields change. */
-    .cfg-readout {
-      margin-top: 8px;
-      padding: 6px 8px;
-      border-left: 2px solid var(--line);
-      color: var(--muted);
-    }
-    .cfg-readout p {
-      margin: 0 0 2px;
-    }
-    .cfg-readout p:last-child {
-      margin-bottom: 0;
-    }
-    .cfg-readout-bad {
-      border-left-color: var(--err);
-      color: var(--err);
     }
     .cfg-entry {
       border-top: 1px dashed var(--line);
       padding-top: 6px;
       margin-top: 6px;
-    }
-    .cfg-more {
-      margin-top: 8px;
-    }
-    .cfg-more summary {
-      cursor: pointer;
-      padding: 2px 0;
-      user-select: none;
     }
     /* Click-to-style: hovered, highlighted ("on N pages") and picked
        elements in the preview; the pick stays solid over the others */
@@ -761,6 +729,7 @@
       padding: 4px 16px 28px;
       flex: 1;
       min-height: 0;
+      container-type: inline-size;
     }
     #config-overlay .sec {
       padding: 14px 0 12px;
@@ -1162,6 +1131,28 @@
     #config-overlay .mdiag .mo {
       grid-area: 2 / 3;
     }
+    /* Narrow slot: the side steppers would overlap the drawing, so Inside and
+       Outside move to a row of their own under it. */
+    @container (max-width: 400px) {
+      #config-overlay .mdiag {
+        grid-template-columns: 1fr 1fr;
+      }
+      #config-overlay .mdiag .stage {
+        grid-area: 2 / 1 / 3 / 3;
+      }
+      #config-overlay .mdiag .mt {
+        grid-area: 1 / 1 / 2 / 3;
+      }
+      #config-overlay .mdiag .mb {
+        grid-area: 3 / 1 / 4 / 3;
+      }
+      #config-overlay .mdiag .mi {
+        grid-area: 4 / 1;
+      }
+      #config-overlay .mdiag .mo {
+        grid-area: 4 / 2;
+      }
+    }
     #config-overlay .mlab {
       display: grid;
       justify-items: center;
@@ -1180,6 +1171,9 @@
     }
     #config-overlay .readout p:first-child {
       color: var(--fg);
+    }
+    #config-overlay .readout.cfg-readout-bad p {
+      color: var(--err);
     }
     #config-overlay button,
     #config-overlay select,
@@ -1270,7 +1264,8 @@
             d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1" />
         </svg>
       </button>
-      <button id="config-button" class="btn" title="Document configuration">
+      <button id="config-button" class="btn" title="Style"
+        aria-label="Style panel">
         <svg viewBox="0 0 16 16">
           <path d="M2 4.5h6.2M11.8 4.5H14M2 11.5h2.2M7.8 11.5H14" />
           <circle cx="10" cy="4.5" r="1.8" />

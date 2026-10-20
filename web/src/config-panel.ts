@@ -270,28 +270,6 @@ export function selectInput(
   return el;
 }
 
-export function checkboxInput(
-  checked: boolean,
-  onChange: (v: boolean) => void,
-): HTMLInputElement {
-  const el = document.createElement("input");
-  el.type = "checkbox";
-  el.checked = checked;
-  el.onchange = () => onChange(el.checked);
-  return el;
-}
-
-// A small label glued to a control (e.g. "show" next to its checkbox),
-// distinct from field()'s fixed-width row label.
-export function inlineLabel(text: string, control: HTMLElement): HTMLElement {
-  const wrap = document.createElement("span");
-  wrap.className = "cfg-inline";
-  const s = document.createElement("span");
-  s.textContent = text;
-  wrap.append(control, s);
-  return wrap;
-}
-
 const INHERIT = "";
 const OTHER = "__other";
 

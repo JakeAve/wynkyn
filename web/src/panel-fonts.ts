@@ -4,7 +4,7 @@
 import { renameKey } from "./config-data.ts";
 import { GOOGLE_FONTS } from "./fonts-list.ts";
 import { row, section, select } from "./panel-controls.ts";
-import { type PanelContext, usedBy } from "./style-catalog.ts";
+import { bookParts, type PanelContext, usedBy } from "./style-catalog.ts";
 
 const SAMPLES: Record<string, string> = {
   body: "The quick brown fox jumps over the lazy dog.",
@@ -26,6 +26,16 @@ const el = <K extends keyof HTMLElementTagNameMap>(
 export function buildFontsTab(ctx: PanelContext): Node[] {
   const { meta, queueSave } = ctx;
   const holder = document.createElement("div");
+  // Parts on no page of this book drop out of "Used by". Body text always
+  // stays; before the preview has paginated (every count 0) nothing drops.
+  const counts = bookParts(meta).map((p) =>
+    [p.id, Math.max(0, ...p.keys.map((k) => ctx.preview.pagesFor(k)))] as const
+  );
+  const absent = new Set(
+    counts.some(([, n]) => n > 0)
+      ? counts.filter(([id, n]) => n === 0 && id !== "body").map(([id]) => id)
+      : [],
+  );
 
   function picker(alias: string, sample: HTMLElement): HTMLSelectElement {
     const fonts = meta.fonts ??= {};
@@ -57,6 +67,7 @@ export function buildFontsTab(ctx: PanelContext): Node[] {
     if (!FIXED.includes(alias)) {
       const nameIn = document.createElement("input");
       nameIn.type = "text";
+      nameIn.className = "txt";
       nameIn.value = alias;
       nameIn.setAttribute("aria-label", "Font name");
       // Rename on commit (change = blur/enter), not per keystroke — a
@@ -75,7 +86,9 @@ export function buildFontsTab(ctx: PanelContext): Node[] {
     }
     kids.push(row("Typeface", picker(alias, sample), { set: true }), sample);
 
-    const uses = usedBy(meta, alias);
+    const uses = usedBy(meta, alias).filter((u) =>
+      !u.route.part || !absent.has(u.route.part)
+    );
     kids.push(el(
       "div",
       "uses",

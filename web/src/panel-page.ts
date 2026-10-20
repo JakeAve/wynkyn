@@ -39,12 +39,14 @@ import {
 } from "./config-panel.ts";
 import {
   icon,
+  makeView,
   row,
   section,
   seg,
   select,
   stepper,
   toggle,
+  type View,
 } from "./panel-controls.ts";
 import type { PanelContext } from "./style-catalog.ts";
 
@@ -70,7 +72,10 @@ const el = <K extends keyof HTMLElementTagNameMap>(
 const inches = (v: string | undefined) =>
   v ? tryParseDims(`${v} ${v}`)?.w ?? 0 : 0;
 
-export function buildPageTab(ctx: PanelContext): Node[] {
+export function buildPageTab(panel: PanelContext): Node[] {
+  // Every save in this tab, advanced running heads included, repaints the dots.
+  const v = makeView(panel);
+  const ctx: PanelContext = { ...panel, queueSave: v.changed };
   const page: PageConfig = ctx.meta.page ??= {};
   // Read-only snapshot — must not eagerly create page.margins, or an edit to
   // an unrelated field (e.g. size) would persist a spurious empty margins
@@ -135,14 +140,16 @@ export function buildPageTab(ctx: PanelContext): Node[] {
 
   return [
     section("Trim size", "trim", [
-      row(
-        "Page",
-        sizeControl(page.size, "Trim size", (size) => {
-          page.size = size;
-          draw();
-          ctx.queueSave("page");
-        }),
-        { set: !!page.size },
+      v.mark(
+        row(
+          "Page",
+          sizeControl(page.size, "Trim size", (size) => {
+            page.size = size;
+            draw();
+            ctx.queueSave("page");
+          }),
+        ),
+        () => !!page.size,
       ),
     ]),
     section("Margins", "margins", [
@@ -153,62 +160,67 @@ export function buildPageTab(ctx: PanelContext): Node[] {
         "Inside is the spine edge. The preview shows the spread as it will fold.",
       ),
     ]),
-    pageNumbers(ctx),
-    runningHeads(ctx),
+    pageNumbers(ctx, v),
+    runningHeads(ctx, v),
   ];
 }
 
 export function buildPrintTab(ctx: PanelContext): Node[] {
   const page: PageConfig = ctx.meta.page ??= {};
   const readout = el("div", "readout");
-  const save = () => {
-    ctx.queueSave("page");
-    showSetup(page, readout);
-  };
+  const v = makeView(ctx, () => showSetup(page, readout));
+  const save = () => v.changed("page");
   showSetup(page, readout);
   return [
     section("Paper", "sheet", [
-      row(
-        "Sheet",
-        sizeControl(page.sheet, "Sheet size", (sheet) => {
-          page.sheet = sheet;
-          save();
-        }, SHEET_PRESETS),
-        { set: !!page.sheet },
-      ),
-      row(
-        "Two-sided",
-        seg<Duplex>(
-          [
-            { label: "Short edge", value: "short-edge" },
-            { label: "Long edge", value: "long-edge" },
-            { label: "Separate files", value: "none" },
-          ],
-          page.duplex ?? "short-edge",
-          (v) => {
-            if (v) page.duplex = v;
+      v.mark(
+        row(
+          "Sheet",
+          sizeControl(page.sheet, "Sheet size", (sheet) => {
+            page.sheet = sheet;
             save();
-          },
-          "Duplex",
+          }, SHEET_PRESETS),
         ),
-        { set: !!page.duplex },
+        () => !!page.sheet,
+      ),
+      v.mark(
+        row(
+          "Two-sided",
+          seg<Duplex>(
+            [
+              { label: "Short edge", value: "short-edge" },
+              { label: "Long edge", value: "long-edge" },
+              { label: "Separate files", value: "none" },
+            ],
+            page.duplex ?? "short-edge",
+            (d) => {
+              if (d) page.duplex = d;
+              save();
+            },
+            "Duplex",
+          ),
+        ),
+        () => !!page.duplex,
       ),
     ]),
     section("Signatures", "folios-per-signature", [
-      row(
-        "Folios each",
-        stepper({
-          value: page["folios-per-signature"]?.toString(),
-          placeholder: "4",
-          label: "Folios per signature",
-          onChange: (v) => {
-            if (v === undefined) delete page["folios-per-signature"];
-            else if (isValidFolios(v)) page["folios-per-signature"] = Number(v);
-            else return; // 0 or a fraction: keep the last good value
-            save();
-          },
-        }),
-        { set: page["folios-per-signature"] !== undefined },
+      v.mark(
+        row(
+          "Folios each",
+          stepper({
+            value: page["folios-per-signature"]?.toString(),
+            placeholder: "4",
+            label: "Folios per signature",
+            onChange: (n) => {
+              if (n === undefined) delete page["folios-per-signature"];
+              else if (isValidFolios(n)) {
+                page["folios-per-signature"] = Number(n);
+              } else return false; // 0 or a fraction: show the saved value
+              save();
+            },
+          }),
+        ),
+        () => page["folios-per-signature"] !== undefined,
       ),
       readout,
     ]),
@@ -273,11 +285,11 @@ function sizeControl(
   onChange: (size: string) => void,
   presets: SizePreset[] = PAGE_SIZE_PRESETS,
 ): HTMLElement {
-  // cfg-field borrows the old panel's text-input styling for the custom box.
-  const wrap = el("span", "cfg-row cfg-field");
+  const wrap = el("span", "cfg-row");
   const preset = presetFor(current, presets);
   const custom = document.createElement("input");
   custom.type = "text";
+  custom.className = "txt";
   custom.placeholder = "5.5in 8.5in";
   custom.setAttribute("aria-label", `Custom ${label.toLowerCase()}`);
   custom.value = preset === "custom" ? (current ?? "") : "";
@@ -335,17 +347,20 @@ const NUMERALS = [
   { label: "Hidden", value: "hidden" },
 ];
 
-function pageNumbers(ctx: PanelContext): HTMLElement {
+function pageNumbers(ctx: PanelContext, view: View): HTMLElement {
   const numbering = ctx.meta.numbering ??= {};
+  const live = () => numbering.pages; // the dots read the current value
   // Read-only snapshot — must not eagerly create numbering.pages[zone], or an
   // edit to one zone would persist a spurious empty sibling on save, since the
   // whole "numbering" section round-trips together.
   const pages = numbering.pages ?? {};
   const css: CssProps = pages.css ?? {};
   const setCss = (prop: string, v: string | undefined) => {
-    const c = (numbering.pages ??= {}).css ??= {};
+    const p = numbering.pages ??= {};
+    const c = p.css ??= {};
     if (v) c[prop] = v;
     else delete c[prop];
+    if (!Object.keys(c).length) delete p.css; // leave no empty css behind
     ctx.queueSave("numbering");
   };
   const zones = ([
@@ -360,49 +375,60 @@ function pageNumbers(ctx: PanelContext): HTMLElement {
     const options = NUMERALS.some((o) => o.value === current)
       ? NUMERALS
       : [...NUMERALS, { label: current, value: current }]; // e.g. alpha-upper
-    return row(
-      label,
-      select(options, current, (v) => {
-        const z = (numbering.pages ??= {})[zone] ??= {};
-        if (v === "hidden") z.show = false;
-        else {
-          z.style = v as NumberingStyle;
-          z.show = true;
-        }
-        ctx.queueSave("numbering");
-      }, `${label} page numbers`),
-      { set: cfg.style !== undefined || cfg.show !== undefined },
+    return view.mark(
+      row(
+        label,
+        select(options, current, (v) => {
+          const z = (numbering.pages ??= {})[zone] ??= {};
+          if (v === "hidden") z.show = false;
+          else {
+            z.style = v as NumberingStyle;
+            z.show = true;
+          }
+          ctx.queueSave("numbering");
+        }, `${label} page numbers`),
+      ),
+      () => {
+        const z = live()?.[zone];
+        return z?.style !== undefined || z?.show !== undefined;
+      },
     );
   });
   return section("Page numbers", "folios", [
-    row(
-      "Size",
-      stepper({
-        value: css["font-size"],
-        placeholder: "9pt",
-        label: "Page number size",
-        onChange: (v) => setCss("font-size", v),
-      }),
-      { set: !!css["font-size"] },
-    ),
-    row(
-      "Font",
-      fontSeg(
-        ctx,
-        css["font-family"],
-        (v) => setCss("font-family", v),
-        "Page number font",
+    view.mark(
+      row(
+        "Size",
+        stepper({
+          value: css["font-size"],
+          placeholder: "9pt",
+          label: "Page number size",
+          onChange: (v) => setCss("font-size", v),
+        }),
       ),
-      { set: !!css["font-family"] },
+      () => !!live()?.css?.["font-size"],
     ),
-    row(
-      "Style",
-      toggle(
-        "Italic",
-        css["font-style"] === "italic",
-        (on) => setCss("font-style", on ? "italic" : undefined),
+    view.mark(
+      row(
+        "Font",
+        fontSeg(
+          ctx,
+          css["font-family"],
+          (v) => setCss("font-family", v),
+          "Page number font",
+        ),
       ),
-      { set: !!css["font-style"] },
+      () => !!live()?.css?.["font-family"],
+    ),
+    view.mark(
+      row(
+        "Style",
+        toggle(
+          "Italic",
+          css["font-style"] === "italic",
+          (on) => setCss("font-style", on ? "italic" : undefined),
+        ),
+      ),
+      () => !!live()?.css?.["font-style"],
     ),
     ...zones,
   ], el("span", "from", "Bottom center"));
@@ -415,8 +441,9 @@ const HEADS = [
   { label: "Nothing", value: "none" },
 ];
 
-function runningHeads(ctx: PanelContext): HTMLElement {
+function runningHeads(ctx: PanelContext, view: View): HTMLElement {
   const running = ctx.meta.running ??= {};
+  const now = () => runningSummary(running);
   const simple = document.createElement("div");
   const summary = document.createElement("span");
   const advanced = advancedHeads(ctx, running, () => {
@@ -462,23 +489,25 @@ function runningHeads(ctx: PanelContext): HTMLElement {
         label: current === "page-number" ? "Page number" : `“${current}”`,
         value: current,
       }];
-    return row(
-      label,
-      select(options, current, (v) => {
-        const entries = running[side] ??= [];
-        if (entries[0]) entries[0].content = v;
-        else {
-          // First head on this side: mirror the other side's styling.
-          const other = running[side === "odd" ? "even" : "odd"]?.[0];
-          entries.push({
-            ...other,
-            content: v,
-            area: side === "odd" ? "top-right" : "top-left",
-          });
-        }
-        changed();
-      }, `${label.replace(" pages", " page")} running head`),
-      { set: !!running[side]?.length },
+    return view.mark(
+      row(
+        label,
+        select(options, current, (v) => {
+          const entries = running[side] ??= [];
+          if (entries[0]) entries[0].content = v;
+          else {
+            // First head on this side: mirror the other side's styling.
+            const other = running[side === "odd" ? "even" : "odd"]?.[0];
+            entries.push({
+              ...other,
+              content: v,
+              area: side === "odd" ? "top-right" : "top-left",
+            });
+          }
+          changed();
+        }, `${label.replace(" pages", " page")} running head`),
+      ),
+      () => !!running[side]?.length,
     );
   };
 
@@ -508,40 +537,46 @@ function runningHeads(ctx: PanelContext): HTMLElement {
       sideRow("even", "Left pages", s.left),
       sideRow("odd", "Right pages", s.right),
       mixed(
-        row(
-          "Size",
-          stepper({
-            value: s.size === "mixed" ? undefined : s.size,
-            placeholder: "8pt",
-            label: "Running head size",
-            onChange: (v) => shared("font-size", v),
-          }),
-          { set: !!s.size && s.size !== "mixed" },
+        view.mark(
+          row(
+            "Size",
+            stepper({
+              value: s.size === "mixed" ? undefined : s.size,
+              placeholder: "8pt",
+              label: "Running head size",
+              onChange: (v) => shared("font-size", v),
+            }),
+          ),
+          () => !!now().size && now().size !== "mixed",
         ),
         s.size === "mixed",
       ),
       mixed(
-        row(
-          "Font",
-          fontSeg(
-            ctx,
-            s.font === "mixed" ? undefined : s.font,
-            (v) => shared("font-family", v),
-            "Running head font",
+        view.mark(
+          row(
+            "Font",
+            fontSeg(
+              ctx,
+              s.font === "mixed" ? undefined : s.font,
+              (v) => shared("font-family", v),
+              "Running head font",
+            ),
           ),
-          { set: !!s.font && s.font !== "mixed" },
+          () => !!now().font && now().font !== "mixed",
         ),
         s.font === "mixed",
       ),
       mixed(
-        row(
-          "Style",
-          toggle(
-            "Italic",
-            s.italic === true,
-            (on) => shared("font-style", on ? "italic" : undefined),
+        view.mark(
+          row(
+            "Style",
+            toggle(
+              "Italic",
+              s.italic === true,
+              (on) => shared("font-style", on ? "italic" : undefined),
+            ),
           ),
-          { set: s.italic === true },
+          () => now().italic === true,
         ),
         s.italic === "mixed",
       ),
