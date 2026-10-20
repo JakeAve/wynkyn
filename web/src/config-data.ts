@@ -3,16 +3,19 @@
 import type {
   CssProps,
   NumberingStyle,
+  Running,
   RunningEntry,
 } from "../../metadata/types.ts";
 // Size parsing and derivation are shared with the print exporter so the panel
 // and `bml export` can never disagree about the geometry (§4.3).
 import { foldedSize } from "../../metadata/page-setup.ts";
 export {
+  DEFAULT_SIZE,
   describePageSetup,
   fmtLength,
   isValidSize,
   resolvePageSetup,
+  tryParseDims,
 } from "../../metadata/page-setup.ts";
 
 export interface SizePreset {
@@ -159,6 +162,40 @@ export function makeRunningEntry(form: RunningEntryForm): RunningEntry {
   return { content: form.content, area: form.area, ...extras };
 }
 
+// The running heads' simple view (spec R5): what the first entry on each side
+// shows, and the shared size / italic / font across every entry. A property
+// the entries disagree on reads "mixed".
+export function runningSummary(running: Running | undefined): {
+  left: string;
+  right: string;
+  size: string | "mixed" | undefined;
+  italic: boolean | "mixed";
+  font: string | "mixed" | undefined;
+} {
+  const all = [...(running?.odd ?? []), ...(running?.even ?? [])];
+  const agree = <T>(pick: (e: RunningEntry) => T): T | "mixed" | undefined =>
+    new Set(all.map(pick)).size > 1 ? "mixed" : all[0] && pick(all[0]);
+  return {
+    left: running?.even?.[0]?.content ?? "none",
+    right: running?.odd?.[0]?.content ?? "none",
+    size: agree((e) => e["font-size"]),
+    italic: agree((e) => e["font-style"] === "italic") ?? false,
+    font: agree((e) => e["font-family"]),
+  };
+}
+
+// Write one shared property to every entry on both sides; undefined deletes.
+export function setRunningShared(
+  running: Running,
+  prop: "font-size" | "font-style" | "font-family",
+  value: string | undefined,
+): void {
+  for (const e of [...(running.odd ?? []), ...(running.even ?? [])]) {
+    if (value === undefined) delete e[prop];
+    else e[prop] = value;
+  }
+}
+
 // Rename an object key preserving entry order (font-alias rename).
 export function renameKey<T>(
   obj: Record<string, T>,
@@ -209,7 +246,15 @@ export function parseLength(v: string): { n: number; unit: string } | null {
 
 // How far one arrow-key press moves a value in this unit.
 export function stepFor(unit: string): number {
-  return ({ pt: 0.5, em: 0.05, mm: 1, lh: 0.25, px: 1, "%": 1 } as Record<
+  return ({
+    pt: 0.5,
+    em: 0.05,
+    mm: 1,
+    in: 0.125,
+    lh: 0.25,
+    px: 1,
+    "%": 1,
+  } as Record<
     string,
     number
   >)[unit] ?? 1;

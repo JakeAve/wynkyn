@@ -3,132 +3,221 @@
 // signatures and the imposition they derive to (§4.3). Both write the `page`
 // section; Print reads the trim size the Page tab set.
 import type {
+  CssProps,
   Duplex,
   NumberingStyle,
   PageConfig,
+  Running,
   RunningEntry,
 } from "../../metadata/types.ts";
 import {
+  DEFAULT_SIZE,
   fmtLength,
   formatCssLines,
   isValidFolios,
   isValidSize,
   makeRunningEntry,
   MARGIN_AREAS,
-  PAGE_NUMBERING_STYLES,
   PAGE_SIZE_PRESETS,
   parseCssLines,
+  parseLength,
   presetFor,
   resolvePageSetup,
   RUNNING_CONTENT_CHOICES,
+  runningSummary,
+  setRunningShared,
   SHEET_PRESETS,
   type SizePreset,
   splitRunningEntry,
+  tryParseDims,
 } from "./config-data.ts";
 import {
-  checkboxInput,
   field,
   fontControl,
-  inlineLabel,
   selectInput,
-  textInput,
   textInputRaw,
 } from "./config-panel.ts";
-import { section } from "./panel-controls.ts";
+import {
+  icon,
+  row,
+  section,
+  seg,
+  select,
+  stepper,
+  toggle,
+} from "./panel-controls.ts";
 import type { PanelContext } from "./style-catalog.ts";
 
-const MARGIN_KEYS = ["top", "bottom", "inside", "outside"] as const;
+const MARGINS = [
+  ["top", "Top"],
+  ["bottom", "Bottom"],
+  ["inside", "Inside"],
+  ["outside", "Outside"],
+] as const;
+
+const el = <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className: string,
+  ...kids: Array<Node | string>
+): HTMLElementTagNameMap[K] => {
+  const e = document.createElement(tag);
+  e.className = className;
+  e.append(...kids);
+  return e;
+};
+
+// A CSS length in inches, for drawing only; 0 when it isn't one.
+const inches = (v: string | undefined) =>
+  v ? tryParseDims(`${v} ${v}`)?.w ?? 0 : 0;
 
 export function buildPageTab(ctx: PanelContext): Node[] {
-  const { meta } = ctx;
-  const page: PageConfig = meta.page ??= {};
-  const trim = section("Trim size", "trim", [
-    field(
-      "page size",
-      sizeControl(page.size, (size) => {
-        page.size = size;
-        ctx.queueSave("page");
-      }),
-    ),
-  ]);
-  // Read-only snapshot for display — must not eagerly create page.margins,
-  // or an edit to an unrelated field (e.g. size) would persist a spurious
-  // empty margins object on save (the whole "page" section round-trips
-  // together, so any local default-filling here leaks onto disk).
+  const page: PageConfig = ctx.meta.page ??= {};
+  // Read-only snapshot — must not eagerly create page.margins, or an edit to
+  // an unrelated field (e.g. size) would persist a spurious empty margins
+  // object on save (the whole "page" section round-trips together).
   const margins = page.margins ?? {};
-  const marginBox = section(
-    "Margins",
-    "margins",
-    MARGIN_KEYS.map((key) =>
-      field(
-        `margin ${key}`,
-        textInput(margins[key] ?? "", (v) => {
-          const m = page.margins ??= {};
-          if (v) m[key] = v;
-          else delete m[key];
-          ctx.queueSave("page");
+
+  const H = 138; // px, the drawn page height (matches .mpage in index.html)
+  const block = el("div", "mblock");
+  const vblock = el("div", "mblock");
+  const pageR = el("div", "mpage", block);
+  const pageV = el("div", "mpage v", vblock);
+  const draw = () => {
+    const trim = tryParseDims(page.size ?? DEFAULT_SIZE) ??
+      tryParseDims(DEFAULT_SIZE)!;
+    const s = H / trim.h;
+    const w = H * trim.w / trim.h;
+    pageR.style.width = `${w.toFixed(1)}px`;
+    pageV.style.width = `${(w / 2.4).toFixed(1)}px`;
+    const m = page.margins ?? {};
+    const px = (v: string | undefined) => `${inches(v) * s}px`;
+    Object.assign(block.style, {
+      top: px(m.top),
+      bottom: px(m.bottom),
+      left: px(m.inside),
+      right: px(m.outside),
+    });
+    Object.assign(vblock.style, {
+      top: px(m.top),
+      bottom: px(m.bottom),
+      left: "0",
+      right: px(m.inside),
+    });
+  };
+  draw();
+
+  const unit = Object.values(margins).map((v) => parseLength(v)?.unit)
+    .find(Boolean) ?? "mm";
+  const diag = el(
+    "div",
+    "mdiag",
+    el("div", "stage", pageV, pageR),
+    ...MARGINS.map(([key, label]) =>
+      el(
+        "label",
+        `mlab m${key[0]}`,
+        label,
+        stepper({
+          value: margins[key],
+          placeholder: `0${unit}`,
+          label: `${label} margin`,
+          onChange: (v) => {
+            const m = page.margins ??= {};
+            if (v) m[key] = v;
+            else delete m[key];
+            draw();
+            ctx.queueSave("page");
+          },
         }),
       )
     ),
   );
-  return [trim, marginBox, pageNumbers(ctx), runningHeads(ctx)];
+
+  return [
+    section("Trim size", "trim", [
+      row(
+        "Page",
+        sizeControl(page.size, "Trim size", (size) => {
+          page.size = size;
+          draw();
+          ctx.queueSave("page");
+        }),
+        { set: !!page.size },
+      ),
+    ]),
+    section("Margins", "margins", [
+      diag,
+      el(
+        "p",
+        "hint",
+        "Inside is the spine edge. The preview shows the spread as it will fold.",
+      ),
+    ]),
+    pageNumbers(ctx),
+    runningHeads(ctx),
+  ];
 }
 
 export function buildPrintTab(ctx: PanelContext): Node[] {
   const page: PageConfig = ctx.meta.page ??= {};
-  const readout = document.createElement("div");
-  readout.className = "cfg-readout";
+  const readout = el("div", "readout");
   const save = () => {
     ctx.queueSave("page");
     showSetup(page, readout);
   };
-
-  const paper = section("Paper", "sheet", [
-    field(
-      "sheet",
-      sizeControl(page.sheet, (sheet) => {
-        page.sheet = sheet;
-        save();
-      }, SHEET_PRESETS),
-    ),
-    field(
-      "duplex",
-      selectInput(
-        [
-          { label: "short-edge — book-style turn", value: "short-edge" },
-          { label: "long-edge — calendar-style turn", value: "long-edge" },
-          { label: "none — separate fronts/backs files", value: "none" },
-        ],
-        page.duplex ?? "short-edge",
-        (v) => {
-          page.duplex = v as Duplex;
-          save();
-        },
-      ),
-    ),
-  ]);
-
-  const folioError = document.createElement("span");
-  folioError.className = "cfg-error";
-  const folios = textInput(
-    String(page["folios-per-signature"] ?? ""),
-    (v) => {
-      if (isValidFolios(v)) {
-        folioError.textContent = "";
-        page["folios-per-signature"] = Number(v);
-        save();
-      } else {
-        folioError.textContent = v ? "must be a positive integer" : "";
-      }
-    },
-  );
-  folios.placeholder = "4";
-  const signatures = section("Signatures", "folios", [
-    field("folios/signature", folios, folioError),
-    readout,
-  ]);
   showSetup(page, readout);
-  return [paper, signatures];
+  return [
+    section("Paper", "sheet", [
+      row(
+        "Sheet",
+        sizeControl(page.sheet, "Sheet size", (sheet) => {
+          page.sheet = sheet;
+          save();
+        }, SHEET_PRESETS),
+        { set: !!page.sheet },
+      ),
+      row(
+        "Two-sided",
+        seg<Duplex>(
+          [
+            { label: "Short edge", value: "short-edge" },
+            { label: "Long edge", value: "long-edge" },
+            { label: "Separate files", value: "none" },
+          ],
+          page.duplex ?? "short-edge",
+          (v) => {
+            if (v) page.duplex = v;
+            save();
+          },
+          "Duplex",
+        ),
+        { set: !!page.duplex },
+      ),
+    ]),
+    section("Signatures", "folios-per-signature", [
+      row(
+        "Folios each",
+        stepper({
+          value: page["folios-per-signature"]?.toString(),
+          placeholder: "4",
+          label: "Folios per signature",
+          onChange: (v) => {
+            if (v === undefined) delete page["folios-per-signature"];
+            else if (isValidFolios(v)) page["folios-per-signature"] = Number(v);
+            else return; // 0 or a fraction: keep the last good value
+            save();
+          },
+        }),
+        { set: page["folios-per-signature"] !== undefined },
+      ),
+      readout,
+    ]),
+    el(
+      "p",
+      "tip",
+      "Run a proof export first on a new printer and fold one signature by hand.",
+    ),
+  ];
 }
 
 // The derived half of the setup: what these values actually produce on paper.
@@ -136,11 +225,7 @@ function showSetup(page: PageConfig, readout: HTMLElement): void {
   const setup = resolvePageSetup(page);
   readout.textContent = "";
   readout.classList.toggle("cfg-readout-bad", setup.error !== null);
-  const line = (text: string) => {
-    const p = document.createElement("p");
-    p.textContent = text;
-    readout.appendChild(p);
-  };
+  const line = (text: string) => readout.append(el("p", "", text));
   if (setup.error !== null) {
     line(setup.error);
     return;
@@ -153,13 +238,13 @@ function showSetup(page: PageConfig, readout: HTMLElement): void {
   // where the sheet turns portrait and gets cut across before folding.
   const grid = setup.rows === 1 ? "" : ` (${setup.cols} × ${setup.rows})`;
   line(
-    `${setup.nUp}-up on ${setup.sheet}${grid} — ${setup.foliosPerSheet} ${folioWord} per sheet (${cuts})`,
+    `${setup.nUp}-up on ${setup.sheet}${grid}: ${setup.foliosPerSheet} ${folioWord} per sheet, ${cuts}`,
   );
   if (setup.rows > 1) {
     line(
-      `sheet prints ${
+      `Sheet prints ${
         setup.landscape ? "landscape" : "portrait"
-      } — cut across, then fold each piece down its center`,
+      }: cut across, then fold each piece down its center`,
     );
   }
   line(
@@ -170,12 +255,12 @@ function showSetup(page: PageConfig, readout: HTMLElement): void {
   const EPS = 5e-4;
   if (setup.slackAcross > EPS || setup.slackDown > EPS) {
     line(
-      `leftover paper: ${fmtLength(setup.slackAcross, setup.unit)} across, ${
+      `Leftover paper: ${fmtLength(setup.slackAcross, setup.unit)} across, ${
         fmtLength(setup.slackDown, setup.unit)
-      } down — trimmed off after folding`,
+      } down, trimmed off after folding`,
     );
   } else {
-    line("the page tiles the sheet exactly — nothing to trim off");
+    line("The page tiles the sheet exactly, nothing to trim off");
   }
 }
 
@@ -184,20 +269,21 @@ function showSetup(page: PageConfig, readout: HTMLElement): void {
 // Calls onChange only with valid values; invalid custom input shows an error.
 function sizeControl(
   current: string | undefined,
+  label: string,
   onChange: (size: string) => void,
   presets: SizePreset[] = PAGE_SIZE_PRESETS,
 ): HTMLElement {
-  const wrap = document.createElement("span");
-  wrap.className = "cfg-row";
+  // cfg-field borrows the old panel's text-input styling for the custom box.
+  const wrap = el("span", "cfg-row cfg-field");
   const preset = presetFor(current, presets);
   const custom = document.createElement("input");
   custom.type = "text";
   custom.placeholder = "5.5in 8.5in";
+  custom.setAttribute("aria-label", `Custom ${label.toLowerCase()}`);
   custom.value = preset === "custom" ? (current ?? "") : "";
   custom.hidden = preset !== "custom";
-  const error = document.createElement("span");
-  error.className = "cfg-error";
-  const sel = selectInput(
+  const error = el("span", "cfg-error");
+  const sel = select(
     [
       ...presets.map((p) => ({ label: p.label, value: p.value })),
       { label: "Custom…", value: "custom" },
@@ -208,6 +294,7 @@ function sizeControl(
       error.textContent = "";
       if (v !== "custom") onChange(v);
     },
+    label,
   );
   custom.oninput = () => {
     const v = custom.value.trim();
@@ -222,10 +309,31 @@ function sizeControl(
   return wrap;
 }
 
-const PAGE_STYLE_CHOICES = PAGE_NUMBERING_STYLES.map((s) => ({
-  label: s,
-  value: s,
-}));
+// Font alias segments (Body / Display / …); clicking the lit one unsets it.
+function fontSeg(
+  ctx: PanelContext,
+  value: string | undefined,
+  onChange: (v: string | undefined) => void,
+  label: string,
+): HTMLElement {
+  return seg(
+    Object.keys(ctx.meta.fonts ?? {}).map((a) => ({
+      value: a,
+      label: a[0]!.toUpperCase() + a.slice(1),
+    })),
+    value,
+    onChange,
+    label,
+    true,
+  );
+}
+
+const NUMERALS = [
+  { label: "i, ii, iii", value: "roman-lower" },
+  { label: "I, II, III", value: "roman-upper" },
+  { label: "1, 2, 3", value: "arabic" },
+  { label: "Hidden", value: "hidden" },
+];
 
 function pageNumbers(ctx: PanelContext): HTMLElement {
   const numbering = ctx.meta.numbering ??= {};
@@ -233,37 +341,231 @@ function pageNumbers(ctx: PanelContext): HTMLElement {
   // edit to one zone would persist a spurious empty sibling on save, since the
   // whole "numbering" section round-trips together.
   const pages = numbering.pages ?? {};
-  return section(
-    "Page numbers",
-    "folios",
-    (["front-matter", "body", "back-matter"] as const).map((zone) => {
-      const cfg = pages[zone] ?? {};
-      return field(
-        `${zone} pages`,
-        selectInput(PAGE_STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
-          ((numbering.pages ??= {})[zone] ??= {}).style = v as NumberingStyle;
-          ctx.queueSave("numbering");
-        }),
-        inlineLabel(
-          "show",
-          checkboxInput(cfg.show ?? true, (v) => {
-            ((numbering.pages ??= {})[zone] ??= {}).show = v;
-            ctx.queueSave("numbering");
-          }),
-        ),
-      );
-    }),
+  const css: CssProps = pages.css ?? {};
+  const setCss = (prop: string, v: string | undefined) => {
+    const c = (numbering.pages ??= {}).css ??= {};
+    if (v) c[prop] = v;
+    else delete c[prop];
+    ctx.queueSave("numbering");
+  };
+  const zones = ([
+    ["front-matter", "Front matter"],
+    ["body", "Body"],
+    ["back-matter", "Back matter"],
+  ] as const).map(([zone, label]) => {
+    const cfg = pages[zone] ?? {};
+    const current = cfg.show === false || cfg.style === "none"
+      ? "hidden"
+      : cfg.style ?? "arabic";
+    const options = NUMERALS.some((o) => o.value === current)
+      ? NUMERALS
+      : [...NUMERALS, { label: current, value: current }]; // e.g. alpha-upper
+    return row(
+      label,
+      select(options, current, (v) => {
+        const z = (numbering.pages ??= {})[zone] ??= {};
+        if (v === "hidden") z.show = false;
+        else {
+          z.style = v as NumberingStyle;
+          z.show = true;
+        }
+        ctx.queueSave("numbering");
+      }, `${label} page numbers`),
+      { set: cfg.style !== undefined || cfg.show !== undefined },
+    );
+  });
+  return section("Page numbers", "folios", [
+    row(
+      "Size",
+      stepper({
+        value: css["font-size"],
+        placeholder: "9pt",
+        label: "Page number size",
+        onChange: (v) => setCss("font-size", v),
+      }),
+      { set: !!css["font-size"] },
+    ),
+    row(
+      "Font",
+      fontSeg(
+        ctx,
+        css["font-family"],
+        (v) => setCss("font-family", v),
+        "Page number font",
+      ),
+      { set: !!css["font-family"] },
+    ),
+    row(
+      "Style",
+      toggle(
+        "Italic",
+        css["font-style"] === "italic",
+        (on) => setCss("font-style", on ? "italic" : undefined),
+      ),
+      { set: !!css["font-style"] },
+    ),
+    ...zones,
+  ], el("span", "from", "Bottom center"));
+}
+
+const HEADS = [
+  { label: "Chapter title", value: "chapter-title" },
+  { label: "Book title", value: "book-title" },
+  { label: "Part title", value: "part-title" },
+  { label: "Nothing", value: "none" },
+];
+
+function runningHeads(ctx: PanelContext): HTMLElement {
+  const running = ctx.meta.running ??= {};
+  const simple = document.createElement("div");
+  const summary = document.createElement("span");
+  const advanced = advancedHeads(ctx, running, () => {
+    drawSimple();
+    drawSummary();
+  });
+  const details = el(
+    "details",
+    "more",
+    el("summary", "", icon("chevR"), summary),
+    el(
+      "p",
+      "hint",
+      "Place heads in any of the 16 margin areas, add more than one per page, or give each its own CSS.",
+    ),
+    advanced.el,
   );
+  // An edit in the advanced editor can change what the simple view shows.
+  details.addEventListener("change", () => {
+    drawSimple();
+    drawSummary();
+  });
+
+  const drawSummary = () => {
+    const all = [...(running.odd ?? []), ...(running.even ?? [])];
+    const areas = [...new Set(all.map((e) => e.area))].join(", ");
+    summary.textContent = `Layout: ${all.length} head${
+      all.length === 1 ? "" : "s"
+    }${areas ? `, ${areas}` : ""}`;
+  };
+
+  // Simple edits rebuild the advanced rows so they never show stale values.
+  const changed = () => {
+    ctx.queueSave("running");
+    advanced.render();
+    drawSummary();
+  };
+
+  const sideRow = (side: "odd" | "even", label: string, current: string) => {
+    const options = HEADS.some((o) => o.value === current)
+      ? HEADS
+      : [...HEADS, {
+        label: current === "page-number" ? "Page number" : `“${current}”`,
+        value: current,
+      }];
+    return row(
+      label,
+      select(options, current, (v) => {
+        const entries = running[side] ??= [];
+        if (entries[0]) entries[0].content = v;
+        else {
+          // First head on this side: mirror the other side's styling.
+          const other = running[side === "odd" ? "even" : "odd"]?.[0];
+          entries.push({
+            ...other,
+            content: v,
+            area: side === "odd" ? "top-right" : "top-left",
+          });
+        }
+        changed();
+      }, `${label.replace(" pages", " page")} running head`),
+      { set: !!running[side]?.length },
+    );
+  };
+
+  // "mixed": the entries disagree; the note stays until the control is used.
+  const mixed = (r: HTMLElement, isMixed: boolean) => {
+    if (!isMixed) return r;
+    const ctl = r.querySelector(".ctl")!;
+    const note = el("span", "from", "Mixed");
+    ctl.append(note);
+    ctl.addEventListener("change", () => note.remove());
+    ctl.addEventListener("click", (e) => {
+      if ((e.target as Element).closest("button")) note.remove();
+    });
+    return r;
+  };
+
+  const drawSimple = () => {
+    const s = runningSummary(running);
+    const shared = (
+      prop: "font-size" | "font-style" | "font-family",
+      v: string | undefined,
+    ) => {
+      setRunningShared(running, prop, v);
+      changed();
+    };
+    simple.replaceChildren(
+      sideRow("even", "Left pages", s.left),
+      sideRow("odd", "Right pages", s.right),
+      mixed(
+        row(
+          "Size",
+          stepper({
+            value: s.size === "mixed" ? undefined : s.size,
+            placeholder: "8pt",
+            label: "Running head size",
+            onChange: (v) => shared("font-size", v),
+          }),
+          { set: !!s.size && s.size !== "mixed" },
+        ),
+        s.size === "mixed",
+      ),
+      mixed(
+        row(
+          "Font",
+          fontSeg(
+            ctx,
+            s.font === "mixed" ? undefined : s.font,
+            (v) => shared("font-family", v),
+            "Running head font",
+          ),
+          { set: !!s.font && s.font !== "mixed" },
+        ),
+        s.font === "mixed",
+      ),
+      mixed(
+        row(
+          "Style",
+          toggle(
+            "Italic",
+            s.italic === true,
+            (on) => shared("font-style", on ? "italic" : undefined),
+          ),
+          { set: s.italic === true },
+        ),
+        s.italic === "mixed",
+      ),
+    );
+  };
+
+  drawSimple();
+  drawSummary();
+  return section("Running heads", "heads", [simple, details]);
 }
 
 const AREA_CHOICES = MARGIN_AREAS.map((a) => ({ label: a, value: a }));
 const LITERAL = "__literal"; // select sentinel for "type your own text"
 
-function runningHeads(ctx: PanelContext): HTMLElement {
-  const { meta } = ctx;
-  const queueSave = ctx.queueSave;
-  const running = meta.running ??= {};
-  const kids: HTMLElement[] = [];
+// The full running-head editor: any number of entries per side, all 16 margin
+// areas, raw CSS. `onEdit` fires after an entry is added or removed.
+function advancedHeads(
+  ctx: PanelContext,
+  running: Running,
+  onEdit: () => void,
+): { el: HTMLElement; render: () => void } {
+  const { meta, queueSave } = ctx;
+  const wrap = document.createElement("div");
+  const renders: Array<() => void> = [];
 
   for (const side of ["odd", "even"] as const) {
     const head = document.createElement("div");
@@ -358,6 +660,7 @@ function runningHeads(ctx: PanelContext): HTMLElement {
         entries.splice(i, 1);
         queueSave("running");
         render(); // indices shifted — rebuild the rows
+        onEdit();
       };
 
       row.append(
@@ -380,10 +683,12 @@ function runningHeads(ctx: PanelContext): HTMLElement {
       entries.push(seed);
       queueSave("running");
       render();
+      onEdit();
     };
 
     render();
-    kids.push(head, list);
+    renders.push(render);
+    wrap.append(head, list);
   }
-  return section("Running heads", "heads", kids);
+  return { el: wrap, render: () => renders.forEach((r) => r()) };
 }

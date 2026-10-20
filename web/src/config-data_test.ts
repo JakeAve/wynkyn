@@ -1,4 +1,5 @@
 import { assert, assertEquals, assertFalse } from "@std/assert";
+import type { RunningEntry } from "../../metadata/types.ts";
 import {
   bumpLength,
   formatCssLines,
@@ -11,6 +12,8 @@ import {
   parseLength,
   presetFor,
   renameKey,
+  runningSummary,
+  setRunningShared,
   splitProps,
   splitRunningEntry,
   stepFor,
@@ -122,6 +125,7 @@ Deno.test("parseLength keeps the unit", () => {
   assertEquals(parseLength("auto"), null);
   assertEquals(stepFor("pt"), 0.5);
   assertEquals(stepFor("lh"), 0.25);
+  assertEquals(stepFor("in"), 0.125);
   assertEquals(stepFor(""), 1);
 });
 
@@ -134,4 +138,47 @@ Deno.test("bumpLength steps pt by 0.5 and em by 0.05", () => {
   assertEquals(bumpLength("", 1, "11pt"), "11.5pt"); // empty bumps the fallback
   assertEquals(bumpLength("junk", -1, "1em"), "0.95em");
   assertEquals(bumpLength("", 1, ""), "1");
+});
+
+Deno.test("runningSummary reports mixed sizes", () => {
+  const running = {
+    odd: [{ content: "book-title", area: "top-right", "font-size": "8pt" }],
+    even: [{
+      content: "chapter-title",
+      area: "top-left",
+      "font-size": "9pt",
+      "font-style": "italic",
+      "font-family": "body",
+    }],
+  };
+  assertEquals(runningSummary(running), {
+    left: "chapter-title",
+    right: "book-title",
+    size: "mixed",
+    italic: "mixed",
+    font: "mixed",
+  });
+  running.odd[0]!["font-size"] = "9pt";
+  assertEquals(runningSummary(running).size, "9pt");
+  assertEquals(runningSummary(undefined), {
+    left: "none",
+    right: "none",
+    size: undefined,
+    italic: false,
+    font: undefined,
+  });
+});
+
+Deno.test("setRunningShared writes every entry", () => {
+  const odd: RunningEntry[] = [
+    { content: "book-title", area: "top-right", "font-size": "8pt" },
+    { content: "page-number", area: "bottom-right" },
+  ];
+  const even = [{ content: "chapter-title", area: "top-left", color: "red" }];
+  const running = { odd, even };
+  setRunningShared(running, "font-size", "10pt");
+  assertEquals(runningSummary(running).size, "10pt");
+  assertEquals(even[0]!["color"], "red"); // other keys untouched
+  setRunningShared(running, "font-size", undefined);
+  assert([...odd, ...even].every((e) => !("font-size" in e)));
 });
