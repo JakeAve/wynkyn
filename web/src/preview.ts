@@ -318,11 +318,12 @@ export function installStyleHover(
 }
 
 // The panel's view of the preview (spec R3): the pages an entry appears on,
-// outlining every match, scrolling to the first.
+// outlining every match, scrolling from one to the next.
 export function previewLink(
   container: HTMLElement,
   catalog: () => StyleEntry[],
 ): PreviewLink {
+  let step: { key: string; el: Element; i: number } | null = null;
   const matches = (key: string): Element[] => {
     const entry = catalog().find((e) => e.key === key);
     if (!entry) return [];
@@ -338,8 +339,15 @@ export function previewLink(
     highlight(key, on) {
       for (const el of matches(key)) el.toggleAttribute("data-style-hl", on);
     },
+    // Steps through the matches, wrapping; a new key, or a re-render (which
+    // disconnects the last revealed node), starts again from the first.
     reveal(key) {
-      const el = matches(key)[0];
+      const all = matches(key);
+      const i = step?.key === key && step.el.isConnected
+        ? (step.i + 1) % all.length
+        : 0;
+      const el = all[i];
+      step = el ? { key, el, i } : null;
       (el?.closest(".pagedjs_page") ?? el)?.scrollIntoView({
         block: "start",
         behavior: "auto",
