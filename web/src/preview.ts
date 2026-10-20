@@ -2,7 +2,11 @@
 // Paged.js is the global from the vendored /vendor/paged.js (index.html loads
 // it, dev-server.ts serves it); there is no npm build to bundle.
 import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
-import { matchKey, type StyleEntry } from "./style-catalog.ts";
+import {
+  matchKey,
+  type PreviewLink,
+  type StyleEntry,
+} from "./style-catalog.ts";
 import {
   type CachedRender,
   renderHash,
@@ -239,8 +243,31 @@ export function scrollPreviewTo(
   });
 }
 
+// The stylable node at or above `target` and its catalog key: matchKey picks
+// the entry from the target's class+tag chain, closest() finds the node its
+// selector matched. Nothing inside a staged (half-rendered) preview.
+function resolveStyle(
+  target: Element | null,
+  container: HTMLElement,
+  catalog: StyleEntry[],
+): { key: string; el: Element } | null {
+  if (!target || target.closest(".preview-stage")) return null;
+  const chain: string[][] = [];
+  for (
+    let el: Element | null = target;
+    el && el !== container;
+    el = el.parentElement
+  ) {
+    chain.push([...el.classList, el.localName]); // tag last: matches `.bml p`
+  }
+  const key = matchKey(chain, catalog);
+  const entry = catalog.find((e) => e.key === key);
+  const el = entry && target.closest(entry.selector);
+  return entry && el && container.contains(el) ? { key: entry.key, el } : null;
+}
+
 // Click-to-style (spec §7.4): resolve the clicked node to a style-catalog
-// key and hand it back; the clicked node is outlined until the next click
+// key and hand it back; the resolved node is outlined until the next click
 // or re-render. Link clicks that resolve are consumed so the TOC doesn't
 // navigate the preview. `catalog` is read per click — `is:` entries change
 // with the metadata.
@@ -250,25 +277,86 @@ export function installStyleClicks(
   onPick: (key: string) => void,
 ): void {
   container.addEventListener("click", (e) => {
-    const target = e.target as HTMLElement | null;
-    if (!target || target.closest(".preview-stage")) return;
-    const chain: string[][] = [];
-    for (
-      let el: HTMLElement | null = target;
-      el && el !== container;
-      el = el.parentElement
-    ) {
-      chain.push([...el.classList, el.localName]); // tag last: matches `.bml p`
-    }
-    const key = matchKey(chain, catalog());
-    if (!key) return;
+    const hit = resolveStyle(e.target as Element | null, container, catalog());
+    if (!hit) return;
     e.preventDefault();
     container.querySelector("[data-style-selected]")?.removeAttribute(
       "data-style-selected",
     );
-    target.setAttribute("data-style-selected", "");
-    onPick(key);
+    hit.el.setAttribute("data-style-selected", "");
+    onPick(hit.key);
   });
+}
+
+// Hover outline (spec R3): the node a click would pick, once per frame. A
+// re-render replaces the nodes, which takes the attribute with them.
+export function installStyleHover(
+  container: HTMLElement,
+  catalog: () => StyleEntry[],
+): void {
+  let raf = 0;
+  let pointed: Element | null = null;
+  let hovered: Element | null = null;
+  const set = (el: Element | null) => {
+    if (el === hovered) return;
+    hovered?.removeAttribute("data-style-hover");
+    hovered = el;
+    el?.setAttribute("data-style-hover", "");
+  };
+  container.addEventListener("mousemove", (e) => {
+    pointed = e.target as Element | null;
+    raf ||= requestAnimationFrame(() => {
+      raf = 0;
+      set(resolveStyle(pointed, container, catalog())?.el ?? null);
+    });
+  }, { passive: true });
+  container.addEventListener("mouseleave", () => {
+    cancelAnimationFrame(raf);
+    raf = 0;
+    set(null);
+  });
+}
+
+// The panel's view of the preview (spec R3): the pages an entry appears on,
+// outlining every match, scrolling to the first.
+export function previewLink(
+  container: HTMLElement,
+  catalog: () => StyleEntry[],
+): PreviewLink {
+  const matches = (key: string): Element[] => {
+    const entry = catalog().find((e) => e.key === key);
+    if (!entry) return [];
+    const margin = entry.section === "numbering" ||
+      entry.section === "running";
+    return [...container.querySelectorAll(entry.selector)].filter((el) =>
+      !el.closest(".preview-stage") && (!margin || marginShows(el))
+    );
+  };
+  return {
+    pagesFor: (key) =>
+      new Set(matches(key).map((el) => el.closest(".pagedjs_page"))).size,
+    highlight(key, on) {
+      for (const el of matches(key)) el.toggleAttribute("data-style-hl", on);
+    },
+    reveal(key) {
+      const el = matches(key)[0];
+      (el?.closest(".pagedjs_page") ?? el)?.scrollIntoView({
+        block: "start",
+        behavior: "auto",
+      });
+    },
+  };
+}
+
+// A margin box's text is CSS-generated (Paged.js puts the @page content on
+// its .pagedjs_margin-content::after, fed by --folio and friends), so
+// "non-empty" means that content is more than empty strings.
+function marginShows(box: Element): boolean {
+  const inner = box.querySelector(".pagedjs_margin-content");
+  if (!inner || !box.classList.contains("hasContent")) return false;
+  const content = getComputedStyle(inner, "::after").content;
+  return content !== "none" && content !== "normal" &&
+    content.replace(/["\s]/g, "") !== "";
 }
 
 // "Page 12 of 208" for the footer: the page nearest the pane's vertical

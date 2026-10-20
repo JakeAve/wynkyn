@@ -7,6 +7,8 @@ import {
   fitPreview,
   installPageIndicator,
   installStyleClicks,
+  installStyleHover,
+  previewLink,
   renderPreview,
   restoreCachedRender,
   scrollPreviewTo,
@@ -450,6 +452,7 @@ async function fetchMetadata(): Promise<Metadata> {
 }
 
 let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
+const styleCatalog = () => catalogFor(metadata ?? {});
 
 async function ensureConfigPanel(): Promise<ConfigPanel | null> {
   if (configPanel) return configPanel;
@@ -459,8 +462,7 @@ async function ensureConfigPanel(): Promise<ConfigPanel | null> {
       overlay: $("config-overlay"),
       metadata,
       saveSections: saveMetadataSections,
-      // No preview wiring yet: page counts and outlines arrive with R3.
-      preview: { pagesFor: () => 0, highlight() {}, reveal() {} },
+      preview: previewLink($("preview"), styleCatalog),
     });
     return configPanel;
   } catch (err) {
@@ -774,7 +776,8 @@ async function main(): Promise<void> {
     previewEl,
     $("page-indicator"),
   );
-  installStyleClicks(previewEl, () => catalogFor(metadata ?? {}), pickStyle);
+  installStyleClicks(previewEl, styleCatalog, pickStyle);
+  installStyleHover(previewEl, styleCatalog);
   // Restore before opening the socket so the previous render is on screen
   // when the first update lands, instead of a blank preview.
   const key = cacheId(book, edition);

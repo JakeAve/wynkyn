@@ -21,6 +21,11 @@
       --hover: #efefec;
       --sel: #e4e4df; /* editor selection */
       --fg: #161616;
+      /* Outlines drawn on the pages, which are paper-white in both themes:
+         fixed dark ink, so dark mode does not override them. */
+      --pick: rgba(22, 22, 22, 0.9);
+      --hover-ring: rgba(22, 22, 22, 0.32);
+      --hl: rgba(22, 22, 22, 0.07);
       --muted: #71716c;
       --inv-bg: #161616; /* inverted pill: active nav/segment */
       --inv-fg: #fbfbfa;
@@ -693,10 +698,19 @@
       padding: 2px 0;
       user-select: none;
     }
-    /* Click-to-style: the picked element in the preview */
+    /* Click-to-style: hovered, highlighted ("on N pages") and picked
+       elements in the preview; the pick stays solid over the others */
+    [data-style-hover],
+    [data-style-hl] {
+      outline: 1px solid var(--hover-ring);
+      outline-offset: 3px;
+    }
+    [data-style-hl] {
+      background: var(--hl);
+    }
     [data-style-selected] {
-      outline: 2px solid var(--fg);
-      outline-offset: 2px;
+      outline: 1px solid var(--pick);
+      outline-offset: 3px;
     }
     .pagedjs_page .bml *,
     .pagedjs_margin-content {
