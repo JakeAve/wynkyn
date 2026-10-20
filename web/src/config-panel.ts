@@ -91,7 +91,6 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   };
 
   let route: Route = { tab: "page" }; // survives refresh()
-  let styleKey: string | undefined; // a preview pick, handed to the parts tab once
 
   const tablist = document.createElement("div");
   tablist.className = "tabs";
@@ -151,11 +150,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         return buildFontsTab(ctx);
       case "print":
         return buildPrintTab(ctx);
-      case "parts": {
-        const key = styleKey;
-        styleKey = undefined;
-        return buildPartsTab(ctx, route.part, key);
-      }
+      case "parts":
+        return buildPartsTab(ctx, route.part);
     }
   }
 
@@ -215,7 +211,6 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       );
     },
     selectStyle(key) {
-      styleKey = key;
       opts.overlay.hidden = false;
       go(routeFor(key, meta));
     },
