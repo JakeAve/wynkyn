@@ -258,7 +258,7 @@ export function installStyleClicks(
       el && el !== container;
       el = el.parentElement
     ) {
-      chain.push([...el.classList]);
+      chain.push([...el.classList, el.localName]); // tag last: matches `.bml p`
     }
     const key = matchKey(chain, catalog());
     if (!key) return;

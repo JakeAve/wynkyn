@@ -1,9 +1,13 @@
 import { assertEquals } from "@std/assert";
 import {
+  bookParts,
   catalogFor,
   getProps,
   inheritedFont,
   matchKey,
+  routeFor,
+  setCount,
+  usedBy,
 } from "./style-catalog.ts";
 
 const catalog = catalogFor({
@@ -21,8 +25,140 @@ Deno.test("deepest match wins: chapter number inside a chapter", () => {
   );
 });
 
-Deno.test("a paragraph inside a chapter resolves to body, not chapter", () => {
-  assertEquals(matchKey([[], ["chapter"], ["bml"]], catalog), "body");
+Deno.test("a paragraph inside a chapter resolves to paragraph, not chapter", () => {
+  assertEquals(
+    matchKey([["p"], ["chapter", "div"], ["bml", "div"]], catalog),
+    "paragraph",
+  );
+  // Any other unclassed element still falls back to the body.
+  assertEquals(matchKey([["span"], ["chapter"], ["bml"]], catalog), "body");
+  assertEquals(matchKey([["em"], ["p"], ["bml"]], catalog), "em");
+});
+
+const book = {
+  fonts: { body: "Crimson Pro", display: "Cormorant Garamond" },
+  elements: {
+    body: { "font-family": "body", "font-size": "11pt" },
+    chapter: { title: { "font-family": "display", "font-size": "15pt" } },
+    "half-title": { title: { "font-family": "display" } },
+  },
+  numbering: {
+    chapters: { style: "roman-upper" as const, prefix: "Chapter " },
+    pages: { css: { "font-family": "display" } },
+  },
+  running: {
+    odd: [{ content: "book-title", area: "top-right" }],
+    even: [{
+      content: "chapter-title",
+      area: "top-left",
+      "font-family": "body",
+    }],
+  },
+  is: { telegram: { "font-family": "monospace" } },
+};
+
+Deno.test("every catalog entry belongs to exactly one part or the Page tab", () => {
+  const parts = bookParts(book);
+  const owners = new Map<string, number>();
+  for (const p of parts) {
+    for (const k of p.keys) owners.set(k, (owners.get(k) ?? 0) + 1);
+  }
+  for (const e of catalogFor(book)) {
+    const pageTab = e.section === "numbering" || e.section === "running";
+    assertEquals(owners.get(e.key) ?? 0, pageTab ? 0 : 1, e.key);
+  }
+  assertEquals(parts.map((p) => p.name), [
+    "Half title",
+    "Title page",
+    "Copyright",
+    "Dedication",
+    "Contents",
+    "Foreword, preface, introduction",
+    "Body text",
+    "Part opener",
+    "Chapter opener",
+    "Headings",
+    "Epigraph",
+    "Quotes, poems and asides",
+    "Drop caps and breaks",
+    "Illustrations",
+    "Notes",
+    "Appendix",
+    "Colophon",
+    "telegram",
+  ]);
+  assertEquals(parts.find((p) => p.id === "body")!.keys, [
+    "body",
+    "paragraph",
+    "em",
+  ]);
+  assertEquals(parts.at(-1)!.group, "custom");
+});
+
+Deno.test("routeFor sends folios and running heads to the Page tab", () => {
+  assertEquals(routeFor("numbering.pages.body", book), {
+    tab: "page",
+    focus: "folios",
+  });
+  assertEquals(routeFor("running.top-left", book), {
+    tab: "page",
+    focus: "heads",
+  });
+  assertEquals(routeFor("paragraph", book), {
+    tab: "parts",
+    part: "body",
+    focus: "paragraphs",
+  });
+  assertEquals(routeFor("chapter.number", book), {
+    tab: "parts",
+    part: "chapter",
+    focus: "number",
+  });
+  assertEquals(routeFor("quote", book), {
+    tab: "parts",
+    part: "blocks",
+    focus: "quote",
+  });
+  assertEquals(routeFor("is.telegram", book), {
+    tab: "parts",
+    part: "is.telegram",
+  });
+});
+
+Deno.test("running heads get one catalog entry per margin area", () => {
+  const e = catalogFor(book).filter((c) => c.section === "running");
+  assertEquals(e.map((c) => [c.key, c.selector]), [
+    ["running.top-right", ".pagedjs_margin-top-right"],
+    ["running.top-left", ".pagedjs_margin-top-left"],
+  ]);
+  assertEquals(
+    matchKey([["pagedjs_margin-top-left"], ["pagedjs_page"]], catalogFor(book)),
+    "running.top-left",
+  );
+});
+
+Deno.test("usedBy counts inherited body font as Body", () => {
+  const body = usedBy(book, "body").map((u) => u.label);
+  // Every part has text that inherits the body font; Half title's only
+  // entry names display, so it is not listed.
+  assertEquals(body.includes("Body text"), true);
+  assertEquals(body.includes("Chapter opener"), true); // number inherits
+  assertEquals(body.includes("Half title"), false);
+  assertEquals(body.includes("Running heads"), true);
+  assertEquals(body.includes("Page numbers"), false);
+  assertEquals(usedBy(book, "display"), [
+    { label: "Half title", route: { tab: "parts", part: "half-title" } },
+    { label: "Chapter opener", route: { tab: "parts", part: "chapter" } },
+    { label: "Page numbers", route: { tab: "page", focus: "folios" } },
+  ]);
+});
+
+Deno.test("setCount counts set props plus opener numbering keys", () => {
+  const parts = bookParts(book);
+  const at = (id: string) => parts.find((p) => p.id === id)!;
+  assertEquals(setCount(book, at("body")), 2);
+  assertEquals(setCount(book, at("chapter")), 4); // 2 title props + style, prefix
+  assertEquals(setCount(book, at("colophon")), 0);
 });
 
 Deno.test("nested matter sub-elements use the matter type", () => {

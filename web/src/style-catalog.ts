@@ -1,6 +1,7 @@
 // web/src/style-catalog.ts — every stylable element (spec §4.5 + page
-// numbers + `is:` classes) and how a preview click resolves to one. Pure:
-// the DOM adapter lives in preview.ts, so this is unit-tested in Deno.
+// numbers + running heads + `is:` classes), how a preview click resolves to
+// one, and how entries group into the style panel's book parts and tabs.
+// Pure: the DOM adapter lives in preview.ts, so this is unit-tested in Deno.
 import { selectorFor } from "../../metadata/css-generator.ts";
 import type { CssProps, Metadata } from "../../metadata/types.ts";
 
@@ -9,7 +10,7 @@ export interface StyleEntry {
   group: string; // <optgroup> label
   label: string; // <option> label
   path: string[]; // where the props object lives in Metadata
-  section: "elements" | "is" | "numbering"; // queueSave key
+  section: "elements" | "is" | "numbering" | "running"; // queueSave key
   selector: string; // rendered CSS selector — space-separated .class tokens
 }
 
@@ -100,6 +101,17 @@ const STATIC_CATALOG: StyleEntry[] = ELEMENTS.flatMap(([group, type, subs]) =>
     }]
 );
 
+// Body paragraphs, matched by tag: the click chain ends each element's
+// classes with its tag name.
+const PARAGRAPH: StyleEntry = {
+  key: "paragraph",
+  group: "Body text",
+  label: "Paragraph",
+  path: ["elements", "paragraph"],
+  section: "elements",
+  selector: ".bml p",
+};
+
 const ZONES: Array<[string, string]> = [["front-matter", "front"], [
   "body",
   "body",
@@ -149,7 +161,201 @@ export function catalogFor(metadata: Metadata): StyleEntry[] {
     section: "is",
     selector: `.is-${name}`,
   }));
-  return [...STATIC_CATALOG, ...TOC_NESTED, ...PAGE_NUMBERS, ...is];
+  return [
+    ...STATIC_CATALOG,
+    PARAGRAPH,
+    ...TOC_NESTED,
+    ...PAGE_NUMBERS,
+    ...runningEntries(metadata),
+    ...is,
+  ];
+}
+
+// One entry per margin area the running heads use. They are edited on the
+// Page tab, so the path is the whole `running` section.
+function runningEntries(metadata: Metadata): StyleEntry[] {
+  const areas = new Set(
+    [...(metadata.running?.odd ?? []), ...(metadata.running?.even ?? [])]
+      .map((e) => e.area),
+  );
+  return [...areas].map((area) => ({
+    key: `running.${area}`,
+    group: "Running heads",
+    label: titleCase(area),
+    path: ["running"],
+    section: "running",
+    selector: `.pagedjs_margin-${area}`,
+  }));
+}
+
+// ---- Style panel: tabs, book parts, routes (spec R1) ----
+
+export type TabId = "page" | "fonts" | "parts" | "print";
+
+export interface Route {
+  tab: TabId;
+  part?: string;
+  focus?: string;
+}
+
+export interface PreviewLink {
+  pagesFor(key: string): number;
+  highlight(key: string, on: boolean): void;
+  reveal(key: string): void;
+}
+
+export interface PanelContext {
+  meta: Metadata;
+  queueSave(key: keyof Metadata): void;
+  go(route: Route): void;
+  preview: PreviewLink;
+}
+
+export interface BookPart {
+  id: string;
+  name: string;
+  group: "front" | "body" | "back" | "custom";
+  keys: string[]; // catalog entry keys, in display order
+}
+
+// [id, name, group, element types in display order]
+const PARTS: Array<[string, string, BookPart["group"], string[]]> = [
+  ["half-title", "Half title", "front", ["half-title"]],
+  ["title-page", "Title page", "front", ["title-page"]],
+  ["copyright", "Copyright", "front", ["copyright"]],
+  ["dedication", "Dedication", "front", ["dedication"]],
+  ["contents", "Contents", "front", ["toc"]],
+  ["prose", "Foreword, preface, introduction", "front", ["prose-matter"]],
+  ["body", "Body text", "body", ["body", "paragraph", "em"]],
+  ["part", "Part opener", "body", ["part"]],
+  ["chapter", "Chapter opener", "body", ["chapter"]],
+  ["headings", "Headings", "body", ["heading", "subheading"]],
+  ["epigraph", "Epigraph", "body", ["epigraph"]],
+  ["blocks", "Quotes, poems and asides", "body", [
+    "quote",
+    "pullquote",
+    "poem",
+    "sidebar",
+    "verses",
+    "columns",
+  ]],
+  ["dropcaps", "Drop caps and breaks", "body", ["dropcap", "break"]],
+  ["illustrations", "Illustrations", "body", ["illustration"]],
+  ["footnotes", "Notes", "body", ["footnote"]],
+  ["appendix", "Appendix", "back", ["appendix"]],
+  ["colophon", "Colophon", "back", ["colophon"]],
+];
+
+const typeOf = (key: string) => key.split(".")[0]!;
+
+export function bookParts(metadata: Metadata): BookPart[] {
+  const keys = catalogFor(metadata).map((e) => e.key);
+  const parts: BookPart[] = PARTS.map(([id, name, group, types]) => ({
+    id,
+    name,
+    group,
+    keys: types.flatMap((t) => keys.filter((k) => typeOf(k) === t)),
+  }));
+  for (const name of Object.keys(metadata.is ?? {})) {
+    parts.push({
+      id: `is.${name}`,
+      name,
+      group: "custom",
+      keys: [`is.${name}`],
+    });
+  }
+  return parts;
+}
+
+// Where a preview pick (or a "Used by" chip) opens in the panel.
+export function routeFor(key: string, metadata: Metadata): Route {
+  const type = typeOf(key);
+  if (type === "numbering") return { tab: "page", focus: "folios" };
+  if (type === "running") return { tab: "page", focus: "heads" };
+  const part = bookParts(metadata).find((p) => p.keys.includes(key));
+  if (!part) return { tab: "parts" };
+  if (part.id === "body") {
+    return { tab: "parts", part: "body", focus: "paragraphs" };
+  }
+  if (part.group === "custom") return { tab: "parts", part: part.id };
+  // chapter.number → "number"; a flat type (heading, quote) is its own block.
+  return {
+    tab: "parts",
+    part: part.id,
+    focus: key.slice(type.length + 1) || type,
+  };
+}
+
+// The alias an entry's text is set in: its own font-family, else the nearest
+// ancestor entry's, else the body's — so inherited text counts as body.
+function aliasOf(
+  metadata: Metadata,
+  path: string[],
+  bodyAlias: string,
+): string {
+  for (let i = path.length; i > 1; i--) {
+    const ff = getProps(metadata, { path: path.slice(0, i) })["font-family"];
+    if (ff) return ff;
+  }
+  return bodyAlias;
+}
+
+// Every part, page numbers and running heads set in `alias` (Fonts tab chips).
+export function usedBy(
+  metadata: Metadata,
+  alias: string,
+): Array<{ label: string; route: Route }> {
+  const catalog = new Map(catalogFor(metadata).map((e) => [e.key, e]));
+  const bodyAlias =
+    getProps(metadata, { path: ["elements", "body"] })["font-family"] ?? "body";
+  const out: Array<{ label: string; route: Route }> = [];
+  for (const part of bookParts(metadata)) {
+    const uses = part.keys.some((k) =>
+      aliasOf(metadata, catalog.get(k)!.path, bodyAlias) === alias
+    );
+    if (uses) {
+      out.push({ label: part.name, route: { tab: "parts", part: part.id } });
+    }
+  }
+  // Margin boxes inherit nothing from the body: only an explicit font counts.
+  const pages = PAGE_NUMBERS.some((e) =>
+    getProps(metadata, e)["font-family"] === alias
+  );
+  if (pages) {
+    out.push({
+      label: "Page numbers",
+      route: routeFor("numbering.pages", metadata),
+    });
+  }
+  const heads = [
+    ...(metadata.running?.odd ?? []),
+    ...(metadata.running?.even ?? []),
+  ]
+    .some((e) => e["font-family"] === alias);
+  if (heads) {
+    out.push({
+      label: "Running heads",
+      route: { tab: "page", focus: "heads" },
+    });
+  }
+  return out;
+}
+
+// The change count on a Book parts row: string props set across the part's
+// entries, plus the chapter/part numbering keys its opener view edits.
+export function setCount(metadata: Metadata, part: BookPart): number {
+  const catalog = new Map(catalogFor(metadata).map((e) => [e.key, e]));
+  let n = 0;
+  for (const k of part.keys) {
+    const entry = catalog.get(k);
+    if (entry) n += Object.keys(getProps(metadata, entry)).length;
+  }
+  const numbering = part.id === "chapter"
+    ? metadata.numbering?.chapters
+    : part.id === "part"
+    ? metadata.numbering?.parts
+    : undefined;
+  return n + Object.keys(numbering ?? {}).length;
 }
 
 // `chain[0]` is the clicked node's classes, `chain[n]` its n-th ancestor's.
@@ -164,7 +370,9 @@ export function matchKey(
   let best: { key: string; depth: number; tokens: number } | null = null;
   for (const entry of catalog) {
     for (const alt of entry.selector.split(", ")) {
-      const tokens = alt.trim().split(/\s+/).map((t) => t.slice(1)).reverse(); // innermost first
+      // ".class" tokens match a class, bare ones ("p", "em") a tag name.
+      const tokens = alt.trim().split(/\s+/)
+        .map((t) => t.startsWith(".") ? t.slice(1) : t).reverse(); // innermost first
       const depth = matchDepth(chain, tokens);
       if (depth === null) continue;
       if (
@@ -241,7 +449,9 @@ export function inheritedFont(
 ): string {
   const family = (v: string | undefined) =>
     v ? (metadata.fonts?.[v] ?? v) : undefined;
-  if (entry.section === "numbering") return "browser default"; // margin box
+  if (entry.section === "numbering" || entry.section === "running") {
+    return "browser default"; // margin box
+  }
   // Nearest ancestor entry that names a font: .toc .toc-part .number → .toc.
   for (let i = entry.path.length - 1; i > 1; i--) {
     const at = family(
