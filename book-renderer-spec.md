@@ -1205,7 +1205,11 @@ becomes a descendant selector (`toc → toc-part → number` is
 stylesheet repeats across the row (§4.5 recipes); everywhere else `content` sets
 the element's `::before`, as for `break`. One sub-element key is special: `em`
 styles the emphasis element (§3.2.7) inside its parent, so
-`title-page → subtitle → em` is `.matter-title-page .subtitle em`.
+`title-page → subtitle → em` is `.matter-title-page .subtitle em`. `paragraph`
+styles body paragraphs (`.bml p`); its typical keys are `text-indent` (the base
+default is `1.5em`) and `margin-top` in `lh` units for space between paragraphs
+(`"0.5lh"`). The paragraph that opens a block (`.lead`, after a title or break)
+and the drop-cap paragraph stay flush and tight whatever `paragraph` says.
 
 ```json
 "elements": {
@@ -1216,6 +1220,8 @@ styles the emphasis element (§3.2.7) inside its parent, so
     "line-height": "1.5",
     "text-align": "justify"
   },
+
+  "paragraph": { "text-indent": "1.5em", "margin-top": "0" },
 
   "half-title": {
     "title": {

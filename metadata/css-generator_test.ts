@@ -56,6 +56,22 @@ Deno.test("em maps to .bml em", () => {
   assertStringIncludes(css, ".bml em {");
 });
 
+Deno.test("paragraph maps to .bml p", () => {
+  const css = generateDomCSS({
+    elements: { paragraph: { "text-indent": "0", "margin-top": "0.5lh" } },
+  });
+  assertStringIncludes(
+    css,
+    ".bml p {\n  text-indent: 0;\n  margin-top: 0.5lh;\n}",
+  );
+  assert(!css.includes("+"));
+});
+
+Deno.test("a book without paragraph emits no paragraph rule", () => {
+  const css = generateDomCSS({ elements: { body: { "font-size": "11pt" } } });
+  assert(!css.includes(".bml p"));
+});
+
 Deno.test("content property goes to ::before, value quoted", () => {
   const css = generateDomCSS({ elements: { break: { content: "✦" } } });
   assertStringIncludes(css, ".break::before {");

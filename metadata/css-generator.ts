@@ -23,6 +23,7 @@ const PROSE_MATTER = ["foreword", "preface", "introduction"];
 export function selectorFor(key: string): string {
   if (key === "body") return ".bml";
   if (key === "em") return ".bml em";
+  if (key === "paragraph") return ".bml p";
   if (key === "prose-matter") {
     return PROSE_MATTER.map((t) => `.matter-${t}`).join(", ");
   }

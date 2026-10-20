@@ -18,6 +18,12 @@
 .bml .verse {
   text-indent: 0;
 }
+/* Paragraph spacing (`elements.paragraph.margin-top`, in lh) is a top margin on
+   every paragraph; the one that opens a block stays tight. */
+.bml p.lead,
+.bml p.has-dropcap {
+  margin-top: 0;
+}
 .bml .dropcap {
   float: left;
   padding-right: 0.05em;

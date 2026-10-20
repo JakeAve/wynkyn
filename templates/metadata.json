@@ -174,7 +174,8 @@
     },
     "pages": {
       "css": {
-        "font-family": "body"
+        "font-family": "body",
+        "font-size": "9pt"
       },
       "front-matter": {
         "style": "roman-lower",
