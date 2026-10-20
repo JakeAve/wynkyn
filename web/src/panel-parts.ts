@@ -1,29 +1,29 @@
-// web/src/style-panel.ts — the "Styles" section of the config panel (spec
-// §7.4, tiers 1–2): pick any stylable element, edit the handful of CSS
-// properties a typesetter touches, plus a "more CSS" list for the rest.
-import type { Metadata } from "../../metadata/types.ts";
+// web/src/panel-parts.ts — the style panel's Book parts tab (spec R1): the
+// element picker over the style catalog (spec §7.4, tiers 1–2), chapter and
+// part numbering, and note placement.
+import type { Metadata, NumberingStyle } from "../../metadata/types.ts";
 import {
   checkboxInput,
   field,
-  sectionBox,
+  fontControl,
+  inlineLabel,
   selectInput,
   textInput,
+  textInputRaw,
 } from "./config-panel.ts";
-import { CURATED_PROPS, splitProps } from "./config-data.ts";
+import { CURATED_PROPS, NUMBERING_STYLES, splitProps } from "./config-data.ts";
+import { section } from "./panel-controls.ts";
 import {
+  bookParts,
   catalogFor,
   ensureProps,
   getProps,
   inheritedFont,
+  type PanelContext,
+  routeFor,
 } from "./style-catalog.ts";
 
-export interface StyleSection {
-  el: HTMLDetailsElement;
-  select(key: string): void; // open the section and show this entry's form
-}
-
 const INHERIT = "";
-const OTHER = "__other";
 const COMMON_PROPS = [
   ...CURATED_PROPS,
   "line-height",
@@ -44,15 +44,27 @@ const COMMON_PROPS = [
   "width",
 ];
 
-export function buildStyleSection(
-  meta: Metadata,
-  queueSave: (key: keyof Metadata) => void,
-  initialKey?: string,
-): StyleSection {
-  const box = sectionBox("Styles");
-  const catalog = catalogFor(meta);
+// The picked entry outlives a tab switch or refresh() (both rebuild the tab).
+let picked: string | undefined;
+
+// `key` is the exact entry a preview click chose (selectStyle); without it
+// the picker stays on its last entry, or the part's first when that left.
+export function buildPartsTab(
+  ctx: PanelContext,
+  part?: string,
+  key?: string,
+): Node[] {
+  const { meta } = ctx;
+  // Running-head entries point at the whole `running` section — editing one
+  // here would write stray props onto metadata.running. The Page tab owns them.
+  const catalog = catalogFor(meta).filter((e) => e.section !== "running");
   const byKey = new Map(catalog.map((e) => [e.key, e]));
-  let current = byKey.get(initialKey ?? "") ?? catalog[0]!;
+  const keys = part
+    ? bookParts(meta).find((p) => p.id === part)?.keys ?? []
+    : [];
+  if (key && byKey.has(key)) picked = key;
+  else if (keys.length && !keys.includes(picked ?? "")) picked = keys[0];
+  let current = byKey.get(picked ?? "") ?? catalog[0]!;
 
   // Picker: one optgroup per catalog group, in catalog order.
   const picker = document.createElement("select");
@@ -67,16 +79,17 @@ export function buildStyleSection(
     }
     g.appendChild(new Option(e.label, e.key, false, e.key === current.key));
   }
+  const form = document.createElement("div");
+  // data-focus follows the picked entry so a routed pick flashes this section.
+  const box = section("Styles", "styles", [field("element", picker), form]);
   picker.onchange = () => {
     current = byKey.get(picker.value)!;
+    picked = current.key;
     renderForm();
   };
-  box.appendChild(field("element", picker));
-
-  const form = document.createElement("div");
-  box.appendChild(form);
 
   function renderForm(): void {
+    box.dataset.focus = routeFor(current.key, meta).focus ?? "styles";
     form.innerHTML = "";
     const entry = current;
     const props = getProps(meta, entry);
@@ -86,9 +99,8 @@ export function buildStyleSection(
       const live = ensureProps(meta, entry);
       if (value) live[prop] = value;
       else delete live[prop];
-      queueSave(entry.section);
+      ctx.queueSave(entry.section);
     };
-
     form.append(
       field(
         "font",
@@ -177,54 +189,80 @@ export function buildStyleSection(
   }
 
   renderForm();
-  return {
-    el: box,
-    select(key) {
-      const e = byKey.get(key);
-      if (!e) return;
-      current = e;
-      picker.value = key;
-      renderForm();
-      box.open = true;
-      box.scrollIntoView({ block: "start" });
-    },
-  };
+  return [box, numberingSection(meta, ctx.queueSave), notesSection(ctx)];
+}
+
+const STYLE_CHOICES = NUMBERING_STYLES.map((s) => ({ label: s, value: s }));
+
+function numberingSection(
+  meta: Metadata,
+  queueSave: PanelContext["queueSave"],
+): HTMLElement {
+  const numbering = meta.numbering ??= {};
+  const kids: HTMLElement[] = [];
+  // Read-only snapshots for display — must not eagerly create
+  // numbering.chapters/parts, or an edit to one of them (e.g. chapters.style)
+  // would persist a spurious empty sibling (e.g. parts: {}) on save, since the
+  // whole "numbering" section round-trips together.
+  for (const key of ["chapters", "parts"] as const) {
+    const cfg = numbering[key] ?? {};
+    kids.push(
+      field(
+        key,
+        selectInput(STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
+          (numbering[key] ??= {}).style = v as NumberingStyle;
+          queueSave("numbering");
+        }),
+        inlineLabel(
+          "show",
+          checkboxInput(cfg.show ?? true, (v) => {
+            (numbering[key] ??= {}).show = v;
+            queueSave("numbering");
+          }),
+        ),
+      ),
+      field(
+        `${key} prefix`,
+        textInputRaw(cfg.prefix ?? "", (v) => {
+          (numbering[key] ??= {}).prefix = v;
+          queueSave("numbering");
+        }),
+      ),
+      field(
+        `${key} suffix`,
+        textInputRaw(cfg.suffix ?? "", (v) => {
+          (numbering[key] ??= {}).suffix = v;
+          queueSave("numbering");
+        }),
+      ),
+    );
+  }
+  return section("Numbering", "numbering", kids);
+}
+
+function notesSection(ctx: PanelContext): HTMLElement {
+  const notes = ctx.meta.notes ??= {};
+  return section("Notes", "notes", [
+    field(
+      "placement",
+      selectInput(
+        [
+          { label: "footnote — bottom of the page", value: "footnote" },
+          { label: "endnote — end of chapter/matter", value: "endnote" },
+        ],
+        notes.placement ?? "footnote",
+        (v) => {
+          notes.placement = v as "footnote" | "endnote";
+          ctx.queueSave("notes");
+        },
+      ),
+    ),
+  ]);
 }
 
 function placeholder(input: HTMLInputElement, text: string): HTMLInputElement {
   input.placeholder = text;
   return input;
-}
-
-// Font alias picker with an escape hatch for a literal family name.
-export function fontControl(
-  meta: Metadata,
-  value: string | undefined,
-  onChange: (v: string) => void,
-  unsetAs: string, // what the box renders in with no font-family of its own
-): HTMLElement {
-  const wrap = document.createElement("span");
-  wrap.className = "cfg-row";
-  const aliases = Object.keys(meta.fonts ?? {});
-  const isAlias = !value || aliases.includes(value);
-  const other = textInput(isAlias ? "" : value, onChange);
-  other.placeholder = "Georgia, serif";
-  other.hidden = isAlias;
-  const sel = selectInput(
-    [
-      { label: `(unset — ${unsetAs})`, value: INHERIT },
-      ...aliases.map((a) => ({ label: a, value: a })),
-      { label: "other…", value: OTHER },
-    ],
-    isAlias ? (value ?? INHERIT) : OTHER,
-    (v) => {
-      other.hidden = v !== OTHER;
-      if (v !== OTHER) onChange(v);
-      else other.focus();
-    },
-  );
-  wrap.append(sel, other);
-  return wrap;
 }
 
 // Key/value rows for properties outside the curated set. Commit on change;

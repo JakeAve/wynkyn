@@ -459,7 +459,8 @@ async function ensureConfigPanel(): Promise<ConfigPanel | null> {
       overlay: $("config-overlay"),
       metadata,
       saveSections: saveMetadataSections,
-      onNewEdition: newEdition,
+      // No preview wiring yet: page counts and outlines arrive with R3.
+      preview: { pagesFor: () => 0, highlight() {}, reveal() {} },
     });
     return configPanel;
   } catch (err) {

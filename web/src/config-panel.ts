@@ -1,38 +1,19 @@
-// web/src/config-panel.ts — document configuration panel (spec §7.5): a form
-// UI over metadata.json's book-wide sections, one builder per section. DOM
-// assembly only — reusable transforms live in config-data.ts with tests.
-import type {
-  Duplex,
-  Metadata,
-  NumberingStyle,
-  PageConfig,
-  RunningEntry,
-} from "../../metadata/types.ts";
+// web/src/config-panel.ts — the style panel (spec R1): a header with four
+// tabs (Page · Fonts · Book parts · Print), save status and close, over a tab
+// body rendered from a Route. Each tab's builder lives in its own panel-*.ts;
+// this file owns the debounced save, routing, and the DOM helpers the
+// builders share. Reusable transforms live in config-data.ts with tests.
+import type { Metadata } from "../../metadata/types.ts";
+import { buildFontsTab } from "./panel-fonts.ts";
+import { buildPageTab, buildPrintTab } from "./panel-page.ts";
+import { buildPartsTab } from "./panel-parts.ts";
 import {
-  fmtLength,
-  formatCssLines,
-  isValidFolios,
-  isValidSize,
-  makeRunningEntry,
-  MARGIN_AREAS,
-  NUMBERING_STYLES,
-  PAGE_NUMBERING_STYLES,
-  PAGE_SIZE_PRESETS,
-  parseCssLines,
-  presetFor,
-  renameKey,
-  resolvePageSetup,
-  RUNNING_CONTENT_CHOICES,
-  SHEET_PRESETS,
-  type SizePreset,
-  splitRunningEntry,
-} from "./config-data.ts";
-import { GOOGLE_FONTS } from "./fonts-list.ts";
-import {
-  buildStyleSection,
-  fontControl,
-  type StyleSection,
-} from "./style-panel.ts";
+  type PanelContext,
+  type PreviewLink,
+  type Route,
+  routeFor,
+  type TabId,
+} from "./style-catalog.ts";
 
 const SAVE_DEBOUNCE_MS = 600;
 
@@ -41,17 +22,22 @@ export interface ConfigPanel {
   isDirty(): boolean; // sections touched but not yet handed to saveSections
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   markSaved(ok: boolean, detail?: string): void; // feedback from the save round-trip
-  selectStyle(key: string): void; // open the Styles section on a catalog entry (§7.4)
+  selectStyle(key: string): void; // open the panel where a catalog entry is styled (§7.4)
 }
 
 export interface ConfigPanelOptions {
   overlay: HTMLElement;
   metadata: Metadata;
   saveSections(sections: Partial<Metadata>): void;
-  onNewEdition?: () => void; // shown in the head so a single-edition book can branch
+  preview: PreviewLink;
 }
 
-type QueueSave = (key: keyof Metadata) => void;
+const TABS: Array<[TabId, string]> = [
+  ["page", "Page"],
+  ["fonts", "Fonts"],
+  ["parts", "Book parts"],
+  ["print", "Print"],
+];
 
 export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   let meta = structuredClone(opts.metadata);
@@ -60,12 +46,13 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
 
   const saved = document.createElement("span");
   saved.className = "cfg-saved";
+  saved.setAttribute("aria-live", "polite");
   const setSaved = (text: string, state: "saving" | "ok" | "error") => {
     saved.textContent = text;
     saved.dataset.state = state;
   };
 
-  const queueSave: QueueSave = (key) => {
+  const queueSave = (key: keyof Metadata): void => {
     dirty.add(key);
     setSaved("Saving…", "saving");
     clearTimeout(timer);
@@ -80,7 +67,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         sections[k] = (meta as Record<string, unknown>)[k] ?? null;
       }
       // Fonts rows can sit blank in the DOM while the user is still typing an
-      // alias (see buildFontsSection's "+ font alias" button). A sibling
+      // alias (see the Fonts tab's "+ font alias" button). A sibling
       // field's save must not flush that blank entry to disk — an empty
       // family produces a malformed css2 URL param in generateFontLinks and
       // can knock out every custom font in the live preview.
@@ -103,62 +90,118 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     }, SAVE_DEBOUNCE_MS);
   };
 
-  let styles: StyleSection | null = null;
-  let styleKey: string | undefined; // survives refresh()
+  let route: Route = { tab: "page" }; // survives refresh()
+  let styleKey: string | undefined; // a preview pick, handed to the parts tab once
 
-  function build(): void {
-    opts.overlay.innerHTML = "";
-    styles = buildStyleSection(meta, queueSave, styleKey);
-    const head = document.createElement("div");
-    head.className = "cfg-head";
-    const title = document.createElement("strong");
-    title.textContent = "Document configuration";
-    const newEdition = document.createElement("button");
-    newEdition.className = "cfg-new-edition";
-    newEdition.textContent = "New edition";
-    newEdition.title = "Copy this edition's styling under a new name";
-    newEdition.onclick = () => opts.onNewEdition?.();
-    if (!opts.onNewEdition) newEdition.hidden = true;
-    const close = document.createElement("button");
-    close.innerHTML =
-      '<svg class="tico" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-    close.setAttribute("aria-label", "close");
-    close.title = "close (Esc)";
-    close.onclick = () => {
-      opts.overlay.hidden = true;
-    };
-    head.append(title, saved, newEdition, close);
-    opts.overlay.append(
-      head,
-      buildPageSection(meta, queueSave),
-      buildFontsSection(meta, queueSave),
-      buildNumberingSection(meta, queueSave),
-      buildRunningSection(meta, queueSave),
-      buildNotesSection(meta, queueSave),
-      styles.el,
-    );
+  const tablist = document.createElement("div");
+  tablist.className = "tabs";
+  tablist.setAttribute("role", "tablist");
+  tablist.setAttribute("aria-label", "Style sections");
+  const tabs = TABS.map(([id, label]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.id = `cfg-tab-${id}`;
+    b.dataset.tab = id;
+    b.textContent = label;
+    b.onclick = () => go({ tab: id });
+    return b;
+  });
+  tablist.append(...tabs);
+  // Roving tablist: arrows move the selection, only the selected tab tabs in.
+  tablist.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    const i = TABS.findIndex(([id]) => id === route.tab);
+    const n = (i + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) %
+      TABS.length;
+    go({ tab: TABS[n]![0] });
+    tabs[n]!.focus();
+  });
+
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "ghost";
+  close.innerHTML =
+    '<svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+  close.setAttribute("aria-label", "Close style panel");
+  close.title = "Close (Esc)";
+  close.onclick = () => {
+    opts.overlay.hidden = true;
+  };
+  const head = document.createElement("div");
+  head.className = "phead";
+  head.append(tablist, saved, close);
+  const body = document.createElement("div");
+  body.className = "pbody";
+  body.setAttribute("role", "tabpanel");
+  opts.overlay.replaceChildren(head, body);
+
+  function go(next: Route): void {
+    route = next;
+    render();
+  }
+
+  function build(): Node[] {
+    const ctx: PanelContext = { meta, queueSave, go, preview: opts.preview };
+    switch (route.tab) {
+      case "page":
+        return buildPageTab(ctx);
+      case "fonts":
+        return buildFontsTab(ctx);
+      case "print":
+        return buildPrintTab(ctx);
+      case "parts": {
+        const key = styleKey;
+        styleKey = undefined;
+        return buildPartsTab(ctx, route.part, key);
+      }
+    }
+  }
+
+  function render(keepScroll = false): void {
+    for (const b of tabs) {
+      const on = b.dataset.tab === route.tab;
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+    }
+    body.setAttribute("aria-labelledby", `cfg-tab-${route.tab}`);
+    const top = body.scrollTop;
+    body.replaceChildren(...build());
+    const focus = route.focus;
+    if (focus) {
+      route = { ...route, focus: undefined }; // flash once, not on every refresh
+      const t = body.querySelector(`[data-focus="${CSS.escape(focus)}"]`);
+      if (t) {
+        t.scrollIntoView({ block: "nearest" });
+        t.classList.add("flash");
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => t.classList.remove("flash"))
+        );
+      }
+    } else body.scrollTop = keepScroll ? top : 0;
   }
 
   opts.overlay.setAttribute("role", "dialog");
-  opts.overlay.setAttribute("aria-label", "Document configuration");
+  opts.overlay.setAttribute("aria-label", "Style");
   opts.overlay.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       opts.overlay.hidden = true;
       e.stopPropagation();
     }
   });
-  build();
+  render();
   return {
     toggle: () => {
       opts.overlay.hidden = !opts.overlay.hidden;
       if (!opts.overlay.hidden) {
-        opts.overlay.querySelector<HTMLElement>("input, select")?.focus();
+        tabs.find((b) => b.tabIndex === 0)?.focus();
       }
     },
     isDirty: () => dirty.size > 0,
     refresh(metadata: Metadata) {
       meta = structuredClone(metadata);
-      build();
+      render(true);
     },
     markSaved(ok, detail) {
       if (dirty.size) return; // a newer edit is already queued — stay on "Saving…"
@@ -174,26 +217,12 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     selectStyle(key) {
       styleKey = key;
       opts.overlay.hidden = false;
-      styles?.select(key);
+      go(routeFor(key, meta));
     },
   };
 }
 
-// ---------- shared DOM helpers (used by every section builder) ----------
-
-// Sections are native <details>: Page and Fonts open by default, the rarer
-// ones collapsed so the panel isn't one long wall of fields.
-const OPEN_BY_DEFAULT = new Set(["Page", "Fonts"]);
-export function sectionBox(title: string): HTMLDetailsElement {
-  const box = document.createElement("details");
-  box.className = "cfg-section";
-  box.open = OPEN_BY_DEFAULT.has(title);
-  const summary = document.createElement("summary");
-  summary.className = "caption";
-  summary.textContent = title;
-  box.appendChild(summary);
-  return box;
-}
+// ---------- shared DOM helpers (used by the panel-*.ts tab builders) ----------
 
 export function field(
   labelText: string,
@@ -222,7 +251,7 @@ export function textInput(
 // Like textInput, but never trims. Use for fields where leading/trailing
 // whitespace is semantically load-bearing (e.g. numbering prefix/suffix,
 // which render.ts concatenates verbatim — "Part " + "IV").
-function textInputRaw(
+export function textInputRaw(
   value: string,
   onInput: (v: string) => void,
 ): HTMLInputElement {
@@ -259,7 +288,7 @@ export function checkboxInput(
 
 // A small label glued to a control (e.g. "show" next to its checkbox),
 // distinct from field()'s fixed-width row label.
-function inlineLabel(text: string, control: HTMLElement): HTMLElement {
+export function inlineLabel(text: string, control: HTMLElement): HTMLElement {
   const wrap = document.createElement("span");
   wrap.className = "cfg-inline";
   const s = document.createElement("span");
@@ -268,493 +297,36 @@ function inlineLabel(text: string, control: HTMLElement): HTMLElement {
   return wrap;
 }
 
-// Preset dropdown + custom-dimensions input (spec §7.5: named presets and
-// custom dimensions), over either the book-page or the sheet preset list.
-// Calls onChange only with valid values; invalid custom input shows an error.
-function sizeControl(
-  current: string | undefined,
-  onChange: (size: string) => void,
-  presets: SizePreset[] = PAGE_SIZE_PRESETS,
+const INHERIT = "";
+const OTHER = "__other";
+
+// Font alias picker with an escape hatch for a literal family name.
+export function fontControl(
+  meta: Metadata,
+  value: string | undefined,
+  onChange: (v: string) => void,
+  unsetAs: string, // what the box renders in with no font-family of its own
 ): HTMLElement {
   const wrap = document.createElement("span");
   wrap.className = "cfg-row";
-  const preset = presetFor(current, presets);
-  const custom = document.createElement("input");
-  custom.type = "text";
-  custom.placeholder = "5.5in 8.5in";
-  custom.value = preset === "custom" ? (current ?? "") : "";
-  custom.hidden = preset !== "custom";
-  const error = document.createElement("span");
-  error.className = "cfg-error";
+  const aliases = Object.keys(meta.fonts ?? {});
+  const isAlias = !value || aliases.includes(value);
+  const other = textInput(isAlias ? "" : value, onChange);
+  other.placeholder = "Georgia, serif";
+  other.hidden = isAlias;
   const sel = selectInput(
     [
-      ...presets.map((p) => ({ label: p.label, value: p.value })),
-      { label: "Custom…", value: "custom" },
+      { label: `(unset — ${unsetAs})`, value: INHERIT },
+      ...aliases.map((a) => ({ label: a, value: a })),
+      { label: "other…", value: OTHER },
     ],
-    preset,
+    isAlias ? (value ?? INHERIT) : OTHER,
     (v) => {
-      custom.hidden = v !== "custom";
-      error.textContent = "";
-      if (v !== "custom") onChange(v);
+      other.hidden = v !== OTHER;
+      if (v !== OTHER) onChange(v);
+      else other.focus();
     },
   );
-  custom.oninput = () => {
-    const v = custom.value.trim();
-    if (isValidSize(v)) {
-      error.textContent = "";
-      onChange(v);
-    } else {
-      error.textContent = "e.g. “5.5in 8.5in” or a named size";
-    }
-  };
-  wrap.append(sel, custom, error);
+  wrap.append(sel, other);
   return wrap;
-}
-
-// ---------- sections ----------
-
-const MARGIN_KEYS = ["top", "bottom", "inside", "outside"] as const;
-
-// One section for the whole physical setup (§4.3): the book page, the sheet it
-// prints on, and the signature it folds into. They are one decision — a page
-// size only means something against the sheet it has to tile — so the panel
-// keeps them together and shows what they derive to as you change them.
-function buildPageSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
-  const page: PageConfig = meta.page ??= {};
-  const box = sectionBox("Page setup");
-  const body = document.createElement("div");
-  const readout = document.createElement("div");
-  readout.className = "cfg-readout";
-  box.append(body, readout);
-
-  const save = () => {
-    queueSave("page");
-    refresh();
-  };
-
-  // The derived half of the setup: what these values actually produce on paper.
-  function refresh(): void {
-    const setup = resolvePageSetup(page);
-    readout.textContent = "";
-    readout.classList.toggle("cfg-readout-bad", setup.error !== null);
-    const line = (text: string) => {
-      const p = document.createElement("p");
-      p.textContent = text;
-      readout.appendChild(p);
-    };
-    if (setup.error !== null) {
-      line(setup.error);
-      return;
-    }
-    const folioWord = setup.foliosPerSheet === 1 ? "folio" : "folios";
-    const cuts = setup.cutsPerSheet === 0
-      ? "fold only, no cuts"
-      : `${setup.cutsPerSheet} cut${setup.cutsPerSheet === 1 ? "" : "s"}`;
-    // The grid only earns a mention once it has more than one row — that is
-    // where the sheet turns portrait and gets cut across before folding.
-    const grid = setup.rows === 1 ? "" : ` (${setup.cols} × ${setup.rows})`;
-    line(
-      `${setup.nUp}-up on ${setup.sheet}${grid} — ${setup.foliosPerSheet} ${folioWord} per sheet (${cuts})`,
-    );
-    if (setup.rows > 1) {
-      line(
-        `sheet prints ${
-          setup.landscape ? "landscape" : "portrait"
-        } — cut across, then fold each piece down its center`,
-      );
-    }
-    line(
-      `${setup.sheetsPerSignature} sheet${
-        setup.sheetsPerSignature === 1 ? "" : "s"
-      } per ${setup.folios}-folio signature = ${setup.pagesPerSignature} book pages`,
-    );
-    const EPS = 5e-4;
-    if (setup.slackAcross > EPS || setup.slackDown > EPS) {
-      line(
-        `leftover paper: ${fmtLength(setup.slackAcross, setup.unit)} across, ${
-          fmtLength(setup.slackDown, setup.unit)
-        } down — trimmed off after folding`,
-      );
-    } else {
-      line("the page tiles the sheet exactly — nothing to trim off");
-    }
-  }
-
-  // The stored half: the two sizes, how many folios nest into a signature,
-  // and which way the printer turns the sheet over.
-  body.appendChild(
-    field(
-      "page size",
-      sizeControl(page.size, (size) => {
-        page.size = size;
-        save();
-      }),
-    ),
-  );
-  body.appendChild(
-    field(
-      "sheet",
-      sizeControl(page.sheet, (sheet) => {
-        page.sheet = sheet;
-        save();
-      }, SHEET_PRESETS),
-    ),
-  );
-  const folioError = document.createElement("span");
-  folioError.className = "cfg-error";
-  const folios = textInput(
-    String(page["folios-per-signature"] ?? ""),
-    (v) => {
-      if (isValidFolios(v)) {
-        folioError.textContent = "";
-        page["folios-per-signature"] = Number(v);
-        save();
-      } else {
-        folioError.textContent = v ? "must be a positive integer" : "";
-      }
-    },
-  );
-  folios.placeholder = "4";
-  body.appendChild(field("folios/signature", folios, folioError));
-  body.appendChild(
-    field(
-      "duplex",
-      selectInput(
-        [
-          { label: "short-edge — book-style turn", value: "short-edge" },
-          { label: "long-edge — calendar-style turn", value: "long-edge" },
-          { label: "none — separate fronts/backs files", value: "none" },
-        ],
-        page.duplex ?? "short-edge",
-        (v) => {
-          page.duplex = v as Duplex;
-          save();
-        },
-      ),
-    ),
-  );
-  // Read-only snapshot for display — must not eagerly create page.margins,
-  // or an edit to an unrelated field (e.g. size) would persist a spurious
-  // empty margins object on save (the whole "page" section round-trips
-  // together, so any local default-filling here leaks onto disk).
-  const margins = page.margins ?? {};
-  for (const key of MARGIN_KEYS) {
-    body.appendChild(
-      field(
-        `margin ${key}`,
-        textInput(margins[key] ?? "", (v) => {
-          const m = page.margins ??= {};
-          if (v) m[key] = v;
-          else delete m[key];
-          queueSave("page");
-        }),
-      ),
-    );
-  }
-  refresh();
-  return box;
-}
-
-function buildFontsSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
-  const box = sectionBox("Fonts");
-  const dl = document.createElement("datalist");
-  dl.id = "google-fonts-list";
-  for (const f of GOOGLE_FONTS) dl.appendChild(new Option(f, f));
-  const rows = document.createElement("div");
-  const add = document.createElement("button");
-  add.textContent = "+ font alias";
-
-  function render(): void {
-    rows.innerHTML = "";
-    const fonts = meta.fonts ??= {};
-    for (const alias of Object.keys(fonts)) {
-      const aliasIn = document.createElement("input");
-      aliasIn.type = "text";
-      aliasIn.value = alias;
-      aliasIn.placeholder = "alias";
-      aliasIn.setAttribute("aria-label", "font alias");
-      // Rename on commit (change = blur/enter), not per keystroke — a
-      // half-typed alias must not repeatedly rename the key.
-      aliasIn.onchange = () => {
-        const next = aliasIn.value.trim();
-        if (!next || next === alias) {
-          aliasIn.value = alias;
-          return;
-        }
-        if (Object.hasOwn(fonts, next)) {
-          aliasIn.value = alias; // collision: refuse silently, keep old name
-          return;
-        }
-        meta.fonts = renameKey(fonts, alias, next);
-        queueSave("fonts");
-        render();
-      };
-      const familyIn = textInput(fonts[alias] ?? "", (v) => {
-        fonts[alias] = v;
-        // Empty family would put a blank entry in the css2 URL — save once
-        // there's a real value; deletion is the ✕ button's job.
-        if (v) queueSave("fonts");
-      });
-      familyIn.setAttribute("list", "google-fonts-list");
-      familyIn.placeholder = "Google Fonts family";
-      familyIn.setAttribute("aria-label", "font family");
-      const rm = document.createElement("button");
-      rm.textContent = "✕";
-      rm.title = `remove ${alias}`;
-      rm.onclick = () => {
-        delete fonts[alias];
-        queueSave("fonts");
-        render();
-      };
-      const row = document.createElement("div");
-      row.className = "cfg-field";
-      row.append(aliasIn, familyIn, rm);
-      rows.appendChild(row);
-    }
-  }
-
-  add.onclick = () => {
-    const fonts = meta.fonts ??= {};
-    let alias = "new-font";
-    for (let i = 2; Object.hasOwn(fonts, alias); i++) alias = `new-font-${i}`;
-    fonts[alias] = "";
-    render(); // not saved until a family name is typed (see familyIn)
-  };
-
-  render();
-  box.append(dl, rows, add);
-  return box;
-}
-
-const STYLE_CHOICES = NUMBERING_STYLES.map((s) => ({ label: s, value: s }));
-const PAGE_STYLE_CHOICES = PAGE_NUMBERING_STYLES.map((s) => ({
-  label: s,
-  value: s,
-}));
-
-function buildNumberingSection(
-  meta: Metadata,
-  queueSave: QueueSave,
-): HTMLElement {
-  const box = sectionBox("Numbering");
-  const numbering = meta.numbering ??= {};
-
-  // Read-only snapshots for display — must not eagerly create
-  // numbering.chapters/parts/pages[zone], or an edit to one of them (e.g.
-  // chapters.style) would persist a spurious empty sibling (e.g. parts: {})
-  // on save, since the whole "numbering" section round-trips together.
-  for (const key of ["chapters", "parts"] as const) {
-    const cfg = numbering[key] ?? {};
-    box.appendChild(
-      field(
-        key,
-        selectInput(STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
-          (numbering[key] ??= {}).style = v as NumberingStyle;
-          queueSave("numbering");
-        }),
-        inlineLabel(
-          "show",
-          checkboxInput(cfg.show ?? true, (v) => {
-            (numbering[key] ??= {}).show = v;
-            queueSave("numbering");
-          }),
-        ),
-      ),
-    );
-    box.appendChild(
-      field(
-        `${key} prefix`,
-        textInputRaw(cfg.prefix ?? "", (v) => {
-          (numbering[key] ??= {}).prefix = v;
-          queueSave("numbering");
-        }),
-      ),
-    );
-    box.appendChild(
-      field(
-        `${key} suffix`,
-        textInputRaw(cfg.suffix ?? "", (v) => {
-          (numbering[key] ??= {}).suffix = v;
-          queueSave("numbering");
-        }),
-      ),
-    );
-  }
-
-  const pages = numbering.pages ?? {};
-  for (const zone of ["front-matter", "body", "back-matter"] as const) {
-    const cfg = pages[zone] ?? {};
-    box.appendChild(
-      field(
-        `${zone} pages`,
-        selectInput(PAGE_STYLE_CHOICES, cfg.style ?? "arabic", (v) => {
-          ((numbering.pages ??= {})[zone] ??= {}).style = v as NumberingStyle;
-          queueSave("numbering");
-        }),
-        inlineLabel(
-          "show",
-          checkboxInput(cfg.show ?? true, (v) => {
-            ((numbering.pages ??= {})[zone] ??= {}).show = v;
-            queueSave("numbering");
-          }),
-        ),
-      ),
-    );
-  }
-  return box;
-}
-
-const AREA_CHOICES = MARGIN_AREAS.map((a) => ({ label: a, value: a }));
-const LITERAL = "__literal"; // select sentinel for "type your own text"
-
-function buildRunningSection(
-  meta: Metadata,
-  queueSave: QueueSave,
-): HTMLElement {
-  const box = sectionBox("Running headers / footers");
-  const running = meta.running ??= {};
-
-  for (const side of ["odd", "even"] as const) {
-    const head = document.createElement("div");
-    head.className = "cfg-field";
-    const title = document.createElement("span");
-    title.className = "cfg-label";
-    title.textContent = `${side} pages`;
-    const add = document.createElement("button");
-    add.textContent = "+ entry";
-    head.append(title, add);
-    const list = document.createElement("div");
-
-    const render = (): void => {
-      list.innerHTML = "";
-      (running[side] ?? []).forEach((_, i) => list.appendChild(entryRow(i)));
-    };
-
-    const entryRow = (i: number): HTMLElement => {
-      const entries = running[side]!;
-      const form = splitRunningEntry(entries[i]!);
-      const commit = () => {
-        entries[i] = makeRunningEntry(form);
-        queueSave("running");
-      };
-      const row = document.createElement("div");
-      row.className = "cfg-entry";
-
-      const isChoice = (RUNNING_CONTENT_CHOICES as readonly string[]).includes(
-        form.content,
-      );
-      // Raw (non-trimming): a literal running-header string may legitimately
-      // need a leading/trailing space to control spacing against an adjacent
-      // margin-box element (same rationale as numbering prefix/suffix).
-      const literal = textInputRaw(isChoice ? "" : form.content, (v) => {
-        form.content = v;
-        commit();
-      });
-      literal.placeholder = "literal text";
-      literal.hidden = isChoice;
-      const contentSel = selectInput(
-        [
-          ...RUNNING_CONTENT_CHOICES.map((c) => ({ label: c, value: c })),
-          { label: "literal…", value: LITERAL },
-        ],
-        isChoice ? form.content : LITERAL,
-        (v) => {
-          literal.hidden = v !== LITERAL;
-          form.content = v === LITERAL ? literal.value : v;
-          commit();
-        },
-      );
-
-      const areaSel = selectInput(AREA_CHOICES, form.area, (v) => {
-        form.area = v;
-        commit();
-      });
-
-      const css = document.createElement("textarea");
-      css.rows = 2;
-      css.value = form.extraCss;
-      css.placeholder = "font-size: 8pt\nfont-style: italic";
-
-      // The margin box inherits nothing from the book body, so its font has to
-      // be set here. Same picker as the Styles panel, writing font-family into
-      // the same extra-css blob the textarea shows.
-      const setFont = (v: string) => {
-        const extras = parseCssLines(form.extraCss);
-        if (v) extras["font-family"] = v;
-        else delete extras["font-family"];
-        form.extraCss = formatCssLines(extras);
-        css.value = form.extraCss;
-        commit();
-      };
-      const font = fontControl(
-        meta,
-        parseCssLines(form.extraCss)["font-family"],
-        setFont,
-        "browser default",
-      );
-
-      css.oninput = () => {
-        form.extraCss = css.value;
-        commit();
-      };
-      // On blur, rebuild the rows so the font picker reflects a font-family
-      // typed straight into the textarea.
-      css.onchange = () => render();
-
-      const rm = document.createElement("button");
-      rm.textContent = "✕ remove entry";
-      rm.onclick = () => {
-        entries.splice(i, 1);
-        queueSave("running");
-        render(); // indices shifted — rebuild the rows
-      };
-
-      row.append(
-        field("content", contentSel, literal),
-        field("area", areaSel),
-        field("font", font),
-        field("extra css", css),
-        rm,
-      );
-      return row;
-    };
-
-    add.onclick = () => {
-      const entries = running[side] ??= [];
-      // Sensible seed per §4.8's example: outer top corner of the spread.
-      const seed: RunningEntry = {
-        content: "book-title",
-        area: side === "odd" ? "top-right" : "top-left",
-      };
-      entries.push(seed);
-      queueSave("running");
-      render();
-    };
-
-    render();
-    box.append(head, list);
-  }
-  return box;
-}
-
-function buildNotesSection(meta: Metadata, queueSave: QueueSave): HTMLElement {
-  const box = sectionBox("Notes");
-  const notes = meta.notes ??= {};
-  box.appendChild(
-    field(
-      "placement",
-      selectInput(
-        [
-          { label: "footnote — bottom of the page", value: "footnote" },
-          { label: "endnote — end of chapter/matter", value: "endnote" },
-        ],
-        notes.placement ?? "footnote",
-        (v) => {
-          notes.placement = v as "footnote" | "endnote";
-          queueSave("notes");
-        },
-      ),
-    ),
-  );
-  return box;
 }
