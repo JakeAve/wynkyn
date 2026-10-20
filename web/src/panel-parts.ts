@@ -6,6 +6,7 @@ import type {
   NumberingStyle,
   StructureNumbering,
 } from "../../metadata/types.ts";
+import { parseLength } from "./config-data.ts";
 import {
   crumb,
   icon,
@@ -306,6 +307,7 @@ function block(
   const from = alignRow.querySelector(".from")!;
   if (props["text-align"]) from.textContent = "";
 
+  // Spacing may go negative (tighten, pull up); sizes may not.
   const length = (lbl: string, prop: string, placeholder: string) =>
     v.mark(
       row(
@@ -314,6 +316,8 @@ function block(
           value: props[prop],
           placeholder,
           label: `${label} ${lbl.toLowerCase()}`,
+          unit: parseLength(placeholder)?.unit,
+          allowNegative: true,
           onChange: set(prop),
         }),
       ),
@@ -441,6 +445,15 @@ function extrasFor(
     lab.value = cur.prefix ?? "";
     lab.setAttribute("aria-label", "Label before the number");
     lab.oninput = () => edit((c) => c.prefix = lab.value);
+    // Raw like the prefix: a trailing space or full stop is the point.
+    const suf = el("input", "txt");
+    suf.type = "text";
+    suf.value = cur.suffix ?? "";
+    suf.setAttribute("aria-label", "Text after the number");
+    suf.oninput = () => edit((c) => c.suffix = suf.value);
+    const sample = (s: NumberingStyle | undefined) =>
+      NUMERALS.find((n) => n.value === (s ?? "arabic"))?.label ?? "1";
+    const num = el("span", "from", sample(cur.style));
     return {
       rows: [
         v.mark(
@@ -449,7 +462,10 @@ function extrasFor(
             seg(
               NUMERALS,
               cur.style ?? "arabic",
-              (s) => edit((c) => c.style = s ?? "arabic"),
+              (s) => {
+                num.textContent = sample(s);
+                edit((c) => c.style = s ?? "arabic");
+              },
               "Numerals",
             ),
           ),
@@ -462,6 +478,8 @@ function extrasFor(
               "span",
               "ctl",
               lab,
+              num,
+              suf,
               toggle(
                 "Show",
                 cur.show ?? true,
@@ -469,7 +487,9 @@ function extrasFor(
               ),
             ),
           ),
-          () => cfg()?.prefix !== undefined || cfg()?.show !== undefined,
+          () =>
+            cfg()?.prefix !== undefined || cfg()?.suffix !== undefined ||
+            cfg()?.show !== undefined,
         ),
       ],
       reset() {
@@ -477,6 +497,7 @@ function extrasFor(
         if (!c) return [];
         delete c.style;
         delete c.prefix;
+        delete c.suffix;
         delete c.show;
         if (!Object.keys(c).length) delete meta.numbering![which];
         return ["numbering"];
@@ -546,7 +567,11 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
     count.textContent = `${
       plural(setCount(meta, part), "setting")
     } in this book`;
-  const v = makeView(ctx, recount);
+  let syncSep = () => {};
+  const v = makeView(ctx, () => {
+    recount();
+    syncSep();
+  });
   const has = (entry: StyleEntry, ...ps: string[]) => () => {
     const now = getProps(meta, entry);
     return ps.some((p) => p in now);
@@ -618,16 +643,25 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
     ),
   ], el("span", "from", "Every page"));
 
-  // Paragraphs: Indent → text-indent only; Space → a top margin in lines and
-  // no indent; Both → both. The steppers remember the last non-zero value.
+  // Paragraphs: an indent is on unless text-indent is 0 (unset inherits
+  // base.css's 1.5em); space is on when margin-top (in lines) isn't 0. Indent
+  // / Space / Both follow from the two; neither on selects nothing. Space and
+  // Both remember the last space set; Indent and Both the last indent.
+  const SEPS: Array<{ label: string; value: Sep }> = [
+    { label: "Indent", value: "indent" },
+    { label: "Space", value: "space" },
+    { label: "Both", value: "both" },
+  ];
+  const sepOf = (): Sep | undefined => {
+    const p = getProps(meta, para);
+    const i = p["text-indent"] === undefined || !isZero(p["text-indent"]);
+    const s = !isZero(p["margin-top"]);
+    return i && s ? "both" : i ? "indent" : s ? "space" : undefined;
+  };
   const pp = getProps(meta, para);
-  let indent = isZero(pp["text-indent"]) ? "1.5em" : pp["text-indent"]!;
+  let indent = isZero(pp["text-indent"]) ? undefined : pp["text-indent"];
   let space = isZero(pp["margin-top"]) ? "0.5lh" : pp["margin-top"]!;
-  let sep: Sep = isZero(pp["margin-top"])
-    ? "indent"
-    : pp["text-indent"] !== undefined && isZero(pp["text-indent"])
-    ? "space"
-    : "both";
+  let sep = sepOf();
   const indentRow = () =>
     v.mark(
       row(
@@ -636,9 +670,10 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
           value: indent,
           placeholder: "1.5em",
           label: "First-line indent",
+          unit: "em",
           onChange: (x) => {
-            indent = x ?? "1.5em";
-            put(meta, para, "text-indent", indent);
+            indent = x;
+            put(meta, para, "text-indent", x);
             save();
           },
         }),
@@ -651,12 +686,13 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
       row(
         "Space between",
         stepper({
-          value: space,
+          value: isZero(getProps(meta, para)["margin-top"]) ? undefined : space,
           placeholder: "0.5lh",
           label: "Space between paragraphs",
+          unit: "lh",
           onChange: (x) => {
-            space = x ?? "0.5lh";
-            put(meta, para, "margin-top", space);
+            if (x && !isZero(x)) space = x;
+            put(meta, para, "margin-top", x);
             save();
           },
         }),
@@ -667,14 +703,10 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
   let iRow = indentRow();
   let sRow = spaceRow();
   const sepSeg = seg<Sep>(
-    [
-      { label: "Indent", value: "indent" },
-      { label: "Space", value: "space" },
-      { label: "Both", value: "both" },
-    ],
+    SEPS,
     sep,
     (s) => {
-      sep = s ?? "indent";
+      sep = s;
       put(meta, para, "text-indent", sep === "space" ? "0" : indent);
       put(meta, para, "margin-top", sep === "indent" ? undefined : space);
       const [a, b] = [indentRow(), spaceRow()];
@@ -685,6 +717,13 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
     },
     "Separate paragraphs by",
   );
+  // A stepper edit can turn one of the two off: the segment follows.
+  syncSep = () => {
+    const now = sepOf();
+    sepSeg.querySelectorAll("[role=radio]").forEach((b, i) =>
+      b.setAttribute("aria-checked", String(SEPS[i]?.value === now))
+    );
+  };
   const paraControlled = ["text-indent", "margin-top"];
   const paragraphs = section("Paragraphs", "paragraphs", [
     v.mark(

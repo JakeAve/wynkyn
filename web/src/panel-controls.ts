@@ -55,8 +55,10 @@ export interface View {
   changed(section: keyof Metadata): void;
 }
 
+// A row that was redrawn away (no longer in the document) drops out on the
+// next write, so redraws don't pile up marks.
 export function makeView(ctx: PanelContext, after = () => {}): View {
-  const marks: Array<[HTMLElement, () => boolean]> = [];
+  let marks: Array<[HTMLElement, () => boolean]> = [];
   const paint = ([r, f]: [HTMLElement, () => boolean]) =>
     r.classList.toggle("set", f());
   return {
@@ -67,6 +69,7 @@ export function makeView(ctx: PanelContext, after = () => {}): View {
     },
     changed(section) {
       ctx.queueSave(section);
+      marks = marks.filter(([r]) => r.isConnected);
       marks.forEach(paint);
       after();
     },
@@ -76,14 +79,18 @@ export function makeView(ctx: PanelContext, after = () => {}): View {
 // Length field: takes and emits CSS lengths ("9pt"). The unit is shown beside
 // the number and kept; empty means unset. `placeholder` is the inherited value.
 // onChange returning false rejects the value: the field shows the old one.
+// A bare non-zero number gets `unit` (default "pt"; "" for plain counts), and
+// a negative one is clamped to 0 unless `allowNegative`.
 export function stepper(o: {
   value: string | undefined;
   placeholder?: string;
   label: string;
+  unit?: string;
+  allowNegative?: boolean;
   onChange(v: string | undefined): void | false;
 }): HTMLElement {
   let value = o.value;
-  let unit = parseLength(value ?? o.placeholder ?? "")?.unit ?? "";
+  let unit = parseLength(value ?? o.placeholder ?? "")?.unit ?? o.unit ?? "pt";
   const num = (v: string | undefined) => {
     const p = v === undefined ? null : parseLength(v);
     return p ? String(p.n) : "";
@@ -100,7 +107,10 @@ export function stepper(o: {
     input.value = num(value);
     u.textContent = unit;
   };
-  const commit = (v: string | undefined) => {
+  const commit = (raw: string | undefined) => {
+    const p0 = raw === undefined ? null : parseLength(raw);
+    const n = p0 && !o.allowNegative ? Math.max(0, p0.n) : p0?.n;
+    const v = p0 ? `${n}${p0.unit || (n === 0 ? "" : o.unit ?? "pt")}` : raw;
     if (o.onChange(v) === false) return show();
     value = v;
     const p = v === undefined ? null : parseLength(v);

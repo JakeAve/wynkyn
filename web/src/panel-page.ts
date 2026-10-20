@@ -40,6 +40,7 @@ import {
 import {
   icon,
   makeView,
+  moreCss,
   row,
   section,
   seg,
@@ -347,6 +348,12 @@ const NUMERALS = [
   { label: "Hidden", value: "hidden" },
 ];
 
+const ZONES = [
+  ["front-matter", "Front matter"],
+  ["body", "Body"],
+  ["back-matter", "Back matter"],
+] as const;
+
 function pageNumbers(ctx: PanelContext, view: View): HTMLElement {
   const numbering = ctx.meta.numbering ??= {};
   const live = () => numbering.pages; // the dots read the current value
@@ -363,11 +370,21 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement {
     if (!Object.keys(c).length) delete p.css; // leave no empty css behind
     ctx.queueSave("numbering");
   };
-  const zones = ([
-    ["front-matter", "Front matter"],
-    ["body", "Body"],
-    ["back-matter", "Back matter"],
-  ] as const).map(([zone, label]) => {
+  // "More CSS" hands back every prop without a control; swap those in.
+  const putOthers = (
+    holder: { css?: CssProps },
+    controlled: string[],
+    next: CssProps,
+  ) => {
+    const c = holder.css ?? {};
+    for (const k of Object.keys(c)) if (!controlled.includes(k)) delete c[k];
+    Object.assign(c, next);
+    if (Object.keys(c).length) holder.css = c;
+    else delete holder.css;
+    ctx.queueSave("numbering");
+  };
+  const FOLIO = ["font-size", "font-family", "font-style"];
+  const zones = ZONES.map(([zone, label]) => {
     const cfg = pages[zone] ?? {};
     const current = cfg.show === false || cfg.style === "none"
       ? "hidden"
@@ -400,7 +417,7 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement {
         "Size",
         stepper({
           value: css["font-size"],
-          placeholder: "9pt",
+          // A margin box inherits nothing: unset shows no number.
           label: "Page number size",
           onChange: (v) => setCss("font-size", v),
         }),
@@ -431,6 +448,27 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement {
       () => !!live()?.css?.["font-style"],
     ),
     ...zones,
+    moreCss("More CSS for page numbers", css, (next) => {
+      if (!Object.keys(next).length && !numbering.pages?.css) return;
+      putOthers(numbering.pages ??= {}, FOLIO, next);
+      if (!Object.keys(numbering.pages).length) delete numbering.pages;
+    }, FOLIO),
+    ...ZONES.map(([zone, label]) =>
+      moreCss(
+        `More CSS for ${label.toLowerCase()} page numbers`,
+        pages[zone]?.css ?? {},
+        (next) => {
+          const p = numbering.pages;
+          if (!Object.keys(next).length && !p?.[zone]?.css) return;
+          const z = (numbering.pages ??= {})[zone] ??= {};
+          putOthers(z, [], next);
+          const all = numbering.pages!;
+          if (!Object.keys(z).length) delete all[zone];
+          if (!Object.keys(all).length) delete numbering.pages;
+        },
+        [],
+      )
+    ),
   ], el("span", "from", "Bottom center"));
 }
 

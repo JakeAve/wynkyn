@@ -333,9 +333,28 @@ export function previewLink(
       !el.closest(".preview-stage") && (!margin || marginShows(el))
     );
   };
+  // Page counts hold until the pages they were counted on are replaced (a
+  // re-render or a cache restore disconnects the first live page).
+  const counts = new Map<string, number>();
+  let countedOn: Element | null = null;
+  const firstPage = () =>
+    [...container.querySelectorAll(".pagedjs_page")].find((p) =>
+      !p.closest(".preview-stage")
+    ) ?? null;
   return {
-    pagesFor: (key) =>
-      new Set(matches(key).map((el) => el.closest(".pagedjs_page"))).size,
+    pagesFor(key) {
+      if (!countedOn?.isConnected) {
+        counts.clear();
+        countedOn = firstPage();
+      }
+      let n = counts.get(key);
+      if (n === undefined) {
+        n = new Set(matches(key).map((el) => el.closest(".pagedjs_page")))
+          .size;
+        if (countedOn) counts.set(key, n); // nothing paginated yet: don't keep
+      }
+      return n;
+    },
     highlight(key, on) {
       for (const el of matches(key)) el.toggleAttribute("data-style-hl", on);
     },

@@ -163,6 +163,10 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     }
     body.setAttribute("aria-labelledby", `cfg-tab-${route.tab}`);
     const top = body.scrollTop;
+    // A hovered "On N pages" button that is replaced never gets its mouseleave.
+    for (const e of document.querySelectorAll("[data-style-hl]")) {
+      e.removeAttribute("data-style-hl");
+    }
     body.replaceChildren(...build());
     const focus = route.focus;
     if (focus) {
