@@ -4,6 +4,7 @@ import {
   applySnippet,
   closingForm,
   nextField,
+  overSelection,
   SNIPPETS,
   wrapSnippet,
 } from "./snippets.ts";
@@ -105,4 +106,14 @@ Deno.test("Tab stop after a slug is the title line", () => {
   // a placeholder that is already the content has no further stop
   assertEquals(nextField(snippet("quote"), 0), null);
   assertEquals(nextField(snippet("footnote"), 0), null);
+});
+
+Deno.test("overSelection: a block without a close goes after the selected line, not mid-paragraph", () => {
+  const state = stateWith("Para one here.\nNext.", 5, 8); // "one" selected
+  const over = overSelection(state, snippet("chapter"));
+  const at = state.update({ selection: over.selection }).state;
+  assertEquals(
+    at.update(applySnippet(at, over.snippet)).state.doc.toString(),
+    "Para one here.\n\n{chapter: slug}\n{title}\nChapter Title\n\nNext.",
+  );
 });

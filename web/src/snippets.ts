@@ -203,6 +203,20 @@ export function wrapSnippet(s: Snippet, selected: string): Snippet | null {
   return { ...s, text: `${open}\n${selected}\n${close}`, placeholder };
 }
 
+// A non-wrap snippet over a selection: a block with a close encloses the
+// selected lines; any other block goes after the last selected line (never
+// mid-paragraph); an inline goes after the selection.
+export function overSelection(
+  state: EditorState,
+  s: Snippet,
+): { snippet: Snippet; selection: { anchor: number; head?: number } } {
+  const { from, to } = state.selection.main;
+  const a = state.doc.lineAt(from).from, b = state.doc.lineAt(to).to;
+  const wrapped = wrapSnippet(s, state.sliceDoc(a, b));
+  if (wrapped) return { snippet: wrapped, selection: { anchor: a, head: b } };
+  return { snippet: s, selection: { anchor: s.kind === "block" ? b : to } };
+}
+
 // The Tab stop after a slug placeholder: the first plain line below the
 // sentinel line holding the placeholder (a chapter's title, a block's text).
 // `at` is where the placeholder starts in the document after applySnippet.

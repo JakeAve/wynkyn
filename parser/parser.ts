@@ -127,6 +127,7 @@ export function parse(
   // EXPERIMENTAL {only} pre-pass: tag lines and dropped content become blank
   // lines, so line numbers and the block-close lookahead see the gated text.
   const onlyOpeners = new Set<number>();
+  const onlyClosers = new Map<number, number>(); // {/only} line → its opener
   const onlyStack: { span: OnlySpan; keep: boolean }[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = i + 1;
@@ -135,8 +136,10 @@ export function parse(
       lines[i] = "";
       if (tag.closing) {
         const open = onlyStack.pop();
-        if (open) open.span.endLine = line;
-        else diag(line, "stray closing tag {/only}");
+        if (open) {
+          open.span.endLine = line;
+          if (!onlyStack.length) onlyClosers.set(line, open.span.line);
+        } else diag(line, "stray closing tag {/only}");
         continue;
       }
       const editions = [
@@ -550,6 +553,13 @@ export function parse(
         diag(
           line,
           `{only} opened inside an open {${open.name}} block — it gates whole blocks`,
+        );
+      }
+      const opener = onlyClosers.get(line);
+      if (open && opener !== undefined && open.node.line > opener) {
+        diag(
+          line,
+          `{/only} closes inside the {${open.name}} block it opened — it gates whole blocks`,
         );
       }
       continue;

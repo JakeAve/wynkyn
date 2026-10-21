@@ -745,6 +745,19 @@ Deno.test("parse: {only} misuse is diagnosed", () => {
     ]),
     [4],
   );
+  // The reverse: a block opened inside the span is still open at {/only}.
+  assertEquals(
+    lines([
+      "{chapter: a}",
+      "{only: pocket}",
+      "{quote}",
+      "x",
+      "{/only}",
+      "y",
+      "{/quote}",
+    ]),
+    [5],
+  );
   assertEquals(
     lines(["{chapter: a}", "{only: a}", "{only: b}", "{/only}", "{/only}"]),
     [3],

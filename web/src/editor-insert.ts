@@ -26,10 +26,10 @@ import {
   applySnippet,
   closingForm,
   nextField,
+  overSelection,
   type Snippet,
   type SnippetGroup,
   SNIPPETS,
-  wrapSnippet,
 } from "./snippets.ts";
 
 const GROUPS: Record<SnippetGroup, string> = {
@@ -73,8 +73,7 @@ function jumpToStop(view: EditorView): boolean {
 }
 
 // Insert a snippet at the selection, first deleting `replace` (the typed
-// `{quo`). A wrap snippet encloses the selection; a block with a close
-// encloses the selected lines; anything else goes after the selection.
+// `{quo`). A wrap snippet encloses the selection; the rest is overSelection's.
 export function insertSnippet(
   view: EditorView,
   s: Snippet,
@@ -93,10 +92,9 @@ export function insertSnippet(
   let used = s;
   const { from, to } = state.selection.main;
   if (from !== to && s.kind !== "wrap") {
-    const a = state.doc.lineAt(from).from, b = state.doc.lineAt(to).to;
-    const wrapped = wrapSnippet(s, state.sliceDoc(a, b));
-    if (wrapped) used = wrapped;
-    step({ selection: wrapped ? { anchor: a, head: b } : { anchor: to } });
+    const over = overSelection(state, s);
+    used = over.snippet;
+    step({ selection: over.selection });
   }
   step(applySnippet(state, used));
   view.dispatch({
