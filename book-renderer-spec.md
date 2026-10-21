@@ -1716,10 +1716,11 @@ anyway.
   and `metadata.json`, re-runs `parse` → `render` → `css-generator` on change,
   and pushes the updated HTML/CSS to the browser over a WebSocket — instant
   feedback with no manual refresh. This is the first thing built (Plan 1, §9)
-  because every other feature depends on it. A change that originated from a
-  client's own editor buffer is not echoed back to that client — the update is
-  suppressed (or version-tagged and ignored) for the originating editor, so a
-  save never round-trips and clobbers the buffer or cursor.
+  because every other feature depends on it. Updates are version-tagged: a
+  client ignores versions its buffer already reflects, reloads silently when it
+  has no unsaved edits, and otherwise shows a changed-on-disk banner (Reload /
+  Keep mine); a save based on a stale version is refused (409) rather than
+  overwriting.
 - **One pagination engine (§5.4):** Paged.js paginates both the live preview and
   the print export. Chosen deliberately over a hybrid
   Paged.js-preview/native-Chrome-export split: (a) the preview and the exported

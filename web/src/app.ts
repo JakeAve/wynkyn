@@ -104,6 +104,15 @@ let saveInFlight = false;
 let queuedSaveText: string | null = null;
 let dirty = false; // local edits newer than the last completed save
 let remoteFetchGen = 0;
+// The server version the buffer is based on; every save names it, and a save
+// from a version that is no longer current is refused (409) instead of
+// overwriting a change this editor never saw. Set on load and by every save.
+let base: string | null = null;
+// The disk text the changed-on-disk banner is offering, while it is up.
+let diskOffer: { text: string; version: string } | null = null;
+let metaBase: string | null = null; // the metadata version the panel shows
+let metaStale = false; // metadata changed while the panel had unsaved edits
+let metaFetchGen = 0;
 let configPanel: ConfigPanel | null = null;
 let metaSaveInFlight = false;
 let metaSaveDone: Promise<void> = Promise.resolve(); // the save in flight
@@ -426,7 +435,7 @@ async function renameEdition(e: EditionInfo, value: string): Promise<void> {
 async function jumpToPassages(slug: string | null): Promise<void> {
   const text = selBook === book
     ? editor.state.doc.toString()
-    : await fetchManuscript(selBook);
+    : (await fetchManuscript(selBook)).text;
   openEdition(
     selBook,
     slug,
@@ -535,11 +544,31 @@ async function doSave(text: string): Promise<void> {
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text, clientId }),
+        body: JSON.stringify({ text, clientId, base }),
       },
     );
+    if (res.status === 409) {
+      const disk = await res.json() as { text: string; version: string };
+      // Equal: Reload or Keep mine already settled on this version, and a
+      // Keep mine save may be queued behind this one — leave it.
+      if (disk.version !== base) {
+        queuedSaveText = null; // based on the same stale version
+        showDiskBanner(disk);
+        setStatus("error", "manuscript.md changed on disk");
+      }
+      return;
+    }
     if (!res.ok) throw new Error(await res.text());
-    if (editor.state.doc.toString() === text) {
+    const ok = await res.json() as { version: string; text?: string };
+    base = ok.version;
+    // The server rewrote the save (a renamed edition's token): take its text,
+    // unless the author has typed past what was sent.
+    if (ok.text !== undefined && editor.state.doc.toString() === text) {
+      replaceBuffer(editor, ok.text);
+      reparse(ok.text);
+    }
+    if (diskOffer?.version === base) hideDiskBanner(); // it was our own save
+    if (editor.state.doc.toString() === (ok.text ?? text)) {
       dirty = false;
       setStatus("saved");
     }
@@ -576,6 +605,7 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
       body: JSON.stringify({ sections, clientId }),
     });
     if (!res.ok) throw new Error(await res.text());
+    metaBase = ((await res.json()) as { version: string }).version;
     configPanel?.markSaved(true);
   } catch (err) {
     configPanel?.markSaved(false, brief(err));
@@ -588,16 +618,18 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
       // fire-and-forget: same intentional non-blocking dispatch as doSave.
       metaSaveInFlight = true;
       metaSaveDone = doMetadataSave(next);
-    }
+    } else if (metaStale) refreshConfigFromRemote(); // no-op while still dirty
   }
 }
 
-async function fetchMetadata(): Promise<Metadata> {
+async function fetchMetadata(): Promise<
+  { metadata: Metadata; version: string | null }
+> {
   const res = await fetch(metadataUrl());
   if (!res.ok) {
     throw new Error(`metadata load failed: ${res.status} ${await res.text()}`);
   }
-  return ((await res.json()) as { metadata: Metadata }).metadata;
+  return await res.json() as { metadata: Metadata; version: string | null };
 }
 
 let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
@@ -649,7 +681,7 @@ let panelLoad: Promise<ConfigPanel | null> | null = null;
 function ensureConfigPanel(): Promise<ConfigPanel | null> {
   return panelLoad ??= (async () => {
     try {
-      metadata = await fetchMetadata();
+      ({ metadata, version: metaBase } = await fetchMetadata());
       return configPanel = createConfigPanel({
         overlay: $("config-overlay"),
         nav: $("style-nav"),
@@ -697,30 +729,90 @@ async function pickStyle(key: string): Promise<void> {
   (await ensureConfigPanel())?.selectStyle(key);
 }
 
-async function fetchManuscript(name: string): Promise<string> {
+async function fetchManuscript(
+  name: string,
+): Promise<{ text: string; version: string }> {
   const res = await fetch(`/api/books/${encodeURIComponent(name)}/manuscript`);
   if (!res.ok) throw new Error(`manuscript load failed: ${res.status}`);
-  return ((await res.json()) as { text: string }).text;
+  return await res.json() as { text: string; version: string };
 }
 
-// A foreign-origin update means the file changed outside this editor — pull
-// the new source, but never over unsaved local edits (they win; the next
-// save round-trip reconciles).
+// An update built from a version the buffer isn't based on: fetch the current
+// text. Its version may still be ours (a late echo, or a save acknowledged
+// meanwhile). Otherwise a clean buffer just takes it; unsaved edits get the
+// banner and the author decides.
 async function refreshFromRemote(): Promise<void> {
   const gen = ++remoteFetchGen;
-  const text = await fetchManuscript(book);
-  if (gen !== remoteFetchGen || dirty || saveInFlight) return;
-  replaceBuffer(editor, text);
-  reparse(text);
+  const was = base;
+  const disk = await fetchManuscript(book);
+  // A save acknowledged meanwhile is newer than this read; a change after it
+  // sends its own update.
+  if (gen !== remoteFetchGen || base !== was || disk.version === base) return;
+  if (dirty || saveInFlight) {
+    showDiskBanner(disk);
+    return;
+  }
+  replaceBuffer(editor, disk.text);
+  reparse(disk.text);
+  base = disk.version;
+  hideDiskBanner();
 }
 
-// A foreign-origin update may mean metadata.json changed outside this client.
-// Refresh an open panel only when it has nothing unsaved — local edits win,
-// same policy as the editor buffer.
+function showDiskBanner(disk: { text: string; version: string }): void {
+  diskOffer = disk;
+  $("disk-banner").hidden = false;
+}
+function hideDiskBanner(): void {
+  diskOffer = null;
+  $("disk-banner").hidden = true;
+}
+
+// Reload: the disk wins — drop the unsaved edits and anything waiting to save.
+function reloadFromDisk(): void {
+  if (!diskOffer) return;
+  const { text, version } = diskOffer;
+  clearTimeout(saveTimer);
+  queuedSaveText = null;
+  replaceBuffer(editor, text);
+  reparse(text);
+  base = version;
+  dirty = false;
+  hideDiskBanner();
+  setStatus("saved");
+  editor.focus();
+}
+
+// Keep mine: base the buffer on the disk version, so the save overwrites it.
+function keepMine(): void {
+  if (!diskOffer) return;
+  base = diskOffer.version;
+  hideDiskBanner();
+  clearTimeout(saveTimer);
+  save(editor.state.doc.toString());
+  editor.focus();
+}
+
+// metadata.json changed under this client. No banner: saves are section
+// merges, so another writer's sections survive ours. Refresh an open panel
+// only when it has nothing unsaved; otherwise refresh after its next save.
+// ponytail: two writers on the same section, last write wins; a per-section
+// version check (409 like the manuscript) if that ever bites.
 async function refreshConfigFromRemote(): Promise<void> {
-  if (!configPanel || configPanel.isDirty() || metaSaveInFlight) return;
+  if (!configPanel) return;
+  if (configPanel.isDirty() || metaSaveInFlight) {
+    metaStale = true;
+    return;
+  }
+  const gen = ++metaFetchGen;
   try {
-    metadata = await fetchMetadata();
+    const fresh = await fetchMetadata();
+    if (gen !== metaFetchGen) return;
+    if (configPanel.isDirty() || metaSaveInFlight) { // edited meanwhile
+      metaStale = true;
+      return;
+    }
+    metaStale = false;
+    ({ metadata, version: metaBase } = fresh);
     configPanel.refresh(metadata);
   } catch {
     // 409/network — leave the panel as-is; the user can close and reopen.
@@ -882,11 +974,12 @@ async function main(): Promise<void> {
   edition = wanted && editions.some((e) => e.slug === wanted) ? wanted : null;
   setCrumb(editions);
   installSwitcher();
-  fetchMetadata().then((m) => setCrumbSize(m.page?.size), () => {
+  fetchMetadata().then((m) => setCrumbSize(m.metadata.page?.size), () => {
     // no size in the crumb; the Style panel reports the load error
   });
 
-  const text = await fetchManuscript(book);
+  const { text, version } = await fetchManuscript(book);
+  base = version;
   editor = createEditor({
     parent: $("editor"),
     text,
@@ -894,6 +987,8 @@ async function main(): Promise<void> {
     onCursorLine: highlightTreeNode,
   });
   reparse(text);
+  $("disk-reload").onclick = reloadFromDisk;
+  $("disk-keep").onclick = keepMine;
   installShortcuts(
     installColumnToggle("tree-toggle", "tree-hidden"),
     installColumnToggle("pages-toggle", "pages-hidden"),
@@ -948,8 +1043,7 @@ async function main(): Promise<void> {
       setStatus("error", `build: ${brief(msg.message)}`);
       return;
     }
-    if (!dirty && !saveInFlight) setStatus("saved");
-    // Own-origin: preview only — never the buffer (spec §6 echo suppression).
+    if (!dirty && !saveInFlight && !diskOffer) setStatus("saved");
     renderPreview(msg, previewEl, key).then((problems) => {
       showPageProblems(problems);
       refreshPageIndicator();
@@ -959,11 +1053,9 @@ async function main(): Promise<void> {
       setStatus("error", `preview: ${brief(err)}`);
       showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
     });
-    // origin is still sent by dev-server.ts until the later tasks drop it.
-    if ((msg as { origin?: string | null }).origin !== clientId) {
-      refreshFromRemote();
-      refreshConfigFromRemote();
-    }
+    // Versions this client already reflects need nothing (spec §6).
+    if (msg.manuscriptVersion !== base) refreshFromRemote();
+    if (msg.metadataVersion !== metaBase) refreshConfigFromRemote();
   };
 }
 

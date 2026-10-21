@@ -574,9 +574,28 @@
     #editor {
       min-width: 0;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     #editor .cm-editor {
-      height: 100%;
+      flex: 1;
+      min-height: 0;
+    }
+    /* Changed-on-disk banner: the buffer has unsaved edits and the file moved
+       under it. A hairline strip in the editor column, warn-tinted text. */
+    #disk-banner {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px 4px 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--warn);
+    }
+    #disk-banner[hidden] {
+      display: none;
+    }
+    #disk-banner span {
+      flex: 1;
     }
     /* ---- editor: search hits, sentinels by kind, {only} spans ---- */
     #editor .cm-searchMatch {
@@ -1805,7 +1824,15 @@
       <nav id="style-nav"></nav>
       <div id="gutter-tree" class="gutter" role="separator"
         aria-orientation="vertical" title="Drag to resize"></div>
-      <div id="editor"></div>
+      <div id="editor">
+        <div id="disk-banner" role="alert" hidden>
+          <span>manuscript.md changed on disk</span>
+          <button id="disk-reload" class="btn" type="button"
+            title="Discard your unsaved edits and load the file">Reload</button>
+          <button id="disk-keep" class="btn" type="button"
+            title="Save your version over the file">Keep mine</button>
+        </div>
+      </div>
       <div id="config-overlay"></div>
       <div id="gutter-editor" class="gutter" role="separator"
         aria-orientation="vertical" title="Drag to resize"></div>
