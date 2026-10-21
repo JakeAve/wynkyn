@@ -5,6 +5,7 @@
     "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/cli@1": "1.0.32",
     "jsr:@std/internal@^1.0.12": "1.0.14",
+    "npm:@codemirror/autocomplete@^6.20.3": "6.20.3",
     "npm:@codemirror/language@^6.11.0": "6.12.4",
     "npm:@codemirror/lint@^6.8.0": "6.9.7",
     "npm:@codemirror/search@^6.7.1": "6.7.1",
@@ -190,6 +191,7 @@
     "dependencies": [
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/cli@1",
+      "npm:@codemirror/autocomplete@^6.20.3",
       "npm:@codemirror/language@^6.11.0",
       "npm:@codemirror/lint@^6.8.0",
       "npm:@codemirror/search@^6.7.1",

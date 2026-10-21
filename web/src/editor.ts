@@ -20,6 +20,7 @@ import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { bml, ClassMarker } from "./bml-language.ts";
 import { toCmDiagnostics } from "./diagnostics.ts";
 import { searchPanel } from "./search-panel.ts";
+import { insertExtensions } from "./editor-insert.ts";
 import type { Diagnostic, OnlySpan } from "../../parser/types.ts";
 
 // True while replaceBuffer() applies a remote change: those edits must not
@@ -151,6 +152,7 @@ export function createEditor(opts: {
         inkTheme,
         bml(),
         searchPanel(),
+        insertExtensions(),
         editionSpans,
         lintGutter(),
         EditorView.lineWrapping,

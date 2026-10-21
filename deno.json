@@ -10,6 +10,7 @@
     "pre-push": "deno task check && deno task test"
   },
   "imports": {
+    "@codemirror/autocomplete": "npm:@codemirror/autocomplete@^6.20.3",
     "@codemirror/language": "npm:@codemirror/language@^6.11.0",
     "@codemirror/lint": "npm:@codemirror/lint@^6.8.0",
     "@codemirror/search": "npm:@codemirror/search@^6.7.1",

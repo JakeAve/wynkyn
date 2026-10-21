@@ -1,6 +1,12 @@
 import { assertEquals } from "@std/assert";
 import { EditorState } from "@codemirror/state";
-import { applySnippet, SNIPPETS } from "./snippets.ts";
+import {
+  applySnippet,
+  closingForm,
+  nextField,
+  SNIPPETS,
+  wrapSnippet,
+} from "./snippets.ts";
 
 function stateWith(doc: string, anchor: number, head = anchor): EditorState {
   return EditorState.create({ doc, selection: { anchor, head } });
@@ -62,4 +68,41 @@ Deno.test("every block snippet with an explicit close names the same sentinel", 
     const close = s.text.match(/\{\/([a-z-]+)/)![1];
     assertEquals(close, open, `snippet ${s.label}`);
   }
+});
+
+Deno.test("closing forms read as the insert lists show them", () => {
+  assertEquals(closingForm(snippet("quote")), "{/quote}");
+  assertEquals(closingForm(snippet("is")), "{/is}");
+  assertEquals(closingForm(snippet("em")), "wraps");
+  assertEquals(closingForm(snippet("footnote")), "point");
+  assertEquals(closingForm(snippet("chapter")), "—");
+});
+
+Deno.test("{only} is listed under blocks and marked experimental", () => {
+  const only = snippet("only");
+  assertEquals(only.group, "block");
+  assertEquals(only.description.includes("experimental"), true);
+});
+
+Deno.test("wrapping a selection in a closed block keeps the text", () => {
+  const state = stateWith("Before.\n\nThe text.\n\nAfter.", 9, 18);
+  const tr = state.update(
+    applySnippet(state, wrapSnippet(snippet("quote"), "The text.")!),
+  );
+  assertEquals(
+    tr.state.doc.toString(),
+    "Before.\n\n{quote}\nThe text.\n{/quote}\n\nAfter.",
+  );
+  assertEquals(wrapSnippet(snippet("epigraph"), "x"), null);
+  assertEquals(wrapSnippet(snippet("em"), "x"), null);
+});
+
+Deno.test("Tab stop after a slug is the title line", () => {
+  const state = stateWith("Prose.", 6);
+  const tr = state.update(applySnippet(state, snippet("chapter")));
+  const stop = nextField(snippet("chapter"), tr.state.selection.main.from)!;
+  assertEquals(tr.state.sliceDoc(stop.from, stop.to), "Chapter Title");
+  // a placeholder that is already the content has no further stop
+  assertEquals(nextField(snippet("quote"), 0), null);
+  assertEquals(nextField(snippet("footnote"), 0), null);
 });

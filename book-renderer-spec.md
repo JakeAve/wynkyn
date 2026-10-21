@@ -1797,10 +1797,40 @@ CodeMirror 6 over plain BML text.
   not as blocking dialogs — BML tolerates an unclosed block by falling back to
   implicit-close (§3.2.3), so most "errors" are really just "here's where it
   fell back."
-- A toolbar (§7.1) inserts sentinel snippets at the cursor — one button/shortcut
-  per common sentinel (chapter, part, heading, dropcap, em, footnote, etc.),
-  inserting the correct open/close pair for that sentinel's closing form
-  (§3.2.3).
+- Sentinels are styled by kind: structural lines (`matter`, `part`, `chapter`)
+  get a faint band, a hairline above and a gutter mark; field sentinels
+  (`{title}`, `{author}`) are small and muted; a block's opening and closing
+  tags are joined by a 1px rail, so an unclosed block shows at a glance; `{em}`
+  tags dim while their text is italic. The line after `{title}`, `{heading}` or
+  `{subheading}` is bold, after `{subtitle}` italic. A `%%` line of only
+  box-drawing characters draws as a hairline rule, and a `%%` label between two
+  rules as small caps.
+- The selection is a green-grey tint, distinct from the quieter active line.
+- Find and replace is a bar pinned to the top of the editor, in the chrome's
+  colors: find and replace fields, match case / whole word / regex toggles, an
+  "n of m" count, previous / next / close, Replace, All, and an "in chapter"
+  scope that limits Replace All to the structural block under the cursor. The
+  current hit is outlined; other hits are tinted.
+- **EXPERIMENTAL:** `{only}` spans (§3.2.9) carry an amber mark on every line's
+  gutter and a tag naming their editions; lines the open edition skips are
+  dimmed.
+- Sentinels are inserted from inside the editor, never a toolbar menu. Every
+  insertion writes the correct open/close pair for the sentinel's closing form
+  (§3.2.3) and selects its placeholder; where a snippet has a slug and a title
+  (or content), Tab moves from the slug to the title.
+  - Typing `{` offers completions grouped as Structure, Blocks and In the
+    paragraph; each row shows the name, a description, and how it closes
+    (`{/quote}`, "wraps", "point", or "—" for none). Blocks include `{only}`,
+    marked experimental.
+  - A selection the writer makes shows a wrap bar above it: Emphasis (⌘I) wraps
+    it in `{em}…{/em}`, Quote encloses its lines in `{quote}`/`{/quote}`,
+    Footnote puts a `{footnote: slug}` anchor after it, and Wrap in… opens the
+    full list.
+  - ⌘K lists every sentinel, filtered by name or description; Enter inserts it,
+    enclosing the selection for wraps and closed blocks, else placing it after
+    the selection.
+  - Per-sentinel shortcuts remain (em ⌘E, chapter ⌘⇧C, heading ⌘⇧H, footnote
+    ⌘⇧F, quote ⌘⇧Q, break ⌘⇧B), in Write only.
 
 ### 7.4 Sentinel Styling
 

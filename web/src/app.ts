@@ -37,7 +37,8 @@ import {
   scrollEditorToLine,
   setEditionSpans,
 } from "./editor.ts";
-import { applySnippet, SNIPPETS } from "./snippets.ts";
+import { SNIPPETS } from "./snippets.ts";
+import { insertSnippet } from "./editor-insert.ts";
 import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
@@ -807,15 +808,8 @@ function installThemeToggle(): void {
   };
 }
 
-const STRUCTURE_SNIPPETS = new Set([
-  "matter",
-  "part",
-  "chapter",
-  "heading",
-  "subheading",
-]);
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
-// Keyboard chords. Snippet chords insert via applySnippet; the rest are UI.
+// Keyboard chords. Snippet chords insert via insertSnippet; the rest are UI.
 const SNIPPET_KEYS: Record<string, string> = {
   em: "Mod-E",
   chapter: "Mod-Shift-C",
@@ -848,8 +842,7 @@ function installShortcuts(
     const snippet = bySnippet.get(chord);
     const m = MODES[Number(chord.slice(4)) - 1]; // Mod-1..3
     if (snippet && mode === "write") {
-      editor.dispatch(applySnippet(editor.state, snippet));
-      editor.focus();
+      insertSnippet(editor, snippet);
     } else if (m) setMode(m);
     else if (chord === "Mod-,") setMode("style");
     else if (chord === "Mod-\\") toggleContents();
@@ -865,53 +858,6 @@ function installShortcuts(
   });
   $("tree-toggle").title += ` (${chordLabel("Mod-\\")})`;
   $("pages-toggle").title += ` (${chordLabel("Mod-.")})`;
-}
-
-// Snippets live in a grouped dropdown (structure / block / inline) rather than
-// 19 flat toolbar buttons — the toolbar overflowed and hid the status text.
-function buildSnippetToolbar(): void {
-  const menu = $("insert-menu") as HTMLDetailsElement;
-  const bar = $("snippet-buttons");
-  const groups = {
-    structure: [] as typeof SNIPPETS,
-    block: [] as typeof SNIPPETS,
-    inline: [] as typeof SNIPPETS,
-  };
-  for (const s of SNIPPETS) {
-    (STRUCTURE_SNIPPETS.has(s.label)
-      ? groups.structure
-      : s.kind === "block"
-      ? groups.block
-      : groups.inline).push(s);
-  }
-  for (const [name, list] of Object.entries(groups)) {
-    const col = document.createElement("div");
-    col.className = "group";
-    const h = document.createElement("h4");
-    h.className = "caption";
-    h.textContent = name;
-    col.appendChild(h);
-    for (const s of list) {
-      const b = document.createElement("button");
-      b.textContent = s.label;
-      const chord = SNIPPET_KEYS[s.label];
-      if (chord) {
-        const kbd = document.createElement("kbd");
-        kbd.textContent = chordLabel(chord);
-        b.appendChild(kbd);
-      }
-      b.onclick = () => {
-        menu.open = false;
-        editor.dispatch(applySnippet(editor.state, s));
-        editor.focus();
-      };
-      col.appendChild(b);
-    }
-    bar.appendChild(col);
-  }
-  document.addEventListener("click", (e) => {
-    if (!menu.contains(e.target as Node)) menu.open = false;
-  });
 }
 
 async function main(): Promise<void> {
@@ -953,7 +899,6 @@ async function main(): Promise<void> {
     onCursorLine: highlightTreeNode,
   });
   reparse(text);
-  buildSnippetToolbar();
   installShortcuts(
     installColumnToggle("tree-toggle", "tree-hidden"),
     installColumnToggle("pages-toggle", "pages-hidden"),

@@ -131,7 +131,6 @@
 
     /* ---- shared control look: borderless ghosts ---- */
     .btn,
-    #insert-menu summary,
     #config-overlay button {
       background: none;
       color: var(--muted);
@@ -142,8 +141,6 @@
       white-space: nowrap;
     }
     .btn:hover,
-    #insert-menu summary:hover,
-    #insert-menu[open] summary,
     #config-overlay button:hover {
       background: var(--hover);
       color: var(--fg);
@@ -254,62 +251,6 @@
     :root[data-theme="light"] .icon-sun {
       display: none;
     }
-    /* Insert menu: native <details> as a dropdown — no JS for open/close. */
-    #insert-menu {
-      position: relative;
-    }
-    #insert-menu summary {
-      list-style: none;
-    }
-    #insert-menu summary::-webkit-details-marker {
-      display: none;
-    }
-    #snippet-buttons {
-      position: absolute;
-      top: 100%;
-      right: 0;
-      z-index: 20;
-      margin-top: 6px;
-      background: var(--bg);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      box-shadow: 0 12px 32px var(--backdrop);
-      display: flex;
-      gap: 14px;
-    }
-    #snippet-buttons .group {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      min-width: 130px;
-    }
-    #snippet-buttons .group h4 {
-      margin: 0 0 4px;
-      padding: 0 6px;
-      font-weight: 600;
-    }
-    #snippet-buttons button {
-      background: none;
-      color: var(--fg);
-      border: none;
-      border-radius: var(--radius);
-      text-align: left;
-      padding: 4px 6px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    #snippet-buttons button:hover {
-      background: var(--hover);
-    }
-    #snippet-buttons kbd {
-      float: right;
-      margin-left: 16px;
-      font-family: inherit;
-      font-size: var(--fs-sm);
-      color: var(--muted);
-    }
-
     /* ---- book / edition switcher: books left, that book's editions right ---- */
     #switcher {
       position: fixed;
@@ -570,7 +511,6 @@
     :root[data-mode="write"] :is(#style-nav, #config-overlay, #sheet-view),
     :root[data-mode="style"] :is(#tree, #editor, #sheet-view),
     :root[data-mode="print"] :is(#tree, #editor),
-    :root:not([data-mode="write"]) #insert-menu,
     #panes.tree-hidden :is(#tree, #style-nav, #gutter-tree),
     #panes.pages-hidden :is(#sheet-view, #gutter-editor) {
       display: none;
@@ -827,6 +767,136 @@
       font-variant-numeric: tabular-nums;
       padding: 0 4px;
       white-space: nowrap;
+    }
+    /* insert popovers (editor-insert.ts): `{` completions, the ⌘K list of
+       every sentinel, and the wrap bar over a selection */
+    #editor .cm-tooltip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 2px 6px var(--backdrop), 0 16px 40px var(--backdrop);
+      font: var(--fs)/1.4 system-ui, sans-serif;
+    }
+    #editor .cm-tooltip-autocomplete,
+    #editor .cm-bml-palette {
+      padding: 6px;
+    }
+    #editor .cm-tooltip.cm-tooltip-autocomplete > ul,
+    #editor .cm-bml-palette ul {
+      font: inherit;
+      width: 340px;
+      min-width: 0;
+      max-height: 22em;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      overflow: hidden auto;
+    }
+    #editor .cm-tooltip-autocomplete > ul > li,
+    #editor .cm-bml-palette li:not(.grp) {
+      display: grid;
+      grid-template-columns: 92px 1fr auto;
+      gap: 10px;
+      align-items: baseline;
+      padding: 4px 8px;
+      border-radius: var(--radius);
+      line-height: 1.4;
+      cursor: pointer;
+    }
+    #editor .cm-tooltip-autocomplete > ul > completion-section,
+    #editor .cm-bml-palette .grp {
+      display: block;
+      border: none;
+      opacity: 1;
+      font-size: var(--fs-sm);
+      color: var(--muted);
+      padding: 6px 8px 3px;
+    }
+    #editor :is(.cm-completionLabel, .cm-bml-palette code) {
+      font: 12.5px ui-monospace, Menlo, monospace;
+      color: var(--fg);
+    }
+    #editor .cm-completionMatchedText {
+      text-decoration: none;
+      font-weight: 600;
+    }
+    #editor :is(.cm-completionDetail, .cm-bml-palette .d) {
+      margin: 0;
+      font-style: normal;
+      font-size: 12.5px;
+      color: var(--muted);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    #editor :is(.cm-tooltip-autocomplete, .cm-bml-palette) .f {
+      font: 10.5px ui-monospace, Menlo, monospace;
+      color: var(--syn-p);
+    }
+    #editor .cm-tooltip-autocomplete > ul > li[aria-selected],
+    #editor .cm-bml-palette li[aria-selected="true"] {
+      background: var(--inv-bg);
+      color: var(--inv-fg);
+    }
+    #editor :is(.cm-tooltip-autocomplete li[aria-selected], .cm-bml-palette li[aria-selected="true"]) :is(code, .cm-completionLabel, .cm-completionDetail, .d, .f) {
+      color: var(--inv-fg);
+    }
+    #editor :is(.cm-tooltip-autocomplete li[aria-selected], .cm-bml-palette li[aria-selected="true"]) :is(.cm-completionDetail, .d, .f) {
+      opacity: .7;
+    }
+    #editor .cm-bml-palette input {
+      all: unset;
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
+      height: 28px;
+      margin-bottom: 4px;
+      padding: 0 8px;
+      border: 1px solid var(--fg);
+      border-radius: var(--radius);
+      color: var(--fg);
+      font-size: 13px;
+    }
+    #editor .cm-bml-palette input::placeholder {
+      color: var(--muted);
+    }
+    #editor .cm-bml-wrapbar {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+    }
+    .cm-editor:not(.cm-focused) .cm-bml-wrapbar {
+      visibility: hidden; /* e.g. while the find bar selects a hit */
+    }
+    #editor .cm-bml-wrapbar button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      background: none;
+      border: 0;
+      padding: 4px 9px;
+      border-radius: var(--radius);
+      font-size: 12.5px;
+      color: var(--fg);
+      cursor: pointer;
+    }
+    #editor .cm-bml-wrapbar button:hover {
+      background: var(--hover);
+    }
+    #editor .cm-bml-wrapbar .vsep {
+      width: 1px;
+      height: 18px;
+      margin: 0 4px;
+      background: var(--line);
+    }
+    #editor .cm-bml-wrapbar kbd {
+      font: 10px ui-monospace, Menlo, monospace;
+      padding: 0 4px;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      color: var(--muted);
     }
     #preview {
       background: var(--desk);
@@ -1713,10 +1783,6 @@
         <button class="btn" data-mode="print" title="Print">Print</button>
       </span>
       <span class="spacer"></span>
-      <details id="insert-menu">
-        <summary>Insert</summary>
-        <div id="snippet-buttons"></div>
-      </details>
       <button id="theme-toggle" class="btn" title="Switch light/dark">
         <svg class="icon-moon" viewBox="0 0 16 16">
           <path d="M13.2 9.4A5.6 5.6 0 0 1 6.6 2.8a5.6 5.6 0 1 0 6.6 6.6z" />
