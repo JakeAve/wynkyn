@@ -475,9 +475,16 @@ Deno.test("editions: list, build json per edition, metadata GET/POST touch only 
       editions: [
         {
           slug: null,
+          name: "Standard",
           summary: "5.5in × 8.5in · 2-up on letter · EB Garamond · 11pt",
+          passages: 0,
         },
-        { slug: "pocket", summary: "3.5in 5in · Crimson Pro · 9pt" },
+        {
+          slug: "pocket",
+          name: "Pocket",
+          summary: "3.5in 5in · Crimson Pro · 9pt",
+          passages: 0,
+        },
       ],
     });
 
@@ -629,6 +636,96 @@ Deno.test("editions: create copies the source's current metadata; rename; delete
     );
     assertEquals(delMissing.status, 404);
     await delMissing.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("rename rewrites {only} tokens in manuscript.md", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
+  const base = `http://localhost:${server.port}`;
+  const post = (path: string, body: unknown) =>
+    fetch(`${base}/api/books/demo-book${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  try {
+    // A manuscript save still in its debounce window is what gets rewritten.
+    await (await post("/manuscript", {
+      text: "{chapter: one}\n\n{only: pocket | default}\nP\n{/only}\n",
+    })).body?.cancel();
+    const renamed = await post("/editions/pocket/rename", { slug: "travel" });
+    assertEquals((await renamed.json()).ok, true);
+    assertEquals(
+      await Deno.readTextFile(`${root}/demo-book/manuscript.md`),
+      "{chapter: one}\n\n{only: travel | default}\nP\n{/only}\n",
+    );
+    await Deno.stat(`${root}/demo-book/editions/travel.json`);
+
+    // `default` is reserved: never a new slug, never a rename target.
+    for (
+      const r of [
+        await post("/editions", { slug: "default" }),
+        await post("/editions/travel/rename", { slug: "default" }),
+      ]
+    ) {
+      assertEquals(r.status, 400);
+      await r.body?.cancel();
+    }
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("editions: the default edition renames by display name, through the pending save", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
+  const base = `http://localhost:${server.port}`;
+  const post = (path: string, body: unknown) =>
+    fetch(`${base}/api/books/demo-book${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  try {
+    // A debounced metadata edit must survive the rename, not be clobbered.
+    await (await post("/metadata", { sections: { page: { size: "A5" } } }))
+      .body?.cancel();
+    const r = await post("/editions/default/rename", { name: " Hardcover " });
+    assertEquals((await r.json()).ok, true);
+    const meta = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/metadata.json`),
+    );
+    assertEquals(meta.name, "Hardcover");
+    assertEquals(meta.page.size, "A5");
+    const list = await (await fetch(`${base}/api/books/demo-book/editions`))
+      .json();
+    assertEquals(list.editions[0].name, "Hardcover");
+
+    // A clone does not take the default edition's name.
+    await (await post("/editions", { slug: "gift", from: "default" })).body
+      ?.cancel();
+    const gift = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/editions/gift.json`),
+    );
+    assertEquals(gift.name, undefined);
+    assertEquals(gift.page.size, "A5");
+
+    const bad = await post("/editions/default/rename", { name: 3 });
+    assertEquals(bad.status, 400);
+    await bad.body?.cancel();
   } finally {
     await server.stop();
     await Deno.remove(root, { recursive: true });

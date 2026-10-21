@@ -66,7 +66,11 @@ Deno.test("bml cli: edition new, render --edition, list shows editions", async (
     await Deno.stat(`${root}/demo-book/render.pocket.html`);
 
     const list = await bml(root, "list");
-    assertStringIncludes(list.out, "demo-book\n  └ pocket");
+    assertStringIncludes(
+      list.out,
+      "demo-book\n  └ default  Standard  5.5in × 8.5in",
+    );
+    assertStringIncludes(list.out, "\n  └ pocket  Pocket  5.5in × 8.5in");
 
     const checkMissing = await bml(
       root,
@@ -90,6 +94,30 @@ Deno.test("bml cli: edition new, render --edition, list shows editions", async (
       renderMissing.err,
       "no such edition: demo-book/nosuch",
     );
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("bml check: {only} notes go to stderr; unknown tokens fail", async () => {
+  const root = await Deno.makeTempDir();
+  await Deno.mkdir(`${root}/b`);
+  const write = (text: string) =>
+    Deno.writeTextFile(`${root}/b/manuscript.md`, text);
+  try {
+    await write("{chapter: one}\n\n{only: default}\nA\n{/only}\n");
+    const ok = await bml(root, "check", "b");
+    assertEquals(ok.code, 0, ok.err);
+    assertStringIncludes(
+      ok.err,
+      `${root}/b/manuscript.md:3: experimental: {only}`,
+    );
+    assertStringIncludes(ok.out, "b: 0 diagnostic(s)");
+
+    await write("{chapter: one}\n\n{only: pocket}\nA\n{/only}\n");
+    const bad = await bml(root, "check", "b");
+    assertEquals(bad.code, 1);
+    assertStringIncludes(bad.err, '3: {only} names unknown edition "pocket"');
   } finally {
     await Deno.remove(root, { recursive: true });
   }

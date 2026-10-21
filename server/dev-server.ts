@@ -16,6 +16,7 @@ import {
   createEdition,
   listEditions,
   metadataPath,
+  renameOnlyToken,
   safeName,
 } from "./editions.ts";
 
@@ -245,6 +246,20 @@ export async function startServer(
         { status: 409 },
       );
     }
+    const clientId = typeof body.clientId === "string" ? body.clientId : null;
+    queueMetaSave(book, edition, base, sections, clientId);
+    return Response.json({ ok: true });
+  }
+
+  // Debounces a metadata write: `sections` shallow-merged onto `base` (the
+  // edition's currentMetadata), replacing any save already pending for it.
+  function queueMetaSave(
+    book: string,
+    edition: string | null,
+    base: Record<string, unknown>,
+    sections: object,
+    clientId: string | null,
+  ): PendingMetaSave {
     // Shallow-merge only the POSTed top-level keys; everything else —
     // elements, is, future schema keys — passes through untouched.
     const merged = { ...base };
@@ -255,7 +270,6 @@ export async function startServer(
     const key = metaKey(book, edition);
     const existing = pendingMetaSaves.get(key);
     if (existing) clearTimeout(existing.timer);
-    const clientId = typeof body.clientId === "string" ? body.clientId : null;
     const save: PendingMetaSave = {
       metadata: merged,
       clientId,
@@ -279,7 +293,7 @@ export async function startServer(
     };
     save.timer = setTimeout(save.write, saveDebounceMs);
     pendingMetaSaves.set(key, save);
-    return Response.json({ ok: true });
+    return save;
   }
 
   // book/edition keys with an export running; one at a time each.
@@ -349,10 +363,13 @@ export async function startServer(
       return new Response("invalid JSON body", { status: 400 });
     }
     const slug = body.slug;
-    if (typeof slug !== "string" || !safeName(slug)) {
+    if (typeof slug !== "string" || !safeName(slug) || slug === "default") {
       return new Response("bad edition slug", { status: 400 });
     }
-    const from = typeof body.from === "string" ? body.from : null;
+    // "default" names the unnamed edition here, as in the rename route.
+    const from = typeof body.from === "string" && body.from !== "default"
+      ? body.from
+      : null;
     if (from !== null && !safeName(from)) {
       return new Response("bad source edition", { status: 400 });
     }
@@ -396,7 +413,9 @@ export async function startServer(
       return new Response("invalid JSON body", { status: 400 });
     }
     const target = body.slug;
-    if (typeof target !== "string" || !safeName(target)) {
+    if (
+      typeof target !== "string" || !safeName(target) || target === "default"
+    ) {
       return new Response("bad edition slug", { status: 400 });
     }
     const to = metadataPath(booksRoot, book, target);
@@ -419,6 +438,52 @@ export async function startServer(
     } catch {
       return new Response("edition not found", { status: 404 });
     }
+    // EXPERIMENTAL (§3.2.9): the edition's {only} token follows its slug. A
+    // manuscript save still in its debounce window is rewritten and landed now.
+    const pendingText = pendingSaves.get(book);
+    if (pendingText) clearTimeout(pendingText.timer);
+    pendingSaves.delete(book);
+    const manuscript = `${booksRoot}/${book}/manuscript.md`;
+    const text = pendingText?.text ?? await Deno.readTextFile(manuscript);
+    const next = renameOnlyToken(text, edition, target);
+    if (next !== text || pendingText) {
+      recentWrites.set(book, null); // every editor reloads the rewritten text
+      await Deno.writeTextFile(manuscript, next);
+    }
+    return Response.json({ ok: true });
+  }
+
+  // The default edition has no slug to rename, only a display name, kept as
+  // metadata.json's `name` and written through the pending-save path.
+  async function handleDefaultRename(
+    book: string,
+    req: Request,
+  ): Promise<Response> {
+    if (!safeName(book)) return new Response("bad path", { status: 400 });
+    let body: { name?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response("invalid JSON body", { status: 400 });
+    }
+    if (typeof body.name !== "string") {
+      return new Response("body must be { name: string }", { status: 400 });
+    }
+    try {
+      await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
+    } catch {
+      return new Response("book not found", { status: 404 });
+    }
+    const base = await currentMetadata(book, null);
+    if (!base) {
+      return new Response(
+        "metadata is not valid JSON — fix it on disk first",
+        { status: 409 },
+      );
+    }
+    const name = body.name.trim();
+    // Blank clears it, so the edition falls back to "Standard".
+    await queueMetaSave(book, null, base, { name: name || null }, null).write();
     return Response.json({ ok: true });
   }
 
@@ -651,6 +716,9 @@ export async function startServer(
       /^\/api\/books\/([^/]+)\/editions\/([^/]+)\/rename$/,
     );
     if (editionRename && req.method === "POST") {
+      if (editionRename[2] === "default") {
+        return handleDefaultRename(editionRename[1]!, req);
+      }
       return handleEditionRename(editionRename[1]!, editionRename[2]!, req);
     }
 

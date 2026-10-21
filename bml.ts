@@ -11,10 +11,13 @@ import { parseArgs } from "@std/cli/parse-args";
 import { buildBook, listBooks, toHtml } from "./server/pipeline.ts";
 import {
   createEdition,
+  editionSlugs,
+  editionToken,
   listEditions,
   metadataPath,
   safeName,
 } from "./server/editions.ts";
+import { checkOnlySpans, parse } from "./parser/parser.ts";
 
 export { toHtml } from "./server/pipeline.ts";
 
@@ -61,7 +64,8 @@ if (import.meta.main) {
     for (const b of await listBooks(BOOKS)) {
       console.log(b);
       for (const e of await listEditions(BOOKS, b)) {
-        if (e.slug !== null) console.log(`  └ ${e.slug}  ${e.summary}`);
+        const row = [e.slug ?? "default", e.name, e.summary].filter(Boolean);
+        console.log(`  └ ${row.join("  ")}`);
       }
     }
   } else if (cmd === "edition" && book && out === "new" && sub) {
@@ -109,14 +113,28 @@ if (import.meta.main) {
       `created ${dir}/ — drop the source text in as download.txt, then use the convert-manuscript skill`,
     );
   } else if (cmd === "check" && book) {
-    // check is manuscript-only (spec): never pass edition, so a missing
-    // named edition can't crash it — diagnostics come from the manuscript alone.
-    const b = await buildBook(BOOKS, book);
-    if (b.diagnostics.length) {
-      console.error(formatDiagnostics(book, b.diagnostics));
+    // check is manuscript-only (spec): no edition is chosen, so every {only}
+    // span's content is parsed (§3.2.9) and a missing edition can't crash it.
+    const doc = parse(
+      await Deno.readTextFile(`${BOOKS}/${book}/manuscript.md`),
+    );
+    const tokens = [null, ...await editionSlugs(BOOKS, book)].map(editionToken);
+    const diags = [
+      ...doc.diagnostics,
+      ...checkOnlySpans(doc.onlySpans, tokens),
+    ];
+    if (doc.onlySpans.length) {
+      console.error(formatDiagnostics(
+        book,
+        doc.onlySpans.map((s) => ({
+          line: s.line,
+          message: "experimental: {only}",
+        })),
+      ));
     }
-    console.log(`${book}: ${b.diagnostics.length} diagnostic(s)`);
-    Deno.exit(b.diagnostics.length ? 1 : 0);
+    if (diags.length) console.error(formatDiagnostics(book, diags));
+    console.log(`${book}: ${diags.length} diagnostic(s)`);
+    Deno.exit(diags.length ? 1 : 0);
   } else if (cmd === "render" && book) {
     let b;
     try {

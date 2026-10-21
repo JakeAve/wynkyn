@@ -109,6 +109,7 @@ export interface TocConfig {
 }
 
 export interface Metadata {
+  name?: string; // the default edition's display name (§4.1); named editions use their slug
   page?: PageConfig;
   fonts?: Record<string, string>;
   elements?: Record<string, ElementStyle>;

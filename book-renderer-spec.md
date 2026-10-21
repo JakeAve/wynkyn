@@ -330,6 +330,34 @@ never appears in the output.
 - `\\` at the end of a line — a literal backslash, not a hard line break
   (§3.2.6).
 
+#### 3.2.9 Edition Spans (EXPERIMENTAL)
+
+> **EXPERIMENTAL.** `{only}` may change or be removed in a later version. No
+> other sentinel, and nothing outside `{only}` handling, depends on it.
+
+`{only}` gates a run of whole blocks to some of the book's editions (§4.1). Its
+edition list is the slug plus any further pipe-separated names; the default
+edition's token is always `default`, whatever its display name, and a named
+edition's token is its slug.
+
+```
+{only: pocket | default}
+Appears in the pocket and default editions, not in large-print.
+{/only}
+```
+
+- Building an edition keeps the content of spans that list its token and drops
+  the rest. The `{only}` and `{/only}` lines are never output, and line numbers
+  never shift: tag lines and dropped content read as blank lines.
+- With no edition chosen (`bml check`), every span's content is parsed.
+  `bml check` prints a `file:line: experimental: {only}` note per span to
+  stderr; the notes never change its exit code.
+- `{only}` must open outside any block and outside another `{only}`, must be
+  closed by `{/only}`, and must name at least one edition. A token no edition of
+  the book answers to is a diagnostic.
+- Renaming a named edition rewrites its token in every `{only}` opening line of
+  `manuscript.md`; nothing else in the manuscript changes.
+
 ### 3.3 Document Structure
 
 A BML document is divided into three implicit sections — front matter, body
@@ -1091,14 +1119,24 @@ books/
 > the same manuscript. `metadata.json` is the unnamed edition; each
 > `editions/<slug>.json` is a named one, and every one is a complete
 > self-contained metadata file (no inheritance). Editions share `manuscript.md`
-> and `images/` byte for byte. Everything that takes a book also takes an
-> optional edition: `?edition=` in the app, `--edition` on the CLI, and
+> and `images/` byte for byte, with one experimental exception: `{only}` spans
+> (§3.2.9) keep a run of blocks to some editions, and each edition is built with
+> its own spans applied. Everything that takes a book also takes an optional
+> edition: `?edition=` in the app, `--edition` on the CLI, and
 > `/api/books/:book/editions/:edition/metadata` on the server.
+>
+> The unnamed edition is the book's _default_ edition. Its display name is
+> `metadata.json`'s top-level `name` (default `"Standard"`), renamed through
+> `POST /api/books/:book/editions/default/rename` with `{ name }`; a named
+> edition's display name is its slug, title-cased. `default` is reserved and is
+> never a named edition's slug. A new edition may be cloned from any edition
+> (`from`), and never takes the default edition's `name`.
 
 ### 4.2 Full schema
 
 ```json
 {
+  "name": "Standard",
   "page": { ... },
   "fonts": { ... },
   "elements": { ... },

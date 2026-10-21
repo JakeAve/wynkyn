@@ -1,7 +1,7 @@
 // server/pipeline.ts — one build of one book: files on disk → HTML + CSS strings
 // (spec §5.4). Replaces the Plan 0 throwaway scripts/preview.ts; Plan 5's print
 // export composes the same pipeline.
-import { parse } from "../parser/parser.ts";
+import { checkOnlySpans, parse } from "../parser/parser.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import {
   generateDomCSS,
@@ -11,7 +11,7 @@ import {
   pageNumberingConfig,
 } from "../metadata/css-generator.ts";
 import { render } from "../renderer/render.ts";
-import { metadataPath } from "./editions.ts";
+import { editionSlugs, editionToken, metadataPath } from "./editions.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 import type { Seed } from "../renderer/page-map-types.ts";
 
@@ -168,7 +168,12 @@ export async function buildBook(
   const edition = opts.edition ?? null;
   const imageUrlPrefix = opts.imageUrlPrefix ?? `/books/${book}/images`;
   const source = await Deno.readTextFile(`${bookDir}/manuscript.md`);
-  const doc = parse(source);
+  // EXPERIMENTAL {only} (spec §3.2.9): keep this edition's spans, flag tokens
+  // no edition of this book answers to.
+  const doc = parse(source, { edition: editionToken(edition) });
+  const tokens = [null, ...await editionSlugs(booksRoot, book)].map(
+    editionToken,
+  );
   const metaPath = metadataPath(booksRoot, book, edition);
   const meta = await loadMetadata(metaPath);
   if (meta === null && edition !== null) {
@@ -193,6 +198,9 @@ export async function buildBook(
     pagedCss: generatePagedCSS(m, { bookTitle }),
     pageNumbering: pageNumberingConfig(m),
     fontLinks: generateFontLinks(m),
-    diagnostics: doc.diagnostics,
+    diagnostics: [
+      ...doc.diagnostics,
+      ...checkOnlySpans(doc.onlySpans, tokens),
+    ],
   };
 }

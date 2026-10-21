@@ -5,6 +5,9 @@
 import type { Metadata } from "../metadata/types.ts";
 import { describePageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
 import { upgradePageSetup } from "../metadata/upgrade.ts";
+import { parse } from "../parser/parser.ts";
+import { DEFAULT_EDITION_TOKEN } from "../parser/types.ts";
+import { parseSentinelLine } from "../parser/sentinel.ts";
 
 // One path segment: no separators, no dot-dot, no leading dot.
 export function safeName(name: string): boolean {
@@ -58,26 +61,30 @@ export function summaryOf(meta: Metadata): string {
     .filter(Boolean).join(" · ");
 }
 
-export interface EditionInfo {
-  slug: string | null; // null = the unnamed edition
-  summary: string;
+// EXPERIMENTAL: the name an edition answers to in `{only}` (spec §3.2.9).
+export function editionToken(slug: string | null): string {
+  return slug ?? DEFAULT_EDITION_TOKEN;
 }
 
-export async function listEditions(
+// The picker's display name for a named edition — web/src/editions.ts
+// editionLabel's casing.
+function titleCase(slug: string): string {
+  return slug.split("-").map((w) => w ? w[0]!.toUpperCase() + w.slice(1) : w)
+    .join(" ");
+}
+
+export interface EditionInfo {
+  slug: string | null; // null = the unnamed edition
+  name: string;
+  summary: string;
+  passages: number; // EXPERIMENTAL: {only} spans that list this edition
+}
+
+// Named edition slugs, sorted; [] for a single-edition book.
+export async function editionSlugs(
   booksRoot: string,
   book: string,
-): Promise<EditionInfo[]> {
-  const summary = async (edition: string | null): Promise<string> => {
-    try {
-      const text = await Deno.readTextFile(
-        metadataPath(booksRoot, book, edition),
-      );
-      return summaryOf(JSON.parse(text) as Metadata);
-    } catch {
-      return ""; // missing or corrupt — the row still lists, just without a summary
-    }
-  };
-  const out: EditionInfo[] = [{ slug: null, summary: await summary(null) }];
+): Promise<string[]> {
   const slugs: string[] = [];
   try {
     for await (const e of Deno.readDir(`${booksRoot}/${book}/editions`)) {
@@ -88,23 +95,83 @@ export async function listEditions(
   } catch {
     // no editions/ directory — a single-edition book
   }
-  for (const slug of slugs.sort()) {
-    out.push({ slug, summary: await summary(slug) });
+  return slugs.sort();
+}
+
+export async function listEditions(
+  booksRoot: string,
+  book: string,
+): Promise<EditionInfo[]> {
+  let spans: { editions: string[] }[] = [];
+  try {
+    spans = parse(
+      await Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`),
+    ).onlySpans;
+  } catch {
+    // no manuscript — no passages
+  }
+  const info = async (slug: string | null): Promise<EditionInfo> => {
+    let meta: Metadata | null = null;
+    try {
+      meta = JSON.parse(
+        await Deno.readTextFile(metadataPath(booksRoot, book, slug)),
+      ) as Metadata;
+    } catch {
+      // missing or corrupt — the row still lists, just without a summary
+    }
+    const token = editionToken(slug);
+    return {
+      slug,
+      name: slug === null
+        ? (typeof meta?.name === "string" && meta.name) || "Standard"
+        : titleCase(slug),
+      summary: meta ? summaryOf(meta) : "",
+      passages: spans.filter((s) => s.editions.includes(token)).length,
+    };
+  };
+  const out = [await info(null)];
+  for (const slug of await editionSlugs(booksRoot, book)) {
+    out.push(await info(slug));
   }
   return out;
 }
 
+// EXPERIMENTAL: renames one edition token in every {only} opening line's
+// edition list; everything else is left byte for byte.
+export function renameOnlyToken(
+  source: string,
+  from: string,
+  to: string,
+): string {
+  const esc = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const token = new RegExp(
+    `(^\\s*\\{only\\s*:\\s*|\\|\\s*)${esc}(?=\\s*[|}])`,
+    "g",
+  );
+  return source.split("\n").map((line) => {
+    const tag = parseSentinelLine(line);
+    if (tag?.name !== "only" || tag.closing) return line;
+    return line.replace(token, `$1${to}`);
+  }).join("\n");
+}
+
 // Writes a new named edition. Throws Deno.errors.AlreadyExists on a duplicate.
+// The default edition's display `name` is not copied: it names that edition only.
 export async function createEdition(
   booksRoot: string,
   book: string,
   slug: string,
   metadata: unknown,
 ): Promise<void> {
+  let copy = metadata;
+  if (copy !== null && typeof copy === "object" && !Array.isArray(copy)) {
+    const { name: _name, ...rest } = copy as Record<string, unknown>;
+    copy = rest;
+  }
   await Deno.mkdir(`${booksRoot}/${book}/editions`, { recursive: true });
   await Deno.writeTextFile(
     metadataPath(booksRoot, book, slug),
-    JSON.stringify(metadata, null, 2) + "\n",
+    JSON.stringify(copy, null, 2) + "\n",
     { createNew: true },
   );
 }

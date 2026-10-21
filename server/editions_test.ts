@@ -3,8 +3,10 @@ import { assertEquals, assertRejects } from "@std/assert";
 import {
   classifyChange,
   createEdition,
+  editionToken,
   listEditions,
   metadataPath,
+  renameOnlyToken,
   safeName,
   summaryOf,
 } from "./editions.ts";
@@ -83,9 +85,16 @@ Deno.test("listEditions: unnamed first with summary, then named editions sorted"
     // does not, so its row stays at the page size.
     {
       slug: null,
+      name: "Standard",
       summary: "5.5in × 8.5in · 2-up on letter · EB Garamond · 11pt",
+      passages: 0,
     },
-    { slug: "pocket", summary: "3.5in 5in · Crimson Pro · 9pt" },
+    {
+      slug: "pocket",
+      name: "Pocket",
+      summary: "3.5in 5in · Crimson Pro · 9pt",
+      passages: 0,
+    },
   ]);
 });
 
@@ -97,7 +106,9 @@ Deno.test("listEditions: a book without editions/ lists only the unnamed edition
     "{matter: half-title}\n{title}\nB\n",
   );
   try {
-    assertEquals(await listEditions(root, "b"), [{ slug: null, summary: "" }]);
+    assertEquals(await listEditions(root, "b"), [
+      { slug: null, name: "Standard", summary: "", passages: 0 },
+    ]);
   } finally {
     await Deno.remove(root, { recursive: true });
   }
@@ -107,7 +118,11 @@ Deno.test("createEdition: writes editions/<slug>.json, refuses a duplicate", asy
   const root = await Deno.makeTempDir();
   await Deno.mkdir(`${root}/b`);
   try {
-    await createEdition(root, "b", "pocket", { page: { size: "A6" } });
+    // The default edition's display name stays with it.
+    await createEdition(root, "b", "pocket", {
+      name: "Hardcover",
+      page: { size: "A6" },
+    });
     assertEquals(
       JSON.parse(await Deno.readTextFile(`${root}/b/editions/pocket.json`)),
       { page: { size: "A6" } },
@@ -119,4 +134,55 @@ Deno.test("createEdition: writes editions/<slug>.json, refuses a duplicate", asy
   } finally {
     await Deno.remove(root, { recursive: true });
   }
+});
+
+Deno.test("editionToken: null is the default token, a slug is itself", () => {
+  assertEquals(editionToken(null), "default");
+  assertEquals(editionToken("pocket"), "pocket");
+});
+
+Deno.test("listEditions: default name from metadata, title-cased slugs, {only} passages", async () => {
+  const root = await Deno.makeTempDir();
+  await Deno.mkdir(`${root}/b/editions`, { recursive: true });
+  await Deno.writeTextFile(
+    `${root}/b/manuscript.md`,
+    "{chapter: one}\n\n{only: large-print | default}\nA\n{/only}\n\n" +
+      "{only: large-print}\nB\n{/only}\n",
+  );
+  await Deno.writeTextFile(`${root}/b/metadata.json`, '{"name":"Hardcover"}');
+  await Deno.writeTextFile(`${root}/b/editions/large-print.json`, "{}");
+  try {
+    assertEquals(await listEditions(root, "b"), [
+      { slug: null, name: "Hardcover", summary: "", passages: 1 },
+      { slug: "large-print", name: "Large Print", summary: "", passages: 2 },
+    ]);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("renameOnlyToken: rewrites only whole tokens in {only} opening lines", () => {
+  const src = [
+    "{only: pocket}",
+    "pocket stays in prose",
+    "{/only}",
+    "{only: large | pocket}",
+    "{only | pocket}",
+    "{only: pocket-2 | xpocket}",
+    "{chapter: pocket}",
+    "{only: a | key: pocket}",
+  ].join("\r\n");
+  assertEquals(
+    renameOnlyToken(src, "pocket", "travel"),
+    [
+      "{only: travel}",
+      "pocket stays in prose",
+      "{/only}",
+      "{only: large | travel}",
+      "{only | travel}",
+      "{only: pocket-2 | xpocket}",
+      "{chapter: pocket}",
+      "{only: a | key: pocket}",
+    ].join("\r\n"),
+  );
 });

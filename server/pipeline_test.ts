@@ -79,3 +79,41 @@ Deno.test("toHtml drives Paged.js itself, through the page map", async () => {
     "the driver, not PagedConfig.after, ends it",
   );
 });
+
+async function onlyBook(): Promise<string> {
+  const dir = await Deno.makeTempDir();
+  await Deno.mkdir(`${dir}/b/editions`, { recursive: true });
+  await Deno.writeTextFile(
+    `${dir}/b/manuscript.md`,
+    "{chapter: one}\n\nShared text.\n\n{only: default}\nWide only.\n{/only}\n\n" +
+      "{only: pocket | nosuch}\nPocket only.\n{/only}\n",
+  );
+  await Deno.writeTextFile(`${dir}/b/editions/pocket.json`, "{}");
+  return dir;
+}
+
+Deno.test("buildBook: pocket edition drops {only: default} blocks", async () => {
+  const dir = await onlyBook();
+  try {
+    const base = await buildBook(dir, "b");
+    assert(base.html.includes("Wide only."));
+    assert(!base.html.includes("Pocket only."));
+    const pocket = await buildBook(dir, "b", { edition: "pocket" });
+    assert(pocket.html.includes("Shared text."));
+    assert(pocket.html.includes("Pocket only."));
+    assert(!pocket.html.includes("Wide only."));
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("buildBook: an {only} token no edition answers to is a diagnostic", async () => {
+  const dir = await onlyBook();
+  try {
+    assertEquals((await buildBook(dir, "b")).diagnostics, [
+      { line: 9, message: '{only} names unknown edition "nosuch"' },
+    ]);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
