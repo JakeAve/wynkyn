@@ -5,7 +5,7 @@
     "test": "deno test --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys",
     "build:web": "deno check web/src/app.ts && deno bundle --platform browser --output web/app.js web/src/app.ts",
     "bml": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys bml.ts",
-    "dev": "deno task build:web && deno run --allow-read --allow-write --allow-net server/dev-server.ts",
+    "dev": "deno task build:web && deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys server/dev-server.ts",
     "pre-commit": "deno task check && deno task test",
     "pre-push": "deno task check && deno task test"
   },
