@@ -166,11 +166,16 @@ function anchorToTextBlock(area: string, gap: string): CssProps {
   return {};
 }
 
-// Folio margin box per page side; "outside" mirrors to the fore-edge.
-function folioAreas(
-  position: FolioPosition,
+// Folio margin box per page side; "outside" mirrors to the fore-edge. A
+// position that is not a FolioPosition (hand-edited JSON) is bottom-center.
+export function folioAreas(
+  position: FolioPosition | undefined,
 ): Array<[side: "" | ":right" | ":left", area: string]> {
-  const [edge, where] = position.split("-") as ["top" | "bottom", string];
+  const [edge, where] = (position ?? "").split("-");
+  if (
+    (edge !== "top" && edge !== "bottom") ||
+    (where !== "center" && where !== "outside")
+  ) return [["", "bottom-center"]];
   if (where === "center") return [["", `${edge}-center`]];
   return [[":right", `${edge}-right`], [":left", `${edge}-left`]];
 }
@@ -208,7 +213,7 @@ export function generatePagedCSS(
   // is in base.css.
   const pages = metadata.numbering?.pages;
   const numbering = pageNumberingConfig(metadata);
-  const folioAt = folioAreas(pages?.position ?? "bottom-center");
+  const folioAt = folioAreas(pages?.position);
   for (const [name, key] of ZONE_KEYS) {
     const cfg = pages?.[key];
     const { style, show } = numbering[name];

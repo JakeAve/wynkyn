@@ -2,7 +2,7 @@
 // numbers + running heads + `is:` classes), how a preview click resolves to
 // one, and how entries group into the style panel's book parts and tabs.
 // Pure: the DOM adapter lives in preview.ts, so this is unit-tested in Deno.
-import { selectorFor } from "../../metadata/css-generator.ts";
+import { folioAreas, selectorFor } from "../../metadata/css-generator.ts";
 import type {
   CssProps,
   FolioPosition,
@@ -123,18 +123,11 @@ const ZONES = [
   ["back-matter", "back"],
 ] as const;
 
-// The margin boxes a folio sits in (§4.7): center is one box, outside is the
-// right box on recto and the left on verso, so a click on either is a folio.
-function folioBoxes(position: FolioPosition): string[] {
-  const [edge, where] = position.split("-");
-  return where === "center"
-    ? [`.pagedjs_margin-${edge}-center`]
-    : [`.pagedjs_margin-${edge}-right`, `.pagedjs_margin-${edge}-left`];
-}
-
 function pageNumberEntries(metadata: Metadata): StyleEntry[] {
-  const boxes = folioBoxes(
-    metadata.numbering?.pages?.position ?? "bottom-center",
+  // The margin boxes a folio sits in (§4.7): outside is two boxes, so a
+  // click on either side's is a folio.
+  const boxes = folioAreas(metadata.numbering?.pages?.position).map(
+    ([, area]) => `.pagedjs_margin-${area}`,
   );
   return [
     {
@@ -156,21 +149,22 @@ function pageNumberEntries(metadata: Metadata): StyleEntry[] {
   ];
 }
 
-// The running head sharing a top folio's margin box, as "top right", if any.
-// Heads are body only and odd pages are recto, so outside is top-right on odd
-// and top-left on even. Heads are emitted after folios, so the head wins it.
+// The running head sharing a folio's margin box, as "top right", if any.
+// Heads are body only and odd pages are recto, so outside is the right box on
+// odd and the left on even. Heads are emitted after folios, so the head wins it.
 export function folioClash(
   position: FolioPosition,
   running: Running | undefined,
 ): string | undefined {
   const odd = (running?.odd ?? []).map((e) => e.area);
   const even = (running?.even ?? []).map((e) => e.area);
-  if (position === "top-center") {
-    return [...odd, ...even].includes("top-center") ? "top center" : undefined;
+  for (const [side, area] of folioAreas(position)) {
+    const heads = side === ":right" ? odd : side === ":left" ? even : [
+      ...odd,
+      ...even,
+    ];
+    if (heads.includes(area)) return area.replace("-", " ");
   }
-  if (position !== "top-outside") return undefined;
-  if (odd.includes("top-right")) return "top right";
-  if (even.includes("top-left")) return "top left";
   return undefined;
 }
 
@@ -412,8 +406,13 @@ export function usedBy(
 // The change count on a Book parts row: string props set across the part's
 // entries, plus the chapter/part numbering keys its opener view edits. Page
 // numbers add their position, gap and zone numerals; running heads count each
-// entry's keys bar its area, plus the gap.
-export function setCount(metadata: Metadata, part: BookPart): number {
+// entry's keys bar its area, plus the gap. Pass `catalog` (catalogFor keyed
+// by key) when counting many parts of one book.
+export function setCount(
+  metadata: Metadata,
+  part: BookPart,
+  catalog = new Map(catalogFor(metadata).map((e) => [e.key, e])),
+): number {
   if (part.id === "heads") {
     const r = metadata.running;
     return [...(r?.odd ?? []), ...(r?.even ?? [])].reduce(
@@ -421,7 +420,6 @@ export function setCount(metadata: Metadata, part: BookPart): number {
       r?.gap ? 1 : 0,
     );
   }
-  const catalog = new Map(catalogFor(metadata).map((e) => [e.key, e]));
   let n = 0;
   for (const k of part.keys) {
     const entry = catalog.get(k);

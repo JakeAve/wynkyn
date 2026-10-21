@@ -36,19 +36,29 @@ function withQuery(q: SearchQuery, over: Partial<SearchQuery>): SearchQuery {
   });
 }
 
+type Hit = { from: number; to: number };
+
+// Every hit, up to one past COUNT_CAP. Costs a pass over the document, so it
+// reruns only when the query or the doc changes.
+function findHits(state: EditorState, q: SearchQuery): Hit[] {
+  if (!q.search || !q.valid) return [];
+  const hits: Hit[] = [];
+  const cursor = q.getCursor(state);
+  for (let r = cursor.next(); !r.done; r = cursor.next()) {
+    hits.push({ from: r.value.from, to: r.value.to });
+    if (hits.length > COUNT_CAP) break;
+  }
+  return hits;
+}
+
 // "n of m": n is the hit the selection sits on, "–" when it is on none.
-function countLabel(state: EditorState, q: SearchQuery): string {
+function countLabel(q: SearchQuery, hits: Hit[], sel: Hit): string {
   if (!q.search) return "";
   if (!q.valid) return "Invalid";
-  const { from, to } = state.selection.main;
-  const cursor = q.getCursor(state);
-  let n = 0, cur = 0;
-  for (let r = cursor.next(); !r.done && n <= COUNT_CAP; r = cursor.next()) {
-    n++;
-    if (r.value.from === from && r.value.to === to) cur = n;
-  }
-  if (n === 0) return "No results";
-  return `${cur || "–"} of ${n > COUNT_CAP ? `${COUNT_CAP}+` : n}`;
+  if (!hits.length) return "No results";
+  const cur = hits.findIndex((h) => h.from === sel.from && h.to === sel.to);
+  const n = hits.length > COUNT_CAP ? `${COUNT_CAP}+` : hits.length;
+  return `${cur < 0 || cur >= COUNT_CAP ? "–" : cur + 1} of ${n}`;
 }
 
 function button(
@@ -125,13 +135,15 @@ function createPanel(view: EditorView): Panel {
     if (!q.eq(query)) view.dispatch({ effects: setSearchQuery.of(q) });
   }
 
-  function sync(): void {
+  let hits: Hit[] = [];
+  function sync(recount: boolean): void {
+    if (recount) hits = findHits(view.state, query);
     if (find.value !== query.search) find.value = query.search;
     if (repl.value !== query.replace) repl.value = query.replace;
     for (const [f, b] of flags) {
       b.setAttribute("aria-pressed", String(query[f]));
     }
-    count.textContent = countLabel(view.state, query);
+    count.textContent = countLabel(query, hits, view.state.selection.main);
   }
 
   // "in chapter": Replace All under a query whose test admits only hits in
@@ -192,23 +204,23 @@ function createPanel(view: EditorView): Panel {
       replaceNext(view);
     }
   };
-  sync();
+  sync(true);
 
   return {
     dom,
     top: true,
     mount: () => find.select(),
     update(u: ViewUpdate) {
-      let changed = u.docChanged || u.selectionSet;
+      let recount = u.docChanged;
       for (const tr of u.transactions) {
         for (const e of tr.effects) {
           if (e.is(setSearchQuery)) {
             query = e.value;
-            changed = true;
+            recount = true;
           }
         }
       }
-      if (changed) sync();
+      if (recount || u.selectionSet) sync(recount);
     },
   };
 }

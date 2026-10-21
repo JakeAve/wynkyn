@@ -1,9 +1,11 @@
 // metadata/css-generator_test.ts
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { generateDomCSS } from "./css-generator.ts";
+import type { FolioPosition } from "./types.ts";
 import {
   DEFAULT_FOLIO_GAP,
   DEFAULT_HEAD_GAP,
+  folioAreas,
   generatePagedCSS,
   pageNumberingConfig,
 } from "./css-generator.ts";
@@ -428,4 +430,15 @@ Deno.test("folio position: outside mirrors to the fore-edge, top flips the ancho
     generatePagedCSS({ numbering: { pages: { position: "top-center" } } }),
     "@page front {\n  @top-center {",
   );
+});
+
+Deno.test("folio position: an unknown value falls back to bottom center", () => {
+  const css = generatePagedCSS({
+    numbering: { pages: { position: "middle" as FolioPosition } },
+  });
+  assertStringIncludes(css, "@page front {\n  @bottom-center {");
+  assert(!css.includes("undefined"));
+  assertEquals(folioAreas("sideways-outside" as FolioPosition), [
+    ["", "bottom-center"],
+  ]);
 });

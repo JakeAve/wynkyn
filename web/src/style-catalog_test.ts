@@ -280,6 +280,13 @@ Deno.test("folioClash names a running head in a top folio's box", () => {
     undefined, // top-right on a verso is the gutter side, not the folio's
   );
   assertEquals(folioClash("top-center", undefined), undefined);
+  // Any margin area, not only the top ones.
+  assertEquals(
+    folioClash("bottom-outside", {
+      even: [{ content: "x", area: "bottom-left" }],
+    }),
+    "bottom left",
+  );
 });
 
 Deno.test("is: classes come from metadata", () => {

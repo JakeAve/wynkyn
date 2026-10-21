@@ -12,6 +12,7 @@ import {
   addIsNames,
   type BookPart,
   bookParts,
+  catalogFor,
   type ExportRequest,
   type ExportResult,
   type PanelContext,
@@ -75,10 +76,11 @@ function navId(route: Route): string {
 
 function styleNav(meta: Metadata): Array<[string, NavRow[]]> {
   const parts = bookParts(meta);
+  const catalog = new Map(catalogFor(meta).map((e) => [e.key, e]));
   const row = (p: BookPart, label = p.name): NavRow => ({
     id: p.id,
     label,
-    count: setCount(meta, p),
+    count: setCount(meta, p, catalog),
     route: { tab: "parts", part: p.id },
   });
   const body = parts.find((p) => p.id === "body")!;
@@ -124,7 +126,6 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     setSaved("Saving…", "saving");
     clearTimeout(timer);
     timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
-    renderNav(); // the "N set" counts follow the edit
   };
 
   // Hands the dirty sections to saveSections now; the debounce ends here.
@@ -167,6 +168,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     }
     dirty.clear();
     opts.saveSections(sections as Partial<Metadata>);
+    renderNav(); // the "N set" counts follow the edit, once per save
   }
   let onPages: (() => void) | null = null; // the open view's redraw, if any
 
