@@ -1,6 +1,6 @@
 // metadata/css-generator.ts — Metadata → CSS strings (spec §5.2). Pure, no I/O.
 import type { CssProps, ElementStyle, Metadata } from "./types.ts";
-import type { NumberingStyle, RunningEntry } from "./types.ts";
+import type { FolioPosition, NumberingStyle, RunningEntry } from "./types.ts";
 
 const MATTER_KEYS = new Set([
   "half-title",
@@ -150,6 +150,31 @@ function runningContent(value: string, bookTitle?: string): string {
   }
 }
 
+export const DEFAULT_FOLIO_GAP = "5mm";
+export const DEFAULT_HEAD_GAP = "4mm";
+
+// Paged.js sizes a top/bottom margin box to the whole margin and centres its
+// content, so a head or folio would float at half the margin. Pin it to the
+// text block edge instead, `gap` away (§4.7, §4.8). Side boxes are untouched.
+function anchorToTextBlock(area: string, gap: string): CssProps {
+  if (area.startsWith("top-")) {
+    return { "vertical-align": "bottom", "padding-bottom": gap };
+  }
+  if (area.startsWith("bottom-")) {
+    return { "vertical-align": "top", "padding-top": gap };
+  }
+  return {};
+}
+
+// Folio margin box per page side; "outside" mirrors to the fore-edge.
+function folioAreas(
+  position: FolioPosition,
+): Array<[side: "" | ":right" | ":left", area: string]> {
+  const [edge, where] = position.split("-") as ["top" | "bottom", string];
+  if (where === "center") return [["", `${edge}-center`]];
+  return [[":right", `${edge}-right`], [":left", `${edge}-left`]];
+}
+
 export function generatePagedCSS(
   metadata: Metadata,
   opts: { bookTitle?: string } = {},
@@ -183,22 +208,32 @@ export function generatePagedCSS(
   // is in base.css.
   const pages = metadata.numbering?.pages;
   const numbering = pageNumberingConfig(metadata);
+  const folioAt = folioAreas(pages?.position ?? "bottom-center");
   for (const [name, key] of ZONE_KEYS) {
     const cfg = pages?.[key];
     const { style, show } = numbering[name];
     if (show && style !== "none") {
-      const decls = [`    content: var(--folio);`];
-      // Shared folio styling first, the zone's own `css` overrides it (§4.7).
-      for (const [k, v] of Object.entries({ ...pages?.css, ...cfg?.css })) {
-        decls.push(
-          `    ${k}: ${
-            k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
-          };`,
+      for (const [side, area] of folioAt) {
+        const decls = [`    content: var(--folio);`];
+        // Anchoring first, then shared folio styling, then the zone's own
+        // `css`: a book's own keys win (§4.7).
+        for (
+          const [k, v] of Object.entries({
+            ...anchorToTextBlock(area, pages?.gap ?? DEFAULT_FOLIO_GAP),
+            ...pages?.css,
+            ...cfg?.css,
+          })
+        ) {
+          decls.push(
+            `    ${k}: ${
+              k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
+            };`,
+          );
+        }
+        out.push(
+          `@page ${name}${side} {\n  @${area} {\n${decls.join("\n")}\n  }\n}\n`,
         );
       }
-      out.push(
-        `@page ${name} {\n  @bottom-center {\n${decls.join("\n")}\n  }\n}\n`,
-      );
     }
   }
 
@@ -209,11 +244,13 @@ export function generatePagedCSS(
     side: "body:right" | "body:left",
     entries: RunningEntry[] | undefined,
   ) => {
+    const gap = metadata.running?.gap ?? DEFAULT_HEAD_GAP;
     for (const entry of entries ?? []) {
       const decls = [
         `    content: ${runningContent(entry.content, opts.bookTitle)};`,
       ];
-      for (const [k, v] of Object.entries(entry)) {
+      const props = { ...anchorToTextBlock(entry.area, gap), ...entry };
+      for (const [k, v] of Object.entries(props)) {
         if (k === "content" || k === "area") continue;
         decls.push(
           `    ${k}: ${
@@ -231,7 +268,7 @@ export function generatePagedCSS(
   // Display matter (half-title, title page, …) sits on the named page
   // "display" (base.css) and carries no running head or folio: blank every
   // margin box the running/page-number rules above populate.
-  const usedAreas = new Set<string>(["bottom-center"]);
+  const usedAreas = new Set<string>(folioAt.map(([, area]) => area));
   for (
     const e of [
       ...(metadata.running?.odd ?? []),

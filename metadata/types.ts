@@ -55,11 +55,21 @@ export interface PageNumbering {
   css?: CssProps; // styles the folio's margin box (§4.7)
 }
 
+// Where the folio sits (§4.7). "outside" is the fore-edge corner: right on
+// recto, left on verso.
+export type FolioPosition =
+  | "bottom-center"
+  | "bottom-outside"
+  | "top-center"
+  | "top-outside";
+
 export interface Numbering {
   chapters?: StructureNumbering;
   parts?: StructureNumbering;
   pages?: {
     css?: CssProps; // shared folio styling; each zone's own `css` overrides it
+    position?: FolioPosition; // default "bottom-center"
+    gap?: string; // folio ↔ text block distance; default DEFAULT_FOLIO_GAP
     "front-matter"?: PageNumbering;
     body?: PageNumbering;
     "back-matter"?: PageNumbering;
@@ -75,6 +85,7 @@ export interface RunningEntry {
 }
 
 export interface Running {
+  gap?: string; // head ↔ text block distance; default DEFAULT_HEAD_GAP
   odd?: RunningEntry[];
   even?: RunningEntry[];
 }

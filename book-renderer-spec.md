@@ -1415,16 +1415,28 @@ offer it there.
   book body, so they inherit nothing from `elements.body` — without `pages.css`
   a folio renders in the browser's default font. Edited by the Styles panel
   (§7.4), which lists "All page numbers" alongside the three zones.
+- `position` on pages places the folio: `"bottom-center"` (default),
+  `"bottom-outside"`, `"top-center"` or `"top-outside"`. Outside is the
+  fore-edge: `bottom-right`/`top-right` on recto (`:right`), `-left` on verso
+  (`:left`). It applies to every zone.
+- `gap` on pages (default `5mm`) is the distance between the folio and the text
+  block. The folio belongs to the text block, not the margin: a bottom folio
+  sits `gap` below the last line, a top folio `gap` above the first, so raising
+  a margin moves text and folio together. The generator emits this as
+  `vertical-align: top; padding-top: <gap>` on a bottom box (`bottom` /
+  `padding-bottom` on a top box) ahead of `css`, so a book's own keys win.
 - **Current implementation note:** folios are not Paged.js counters. A handler
   (`renderer/folios.js`) builds a page map after layout: for every page its
   zone, its folio (counted per zone, body restarting at 1, formatted in the
   zone's `style`) and its running titles. It writes the folio to the page as the
   CSS variable `--folio`, and generated CSS reads it in one
   `@page front|body|back { @bottom-center { content: var(--folio); } }` rule per
-  shown zone (not per-odd/even, because Paged.js support for `@bottom-center`
-  nested inside `@page :left`/`:right` is unreliable across versions). A zone
-  with `show: false` or style `"none"` gets no rule. The per-zone `style` and
-  `show` reach the handler as the build's `pageNumbering`.
+  shown zone for a centred folio (not per-odd/even, because Paged.js support for
+  `@bottom-center` nested inside `@page :left`/`:right` is unreliable across
+  versions). An outside folio gets a `front:right { @bottom-right }` and
+  `front:left { @bottom-left }` pair per zone (top boxes for `top-outside`). A
+  zone with `show: false` or style `"none"` gets no rule. The per-zone `style`
+  and `show` reach the handler as the build's `pageNumbering`.
 
 ### 4.8 Section: `running`
 
@@ -1452,8 +1464,17 @@ without an explicit `font-family` a running head renders in the browser's
 default font. The configuration panel offers the same font picker as the Styles
 panel on each running entry (§7.5).
 
+**`gap`** (on `running`, default `4mm`) — the distance between a head and the
+text block. Paged.js makes each top/bottom margin box as tall as the margin and
+centres its content, so without anchoring a head floats at half the margin. The
+generator anchors every `top-*` box to its bottom edge and every `bottom-*` box
+to its top edge (`vertical-align` plus `padding-bottom`/`padding-top` of `gap`),
+ahead of the entry's own keys, which win. Side boxes (`left-*`, `right-*`) are
+not anchored.
+
 ```json
 "running": {
+  "gap": "4mm",
   "odd": [
     { "content": "book-title", "area": "top-right", "font-size": "8pt", "font-style": "italic" }
   ],

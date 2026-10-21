@@ -1,7 +1,12 @@
 // metadata/css-generator_test.ts
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { generateDomCSS } from "./css-generator.ts";
-import { generatePagedCSS, pageNumberingConfig } from "./css-generator.ts";
+import {
+  DEFAULT_FOLIO_GAP,
+  DEFAULT_HEAD_GAP,
+  generatePagedCSS,
+  pageNumberingConfig,
+} from "./css-generator.ts";
 
 Deno.test("body maps to .bml with font alias resolved", () => {
   const css = generateDomCSS({
@@ -185,11 +190,11 @@ Deno.test("running header entries: odd→body:right, even→body:left, page-map 
   assert(!css.includes("string("));
   assertStringIncludes(
     css,
-    '@page body:right {\n  @top-right {\n    content: var(--running-off, "Common Sense");\n    font-size: 8pt;',
+    '@page body:right {\n  @top-right {\n    content: var(--running-off, "Common Sense");\n    vertical-align: bottom;\n    padding-bottom: 4mm;\n    font-size: 8pt;',
   );
   assertStringIncludes(
     css,
-    "@page body:left {\n  @top-left {\n    content: var(--chapter-title);\n    font-style: italic;",
+    "@page body:left {\n  @top-left {\n    content: var(--chapter-title);\n    vertical-align: bottom;\n    padding-bottom: 4mm;\n    font-style: italic;",
   );
 });
 
@@ -365,4 +370,62 @@ Deno.test("running-entry font aliases resolve like element styles (§4.8)", () =
   });
   assertStringIncludes(css, 'font-family: "Cormorant Garamond";');
   assertStringIncludes(css, "font-size: 8pt;");
+});
+
+Deno.test("generatePagedCSS anchors the folio a gap below the text block", () => {
+  const css = generatePagedCSS({ numbering: { pages: {} } });
+  assertStringIncludes(
+    css,
+    `@page body {\n  @bottom-center {\n    content: var(--folio);\n    vertical-align: top;\n    padding-top: ${DEFAULT_FOLIO_GAP};`,
+  );
+  // A book's own keys win over the default.
+  const own = generatePagedCSS({
+    numbering: {
+      pages: { gap: "7mm", body: { css: { "vertical-align": "middle" } } },
+    },
+  });
+  const box = own.slice(own.indexOf("@page body {"));
+  assertStringIncludes(box, "vertical-align: middle;");
+  assertStringIncludes(box, "padding-top: 7mm;");
+});
+
+Deno.test("running heads anchor a gap above the text block (§4.8)", () => {
+  const css = generatePagedCSS({
+    running: {
+      odd: [{ content: "book-title", area: "top-right" }],
+      even: [{ content: "chapter-title", area: "bottom-left" }],
+    },
+  });
+  assertStringIncludes(
+    css,
+    `@top-right {\n    content: var(--running-off, "");\n    vertical-align: bottom;\n    padding-bottom: ${DEFAULT_HEAD_GAP};`,
+  );
+  assertStringIncludes(css, `vertical-align: top;\n    padding-top: 4mm;`);
+  const gapped = generatePagedCSS({
+    running: {
+      gap: "6mm",
+      odd: [{ content: "x", area: "top-center", "padding-bottom": "2mm" }],
+    },
+  });
+  assertStringIncludes(gapped, "padding-bottom: 2mm;");
+  assert(!gapped.includes("padding-bottom: 6mm"));
+});
+
+Deno.test("folio position: outside mirrors to the fore-edge, top flips the anchor (§4.7)", () => {
+  const css = generatePagedCSS({
+    numbering: { pages: { position: "top-outside" } },
+  });
+  assertStringIncludes(
+    css,
+    "@page body:right {\n  @top-right {\n    content: var(--folio);\n    vertical-align: bottom;\n    padding-bottom: 5mm;",
+  );
+  assertStringIncludes(css, "@page body:left {\n  @top-left {");
+  assert(!css.includes("@bottom-center"));
+  const display = css.slice(css.indexOf("@page display {"));
+  assertStringIncludes(display, "@top-right {\n    content: none;");
+  assertStringIncludes(display, "@top-left {\n    content: none;");
+  assertStringIncludes(
+    generatePagedCSS({ numbering: { pages: { position: "top-center" } } }),
+    "@page front {\n  @top-center {",
+  );
 });
