@@ -43,6 +43,10 @@ Deno.test("classifyChange: shared files, unnamed edition, named edition, noise",
     edition: "pocket",
   });
   assertEquals(classifyChange(["editions", "pocket.json.swp"]), null);
+  // Atomic writes land via <path>.tmp; only the rename onto the path counts.
+  assertEquals(classifyChange(["manuscript.md.tmp"]), null);
+  assertEquals(classifyChange(["metadata.json.tmp"]), null);
+  assertEquals(classifyChange(["editions", "pocket.json.tmp"]), null);
   assertEquals(classifyChange(["editions", "deep", "pocket.json"]), null);
   assertEquals(classifyChange(["render.html"]), null);
   assertEquals(classifyChange([]), null);

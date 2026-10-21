@@ -1,6 +1,11 @@
 // server/dev-server.ts — live dev server (spec §5.4, §6): serves the app shell,
 // watches books, rebuilds on change, pushes updates over WebSockets, accepts saves.
-import { buildBook, listBooks } from "./pipeline.ts";
+import {
+  buildBook,
+  contentVersion,
+  listBooks,
+  type ServerMessage,
+} from "./pipeline.ts";
 import { watchTree } from "./watch.ts";
 import { upgradePageSetup } from "../metadata/upgrade.ts";
 import type { Metadata } from "../metadata/types.ts";
@@ -56,8 +61,14 @@ interface Client {
 
 interface PendingSave {
   text: string;
-  clientId: string | null;
   timer: number;
+}
+
+// Readers see the old file or the new one, never half a write; the watcher
+// ignores the .tmp name (classifyChange).
+async function atomicWrite(path: string, text: string): Promise<void> {
+  await Deno.writeTextFile(`${path}.tmp`, text);
+  await Deno.rename(`${path}.tmp`, path);
 }
 
 export async function startServer(
@@ -71,9 +82,6 @@ export async function startServer(
   const absRoot = await Deno.realPath(booksRoot);
 
   const clients = new Set<Client>();
-  // book → clientId of the latest server-side write, so the originating editor
-  // can ignore its own echo (spec §6). Written by the save endpoint (Task 5).
-  const recentWrites = new Map<string, string | null>();
 
   const saveDebounceMs = opts.saveDebounceMs ?? 250;
   const pendingSaves = new Map<string, PendingSave>();
@@ -93,26 +101,35 @@ export async function startServer(
     else tokenRenames.delete(book);
   };
 
-  // Lands a manuscript write; the watcher sees it and broadcasts, tagged with
-  // `origin` via recentWrites.
-  function writeManuscript(
+  // A write that fails after its {ok:true} went out has no response left to
+  // report on: tell the affected editors instead (every client on the book
+  // when edition is undefined), and never let it kill the server.
+  function sendError(
     book: string,
-    text: string,
-    origin: string | null,
-  ): Promise<void> {
-    recentWrites.set(book, origin);
-    const done: Promise<void> = Deno.writeTextFile(
+    edition: string | null | undefined,
+    message: string,
+  ) {
+    console.error(`${book}: ${message}`);
+    for (const c of clients) {
+      if (c.book !== book || c.socket.readyState !== WebSocket.OPEN) continue;
+      if (edition !== undefined && c.edition !== edition) continue;
+      const m: ServerMessage = {
+        type: "error",
+        book,
+        edition: c.edition,
+        message,
+      };
+      c.socket.send(JSON.stringify(m));
+    }
+  }
+
+  // Lands a manuscript write; the watcher sees it and broadcasts.
+  function writeManuscript(book: string, text: string): Promise<void> {
+    const done: Promise<void> = atomicWrite(
       `${booksRoot}/${book}/manuscript.md`,
       text,
     ).catch((err) => {
-      // No write means no filesystem event, so nothing will ever consume
-      // (and clear) the recentWrites entry above — drop it ourselves so it
-      // doesn't get misattributed to a later, unrelated broadcast for this
-      // book. There's no open HTTP response left to report this on (the
-      // {ok:true} response already went out), and per Global Constraints
-      // the server must never die on bad state, so just log it.
-      recentWrites.delete(book);
-      console.error(`save failed for book "${book}":`, err);
+      sendError(book, undefined, `save failed: ${String(err)}`);
     }).finally(() => {
       if (writing.get(book) === done) writing.delete(book);
     });
@@ -122,64 +139,85 @@ export async function startServer(
 
   async function handleSave(book: string, req: Request): Promise<Response> {
     if (!safeName(book)) return new Response("bad path", { status: 400 });
-    let body: { text?: unknown; clientId?: unknown };
+    let body: { text?: unknown; clientId?: unknown; base?: unknown };
     try {
       body = await req.json();
     } catch {
       return new Response("invalid JSON body", { status: 400 });
     }
     if (typeof body.text !== "string") {
-      return new Response("body must be { text: string, clientId?: string }", {
-        status: 400,
-      });
+      return new Response(
+        "body must be { text: string, clientId?: string, base?: string }",
+        { status: 400 },
+      );
     }
     try {
       await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
     } catch {
       return new Response("book not found", { status: 404 });
     }
+    // A save based on a version that is no longer current would overwrite a
+    // change its editor never saw: refuse it with the current text. No base
+    // (the CLI, old callers) skips the check.
+    if (typeof body.base === "string") {
+      await writing.get(book);
+      const current = await currentManuscript(book);
+      const version = await contentVersion(current);
+      if (version !== body.base) {
+        return Response.json({ conflict: true, text: current, version }, {
+          status: 409,
+        });
+      }
+    }
     const clientId = typeof body.clientId === "string" ? body.clientId : null;
-    const pending: PendingSave = { text: body.text, clientId, timer: 0 };
+    const pending: PendingSave = { text: body.text, timer: 0 };
     // A save still carrying a renamed edition's old token gets the new one,
-    // and no origin, so its own tab reloads the rewritten text too.
+    // and the response hands the rewritten text back.
     for (const r of tokenRenames.get(book) ?? []) {
       if (clientId !== null && !r.stale.has(clientId)) continue;
       const next = renameOnlyToken(pending.text, r.from, r.to);
-      if (next !== pending.text) {
-        pending.text = next;
-        pending.clientId = null;
-      } else if (clientId !== null) r.stale.delete(clientId); // caught up
+      if (next !== pending.text) pending.text = next;
+      else if (clientId !== null) r.stale.delete(clientId); // caught up
     }
     pruneRenames(book);
     const existing = pendingSaves.get(book);
     if (existing) clearTimeout(existing.timer);
     pending.timer = setTimeout(() => {
       pendingSaves.delete(book);
-      writeManuscript(book, pending.text, pending.clientId);
+      writeManuscript(book, pending.text);
     }, saveDebounceMs);
     pendingSaves.set(book, pending);
-    return Response.json({ ok: true });
+    const version = await contentVersion(pending.text);
+    return Response.json(
+      pending.text === body.text
+        ? { ok: true, version }
+        : { ok: true, version, text: pending.text },
+    );
+  }
+
+  // A save may still be sitting in the debounce window — that, not the stale
+  // disk copy, is the current text.
+  function currentManuscript(book: string): Promise<string> {
+    const pending = pendingSaves.get(book);
+    return pending
+      ? Promise.resolve(pending.text)
+      : Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`);
   }
 
   async function handleManuscriptGet(book: string): Promise<Response> {
     if (!safeName(book)) return new Response("bad path", { status: 400 });
-    // A save may still be sitting in the debounce window — serve what the
-    // client most recently sent, not the stale disk copy.
-    const pending = pendingSaves.get(book);
-    if (pending) return Response.json({ text: pending.text });
+    let text: string;
     try {
-      const text = await Deno.readTextFile(
-        `${booksRoot}/${book}/manuscript.md`,
-      );
-      return Response.json({ text });
+      text = await currentManuscript(book);
     } catch {
       return new Response("book not found", { status: 404 });
     }
+    return Response.json({ text, version: await contentVersion(text) });
   }
 
   interface PendingMetaSave {
     metadata: Record<string, unknown>;
-    clientId: string | null;
+    text: string; // metadata serialized: exactly what the write lands
     timer: number;
     cancelled?: boolean;
     write(): Promise<void>; // the debounced write; also run early by an export
@@ -191,29 +229,33 @@ export async function startServer(
     edition === null ? book : `${book}/editions/${edition}`;
 
   // The authoritative current metadata for serving and merging: a pending
-  // debounced save wins over the disk copy. Returns null when the file exists
-  // but is corrupt JSON — callers turn that into a 409. Returns undefined
-  // when a *named* edition's file is missing (404); a missing metadata.json
-  // is {} because metadata is optional (spec §4).
+  // debounced save wins over the disk copy. `text` is what it was read from
+  // (the pending save's serialization or the raw file; null when there is no
+  // metadata.json). Returns null when the file exists but is corrupt JSON —
+  // callers turn that into a 409. Returns undefined when a *named* edition's
+  // file is missing (404); a missing metadata.json is {} because metadata is
+  // optional (spec §4).
   async function currentMetadata(
     book: string,
     edition: string | null,
-  ): Promise<Record<string, unknown> | null | undefined> {
+  ): Promise<
+    | { metadata: Record<string, unknown>; text: string | null }
+    | null
+    | undefined
+  > {
     const pending = pendingMetaSaves.get(metaKey(book, edition));
-    if (pending) return pending.metadata;
+    if (pending) return { metadata: pending.metadata, text: pending.text };
     let text: string;
     try {
       text = await Deno.readTextFile(metadataPath(booksRoot, book, edition));
     } catch {
-      return edition === null ? {} : undefined;
+      return edition === null ? { metadata: {}, text: null } : undefined;
     }
     try {
       // Upgraded on the way out, so the panel edits (and then saves back) the
       // current shape — that is what retires a legacy `print` section on disk.
-      return upgradePageSetup(JSON.parse(text) as Metadata) as Record<
-        string,
-        unknown
-      >;
+      const metadata = upgradePageSetup(JSON.parse(text) as Metadata);
+      return { metadata: metadata as Record<string, unknown>, text };
     } catch {
       return null;
     }
@@ -231,17 +273,22 @@ export async function startServer(
     } catch {
       return new Response("book not found", { status: 404 });
     }
-    const metadata = await currentMetadata(book, edition);
-    if (metadata === undefined) {
+    const current = await currentMetadata(book, edition);
+    if (current === undefined) {
       return new Response("edition not found", { status: 404 });
     }
-    if (metadata === null) {
+    if (current === null) {
       return new Response(
         "metadata is not valid JSON — fix it on disk first",
         { status: 409 },
       );
     }
-    return Response.json({ metadata });
+    return Response.json({
+      metadata: current.metadata,
+      version: current.text === null
+        ? null
+        : await contentVersion(current.text),
+    });
   }
 
   async function handleMetadataSave(
@@ -252,7 +299,7 @@ export async function startServer(
     if (!safeName(book) || (edition !== null && !safeName(edition))) {
       return new Response("bad path", { status: 400 });
     }
-    let body: { sections?: unknown; clientId?: unknown };
+    let body: { sections?: unknown };
     try {
       body = await req.json();
     } catch {
@@ -264,7 +311,7 @@ export async function startServer(
       Array.isArray(sections)
     ) {
       return new Response(
-        "body must be { sections: object, clientId?: string }",
+        "body must be { sections: object }",
         { status: 400 },
       );
     }
@@ -283,9 +330,11 @@ export async function startServer(
         { status: 409 },
       );
     }
-    const clientId = typeof body.clientId === "string" ? body.clientId : null;
-    queueMetaSave(book, edition, base, sections, clientId);
-    return Response.json({ ok: true });
+    const save = queueMetaSave(book, edition, base.metadata, sections);
+    return Response.json({
+      ok: true,
+      version: await contentVersion(save.text),
+    });
   }
 
   // Debounces a metadata write: `sections` shallow-merged onto `base` (the
@@ -295,7 +344,6 @@ export async function startServer(
     edition: string | null,
     base: Record<string, unknown>,
     sections: object,
-    clientId: string | null,
   ): PendingMetaSave {
     // Shallow-merge only the POSTed top-level keys; everything else —
     // elements, is, future schema keys — passes through untouched.
@@ -309,22 +357,17 @@ export async function startServer(
     if (existing) clearTimeout(existing.timer);
     const save: PendingMetaSave = {
       metadata: merged,
-      clientId,
+      text: JSON.stringify(merged, null, 2) + "\n",
       timer: 0,
       write: async () => {
         clearTimeout(save.timer);
         if (save.cancelled || pendingMetaSaves.get(key) !== save) return;
         pendingMetaSaves.delete(key);
-        recentWrites.set(key, save.clientId);
         try {
-          await Deno.writeTextFile(
-            metadataPath(booksRoot, book, edition),
-            JSON.stringify(save.metadata, null, 2) + "\n",
-          );
-          // The watcher sees this write and broadcasts, tagged via recentWrites.
+          // The watcher sees this write and broadcasts.
+          await atomicWrite(metadataPath(booksRoot, book, edition), save.text);
         } catch (err) {
-          recentWrites.delete(key);
-          console.error(`metadata save failed for "${key}":`, err);
+          sendError(book, edition, `save failed: ${String(err)}`);
         }
       },
     };
@@ -425,7 +468,7 @@ export async function startServer(
       });
     }
     try {
-      await createEdition(booksRoot, book, slug, source);
+      await createEdition(booksRoot, book, slug, source.metadata);
     } catch (err) {
       if (err instanceof Deno.errors.AlreadyExists) {
         return new Response("edition already exists", { status: 409 });
@@ -499,14 +542,8 @@ export async function startServer(
       return Response.json({ ok: true });
     }
     const next = renameOnlyToken(text, edition, target);
-    if (next !== text || pendingText) {
-      // Rewritten text has no origin: every editor reloads it.
-      await writeManuscript(
-        book,
-        next,
-        next === text ? pendingText?.clientId ?? null : null,
-      );
-    }
+    // Rewritten text has a new version, so every editor reloads it.
+    if (next !== text || pendingText) await writeManuscript(book, next);
     return Response.json({ ok: true });
   }
 
@@ -540,7 +577,8 @@ export async function startServer(
     }
     const name = body.name.trim();
     // Blank clears it, so the edition falls back to "Standard".
-    await queueMetaSave(book, null, base, { name: name || null }, null).write();
+    await queueMetaSave(book, null, base.metadata, { name: name || null })
+      .write();
     return Response.json({ ok: true });
   }
 
@@ -568,22 +606,16 @@ export async function startServer(
   async function buildMessage(
     book: string,
     edition: string | null,
-    origin: string | null,
   ): Promise<string> {
+    let m: ServerMessage;
     try {
-      const build = await buildBook(booksRoot, book, { edition });
-      return JSON.stringify({ type: "update", origin, ...build });
+      m = { type: "update", ...await buildBook(booksRoot, book, { edition }) };
     } catch (err) {
       // Bad metadata or a mid-write read must never kill the server —
       // push the failure to the preview instead (Global Constraints).
-      return JSON.stringify({
-        type: "error",
-        book,
-        edition,
-        origin,
-        message: String(err),
-      });
+      m = { type: "error", book, edition, message: String(err) };
     }
+    return JSON.stringify(m);
   }
 
   // edition === undefined: a shared file changed — every client on the book,
@@ -594,36 +626,10 @@ export async function startServer(
       (edition === undefined || c.edition === edition)
     );
     const messages = new Map<string | null, string>(); // one build per edition
-    if (edition !== undefined) {
-      // Targeted: one edition, one origin key.
-      const key = metaKey(book, edition);
-      const origin = recentWrites.get(key) ?? null;
-      recentWrites.delete(key);
-      for (const c of targets) {
-        let m = messages.get(c.edition);
-        if (!m) {
-          messages.set(
-            c.edition,
-            m = await buildMessage(book, c.edition, origin),
-          );
-        }
-        c.socket.send(m);
-      }
-      return;
-    }
-    // Shared: a build (and origin) per distinct edition among the targets,
-    // since a batched shared change may coincide with an edition's own flush.
-    // The shared-file origin (keyed by `book`) applies to every edition, so
-    // it's read once up front rather than deleted after the first edition
-    // consumes it — otherwise later editions in the same batch would miss it.
-    const sharedOrigin = recentWrites.get(book) ?? null;
-    recentWrites.delete(book);
     for (const c of targets) {
-      if (messages.has(c.edition)) continue;
-      const key = metaKey(book, c.edition);
-      const origin = sharedOrigin ?? recentWrites.get(key) ?? null;
-      recentWrites.delete(key);
-      messages.set(c.edition, await buildMessage(book, c.edition, origin));
+      if (!messages.has(c.edition)) {
+        messages.set(c.edition, await buildMessage(book, c.edition));
+      }
     }
     for (const c of targets) c.socket.send(messages.get(c.edition)!);
   }
@@ -657,7 +663,7 @@ export async function startServer(
     const client: Client = { socket, book, edition, clientId };
     socket.onopen = async () => {
       clients.add(client);
-      const message = await buildMessage(book, edition, null);
+      const message = await buildMessage(book, edition);
       if (socket.readyState === WebSocket.OPEN) socket.send(message);
     };
     socket.onclose = () => {
