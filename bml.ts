@@ -4,7 +4,7 @@
 //   deno task bml list                    → books, with their named editions
 //   deno task bml new <slug>              → books/<slug>/ from templates/ (house-style metadata.json)
 //   deno task bml edition <book> new <slug> [--from <edition>] → copy an edition under a new name
-//   deno task bml export <book> [--edition e] [--sheet S] [--folios N] [--duplex short-edge|long-edge|none]
+//   deno task bml export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none]
 //                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]
 //                                → exit 1 on pagination problems unless --force
 import { parseArgs } from "@std/cli/parse-args";
@@ -143,12 +143,16 @@ if (import.meta.main) {
     try {
       const opts = {
         edition,
-        folios: a.folios !== undefined ? Number(a.folios) : undefined,
+        folios: a.folios === "booklet"
+          ? "booklet" as const
+          : a.folios !== undefined
+          ? Number(a.folios)
+          : undefined,
         pages: a.pages !== undefined ? Number(a.pages) : undefined,
         sheet: a.sheet,
         duplex: a.duplex as "short-edge" | "long-edge" | "none" | undefined,
         flip: a.flip as "short-edge" | "long-edge" | undefined,
-        reverseBacks: a["reverse-backs"],
+        reverseBacks: a["reverse-backs"] || undefined, // absent: the page section's
         proof: a.proof,
         out: a.out,
         force: a.force,
@@ -180,7 +184,7 @@ if (import.meta.main) {
     }
   } else {
     console.error(
-      "usage: bml list | new <slug> | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]",
+      "usage: bml list | new <slug> | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]",
     );
     Deno.exit(2);
   }

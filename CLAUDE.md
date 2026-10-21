@@ -11,9 +11,10 @@ polish) is open. `bml export` is the print-export command
 (`server/print-export.ts`, `server/imposition.ts`, `server/pdf.ts`).
 
 Page setup lives in one `page` section: `size`, `margins`, `sheet`,
-`folios-per-signature`, `duplex`. The retired `print` section is folded into it
-on load (`metadata/upgrade.ts`), so older books still work and rewrite
-themselves on the next save.
+`folios-per-signature` (a number or `"booklet"`), `duplex`, and for backs
+printed by hand `flip` and `reverse-backs`. The retired `print` section is
+folded into it on load (`metadata/upgrade.ts`), so older books still work and
+rewrite themselves on the next save.
 
 ## Layout
 
@@ -33,7 +34,9 @@ themselves on the next save.
   `queueSave`), `panel-page.ts` (Page + Print tabs), `panel-fonts.ts`,
   `panel-parts.ts` (Book parts list and detail views) build the tabs from
   `panel-controls.ts` primitives; `style-catalog.ts` maps preview clicks and
-  book parts to metadata keys.
+  book parts to metadata keys. The Print tab draws the first signature with
+  `server/imposition.ts` and exports through the dev server's
+  `POST /api/books/<book>/export`, the same `exportBook` as `bml export`.
 
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
 update the checksum in `server/vendor_test.ts`, then read the golden page-map
@@ -51,7 +54,7 @@ diff and re-check the no-reflow note on `layOut` in `renderer/folios.js`.
 - `deno task bml render <book> [out] [--edition e]` standalone HTML (default
   `books/<book>/render.html`, or `render.<e>.html`); open in a browser to
   paginate
-- `deno task bml export <book> [--edition e] [--proof] [--sheet S] [--folios N] [--duplex M]`
+- `deno task bml export <book> [--edition e] [--proof] [--sheet S] [--folios N|booklet] [--duplex M]`
   → `books/<book>/export/` (or `export/<e>/`): `book.pdf`, the sheet PDFs and
   `page-map.json` (the settled seed, keyed by a hash of the render's inputs, so
   a re-export of an unchanged book takes one pass); needs Google Chrome

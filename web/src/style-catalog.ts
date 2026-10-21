@@ -206,6 +206,7 @@ export interface Route {
 }
 
 export interface PreviewLink {
+  pageCount(): number; // pages in the live preview; 0 until it paginates
   pagesFor(key: string): number;
   highlight(key: string, on: boolean): void;
   reveal(key: string): void;
@@ -216,6 +217,22 @@ export interface PanelContext {
   queueSave(key: keyof Metadata): void;
   go(route: Route): void;
   preview: PreviewLink;
+  // The Print tab's export: lands pending saves, then runs it on the server.
+  exportPrint(req: ExportRequest): Promise<ExportResult>;
+  onPages(redraw: () => void): void; // called after each preview render
+}
+
+export interface ExportRequest {
+  proof: boolean;
+  force: boolean; // export despite page-map problems
+  pages?: number; // proof page count; a booklet proof needs one
+}
+
+export interface ExportResult {
+  error?: string; // the export failed outright
+  problems: string[]; // refused over these unless forced, or exported with them
+  summary?: string; // set once files were written
+  files: Array<{ name: string; url: string }>;
 }
 
 export interface BookPart {

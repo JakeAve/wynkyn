@@ -5,6 +5,13 @@ import { watchTree } from "./watch.ts";
 import { upgradePageSetup } from "../metadata/upgrade.ts";
 import type { Metadata } from "../metadata/types.ts";
 import {
+  exportBook,
+  type ExportOptions,
+  formatSummary,
+  PaginationError,
+} from "./print-export.ts";
+import { formatProblem } from "../renderer/page-map-types.ts";
+import {
   classifyChange,
   createEdition,
   listEditions,
@@ -24,12 +31,14 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
+  ".pdf": "application/pdf",
 };
 
 export interface ServerOptions {
   booksRoot?: string; // default "books"
   port?: number; // 0 = OS-assigned (tests); default 8000
   saveDebounceMs?: number; // default 250 (used from Task 5)
+  render?: ExportOptions["render"]; // test seam: print export without Chrome
 }
 
 export interface RunningServer {
@@ -135,6 +144,7 @@ export async function startServer(
     clientId: string | null;
     timer: number;
     cancelled?: boolean;
+    write(): Promise<void>; // the debounced write; also run early by an export
   }
   const pendingMetaSaves = new Map<string, PendingMetaSave>();
 
@@ -246,24 +256,85 @@ export async function startServer(
     const existing = pendingMetaSaves.get(key);
     if (existing) clearTimeout(existing.timer);
     const clientId = typeof body.clientId === "string" ? body.clientId : null;
-    const save: PendingMetaSave = { metadata: merged, clientId, timer: 0 };
-    save.timer = setTimeout(async () => {
-      if (save.cancelled) return;
-      pendingMetaSaves.delete(key);
-      recentWrites.set(key, save.clientId);
-      try {
-        await Deno.writeTextFile(
-          metadataPath(booksRoot, book, edition),
-          JSON.stringify(save.metadata, null, 2) + "\n",
-        );
-        // The watcher sees this write and broadcasts, tagged via recentWrites.
-      } catch (err) {
-        recentWrites.delete(key);
-        console.error(`metadata save failed for "${key}":`, err);
-      }
-    }, saveDebounceMs);
+    const save: PendingMetaSave = {
+      metadata: merged,
+      clientId,
+      timer: 0,
+      write: async () => {
+        clearTimeout(save.timer);
+        if (save.cancelled || pendingMetaSaves.get(key) !== save) return;
+        pendingMetaSaves.delete(key);
+        recentWrites.set(key, save.clientId);
+        try {
+          await Deno.writeTextFile(
+            metadataPath(booksRoot, book, edition),
+            JSON.stringify(save.metadata, null, 2) + "\n",
+          );
+          // The watcher sees this write and broadcasts, tagged via recentWrites.
+        } catch (err) {
+          recentWrites.delete(key);
+          console.error(`metadata save failed for "${key}":`, err);
+        }
+      },
+    };
+    save.timer = setTimeout(save.write, saveDebounceMs);
     pendingMetaSaves.set(key, save);
     return Response.json({ ok: true });
+  }
+
+  // book/edition keys with an export running; one at a time each.
+  const exporting = new Set<string>();
+  const exportDir = (book: string, edition: string | null) =>
+    `${booksRoot}/${book}/export${edition === null ? "" : `/${edition}`}`;
+
+  // The Print tab's export (spec §7.7): `bml export` behind an endpoint, so
+  // both write the same files. The body is { proof?, force?, pages? }.
+  async function handleExport(
+    book: string,
+    edition: string | null,
+    req: Request,
+  ): Promise<Response> {
+    if (!safeName(book) || (edition !== null && !safeName(edition))) {
+      return new Response("bad path", { status: 400 });
+    }
+    let body: { proof?: unknown; force?: unknown; pages?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return new Response("invalid JSON body", { status: 400 });
+    }
+    const key = metaKey(book, edition);
+    if (exporting.has(key)) {
+      return new Response("an export is already running", { status: 409 });
+    }
+    exporting.add(key);
+    try {
+      // The export reads metadata from disk: land a debounced save first.
+      await pendingMetaSaves.get(key)?.write();
+      const s = await exportBook(booksRoot, book, {
+        edition,
+        proof: body.proof === true,
+        force: body.force === true,
+        pages: typeof body.pages === "number" ? body.pages : undefined,
+        render: opts.render,
+      });
+      return Response.json({
+        summary: formatSummary(book, s),
+        files: s.files.map((f) => f.slice(f.lastIndexOf("/") + 1))
+          .filter((f) => f.endsWith(".pdf")),
+        problems: s.pagination.map(formatProblem),
+      });
+    } catch (err) {
+      if (err instanceof PaginationError) {
+        return Response.json(
+          { problems: err.problems.map(formatProblem) },
+          { status: 409 },
+        );
+      }
+      return new Response((err as Error).message, { status: 500 });
+    } finally {
+      exporting.delete(key);
+    }
   }
 
   async function handleEditionCreate(
@@ -581,6 +652,23 @@ export async function startServer(
     );
     if (editionRename && req.method === "POST") {
       return handleEditionRename(editionRename[1]!, editionRename[2]!, req);
+    }
+
+    const exportApi = path.match(
+      /^\/api\/books\/([^/]+)\/export(?:\/([^/]+))?$/,
+    );
+    if (exportApi) {
+      const [, book, file] = exportApi;
+      const edition = url.searchParams.get("edition");
+      if (!file && req.method === "POST") {
+        return handleExport(book!, edition, req);
+      }
+      if (file && req.method === "GET") {
+        if (!safeName(book!) || (edition !== null && !safeName(edition))) {
+          return new Response("bad path", { status: 400 });
+        }
+        return serveStatic(exportDir(book!, edition), file);
+      }
     }
 
     const image = path.match(/^\/books\/([^/]+)\/images\/([^/]+)$/);

@@ -1143,10 +1143,20 @@ in one section.
 - `sheet` — the physical paper the printer loads. Same value space as `size`.
 - `folios-per-signature` — signature thickness in folios (one folio = one folded
   piece = 4 book pages, §7.7). Signature page count = `folios-per-signature`
-  × 4.
+  × 4. `"booklet"` puts every page in one signature: its folios are the page
+  count ÷ 4, rounded up, sized from the preview in the panel and from the
+  rendered `book.pdf` at export.
 - `duplex` — `short-edge` (book-style turn, default), `long-edge`
-  (calendar-style turn), or `none` (separate fronts/backs files). CLI flags
-  (`bml export --sheet/--folios/--duplex`) override per run.
+  (calendar-style turn), or `none` (separate fronts/backs files, the backs
+  printed by hand).
+- `flip` — with `duplex: none`, the edge the stack turns over on before its
+  backs are printed: `short-edge` (default) or `long-edge`. Lays the backs out
+  as §7.7 step 3 does for `duplex`.
+- `reverse-backs` — with `duplex: none`, `true` writes the backs file last sheet
+  first, for printers that stack face up. Default `false`.
+
+CLI flags (`bml export --sheet/--folios/--duplex/--flip/--reverse-backs`)
+override any of these per run.
 
 Everything else about the setup is **derived**, never stored: the grid of pages
 on a sheet side and which orientation it prints in (§7.7's `cols` × `rows`),
@@ -1761,10 +1771,18 @@ the settings that apply to the whole book rather than one sentinel type. Opens
 as a panel/overlay, not a permanent pane (§7.1). Includes:
 
 - Page setup as one unit (§4.3): the book page size (named presets and custom
-  dimensions), its margins, the sheet, folios per signature and duplex — with
-  the derived imposition (pages across a sheet, folios and cuts per sheet,
-  sheets per signature, leftover paper) shown live as those change, and an
-  unprintable combination reported here rather than at export time
+  dimensions), its margins, the sheet, folios per signature (or a booklet),
+  duplex, and for backs printed by hand the flip and back order — with the
+  derived imposition (pages across a sheet, folios and cuts per sheet, sheets
+  per signature, leftover paper) shown live as those change, and an unprintable
+  combination reported here rather than at export time
+- The first signature drawn as it prints: each sheet's front and back with the
+  book pages that land on it, folds dashed, cuts solid, from the same `impose()`
+  export uses
+- Print export from the panel (§7.7): Proof and Export run `bml export` on the
+  dev server (`POST /api/books/<book>/export`), landing any pending save first,
+  then link each PDF to open in the browser's viewer for printing; pagination
+  problems are listed with an "export anyway" choice
 - Font aliases (name → Google Fonts family, with a searchable picker)
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
@@ -1863,7 +1881,11 @@ pages, but a very different book); a 5.5in × 8.5in page gives 2 × 1 (fold only
 
 **Output:** one `sheets.pdf` (or `sheets-fronts.pdf` + `sheets-backs.pdf` for
 `duplex: none`), built by embedding `book.pdf` pages onto sheet-sized PDF pages;
-`--proof` emits numbered placeholders for a one-sheet printer check.
+`--proof` emits numbered placeholders for a one-sheet printer check (a booklet's
+proof needs `--pages`, the book's page count). The files land in
+`books/<book>/export/` (or `export/<edition>/`) whether `bml export` or the
+panel's Export wrote them; the dev server serves them at
+`/api/books/<book>/export/<file>`.
 
 ---
 

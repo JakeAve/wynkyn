@@ -342,6 +342,9 @@ export function previewLink(
       !p.closest(".preview-stage")
     ) ?? null;
   return {
+    pageCount: () =>
+      container.querySelectorAll(":scope > :not(.preview-stage) .pagedjs_page")
+        .length,
     pagesFor(key) {
       if (!countedOn?.isConnected) {
         counts.clear();

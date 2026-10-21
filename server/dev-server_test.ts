@@ -703,3 +703,60 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("http: print export lands a pending save, lists the PDFs and serves them; problems need force", async () => {
+  const { PDFDocument } = await import("pdf-lib");
+  const root = await makeBooksRoot();
+  let problems = [{ page: 2, message: "stranded page: no text or image" }];
+  const render = async () => {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < 4; i++) doc.addPage([396, 612]).drawText(String(i + 1));
+    return { pdf: await doc.save(), problems, passes: 1, seed: {} };
+  };
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 60_000, // only the export can land this save
+    render,
+  });
+  const base = `http://localhost:${server.port}/api/books/demo-book`;
+  const post = (body: unknown) =>
+    fetch(`${base}/export`, { method: "POST", body: JSON.stringify(body) });
+  try {
+    await (await fetch(`${base}/metadata`, {
+      method: "POST",
+      body: JSON.stringify({ sections: { page: { duplex: "none" } } }),
+    })).text();
+
+    const refused = await post({});
+    assertEquals(refused.status, 409);
+    assertEquals((await refused.json()).problems, [
+      "page 2: stranded page: no text or image",
+    ]);
+    const saved = JSON.parse(
+      await Deno.readTextFile(`${root}/demo-book/metadata.json`),
+    );
+    assertEquals(saved.page, { duplex: "none" });
+
+    const forced = await post({ force: true });
+    assertEquals(forced.status, 200);
+    const json = await forced.json();
+    assertEquals(json.files, [
+      "book.pdf",
+      "sheets-fronts.pdf",
+      "sheets-backs.pdf",
+    ]);
+    assertEquals(json.problems.length, 1);
+
+    problems = [];
+    assertEquals((await post({})).status, 200);
+    const pdf = await fetch(`${base}/export/sheets-backs.pdf`);
+    assertEquals(pdf.headers.get("content-type"), "application/pdf");
+    await pdf.body?.cancel();
+    const missing = await fetch(`${base}/export/nope.pdf?edition=pocket`);
+    assertEquals(missing.status, 404);
+    await missing.body?.cancel();
+  } finally {
+    await server.stop();
+  }
+});

@@ -7,11 +7,12 @@ import {
   gridFor,
   isLandscape,
 } from "../metadata/page-setup.ts";
+import type { Flip } from "../metadata/types.ts";
 
 export { type Dims, fmtDims, gridFor };
 export { parseDims } from "../metadata/page-setup.ts";
 
-export type Flip = "short-edge" | "long-edge";
+export type { Flip };
 
 export interface ImposeConfig {
   folios: number; // folios per signature (§4.3)

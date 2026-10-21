@@ -189,7 +189,8 @@ interface PageSetupCommon {
   // Configured values, with §4.3's defaults applied.
   size: string;
   sheet: string;
-  folios: number;
+  folios: number; // a booklet's is its page count ÷ 4, rounded up
+  booklet: boolean; // every page in one signature
   duplex: Duplex;
   unit: Unit;
   // Derived. All zero when the setup is unusable — callers show `error` instead.
@@ -240,14 +241,19 @@ export function resolvePageSetup(
   overrides: {
     size?: string;
     sheet?: string;
-    folios?: number;
+    folios?: number | "booklet";
     duplex?: Duplex;
+    pageCount?: number; // sizes a booklet; until it is known a booklet is 1 folio
   } = {},
 ): PageSetup {
   const size = overrides.size ?? page?.size ?? DEFAULT_SIZE;
   const sheet = overrides.sheet ?? page?.sheet ?? DEFAULT_SHEET;
-  const folios = overrides.folios ?? page?.["folios-per-signature"] ??
+  const setting = overrides.folios ?? page?.["folios-per-signature"] ??
     DEFAULT_FOLIOS;
+  const booklet = setting === "booklet";
+  const folios = booklet
+    ? Math.max(1, Math.ceil((overrides.pageCount ?? 0) / 4))
+    : setting;
   const duplex = overrides.duplex ?? page?.duplex ?? DEFAULT_DUPLEX;
   const unit = unitOf(size);
   const pageDims = tryParseDims(size);
@@ -256,6 +262,7 @@ export function resolvePageSetup(
     size,
     sheet,
     folios,
+    booklet,
     duplex,
     unit,
     page: pageDims,

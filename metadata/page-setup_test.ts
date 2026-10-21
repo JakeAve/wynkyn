@@ -162,3 +162,20 @@ Deno.test("fmtLength renders in the unit asked for, without trailing zeros", () 
   assertEquals(fmtLength(1, "mm"), "25.4mm");
   assertEquals(fmtLength(0), "0in");
 });
+
+Deno.test("resolvePageSetup: a booklet is one signature of every page", () => {
+  const page = {
+    size: "5.5in 8.5in",
+    "folios-per-signature": "booklet" as const,
+  };
+  const s = resolvePageSetup(page, { pageCount: 37 });
+  assertEquals(s.error, null);
+  assert(s.booklet);
+  assertEquals(s.folios, 10); // 37 pages → 40 → 10 folios
+  assertEquals(s.sheetsPerSignature, 10); // 2-up on letter: a folio per sheet
+  // Uncounted, it is the smallest booklet; a flag can turn it back off.
+  assertEquals(resolvePageSetup(page).folios, 1);
+  const flagged = resolvePageSetup(page, { folios: 4, pageCount: 37 });
+  assertFalse(flagged.booklet);
+  assertEquals(flagged.folios, 4);
+});

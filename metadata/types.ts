@@ -15,18 +15,22 @@ export interface PageMargins {
 }
 
 export type Duplex = "short-edge" | "long-edge" | "none";
+export type Flip = Exclude<Duplex, "none">;
 
 // The physical setup of the edition (§4.3): the book page, the sheet it is
 // printed on, and how those sheets are folded into signatures. `size`/`margins`
-// drive the preview; `sheet`/`folios-per-signature`/`duplex` drive imposition.
+// drive the preview; `sheet`/`folios-per-signature`/`duplex` (and, printing
+// the backs by hand, `flip`/`reverse-backs`) drive imposition.
 // Everything else about the setup (pages across a sheet, sheets per signature,
 // slack to trim off) is derived — see metadata/page-setup.ts.
 export interface PageConfig {
   size?: string; // any CSS @page size value (§4.3)
   margins?: PageMargins;
   sheet?: string; // physical paper the printer loads; same value space as `size`
-  "folios-per-signature"?: number;
+  "folios-per-signature"?: number | "booklet"; // booklet: every page in one signature
   duplex?: Duplex;
+  flip?: Flip; // which edge the stack turns over on for its backs, duplex "none"
+  "reverse-backs"?: boolean; // backs file in reverse sheet order, duplex "none"
 }
 
 export type NumberingStyle =

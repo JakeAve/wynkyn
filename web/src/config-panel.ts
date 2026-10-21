@@ -9,6 +9,8 @@ import { buildPageTab, buildPrintTab } from "./panel-page.ts";
 import { buildPartsTab } from "./panel-parts.ts";
 import {
   addIsNames,
+  type ExportRequest,
+  type ExportResult,
   type PanelContext,
   type PreviewLink,
   type Route,
@@ -24,6 +26,7 @@ export interface ConfigPanel {
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   markSaved(ok: boolean, detail?: string): void; // feedback from the save round-trip
   selectStyle(key: string): void; // open the panel where a catalog entry is styled (§7.4)
+  pagesChanged(): void; // the preview repaginated
 }
 
 export interface ConfigPanelOptions {
@@ -32,6 +35,7 @@ export interface ConfigPanelOptions {
   saveSections(sections: Partial<Metadata>): void;
   preview: PreviewLink;
   isNames(): string[]; // `{is}` classes the manuscript uses
+  exportPrint(req: ExportRequest): Promise<ExportResult>; // after saves land
 }
 
 const TABS: Array<[TabId, string]> = [
@@ -58,45 +62,51 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     dirty.add(key);
     setSaved("Saving…", "saving");
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      const sections: Record<string, unknown> = {};
-      // ?? null: defensive fallback for a section the user emptied out to
-      // delete server-side. In the current UI every section builder eagerly
-      // creates its object via `??=`, so meta[k] is always defined (possibly
-      // {}) by the time this fires — this branch is not reachable today, but
-      // is kept in case a future section is built lazily.
-      for (const k of dirty) {
-        sections[k] = (meta as Record<string, unknown>)[k] ?? null;
-      }
-      // Fonts rows can sit blank in the DOM while the user is still typing an
-      // alias (see the Fonts tab's "+ font alias" button). A sibling
-      // field's save must not flush that blank entry to disk — an empty
-      // family produces a malformed css2 URL param in generateFontLinks and
-      // can knock out every custom font in the live preview.
-      if (
-        dirty.has("fonts") && sections.fonts &&
-        typeof sections.fonts === "object"
-      ) {
-        const filtered: Record<string, string> = {};
-        for (
-          const [alias, family] of Object.entries(
-            sections.fonts as Record<string, string>,
-          )
-        ) {
-          if (family) filtered[alias] = family;
-        }
-        sections.fonts = filtered;
-      }
-      // Unstyled `{is}` classes (addIsNames) stay off disk.
-      if (sections.is) {
-        sections.is = Object.fromEntries(
-          Object.entries(sections.is).filter(([, p]) => Object.keys(p).length),
-        );
-      }
-      dirty.clear();
-      opts.saveSections(sections as Partial<Metadata>);
-    }, SAVE_DEBOUNCE_MS);
+    timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
   };
+
+  // Hands the dirty sections to saveSections now; the debounce ends here.
+  function flushSave(): void {
+    clearTimeout(timer);
+    if (!dirty.size) return;
+    const sections: Record<string, unknown> = {};
+    // ?? null: defensive fallback for a section the user emptied out to
+    // delete server-side. In the current UI every section builder eagerly
+    // creates its object via `??=`, so meta[k] is always defined (possibly
+    // {}) by the time this fires — this branch is not reachable today, but
+    // is kept in case a future section is built lazily.
+    for (const k of dirty) {
+      sections[k] = (meta as Record<string, unknown>)[k] ?? null;
+    }
+    // Fonts rows can sit blank in the DOM while the user is still typing an
+    // alias (see the Fonts tab's "+ font alias" button). A sibling
+    // field's save must not flush that blank entry to disk — an empty
+    // family produces a malformed css2 URL param in generateFontLinks and
+    // can knock out every custom font in the live preview.
+    if (
+      dirty.has("fonts") && sections.fonts &&
+      typeof sections.fonts === "object"
+    ) {
+      const filtered: Record<string, string> = {};
+      for (
+        const [alias, family] of Object.entries(
+          sections.fonts as Record<string, string>,
+        )
+      ) {
+        if (family) filtered[alias] = family;
+      }
+      sections.fonts = filtered;
+    }
+    // Unstyled `{is}` classes (addIsNames) stay off disk.
+    if (sections.is) {
+      sections.is = Object.fromEntries(
+        Object.entries(sections.is).filter(([, p]) => Object.keys(p).length),
+      );
+    }
+    dirty.clear();
+    opts.saveSections(sections as Partial<Metadata>);
+  }
+  let onPages: (() => void) | null = null; // the open tab's redraw, if any
 
   let route: Route = { tab: "page" }; // survives refresh()
 
@@ -150,7 +160,20 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   }
 
   function build(): Node[] {
-    const ctx: PanelContext = { meta, queueSave, go, preview: opts.preview };
+    onPages = null;
+    const ctx: PanelContext = {
+      meta,
+      queueSave,
+      go,
+      preview: opts.preview,
+      exportPrint: (req) => {
+        flushSave();
+        return opts.exportPrint(req);
+      },
+      onPages: (redraw) => {
+        onPages = redraw;
+      },
+    };
     switch (route.tab) {
       case "page":
         return buildPageTab(ctx);
@@ -223,6 +246,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         ok ? "ok" : "error",
       );
     },
+    pagesChanged: () => onPages?.(),
     selectStyle(key) {
       opts.overlay.hidden = false;
       addIsNames(meta, opts.isNames());

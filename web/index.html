@@ -902,7 +902,7 @@
       color: var(--muted);
       cursor: pointer;
     }
-    #config-overlay .tog:hover {
+    #config-overlay .tog:not([aria-pressed="true"]):hover {
       color: var(--fg);
     }
     #config-overlay .tog[aria-pressed="true"] {
@@ -1174,6 +1174,107 @@
     }
     #config-overlay .readout.cfg-readout-bad p {
       color: var(--err);
+    }
+    /* Print tab: the first signature as it prints. The sheet is paper-white in
+       both themes. Solid strokes are screen pixels; the fold's dashes are in
+       the SVG's units, inches, where its dash pattern is measured. */
+    #config-overlay .sheets {
+      display: grid;
+      gap: 10px;
+      padding: 6px 0 4px;
+    }
+    #config-overlay .sheet {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    #config-overlay .sheet figure {
+      margin: 0;
+      display: grid;
+      gap: 3px;
+      justify-items: center;
+    }
+    #config-overlay .sheet svg {
+      width: 100%;
+      height: auto;
+      max-height: 150px;
+    }
+    #config-overlay .sheet figcaption {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    #config-overlay .sheet .paper {
+      fill: #fff;
+      stroke: #b9b9b4;
+      stroke-width: 1px;
+      vector-effect: non-scaling-stroke;
+    }
+    #config-overlay .sheet .slot {
+      fill: none;
+      stroke: #e2e2de;
+      stroke-width: 1px;
+      vector-effect: non-scaling-stroke;
+    }
+    #config-overlay .sheet .slot.blank {
+      fill: #ededea;
+    }
+    #config-overlay .sheet text {
+      fill: #161616;
+      text-anchor: middle;
+      dominant-baseline: central;
+      font-variant-numeric: tabular-nums;
+    }
+    #config-overlay .sheet .fold {
+      stroke: #8f8f8a;
+      stroke-width: .06;
+      stroke-dasharray: .25 .18;
+    }
+    #config-overlay .sheet .cut {
+      stroke: #a04545;
+      stroke-width: 1.5px;
+      vector-effect: non-scaling-stroke;
+    }
+    #config-overlay .actions {
+      display: flex;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    #config-overlay .tog.primary {
+      background: var(--inv-bg);
+      border-color: var(--inv-bg);
+      color: var(--inv-fg);
+    }
+    #config-overlay .tog:disabled {
+      opacity: .5;
+      cursor: progress;
+    }
+    #config-overlay .export-status {
+      display: grid;
+      gap: 4px;
+      padding-top: 6px;
+      justify-items: start;
+    }
+    #config-overlay .export-status p {
+      margin: 0;
+    }
+    #config-overlay .export-status .err,
+    #config-overlay .export-status ul {
+      color: var(--err);
+    }
+    #config-overlay .export-status ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+    }
+    #config-overlay .files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      padding: 4px 0;
+    }
+    #config-overlay .files a {
+      color: var(--fg);
+      text-underline-offset: 2px;
     }
     #config-overlay button,
     #config-overlay select,

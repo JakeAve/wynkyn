@@ -541,3 +541,40 @@ Deno.test("buildSheetPdf: a quartered setup prints a portrait sheet, 2 × 2", as
   assertEquals(doc.getPageCount(), 4);
   assertEquals([q.cols * qpage.w, q.rows * qpage.h], [8.5, 14]);
 });
+
+Deno.test("exportBook: a booklet is one signature sized by the rendered pages; flip and reverse-backs come from the page section", async () => {
+  const root = await Deno.makeTempDir();
+  await Deno.mkdir(`${root}/book`);
+  await Deno.writeTextFile(`${root}/book/manuscript.md`, "{title}\nBook\n");
+  await Deno.writeTextFile(
+    `${root}/book/metadata.json`,
+    JSON.stringify({
+      page: {
+        sheet: "legal",
+        "folios-per-signature": "booklet",
+        duplex: "none",
+        "reverse-backs": true,
+      },
+    }),
+  );
+  const out = await Deno.makeTempDir();
+  const render = async () => {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < 10; i++) {
+      doc.addPage([396, 612]).drawText(String(i + 1));
+    }
+    return { pdf: await doc.save(), problems: [], passes: 1, seed: {} };
+  };
+  const s = await exportBook(root, "book", { out, render });
+  assertEquals(s.setup.folios, 3); // 10 pages → 12 → 3 folios
+  assertEquals(s.imposition.signatures, 1);
+  assertEquals(s.imposition.sheets.length, 3);
+  // reverse-backs: the backs file starts at the last sheet.
+  const backs = sidesFor(s.imposition, "backs", true).map((x) => x.label);
+  assertEquals(backs[0], "sig 1 · sheet 3 · back");
+  await assertRejects(
+    () => exportBook(root, "book", { out, proof: true }),
+    Error,
+    "a booklet proof needs --pages",
+  );
+});

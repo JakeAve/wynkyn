@@ -2,7 +2,12 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
-import { addIsNames, catalogFor } from "./style-catalog.ts";
+import {
+  addIsNames,
+  catalogFor,
+  type ExportRequest,
+  type ExportResult,
+} from "./style-catalog.ts";
 import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
   fitPreview,
@@ -88,6 +93,7 @@ let dirty = false; // local edits newer than the last completed save
 let remoteFetchGen = 0;
 let configPanel: ConfigPanel | null = null;
 let metaSaveInFlight = false;
+let metaSaveDone: Promise<void> = Promise.resolve(); // the save in flight
 let queuedMetaSections: Partial<Metadata> | null = null;
 
 function onDocChanged(text: string): void {
@@ -423,7 +429,7 @@ function saveMetadataSections(sections: Partial<Metadata>): void {
     return;
   }
   metaSaveInFlight = true;
-  doMetadataSave(sections);
+  metaSaveDone = doMetadataSave(sections);
 }
 
 async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
@@ -445,7 +451,7 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
       queuedMetaSections = null;
       // fire-and-forget: same intentional non-blocking dispatch as doSave.
       metaSaveInFlight = true;
-      doMetadataSave(next);
+      metaSaveDone = doMetadataSave(next);
     }
   }
 }
@@ -465,6 +471,43 @@ const styleCatalog = () => {
   return catalogFor(m);
 };
 
+// The Print tab's export, run once every style save has reached the server.
+async function exportPrint(req: ExportRequest): Promise<ExportResult> {
+  while (metaSaveInFlight) await metaSaveDone;
+  const q = edition === null ? "" : `?edition=${encodeURIComponent(edition)}`;
+  const base = `/api/books/${encodeURIComponent(book)}/export`;
+  try {
+    const res = await fetch(base + q, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (
+      res.status === 409 && res.headers.get("content-type")?.includes("json")
+    ) {
+      const { problems } = await res.json() as { problems: string[] };
+      return { problems, files: [] };
+    }
+    if (!res.ok) return { error: await res.text(), problems: [], files: [] };
+    const r = await res.json() as {
+      summary: string;
+      files: string[];
+      problems: string[];
+    };
+    // A fresh query per export, so the viewer never shows a cached PDF.
+    const v = `${q ? `${q}&` : "?"}v=${Date.now()}`;
+    return {
+      ...r,
+      files: r.files.map((name) => ({
+        name,
+        url: `${base}/${encodeURIComponent(name)}${v}`,
+      })),
+    };
+  } catch (err) {
+    return { error: brief(err), problems: [], files: [] };
+  }
+}
+
 async function ensureConfigPanel(): Promise<ConfigPanel | null> {
   if (configPanel) return configPanel;
   try {
@@ -475,6 +518,7 @@ async function ensureConfigPanel(): Promise<ConfigPanel | null> {
       saveSections: saveMetadataSections,
       preview: previewLink($("preview"), styleCatalog),
       isNames: () => isNames,
+      exportPrint,
     });
     return configPanel;
   } catch (err) {
@@ -819,6 +863,7 @@ async function main(): Promise<void> {
     renderPreview(msg, previewEl, key).then((problems) => {
       showPageProblems(problems);
       refreshPageIndicator();
+      configPanel?.pagesChanged();
     }, (err) => {
       // The old pages stay up; their problems no longer describe this book.
       setStatus("error", `preview: ${brief(err)}`);

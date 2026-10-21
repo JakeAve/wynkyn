@@ -141,11 +141,11 @@ export async function buildSheetPdf(
 }
 
 export interface ExportOptions {
-  folios?: number;
+  folios?: number | "booklet";
   sheet?: string;
   duplex?: Flip | "none";
-  flip?: Flip;
-  reverseBacks?: boolean;
+  flip?: Flip; // default: the page section's, then short-edge
+  reverseBacks?: boolean; // default: the page section's
   proof?: boolean;
   pages?: number; // proof only
   out?: string;
@@ -162,6 +162,17 @@ export interface ExportSummary {
   diagnostics: number;
   setup: PageSetup; // the §4.3 page setup this run actually used
   pagination: PageProblem[]; // page map problems, exported anyway under force
+}
+
+/** The render settled with page-map problems and `force` was not set. */
+export class PaginationError extends Error {
+  constructor(readonly problems: PageProblem[]) {
+    super(
+      `pagination problems (--force to export anyway):\n${
+        problems.map((p) => `  ${formatProblem(p)}`).join("\n")
+      }`,
+    );
+  }
 }
 
 function assertWholeNumber(value: number, label: string): void {
@@ -221,15 +232,19 @@ export async function exportBook(
   // One resolver for the whole §4.3 setup, shared with the config panel, so a
   // bad setup fails here with the same message the panel shows — and before we
   // spend a Chrome render on it.
-  const setup = resolvePageSetup(m.page, {
+  const overrides = {
     sheet: opts.sheet,
     folios: opts.folios,
     duplex: opts.duplex,
-  });
+  };
+  let setup = resolvePageSetup(m.page, overrides);
   if (setup.error !== null) throw new Error(setup.error);
-  const { folios, duplex, sheetDims: sheet } = setup;
+  const { duplex, sheetDims: sheet } = setup;
   if (opts.pages !== undefined) assertWholeNumber(opts.pages, "pages");
-  const flip = opts.flip ?? "short-edge";
+  if (opts.proof && setup.booklet && opts.pages === undefined) {
+    throw new Error("a booklet proof needs --pages, the book's page count");
+  }
+  const flip = opts.flip ?? m.page?.flip ?? "short-edge";
   if (!FLIP_VALUES.includes(flip)) {
     throw new Error(
       `flip must be short-edge or long-edge (got ${JSON.stringify(flip)})`,
@@ -248,7 +263,7 @@ export async function exportBook(
   if (opts.proof) {
     // No PDF exists yet to measure — fall back to the configured page size.
     page = setup.page;
-    pageCount = opts.pages ?? 4 * folios;
+    pageCount = opts.pages ?? 4 * setup.folios;
   } else {
     const imagesDir = `file://${await Deno.realPath(bookDir)}/images`;
     const built = await buildBook(booksRoot, book, {
@@ -267,11 +282,7 @@ export async function exportBook(
     );
     pagination = rendered.problems;
     if (pagination.length && !opts.force) {
-      throw new Error(
-        `pagination problems (--force to export anyway):\n${
-          pagination.map((p) => `  ${formatProblem(p)}`).join("\n")
-        }`,
-      );
+      throw new PaginationError(pagination);
     }
     source = rendered.pdf;
     const src = await PDFDocument.load(source);
@@ -290,6 +301,13 @@ export async function exportBook(
     }
   }
 
+  // A booklet is sized by the pages it turned out to have.
+  if (setup.booklet) {
+    const sized = resolvePageSetup(m.page, { ...overrides, pageCount });
+    if (sized.error === null) setup = sized;
+  }
+  const { folios } = setup;
+  const reverseBacks = opts.reverseBacks ?? m.page?.["reverse-backs"] ?? false;
   const imposition = impose(pageCount, { folios, sheet, page, duplex, flip });
   const geom: SheetGeometry = {
     sheet: imposition.sheet, // oriented by the grid, not by `sheet` as parsed
@@ -309,7 +327,7 @@ export async function exportBook(
       await Deno.writeFile(
         path,
         await buildSheetPdf(
-          sidesFor(imposition, mode, opts.reverseBacks ?? false),
+          sidesFor(imposition, mode, reverseBacks),
           geom,
           source,
         ),
