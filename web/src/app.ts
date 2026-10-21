@@ -1,7 +1,7 @@
 // web/src/app.ts — client orchestrator: book selection, editor, WebSocket, panes.
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
-import type { BmlDocument } from "../../parser/types.ts";
+import { type BmlDocument, DEFAULT_EDITION_TOKEN } from "../../parser/types.ts";
 import {
   addIsNames,
   catalogFor,
@@ -35,6 +35,7 @@ import {
   createEditor,
   replaceBuffer,
   scrollEditorToLine,
+  setEditionSpans,
 } from "./editor.ts";
 import { applySnippet, SNIPPETS } from "./snippets.ts";
 import { buildTree } from "./tree-data.ts";
@@ -124,6 +125,7 @@ function reparse(text: string): void {
     return t?.name === "is" && !t.closing && t.slug ? [t.slug] : [];
   });
   applyDiagnostics(editor, doc.diagnostics);
+  setEditionSpans(editor, doc.onlySpans, edition ?? DEFAULT_EDITION_TOKEN);
   const diag = $("diagnostics");
   const first = doc.diagnostics[0];
   diag.textContent = first

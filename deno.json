@@ -12,6 +12,7 @@
   "imports": {
     "@codemirror/language": "npm:@codemirror/language@^6.11.0",
     "@codemirror/lint": "npm:@codemirror/lint@^6.8.0",
+    "@codemirror/search": "npm:@codemirror/search@^6.7.1",
     "@codemirror/state": "npm:@codemirror/state@^6.5.0",
     "@codemirror/theme-one-dark": "npm:@codemirror/theme-one-dark@^6.1.0",
     "@codemirror/view": "npm:@codemirror/view@^6.38.0",

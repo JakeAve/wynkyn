@@ -1,6 +1,12 @@
 import { assertEquals } from "@std/assert";
 import { StringStream } from "@codemirror/language";
-import { type BmlStreamState, bmlToken } from "./bml-language.ts";
+import {
+  type BmlStreamState,
+  bmlToken,
+  classifyLines,
+  emRanges,
+  structuralBlock,
+} from "./bml-language.ts";
 
 // Run the tokenizer over one line, collecting [style, consumedText] pairs.
 function tokenize(
@@ -81,4 +87,59 @@ Deno.test("unterminated tag resets at the next line", () => {
   const state: BmlStreamState = { tag: null };
   tokenize("{chapter: thaw", state); // malformed: no closing brace
   assertEquals(tokenize("plain prose", state), [[null, "plain prose"]]);
+});
+
+Deno.test("classifyLines: structural, fields, and the line after a title", () => {
+  assertEquals(
+    classifyLines([
+      "{chapter: one}",
+      "{title}",
+      "Chapter One",
+      "{subtitle}",
+      "In which",
+      "{heading}",
+      "",
+      "Prose.",
+    ]),
+    [["struct"], ["field"], ["strong"], ["field"], ["italic"], [], [], []],
+  );
+});
+
+Deno.test("classifyLines: block rails run tag to tag, or to EOF unclosed", () => {
+  assertEquals(
+    classifyLines(["a", "{quote}", "b", "{/quote}", "c", "{poem}", "d"]),
+    [[], ["rail"], ["rail"], ["rail"], [], ["rail"], ["rail"]],
+  );
+  // nested pairs and a stray closer
+  assertEquals(
+    classifyLines([
+      "{sidebar}",
+      "{quote}",
+      "x",
+      "{/quote}",
+      "{/sidebar}",
+      "{/is}",
+    ]),
+    [["rail"], ["rail"], ["rail"], ["rail"], ["rail"], []],
+  );
+});
+
+Deno.test("classifyLines: box-drawing comments are rules, a label between them", () => {
+  assertEquals(
+    classifyLines(["%% ──────", "%% Body matter", "%% ──────", "%% note"]),
+    [["rule"], ["label"], ["rule"], []],
+  );
+});
+
+Deno.test("emRanges: tags and the text between", () => {
+  assertEquals(emRanges("a {em}bc{/em} \\{em}x"), [[2, 6, 8, 13]]);
+});
+
+Deno.test("structuralBlock: from the structural line at or above to before the next", () => {
+  const lines = ["front", "{chapter: a}", "x", "y", "{part: b}", "z"];
+  const at = (n: number) => lines[n - 1]!;
+  assertEquals(structuralBlock(at, lines.length, 3), [2, 4]);
+  assertEquals(structuralBlock(at, lines.length, 2), [2, 4]);
+  assertEquals(structuralBlock(at, lines.length, 1), [1, 1]);
+  assertEquals(structuralBlock(at, lines.length, 6), [5, 6]);
 });

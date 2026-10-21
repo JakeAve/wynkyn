@@ -1,14 +1,29 @@
 // web/src/bml-language.ts — CodeMirror 6 language support for BML (spec §3.2):
 // sentinels, slugs, key/value pairs, comments, escapes, hard line breaks.
-// A stream parser suffices because a sentinel never spans lines.
+// A stream parser suffices because a sentinel never spans lines. Line
+// decorations on top style sentinels by kind (structural, field, block, wrap).
 import {
   HighlightStyle,
   StreamLanguage,
   type StringStream,
   syntaxHighlighting,
 } from "@codemirror/language";
-import type { Extension } from "@codemirror/state";
+import {
+  type Extension,
+  type Range,
+  RangeSet,
+  StateField,
+  type Text,
+} from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  gutterLineClass,
+  GutterMarker,
+} from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import { parseSentinelLine } from "../../parser/sentinel.ts";
 
 // Which field of a {sentinel: slug | key: value} the next token belongs to.
 export type TagField = "name" | "slug" | "key" | "value";
@@ -87,6 +102,176 @@ const bmlHighlight = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.escape, color: "var(--syn-k)", fontWeight: "bold" },
 ]));
 
+// ---- sentinels by kind (UX round 1): line classes and gutter marks ----
+
+const STRUCTURAL = new Set(["matter", "part", "chapter"]);
+const FIELDS = new Set([
+  "title",
+  "subtitle",
+  "author",
+  "editor",
+  "translator",
+  "publisher",
+  "publisher-location",
+  "year",
+  "edition",
+  "series",
+  "series-number",
+  "copyright-line",
+  "rights",
+  "isbn",
+  "printer",
+  "typeface",
+  "paper",
+  "binding",
+  "dropcap",
+  "attribution",
+]);
+const BLOCKS = new Set([
+  "quote",
+  "epigraph",
+  "poem",
+  "pullquote",
+  "sidebar",
+  "verses",
+  "columns",
+  "is",
+]);
+const NEXT_KIND: Record<string, LineKind> = {
+  title: "strong",
+  heading: "strong",
+  subheading: "strong",
+  subtitle: "italic",
+};
+// A `%%` line made only of box-drawing characters (U+2500–U+257F).
+const RULE_RE = /^%%\s*[─-╿]+\s*$/;
+
+export type LineKind =
+  | "struct" // {matter} / {part} / {chapter}
+  | "field" // {title}, {author}, … — small and muted
+  | "rail" // inside a block pair, tags inclusive
+  | "strong" // the line after {title} / {heading} / {subheading}
+  | "italic" // the line after {subtitle}
+  | "rule" // %% ─────
+  | "label"; // a %% line between two rules
+
+export function isStructural(line: string): boolean {
+  const t = parseSentinelLine(line);
+  return !!t && !t.closing && STRUCTURAL.has(t.name);
+}
+
+// The kinds of every line (index i = line i + 1). Rails run from a block's
+// opening tag to its closing tag, or to the end when it never closes.
+export function classifyLines(lines: string[]): LineKind[][] {
+  const rule = lines.map((l) => RULE_RE.test(l));
+  const open: string[] = [];
+  let next: LineKind | null = null;
+  return lines.map((text, i) => {
+    const kinds: LineKind[] = [];
+    const t = parseSentinelLine(text);
+    if (next && !t && text.trim() !== "") kinds.push(next);
+    next = null;
+    if (rule[i]) kinds.push("rule");
+    else if (text.startsWith("%%") && rule[i - 1] && rule[i + 1]) {
+      kinds.push("label");
+    }
+    if (t) {
+      if (!t.closing && STRUCTURAL.has(t.name)) kinds.push("struct");
+      if (FIELDS.has(t.name)) kinds.push("field");
+      next = t.closing ? null : NEXT_KIND[t.name] ?? null;
+      if (BLOCKS.has(t.name)) {
+        if (!t.closing) open.push(t.name);
+        else if (open.includes(t.name)) {
+          kinds.push("rail");
+          open.length = open.lastIndexOf(t.name);
+        }
+      }
+    }
+    if (open.length && !kinds.includes("rail")) kinds.push("rail");
+    return kinds;
+  });
+}
+
+// `{em}…{/em}` pairs on one line: [tagStart, textStart, textEnd, tagEnd].
+// ponytail: single-line only; a wrap spanning lines stays plain.
+export function emRanges(line: string): [number, number, number, number][] {
+  const out: [number, number, number, number][] = [];
+  for (const m of line.matchAll(/(?<!\\)\{em\}(.*?)(?<!\\)\{\/em\}/g)) {
+    const a = m.index;
+    const b = a + m[0].length;
+    out.push([a, a + 4, b - 5, b]);
+  }
+  return out;
+}
+
+// The structural block holding `line` (1-based): from the nearest
+// {matter}/{part}/{chapter} at or above it to the line before the next.
+export function structuralBlock(
+  lineText: (n: number) => string,
+  lines: number,
+  line: number,
+): [number, number] {
+  let from = line;
+  while (from > 1 && !isStructural(lineText(from))) from--;
+  let to = line + 1;
+  while (to <= lines && !isStructural(lineText(to))) to++;
+  return [from, to - 1];
+}
+
+const lineDeco = (kind: LineKind) =>
+  Decoration.line({ class: `cm-bml-${kind}` });
+const LINE_DECOS = {
+  struct: lineDeco("struct"),
+  field: lineDeco("field"),
+  rail: lineDeco("rail"),
+  strong: lineDeco("strong"),
+  italic: lineDeco("italic"),
+  rule: lineDeco("rule"),
+  label: lineDeco("label"),
+} satisfies Record<LineKind, Decoration>;
+const emTag = Decoration.mark({ class: "cm-bml-wrap" });
+const emText = Decoration.mark({ class: "cm-bml-it" });
+export class ClassMarker extends GutterMarker {
+  constructor(override readonly elementClass: string) {
+    super();
+  }
+}
+const structGutter = new ClassMarker("cm-bml-struct");
+
+interface KindDecos {
+  lines: DecorationSet;
+  gutter: RangeSet<GutterMarker>;
+}
+
+function buildKinds(doc: Text): KindDecos {
+  const text = doc.toString().split("\n");
+  const kinds = classifyLines(text);
+  const decos: Range<Decoration>[] = [];
+  const marks: Range<GutterMarker>[] = [];
+  let pos = 0;
+  text.forEach((line, i) => {
+    for (const k of kinds[i] ?? []) decos.push(LINE_DECOS[k].range(pos));
+    if (kinds[i]?.includes("struct")) marks.push(structGutter.range(pos));
+    for (const [a, b, c, d] of emRanges(line)) {
+      decos.push(emTag.range(pos + a, pos + b));
+      if (c > b) decos.push(emText.range(pos + b, pos + c));
+      decos.push(emTag.range(pos + c, pos + d));
+    }
+    pos += line.length + 1;
+  });
+  return { lines: Decoration.set(decos, true), gutter: RangeSet.of(marks) };
+}
+
+// ponytail: whole-document rescan on every edit; scan the viewport if it lags.
+const bmlKinds = StateField.define<KindDecos>({
+  create: (state) => buildKinds(state.doc),
+  update: (v, tr) => tr.docChanged ? buildKinds(tr.state.doc) : v,
+  provide: (f) => [
+    EditorView.decorations.from(f, (v) => v.lines),
+    gutterLineClass.from(f, (v) => v.gutter),
+  ],
+});
+
 export function bml(): Extension[] {
-  return [bmlLanguage, bmlHighlight];
+  return [bmlLanguage, bmlHighlight, bmlKinds];
 }

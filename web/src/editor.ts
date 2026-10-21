@@ -1,11 +1,26 @@
 // web/src/editor.ts — the CodeMirror pane (spec §7.3).
 import { basicSetup } from "codemirror";
-import { EditorView } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  gutterLineClass,
+  type GutterMarker,
+  WidgetType,
+} from "@codemirror/view";
+import {
+  EditorState,
+  type Range,
+  RangeSet,
+  StateEffect,
+  StateField,
+  type Text,
+} from "@codemirror/state";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
-import { bml } from "./bml-language.ts";
+import { bml, ClassMarker } from "./bml-language.ts";
 import { toCmDiagnostics } from "./diagnostics.ts";
-import type { Diagnostic } from "../../parser/types.ts";
+import { searchPanel } from "./search-panel.ts";
+import type { Diagnostic, OnlySpan } from "../../parser/types.ts";
 
 // True while replaceBuffer() applies a remote change: those edits must not
 // re-enter the save path (spec §6 — a save never round-trips).
@@ -22,9 +37,9 @@ const inkTheme = EditorView.theme({
     color: "var(--muted)",
     border: "none",
   },
-  ".cm-activeLine": { backgroundColor: "var(--hover)" },
+  ".cm-activeLine": { backgroundColor: "var(--active)" },
   ".cm-activeLineGutter": {
-    backgroundColor: "var(--hover)",
+    backgroundColor: "var(--active)",
     color: "var(--fg)",
   },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--fg)" },
@@ -34,7 +49,91 @@ const inkTheme = EditorView.theme({
     backgroundColor: "var(--bg)",
     color: "var(--fg)",
   },
+  ".cm-panels-top": { borderBottom: "1px solid var(--line)" },
+  ".cm-panels-bottom": { borderTop: "1px solid var(--line)" },
 });
+
+// ---- EXPERIMENTAL {only} spans: amber gutter line on every span, the
+// opening line tagged with its editions, lines this edition skips dimmed ----
+
+const setSpans = StateEffect.define<{ spans: OnlySpan[]; token: string }>();
+
+class EditionsTag extends WidgetType {
+  constructor(readonly editions: string) {
+    super();
+  }
+  override eq(o: EditionsTag): boolean {
+    return o.editions === this.editions;
+  }
+  toDOM(): HTMLElement {
+    const s = document.createElement("span");
+    s.className = "cm-bml-cond-tag";
+    s.textContent = this.editions;
+    s.title = "Experimental: shown only in these editions";
+    return s;
+  }
+}
+
+interface SpanDecos {
+  lines: DecorationSet;
+  gutter: RangeSet<GutterMarker>;
+}
+
+const condLine = Decoration.line({ class: "cm-bml-cond" });
+const offLine = Decoration.line({ class: "cm-bml-off" });
+const condGutter = new ClassMarker("cm-bml-cond");
+
+function buildSpans(doc: Text, spans: OnlySpan[], token: string): SpanDecos {
+  const decos: Range<Decoration>[] = [];
+  const marks: Range<GutterMarker>[] = [];
+  for (const s of spans) {
+    if (s.line > doc.lines) continue;
+    const off = !s.editions.includes(token);
+    for (let n = s.line; n <= Math.min(s.endLine, doc.lines); n++) {
+      const from = doc.line(n).from;
+      decos.push(condLine.range(from));
+      if (off) decos.push(offLine.range(from));
+      marks.push(condGutter.range(from));
+    }
+    decos.push(
+      Decoration.widget({
+        widget: new EditionsTag(s.editions.join(" · ")),
+        side: 1,
+      }).range(doc.line(s.line).to),
+    );
+  }
+  return {
+    lines: Decoration.set(decos, true),
+    gutter: RangeSet.of(marks, true),
+  };
+}
+
+const editionSpans = StateField.define<SpanDecos>({
+  create: () => ({ lines: Decoration.none, gutter: RangeSet.empty }),
+  update(v, tr) {
+    for (const e of tr.effects) {
+      if (e.is(setSpans)) {
+        return buildSpans(tr.state.doc, e.value.spans, e.value.token);
+      }
+    }
+    return tr.docChanged
+      ? { lines: v.lines.map(tr.changes), gutter: v.gutter.map(tr.changes) }
+      : v;
+  },
+  provide: (f) => [
+    EditorView.decorations.from(f, (v) => v.lines),
+    gutterLineClass.from(f, (v) => v.gutter),
+  ],
+});
+
+// Mark the {only} spans; `token` is the open edition's {only} token.
+export function setEditionSpans(
+  view: EditorView,
+  spans: OnlySpan[],
+  token: string,
+): void {
+  view.dispatch({ effects: setSpans.of({ spans, token }) });
+}
 
 export function createEditor(opts: {
   parent: HTMLElement;
@@ -51,6 +150,8 @@ export function createEditor(opts: {
         basicSetup,
         inkTheme,
         bml(),
+        searchPanel(),
+        editionSpans,
         lintGutter(),
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
