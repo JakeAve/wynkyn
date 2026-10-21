@@ -104,6 +104,7 @@ export type ServerMessage = (BuildResult & { type: "update" }) | {
   book: string;
   edition: string | null;
   message: string;
+  save?: "metadata"; // a debounced metadata write failed (else a build error)
 };
 
 /** First 16 hex chars of SHA-256. Server-side only: crypto.subtle is undefined

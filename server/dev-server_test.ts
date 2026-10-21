@@ -132,22 +132,17 @@ Deno.test("websocket: initial build on connect, rebuild pushed on file change", 
   }
 });
 
-Deno.test("save: rapid posts coalesce to one write; POST and broadcast carry the version", async () => {
+Deno.test("save: each post lands before it is answered; POST and broadcast carry the version", async () => {
   const root = await makeBooksRoot();
-  // Debounce long enough that two sequential local fetches land inside one window.
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 200,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   const ws = new WebSocket(
     `ws://localhost:${server.port}/ws?book=demo-book&client=observer`,
   );
+  const manuscript = `${root}/demo-book/manuscript.md`;
   try {
     await nextMessage(ws); // initial build
     await new Promise((r) => setTimeout(r, 300)); // let the watch warm up
-    const pushed = nextMessage(ws);
 
     const post = (text: string) =>
       fetch(`${base}/api/books/demo-book/manuscript`, {
@@ -164,22 +159,21 @@ Deno.test("save: rapid posts coalesce to one write; POST and broadcast carry the
       ok: true,
       version: await contentVersion(draftA),
     });
+    assertEquals(await Deno.readTextFile(manuscript), draftA);
+    const versionB = await contentVersion(draftB);
+    const pushed = nextMessageWhere(
+      ws,
+      (m) => m.manuscriptVersion === versionB,
+    );
     const r2 = await post(draftB);
     assertEquals(r2.status, 200);
-    const { version } = await r2.json();
-    assertEquals(version, await contentVersion(draftB));
+    assertEquals((await r2.json()).version, versionB);
+    assertEquals(await Deno.readTextFile(manuscript), draftB);
 
     const msg = await pushed;
     assertEquals(msg.type, "update");
     assertEquals("origin" in msg, false);
-    // spec §6: the saving editor recognises its own echo by version.
-    assertEquals(msg.manuscriptVersion, version);
     assert((msg.html as string).includes("Draft B"));
-    // Only the LAST text hit the disk — the debounce swallowed Draft A.
-    assertEquals(
-      await Deno.readTextFile(`${root}/demo-book/manuscript.md`),
-      draftB,
-    );
 
     const bad = await fetch(`${base}/api/books/demo-book/manuscript`, {
       method: "POST",
@@ -194,57 +188,34 @@ Deno.test("save: rapid posts coalesce to one write; POST and broadcast carry the
   }
 });
 
-Deno.test("save: a failed debounced write reaches the book's editors as an error", async () => {
+Deno.test("save: a failed write is a 500 with the error, and nothing lands", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 150,
-  });
-  const base = `http://localhost:${server.port}`;
-  const ws = new WebSocket(
-    `ws://localhost:${server.port}/ws?book=demo-book&client=observer`,
-  );
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const dir = `${root}/demo-book`;
+  const before = await Deno.readTextFile(`${dir}/manuscript.md`);
   try {
-    await nextMessage(ws); // initial build
-    const failed = nextMessageWhere(
-      ws,
-      (m) =>
-        m.type === "error" && (m.message as string).startsWith("save failed:"),
+    await Deno.chmod(dir, 0o555); // readable, but the tmp file can't be made
+    const res = await fetch(
+      `http://localhost:${server.port}/api/books/demo-book/manuscript`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: "won't land" }),
+      },
     );
-    // Accepted synchronously, but the actual write happens after the debounce.
-    const post = await fetch(`${base}/api/books/demo-book/manuscript`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: "won't land", clientId: "editor-1" }),
-    });
-    assertEquals(post.status, 200);
-    await post.body?.cancel();
-
-    // Yank the book out from under the pending write before the debounce
-    // timer fires, forcing the write to reject (ENOENT).
-    await Deno.remove(`${root}/demo-book`, { recursive: true });
-    const msg = await failed;
-    assertEquals(msg.book, "demo-book");
-    assertEquals(msg.edition, null);
-
-    // Server must still be alive and serving other requests.
-    const books = await (await fetch(`${base}/api/books`)).json();
-    assertEquals(books, { books: [] });
+    assertEquals(res.status, 500);
+    assert((await res.text()).startsWith("save failed:"));
+    assertEquals(await Deno.readTextFile(`${dir}/manuscript.md`), before);
   } finally {
-    ws.close();
+    await Deno.chmod(dir, 0o755);
     await server.stop();
-    await Deno.remove(root, { recursive: true }).catch(() => {});
+    await Deno.remove(root, { recursive: true });
   }
 });
 
 Deno.test("save: stale base gets 409 with the disk text", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 100,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const url = `http://localhost:${server.port}/api/books/demo-book/manuscript`;
   const manuscript = `${root}/demo-book/manuscript.md`;
   const post = (body: unknown) =>
@@ -267,11 +238,10 @@ Deno.test("save: stale base gets 409 with the disk text", async () => {
       text: external,
       version: await contentVersion(external),
     });
-    await new Promise((r) => setTimeout(r, 250));
-    assertEquals(await Deno.readTextFile(manuscript), external); // not queued
+    assertEquals(await Deno.readTextFile(manuscript), external);
 
     // Based on the current version it lands; the next save may be based on
-    // the one still pending.
+    // the version that one returned.
     const ok = await post({
       text: "mine 1",
       base: await contentVersion(external),
@@ -280,27 +250,60 @@ Deno.test("save: stale base gets 409 with the disk text", async () => {
     const { version } = await ok.json();
     const next = await post({ text: "mine 2", base: version });
     assertEquals(next.status, 200);
-    await next.body?.cancel();
+    const { version: v2 } = await next.json();
+
+    // A write from outside between two saves: the second is refused.
+    await Deno.writeTextFile(manuscript, "theirs");
+    const late = await post({ text: "mine 3", base: v2 });
+    assertEquals(late.status, 409);
+    assertEquals((await late.json()).text, "theirs");
+    assertEquals(await Deno.readTextFile(manuscript), "theirs");
+
     // A missing base skips the check.
-    const noBase = await post({ text: "mine 3" });
+    const noBase = await post({ text: "mine 4" });
     assertEquals(noBase.status, 200);
     await noBase.body?.cancel();
-    await new Promise((r) => setTimeout(r, 250));
-    assertEquals(await Deno.readTextFile(manuscript), "mine 3");
+    assertEquals(await Deno.readTextFile(manuscript), "mine 4");
   } finally {
     await server.stop();
     await Deno.remove(root, { recursive: true });
   }
 });
 
-Deno.test("http: GET manuscript returns source; pending saves read through", async () => {
+Deno.test("save: concurrent saves from one base — one lands, the other gets 409", async () => {
   const root = await makeBooksRoot();
-  // 5s debounce: the POSTed save is guaranteed still pending when we GET.
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 5000,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const url = `http://localhost:${server.port}/api/books/demo-book/manuscript`;
+  const post = (text: string, base: string) =>
+    fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, base }),
+    });
+  try {
+    const { version } = await (await fetch(url)).json();
+    const [a, b] = await Promise.all([
+      post("tab A", version),
+      post("tab B", version),
+    ]);
+    assertEquals([a.status, b.status].sort(), [200, 409]);
+    const won = a.status === 200 ? "tab A" : "tab B";
+    const lost = await (a.status === 409 ? a : b).json();
+    await (a.status === 200 ? a : b).body?.cancel();
+    assertEquals(lost.text, won); // the loser is shown what landed
+    assertEquals(
+      await Deno.readTextFile(`${root}/demo-book/manuscript.md`),
+      won,
+    );
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("http: GET manuscript returns source; saves read through", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   try {
     const res = await fetch(`${base}/api/books/demo-book/manuscript`);
@@ -523,6 +526,81 @@ Deno.test("metadata: debounced write broadcasts an update with the POSTed versio
   }
 });
 
+Deno.test("metadata: an outside edit to another section during the debounce survives", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 200,
+  });
+  const path = `${root}/demo-book/metadata.json`;
+  const post = (sections: unknown) =>
+    fetch(`http://localhost:${server.port}/api/books/demo-book/metadata`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sections }),
+    }).then((r) => r.body?.cancel());
+  try {
+    await post({ notes: { placement: "footnote" } });
+    // Another writer names the edition while the save is still debounced.
+    const disk = JSON.parse(await Deno.readTextFile(path));
+    await Deno.writeTextFile(
+      path,
+      JSON.stringify({ ...disk, name: "External" }, null, 2),
+    );
+    await post({ toc: { title: "Contents" } }); // same window, accumulates
+    await new Promise((r) => setTimeout(r, 400));
+    const saved = JSON.parse(await Deno.readTextFile(path));
+    assertEquals(saved.name, "External");
+    assertEquals(saved.notes, { placement: "footnote" });
+    assertEquals(saved.toc, { title: "Contents" });
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("metadata: a failed debounced write reaches the edition's editors as a save error", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 150,
+  });
+  const base = `http://localhost:${server.port}`;
+  const ws = new WebSocket(
+    `ws://localhost:${server.port}/ws?book=demo-book&client=observer`,
+  );
+  try {
+    await nextMessage(ws); // initial build
+    const failed = nextMessageWhere(ws, (m) => m.save === "metadata");
+    // Accepted at once; the write happens after the debounce.
+    const post = await fetch(`${base}/api/books/demo-book/metadata`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sections: { notes: { placement: "footnote" } } }),
+    });
+    assertEquals(post.status, 200);
+    await post.body?.cancel();
+
+    // Yank the book out from under the pending write.
+    await Deno.remove(`${root}/demo-book`, { recursive: true });
+    const msg = await failed;
+    assertEquals(msg.type, "error");
+    assertEquals(msg.book, "demo-book");
+    assertEquals(msg.edition, null);
+    assert((msg.message as string).startsWith("save failed:"));
+
+    // Server must still be alive and serving other requests.
+    const books = await (await fetch(`${base}/api/books`)).json();
+    assertEquals(books, { books: [] });
+  } finally {
+    ws.close();
+    await server.stop();
+    await Deno.remove(root, { recursive: true }).catch(() => {});
+  }
+});
+
 Deno.test("editions: list, build json per edition, metadata GET/POST touch only that file", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({
@@ -726,7 +804,7 @@ Deno.test("rename rewrites {only} tokens in manuscript.md", async () => {
       body: JSON.stringify(body),
     });
   try {
-    // A manuscript save still in its debounce window is what gets rewritten.
+    // The landed manuscript's old token is what gets rewritten.
     await (await post("/manuscript", {
       text: "{chapter: one}\n\n{only: pocket | default}\nP\n{/only}\n",
     })).body?.cancel();

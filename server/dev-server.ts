@@ -43,7 +43,7 @@ const CONTENT_TYPES: Record<string, string> = {
 export interface ServerOptions {
   booksRoot?: string; // default "books"
   port?: number; // 0 = OS-assigned (tests); default 8000
-  saveDebounceMs?: number; // default 250 (used from Task 5)
+  saveDebounceMs?: number; // metadata saves; default 250
   render?: ExportOptions["render"]; // test seam: print export without Chrome
 }
 
@@ -59,16 +59,13 @@ interface Client {
   clientId: string;
 }
 
-interface PendingSave {
-  text: string;
-  timer: number;
-}
-
 // Readers see the old file or the new one, never half a write; the watcher
-// ignores the .tmp name (classifyChange).
+// ignores the .tmp name (classifyChange). The tmp name is unique, so two
+// writes to one path never share (and rename away) each other's tmp file.
 async function atomicWrite(path: string, text: string): Promise<void> {
-  await Deno.writeTextFile(`${path}.tmp`, text);
-  await Deno.rename(`${path}.tmp`, path);
+  const tmp = `${path}.${crypto.randomUUID()}.tmp`;
+  await Deno.writeTextFile(tmp, text);
+  await Deno.rename(tmp, path);
 }
 
 export async function startServer(
@@ -83,10 +80,20 @@ export async function startServer(
 
   const clients = new Set<Client>();
 
-  const saveDebounceMs = opts.saveDebounceMs ?? 250;
-  const pendingSaves = new Map<string, PendingSave>();
-  // book → the manuscript write under way, so a rename reads what it lands.
-  const writing = new Map<string, Promise<void>>();
+  const saveDebounceMs = opts.saveDebounceMs ?? 250; // metadata only
+  // key → the tail of its work queue. Keys are a book (its manuscript: a
+  // save's check + write, a rename's token rewrite) or a metadata path (its
+  // writes); safeName keeps the two apart, a path always has a "/".
+  const chains = new Map<string, Promise<void>>();
+  function serialize<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const run = (chains.get(key) ?? Promise.resolve()).then(fn);
+    const tail = run.then(() => {}, () => {});
+    chains.set(key, tail);
+    tail.then(() => {
+      if (chains.get(key) === tail) chains.delete(key);
+    });
+    return run;
+  }
   // EXPERIMENTAL (§3.2.9): book → edition renames whose {only} token a stale
   // save may still carry (another tab, a debounced save not yet sent). Each
   // lasts until every client connected at the rename has sent a save without
@@ -101,42 +108,32 @@ export async function startServer(
     else tokenRenames.delete(book);
   };
 
-  // A write that fails after its {ok:true} went out has no response left to
-  // report on: tell the affected editors instead (every client on the book
-  // when edition is undefined), and never let it kill the server.
-  function sendError(
+  // A debounced metadata write fails after its {ok:true} went out, so there
+  // is no response left to report on: tell the edition's editors instead,
+  // and never let it kill the server.
+  function sendMetaError(
     book: string,
-    edition: string | null | undefined,
+    edition: string | null,
     message: string,
   ) {
     console.error(`${book}: ${message}`);
     for (const c of clients) {
       if (c.book !== book || c.socket.readyState !== WebSocket.OPEN) continue;
-      if (edition !== undefined && c.edition !== edition) continue;
+      if (c.edition !== edition) continue;
       const m: ServerMessage = {
         type: "error",
         book,
-        edition: c.edition,
+        edition,
         message,
+        save: "metadata",
       };
       c.socket.send(JSON.stringify(m));
     }
   }
 
-  // Lands a manuscript write; the watcher sees it and broadcasts.
-  function writeManuscript(book: string, text: string): Promise<void> {
-    const done: Promise<void> = atomicWrite(
-      `${booksRoot}/${book}/manuscript.md`,
-      text,
-    ).catch((err) => {
-      sendError(book, undefined, `save failed: ${String(err)}`);
-    }).finally(() => {
-      if (writing.get(book) === done) writing.delete(book);
-    });
-    writing.set(book, done);
-    return done;
-  }
-
+  // The client debounces and sends one save at a time, so a save lands before
+  // it is answered: the check against `base` and the write run in the book's
+  // queue, never interleaved with another save or a rename's rewrite.
   async function handleSave(book: string, req: Request): Promise<Response> {
     if (!safeName(book)) return new Response("bad path", { status: 400 });
     let body: { text?: unknown; clientId?: unknown; base?: unknown };
@@ -145,70 +142,59 @@ export async function startServer(
     } catch {
       return new Response("invalid JSON body", { status: 400 });
     }
-    if (typeof body.text !== "string") {
+    const sent = body.text;
+    if (typeof sent !== "string") {
       return new Response(
         "body must be { text: string, clientId?: string, base?: string }",
         { status: 400 },
       );
     }
-    try {
-      await Deno.stat(`${booksRoot}/${book}/manuscript.md`);
-    } catch {
-      return new Response("book not found", { status: 404 });
-    }
-    // A save based on a version that is no longer current would overwrite a
-    // change its editor never saw: refuse it with the current text. No base
-    // (the CLI, old callers) skips the check.
-    if (typeof body.base === "string") {
-      await writing.get(book);
-      const current = await currentManuscript(book);
-      const version = await contentVersion(current);
-      if (version !== body.base) {
-        return Response.json({ conflict: true, text: current, version }, {
-          status: 409,
-        });
-      }
-    }
     const clientId = typeof body.clientId === "string" ? body.clientId : null;
-    const pending: PendingSave = { text: body.text, timer: 0 };
-    // A save still carrying a renamed edition's old token gets the new one,
-    // and the response hands the rewritten text back.
-    for (const r of tokenRenames.get(book) ?? []) {
-      if (clientId !== null && !r.stale.has(clientId)) continue;
-      const next = renameOnlyToken(pending.text, r.from, r.to);
-      if (next !== pending.text) pending.text = next;
-      else if (clientId !== null) r.stale.delete(clientId); // caught up
+    const path = `${booksRoot}/${book}/manuscript.md`;
+    try {
+      return await serialize(book, async () => {
+        const current = await Deno.readTextFile(path);
+        // A save based on a version that is no longer current would overwrite
+        // a change its editor never saw: refuse it with the current text. No
+        // base (the CLI, old callers) skips the check.
+        if (typeof body.base === "string") {
+          const version = await contentVersion(current);
+          if (version !== body.base) {
+            return Response.json({ conflict: true, text: current, version }, {
+              status: 409,
+            });
+          }
+        }
+        // A save still carrying a renamed edition's old token gets the new
+        // one, and the response hands the rewritten text back.
+        let text = sent;
+        for (const r of tokenRenames.get(book) ?? []) {
+          if (clientId !== null && !r.stale.has(clientId)) continue;
+          const next = renameOnlyToken(text, r.from, r.to);
+          if (next !== text) text = next;
+          else if (clientId !== null) r.stale.delete(clientId); // caught up
+        }
+        pruneRenames(book);
+        await atomicWrite(path, text); // the watcher sees it and broadcasts
+        const version = await contentVersion(text);
+        return Response.json(
+          text === sent ? { ok: true, version } : { ok: true, version, text },
+        );
+      });
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) {
+        return new Response("book not found", { status: 404 });
+      }
+      return new Response(`save failed: ${String(err)}`, { status: 500 });
     }
-    pruneRenames(book);
-    const existing = pendingSaves.get(book);
-    if (existing) clearTimeout(existing.timer);
-    pending.timer = setTimeout(() => {
-      pendingSaves.delete(book);
-      writeManuscript(book, pending.text);
-    }, saveDebounceMs);
-    pendingSaves.set(book, pending);
-    const version = await contentVersion(pending.text);
-    return Response.json(
-      pending.text === body.text
-        ? { ok: true, version }
-        : { ok: true, version, text: pending.text },
-    );
-  }
-
-  // A save may still be sitting in the debounce window — that, not the stale
-  // disk copy, is the current text.
-  function currentManuscript(book: string): Promise<string> {
-    const pending = pendingSaves.get(book);
-    return pending
-      ? Promise.resolve(pending.text)
-      : Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`);
   }
 
   async function handleManuscriptGet(book: string): Promise<Response> {
     if (!safeName(book)) return new Response("bad path", { status: 400 });
+    await chains.get(book); // a save under way lands first
     let text: string;
     try {
-      text = await currentManuscript(book);
+      text = await Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`);
     } catch {
       return new Response("book not found", { status: 404 });
     }
@@ -217,7 +203,9 @@ export async function startServer(
 
   interface PendingMetaSave {
     metadata: Record<string, unknown>;
-    text: string; // metadata serialized: exactly what the write lands
+    text: string; // metadata serialized: what the write lands, unless...
+    sections: object; // every section POSTed in this window, merged
+    diskText: string | null; // ...the file moved on from this, its base
     timer: number;
     cancelled?: boolean;
     write(): Promise<void>; // the debounced write; also run early by an export
@@ -235,7 +223,7 @@ export async function startServer(
   // callers turn that into a 409. Returns undefined when a *named* edition's
   // file is missing (404); a missing metadata.json is {} because metadata is
   // optional (spec §4).
-  async function currentMetadata(
+  function currentMetadata(
     book: string,
     edition: string | null,
   ): Promise<
@@ -244,7 +232,24 @@ export async function startServer(
     | undefined
   > {
     const pending = pendingMetaSaves.get(metaKey(book, edition));
-    if (pending) return { metadata: pending.metadata, text: pending.text };
+    if (pending) {
+      return Promise.resolve({
+        metadata: pending.metadata,
+        text: pending.text,
+      });
+    }
+    return readMetadata(book, edition);
+  }
+
+  // currentMetadata's disk half, same results.
+  async function readMetadata(
+    book: string,
+    edition: string | null,
+  ): Promise<
+    | { metadata: Record<string, unknown>; text: string | null }
+    | null
+    | undefined
+  > {
     let text: string;
     try {
       text = await Deno.readTextFile(metadataPath(booksRoot, book, edition));
@@ -330,45 +335,69 @@ export async function startServer(
         { status: 409 },
       );
     }
-    const save = queueMetaSave(book, edition, base.metadata, sections);
+    const save = queueMetaSave(book, edition, base, sections);
     return Response.json({
       ok: true,
       version: await contentVersion(save.text),
     });
   }
 
-  // Debounces a metadata write: `sections` shallow-merged onto `base` (the
-  // edition's currentMetadata), replacing any save already pending for it.
-  function queueMetaSave(
-    book: string,
-    edition: string | null,
-    base: Record<string, unknown>,
-    sections: object,
-  ): PendingMetaSave {
-    // Shallow-merge only the POSTed top-level keys; everything else —
-    // elements, is, future schema keys — passes through untouched.
+  // Shallow-merge only the POSTed top-level keys; everything else —
+  // elements, is, future schema keys — passes through untouched.
+  function mergeSections(base: Record<string, unknown>, sections: object) {
     const merged = { ...base };
     for (const [key, value] of Object.entries(sections)) {
       if (value === null) delete merged[key]; // null removes a section outright
       else merged[key] = value;
     }
+    return merged;
+  }
+  const serializeMeta = (m: object) => JSON.stringify(m, null, 2) + "\n";
+
+  // Debounces a metadata write: `sections` shallow-merged onto `base` (the
+  // edition's currentMetadata), replacing any save already pending for it.
+  function queueMetaSave(
+    book: string,
+    edition: string | null,
+    base: { metadata: Record<string, unknown>; text: string | null },
+    sections: object,
+  ): PendingMetaSave {
+    const merged = mergeSections(base.metadata, sections);
     const key = metaKey(book, edition);
+    const path = metadataPath(booksRoot, book, edition);
     const existing = pendingMetaSaves.get(key);
     if (existing) clearTimeout(existing.timer);
     const save: PendingMetaSave = {
       metadata: merged,
-      text: JSON.stringify(merged, null, 2) + "\n",
+      text: serializeMeta(merged),
+      sections: { ...existing?.sections, ...sections },
+      diskText: existing ? existing.diskText : base.text,
       timer: 0,
-      write: async () => {
+      write: () => {
         clearTimeout(save.timer);
-        if (save.cancelled || pendingMetaSaves.get(key) !== save) return;
-        pendingMetaSaves.delete(key);
-        try {
-          // The watcher sees this write and broadcasts.
-          await atomicWrite(metadataPath(booksRoot, book, edition), save.text);
-        } catch (err) {
-          sendError(book, edition, `save failed: ${String(err)}`);
+        if (pendingMetaSaves.get(key) !== save) {
+          return chains.get(path) ?? Promise.resolve(); // already under way
         }
+        pendingMetaSaves.delete(key);
+        // One write per file at a time; a rename or delete waits its turn.
+        return serialize(path, async () => {
+          if (save.cancelled) return;
+          try {
+            // The file changed during the window (another writer, or the
+            // previous write): merge this window's sections onto it instead,
+            // so another section's edit survives.
+            let text = save.text;
+            const disk = await readMetadata(book, edition);
+            if (disk === undefined) throw new Error("edition not found");
+            if (disk === null) throw new Error("metadata is not valid JSON");
+            if (disk.text !== save.diskText) {
+              text = serializeMeta(mergeSections(disk.metadata, save.sections));
+            }
+            await atomicWrite(path, text); // the watcher sees it and broadcasts
+          } catch (err) {
+            sendMetaError(book, edition, `save failed: ${String(err)}`);
+          }
+        });
       },
     };
     save.timer = setTimeout(save.write, saveDebounceMs);
@@ -405,6 +434,7 @@ export async function startServer(
     try {
       // The export reads metadata from disk: land a debounced save first.
       await pendingMetaSaves.get(key)?.write();
+      await chains.get(metadataPath(booksRoot, book, edition));
       const s = await exportBook(booksRoot, book, {
         edition,
         proof: body.proof === true,
@@ -507,14 +537,14 @@ export async function startServer(
     }
     const pending = pendingMetaSaves.get(metaKey(book, edition));
     if (pending) {
-      // Cancel first: a flush already in flight (past its own cancelled
-      // check, awaiting the write) must not resurrect the file after rename.
       pending.cancelled = true;
       clearTimeout(pending.timer); // any unflushed edit dies with the old name
       pendingMetaSaves.delete(metaKey(book, edition));
     }
+    // In the file's queue: a write already under way lands, then moves.
+    const from = metadataPath(booksRoot, book, edition);
     try {
-      await Deno.rename(metadataPath(booksRoot, book, edition), to);
+      await serialize(from, () => Deno.rename(from, to));
     } catch {
       return new Response("edition not found", { status: 404 });
     }
@@ -529,21 +559,20 @@ export async function startServer(
         { from: edition, to: target, stale },
       ]);
     }
-    // A manuscript save still in its debounce window is rewritten and landed
-    // now; one already being written lands first, so the read below sees it.
-    const pendingText = pendingSaves.get(book);
-    if (pendingText) clearTimeout(pendingText.timer);
-    pendingSaves.delete(book);
-    await writing.get(book);
-    const text = pendingText?.text ??
-      await Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`);
-    // A save that arrived meanwhile is newer, and already rewritten.
-    if (pendingSaves.has(book) || writing.has(book)) {
-      return Response.json({ ok: true });
-    }
-    const next = renameOnlyToken(text, edition, target);
+    // In the book's queue, so no save lands between the read and the write.
     // Rewritten text has a new version, so every editor reloads it.
-    if (next !== text || pendingText) await writeManuscript(book, next);
+    const manuscript = `${booksRoot}/${book}/manuscript.md`;
+    try {
+      await serialize(book, async () => {
+        const text = await Deno.readTextFile(manuscript);
+        const next = renameOnlyToken(text, edition, target);
+        if (next !== text) await atomicWrite(manuscript, next);
+      });
+    } catch (err) {
+      return new Response(`token rewrite failed: ${String(err)}`, {
+        status: 500,
+      });
+    }
     return Response.json({ ok: true });
   }
 
@@ -577,8 +606,7 @@ export async function startServer(
     }
     const name = body.name.trim();
     // Blank clears it, so the edition falls back to "Standard".
-    await queueMetaSave(book, null, base.metadata, { name: name || null })
-      .write();
+    await queueMetaSave(book, null, base, { name: name || null }).write();
     return Response.json({ ok: true });
   }
 
@@ -595,8 +623,9 @@ export async function startServer(
       clearTimeout(pending.timer);
       pendingMetaSaves.delete(metaKey(book, edition));
     }
+    const path = metadataPath(booksRoot, book, edition);
     try {
-      await Deno.remove(metadataPath(booksRoot, book, edition));
+      await serialize(path, () => Deno.remove(path));
     } catch {
       return new Response("edition not found", { status: 404 });
     }
@@ -827,8 +856,8 @@ export async function startServer(
     port: server.addr.port,
     async stop() {
       watcher.stop();
-      for (const p of pendingSaves.values()) clearTimeout(p.timer);
       for (const p of pendingMetaSaves.values()) clearTimeout(p.timer);
+      await Promise.all(chains.values()); // writes under way land
       for (const c of clients) {
         try {
           c.socket.close();

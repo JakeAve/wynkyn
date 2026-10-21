@@ -104,6 +104,7 @@ let saveInFlight = false;
 let queuedSaveText: string | null = null;
 let dirty = false; // local edits newer than the last completed save
 let remoteFetchGen = 0;
+let renaming: Promise<unknown> = Promise.resolve(); // this tab's edition rename
 // The server version the buffer is based on; every save names it, and a save
 // from a version that is no longer current is refused (409) instead of
 // overwriting a change this editor never saw. Set on load and by every save.
@@ -419,9 +420,11 @@ async function renameEdition(e: EditionInfo, value: string): Promise<void> {
     const next = slugify(value);
     if (!next) throw new Error("the name needs a letter or digit");
     if (next !== e.slug) {
-      await post(`${base}/${encodeURIComponent(e.slug)}/rename`, {
+      const done = post(`${base}/${encodeURIComponent(e.slug)}/rename`, {
         slug: next,
-      });
+      }).then(() => selBook === book ? rebaseAfterRename() : undefined);
+      renaming = done.catch(() => {});
+      await done;
       await deleteCachedRender(cacheId(selBook, e.slug));
       if (selBook === book && e.slug === edition) {
         location.search = editionHref(book, next);
@@ -533,12 +536,22 @@ function save(text: string): void {
     queuedSaveText = text; // supersede any earlier queued text — only the latest matters
     return;
   }
-  saveInFlight = true;
+  setSaveInFlight(true);
   doSave(text);
+}
+
+// The banner's choices wait for a save in flight to settle: Reload under an
+// accepted save would show text the disk no longer has.
+function setSaveInFlight(on: boolean): void {
+  saveInFlight = on;
+  for (const id of ["disk-reload", "disk-keep"]) {
+    ($(id) as HTMLButtonElement).disabled = on;
+  }
 }
 
 async function doSave(text: string): Promise<void> {
   try {
+    await renaming; // a rename's token rewrite moves `base`
     const res = await fetch(
       `/api/books/${encodeURIComponent(book)}/manuscript`,
       {
@@ -575,13 +588,13 @@ async function doSave(text: string): Promise<void> {
   } catch (err) {
     setStatus("error", brief(err));
   } finally {
-    saveInFlight = false;
+    setSaveInFlight(false);
     if (queuedSaveText !== null) {
       const next = queuedSaveText;
       queuedSaveText = null;
       // fire-and-forget: intentional non-blocking dispatch, not a missing await —
       // doSave's own finally will run again when this one settles.
-      saveInFlight = true;
+      setSaveInFlight(true);
       doSave(next); // catch-up save, no debounce — the debounce already happened once
     }
   }
@@ -602,7 +615,7 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
     const res = await fetch(metadataUrl(), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sections, clientId }),
+      body: JSON.stringify({ sections }),
     });
     if (!res.ok) throw new Error(await res.text());
     metaBase = ((await res.json()) as { version: string }).version;
@@ -756,6 +769,19 @@ async function refreshFromRemote(): Promise<void> {
   reparse(disk.text);
   base = disk.version;
   hideDiskBanner();
+}
+
+// A rename rewrote this book's {only} tokens on disk: this tab caused that
+// change, so base the buffer on it rather than 409 its own next save (the
+// server rewrites the old token in that save). A clean buffer takes the text.
+async function rebaseAfterRename(): Promise<void> {
+  const disk = await fetchManuscript(book);
+  if (!dirty && !saveInFlight) {
+    replaceBuffer(editor, disk.text);
+    reparse(disk.text);
+  }
+  base = disk.version;
+  if (diskOffer?.version === base) hideDiskBanner();
 }
 
 function showDiskBanner(disk: { text: string; version: string }): void {
@@ -1040,7 +1066,10 @@ async function main(): Promise<void> {
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data) as ServerMessage;
     if (msg.type === "error") {
-      setStatus("error", `build: ${brief(msg.message)}`);
+      if (msg.save === "metadata") { // accepted, then the write failed
+        configPanel?.markSaved(false, brief(msg.message));
+        setStatus("error", `config not saved — ${brief(msg.message)}`);
+      } else setStatus("error", `build: ${brief(msg.message)}`);
       return;
     }
     if (!dirty && !saveInFlight && !diskOffer) setStatus("saved");
