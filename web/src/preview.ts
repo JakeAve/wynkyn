@@ -243,14 +243,18 @@ export function scrollPreviewTo(
   });
 }
 
+// The app's mode (spec §7.1): what the middle column edits.
+export type Mode = "write" | "style" | "print";
+
 // The stylable node at or above `target` and its catalog key: matchKey picks
 // the entry from the target's class+tag chain, closest() finds the node its
-// selector matched. Nothing inside a staged (half-rendered) preview.
+// selector matched. Nothing inside a staged (half-rendered) preview. Page
+// furniture (folios, running heads) has no source line, so it always styles.
 function resolveStyle(
   target: Element | null,
   container: HTMLElement,
   catalog: StyleEntry[],
-): { key: string; el: Element } | null {
+): { key: string; el: Element; furniture: boolean } | null {
   if (!target || target.closest(".preview-stage")) return null;
   const chain: string[][] = [];
   for (
@@ -263,36 +267,53 @@ function resolveStyle(
   const key = matchKey(chain, catalog);
   const entry = catalog.find((e) => e.key === key);
   const el = entry && target.closest(entry.selector);
-  return entry && el && container.contains(el) ? { key: entry.key, el } : null;
+  if (!entry || !el || !container.contains(el)) return null;
+  const furniture = entry.section === "numbering" ||
+    entry.section === "running";
+  return { key: entry.key, el, furniture };
 }
 
-// Click-to-style (spec §7.4): resolve the clicked node to a style-catalog
-// key and hand it back; the resolved node is outlined until the next click
-// or re-render. Link clicks that resolve are consumed so the TOC doesn't
-// navigate the preview. `catalog` is read per click — `is:` entries change
+// Where a click on the pages goes (spec §7.4): in Style, to the clicked
+// element's style; in Write, to its manuscript line (the nearest rendered
+// block's data-line). Furniture always goes to its style. A styled node is
+// outlined until the next pick or re-render; consumed clicks don't let the
+// TOC's links navigate. `catalog` is read per click — `is:` entries change
 // with the metadata.
-export function installStyleClicks(
+export function installPreviewClicks(
   container: HTMLElement,
   catalog: () => StyleEntry[],
-  onPick: (key: string) => void,
+  on: { mode(): Mode; style(key: string): void; source(line: number): void },
 ): void {
   container.addEventListener("click", (e) => {
-    const hit = resolveStyle(e.target as Element | null, container, catalog());
-    if (!hit) return;
-    e.preventDefault();
-    container.querySelector("[data-style-selected]")?.removeAttribute(
-      "data-style-selected",
+    const target = e.target as Element | null;
+    const mode = on.mode();
+    const hit = resolveStyle(target, container, catalog());
+    if (hit && (hit.furniture || mode === "style")) {
+      e.preventDefault();
+      container.querySelector("[data-style-selected]")?.removeAttribute(
+        "data-style-selected",
+      );
+      hit.el.setAttribute("data-style-selected", "");
+      on.style(hit.key);
+      return;
+    }
+    if (mode !== "write" || target?.closest(".preview-stage")) return;
+    const line = Number(
+      target?.closest("[data-line]")?.getAttribute("data-line"),
     );
-    hit.el.setAttribute("data-style-selected", "");
-    onPick(hit.key);
+    if (!line) return;
+    e.preventDefault();
+    on.source(line);
   });
 }
 
-// Hover outline (spec R3): the node a click would pick, once per frame. A
-// re-render replaces the nodes, which takes the attribute with them.
+// Hover outline (spec R3): the node a click would style, once per frame —
+// everywhere in Style, only furniture in Write. A re-render replaces the
+// nodes, which takes the attribute with them.
 export function installStyleHover(
   container: HTMLElement,
   catalog: () => StyleEntry[],
+  mode: () => Mode,
 ): void {
   let raf = 0;
   let pointed: Element | null = null;
@@ -307,7 +328,8 @@ export function installStyleHover(
     pointed = e.target as Element | null;
     raf ||= requestAnimationFrame(() => {
       raf = 0;
-      set(resolveStyle(pointed, container, catalog())?.el ?? null);
+      const hit = resolveStyle(pointed, container, catalog());
+      set(hit && (hit.furniture || mode() === "style") ? hit.el : null);
     });
   }, { passive: true });
   container.addEventListener("mouseleave", () => {

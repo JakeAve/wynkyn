@@ -2,13 +2,26 @@
 // Navigation-only in v1 (spec §7.2, §8): no drag, no reorder.
 import type { TreeNode } from "./tree-data.ts";
 
+const GROUPS: Array<[TreeNode["group"], string]> = [
+  ["front", "Front matter"],
+  ["body", "Chapters"],
+  ["back", "Back matter"],
+];
+
+// One heading per non-empty group, its nodes listed under it.
 export function renderTree(
   container: HTMLElement,
   nodes: TreeNode[],
   onSelect: (node: TreeNode) => void,
 ): void {
-  container.innerHTML = "";
-  container.appendChild(list(nodes, 0, onSelect));
+  container.replaceChildren(...GROUPS.flatMap(([group, title]) => {
+    const items = nodes.filter((n) => n.group === group);
+    if (!items.length) return [];
+    const h = document.createElement("div");
+    h.className = "nh";
+    h.textContent = title;
+    return [h, list(items, 0, onSelect)];
+  }));
 }
 
 function list(

@@ -29,14 +29,18 @@ rewrite themselves on the next save.
 - `server/` `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket,
   watches book files)
 - `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored).
-  Paged.js paginates the preview. The style panel sits in the editor's slot
-  (`#config-overlay`): `config-panel.ts` is the shell (tabs, routing, debounced
-  `queueSave`), `panel-page.ts` (Page + Print tabs), `panel-fonts.ts`,
-  `panel-parts.ts` (Book parts list and detail views) build the tabs from
-  `panel-controls.ts` primitives; `style-catalog.ts` maps preview clicks and
-  book parts to metadata keys. The Print tab draws the first signature with
-  `server/imposition.ts` and exports through the dev server's
-  `POST /api/books/<book>/export`, the same `exportBook` as `bml export`.
+  Paged.js paginates the preview. The Write/Style/Print mode (`setMode` in
+  `app.ts`) decides three columns in `#panes`: `#tree` | `#editor` | `#preview`,
+  `#style-nav` | `#config-overlay` | `#preview`, or `#style-nav` |
+  `#config-overlay` | `#sheet-view`; `preview.ts`'s `installPreviewClicks`
+  routes a page click to the source line or the style by mode. `config-panel.ts`
+  is the panel shell (nav, routing, debounced `queueSave`); `panel-page.ts`
+  (Page + Print views), `panel-fonts.ts`, `panel-parts.ts` (Book parts list and
+  detail views) build the views from `panel-controls.ts` primitives;
+  `style-catalog.ts` maps preview clicks and book parts to metadata keys. The
+  Print view draws the first signature with `server/imposition.ts` and exports
+  through the dev server's `POST /api/books/<book>/export`, the same
+  `exportBook` as `bml export`.
 
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
 update the checksum in `server/vendor_test.ts`, then read the golden page-map

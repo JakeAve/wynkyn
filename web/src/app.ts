@@ -12,8 +12,9 @@ import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
   fitPreview,
   installPageIndicator,
-  installStyleClicks,
+  installPreviewClicks,
   installStyleHover,
+  type Mode,
   previewLink,
   renderPreview,
   restoreCachedRender,
@@ -508,60 +509,57 @@ async function exportPrint(req: ExportRequest): Promise<ExportResult> {
   }
 }
 
-async function ensureConfigPanel(): Promise<ConfigPanel | null> {
-  if (configPanel) return configPanel;
+// Built the first time Style or Print opens; a failed load is retried next time.
+let panelLoad: Promise<ConfigPanel | null> | null = null;
+function ensureConfigPanel(): Promise<ConfigPanel | null> {
+  return panelLoad ??= (async () => {
+    try {
+      metadata = await fetchMetadata();
+      return configPanel = createConfigPanel({
+        overlay: $("config-overlay"),
+        nav: $("style-nav"),
+        sheetView: $("sheet-view"),
+        metadata,
+        saveSections: saveMetadataSections,
+        preview: previewLink($("preview"), styleCatalog),
+        isNames: () => isNames,
+        exportPrint,
+      });
+    } catch (err) {
+      panelLoad = null;
+      setStatus("error", brief(err)); // e.g. 409 corrupt metadata.json — fix on disk
+      return null;
+    }
+  })();
+}
+
+const MODES: Mode[] = ["write", "style", "print"];
+let mode: Mode = "write";
+
+// The mode decides all three columns (spec §7.1): Write = outline | editor |
+// pages, Style = style nav | style part | pages, Print = print nav | print
+// settings | sheet view. Persisted across reloads.
+function setMode(next: Mode): void {
+  mode = next;
+  document.documentElement.dataset.mode = next;
+  for (const b of $("modes").querySelectorAll<HTMLElement>("button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.mode === next));
+  }
   try {
-    metadata = await fetchMetadata();
-    // Temporary columns inside the panel's slot until the app shell has its own.
-    const nav = document.createElement("nav");
-    nav.id = "style-nav";
-    const work = document.createElement("div");
-    work.id = "style-work";
-    const sheetView = document.createElement("div");
-    sheetView.id = "sheet-view";
-    $("config-overlay").replaceChildren(nav, work, sheetView);
-    configPanel = createConfigPanel({
-      overlay: work,
-      nav,
-      sheetView,
-      metadata,
-      saveSections: saveMetadataSections,
-      preview: previewLink($("preview"), styleCatalog),
-      isNames: () => isNames,
-      exportPrint,
-    });
-    return configPanel;
-  } catch (err) {
-    setStatus("error", brief(err)); // e.g. 409 corrupt metadata.json — fix on disk
-    return null;
+    localStorage.setItem("mode", next);
+  } catch {
+    // storage blocked: the mode just won't survive a reload
   }
+  if (next === "write") return;
+  ensureConfigPanel().then((panel) => {
+    if (mode !== "write") panel?.setMode(mode); // the latest, if it changed meanwhile
+  });
 }
 
-let panelMode: "style" | "print" = "style";
-
-// ponytail: until the Write/Style/Print switch lands, the Style button cycles
-// closed → Style → Print → closed.
-async function toggleConfigPanel(): Promise<void> {
-  const panel = await ensureConfigPanel();
-  if (!panel) return;
-  const overlay = $("config-overlay");
-  if (overlay.hidden) panelMode = "style";
-  else if (panelMode === "style") panelMode = "print";
-  else {
-    overlay.hidden = true;
-    return;
-  }
-  panel.setMode(panelMode);
-  overlay.hidden = false;
-}
-
-// Preview click → Styles section on that element (spec §7.4).
+// Preview click → Style on that element (spec §7.4).
 async function pickStyle(key: string): Promise<void> {
-  const panel = await ensureConfigPanel();
-  if (!panel) return;
-  panel.selectStyle(key);
-  panelMode = "style";
-  $("config-overlay").hidden = false;
+  setMode("style");
+  (await ensureConfigPanel())?.selectStyle(key);
 }
 
 async function fetchManuscript(name: string): Promise<string> {
@@ -594,32 +592,6 @@ async function refreshConfigFromRemote(): Promise<void> {
   }
 }
 
-type PaneMode = "split" | "editor" | "preview";
-let paneMode: PaneMode = "split";
-
-// Expands the editor or preview pane by hiding the other; the tree stays put
-// since it's navigation, not content to expand into. Clicking the toggle for
-// the already-active mode restores the split view. Session-only — resets on
-// reload/book-switch like the rest of the UI's transient state.
-function setPaneMode(mode: PaneMode): void {
-  paneMode = mode;
-  // The config panel sits in the editor's slot and must never cover the
-  // preview, so leaving split view closes it.
-  if (mode !== "split") $("config-overlay").hidden = true;
-  const panes = $("panes");
-  panes.classList.remove("pane-mode-editor", "pane-mode-preview");
-  if (mode !== "split") panes.classList.add(`pane-mode-${mode}`);
-  $("pane-toggle-editor").setAttribute(
-    "aria-pressed",
-    String(mode === "editor"),
-  );
-  $("pane-toggle-split").setAttribute("aria-pressed", String(mode === "split"));
-  $("pane-toggle-preview").setAttribute(
-    "aria-pressed",
-    String(mode === "preview"),
-  );
-}
-
 // Draggable gutters: each one writes a CSS var on #panes that the grid
 // template reads, persisted so widths survive a reload.
 function installGutters(): void {
@@ -638,9 +610,9 @@ function installGutters(): void {
       e.preventDefault();
       gutter.setPointerCapture(e.pointerId);
       gutter.classList.add("dragging");
-      const left =
-        (cssVar === "--w-tree" ? panes : $("editor")).getBoundingClientRect()
-          .left;
+      const work = mode === "write" ? $("editor") : $("config-overlay");
+      const left = (cssVar === "--w-tree" ? panes : work)
+        .getBoundingClientRect().left;
       gutter.onpointermove = (m) => {
         // Leave at least 200px for whatever pane sits to the right.
         const max = panes.getBoundingClientRect().right - left - 200;
@@ -658,17 +630,30 @@ function installGutters(): void {
   }
 }
 
-// Collapsible contents tree: a toolbar toggle, persisted across reloads.
-function installTreeToggle(): void {
-  const btn = $("tree-toggle");
+// A side column's toolbar toggle: hides the column, persisted across reloads.
+// Returns the toggle for its shortcut.
+function installColumnToggle(id: string, hiddenClass: string): () => void {
+  const btn = $(id);
+  const panes = $("panes");
   const set = (hidden: boolean) => {
-    $("panes").classList.toggle("tree-hidden", hidden);
+    panes.classList.toggle(hiddenClass, hidden);
     btn.setAttribute("aria-pressed", String(!hidden));
-    btn.title = hidden ? "Show contents" : "Hide contents";
-    localStorage.setItem("tree-hidden", hidden ? "1" : "");
+    try {
+      localStorage.setItem(hiddenClass, hidden ? "1" : "");
+    } catch {
+      // storage blocked: the toggle just won't survive a reload
+    }
   };
-  btn.onclick = () => set(!$("panes").classList.contains("tree-hidden"));
-  set(localStorage.getItem("tree-hidden") === "1");
+  let saved = false;
+  try {
+    saved = localStorage.getItem(hiddenClass) === "1";
+  } catch {
+    // as above
+  }
+  set(saved);
+  const toggle = () => set(!panes.classList.contains(hiddenClass));
+  btn.onclick = toggle;
+  return toggle;
 }
 
 // Light/dark toggle; an explicit choice persists, first load follows the
@@ -681,20 +666,6 @@ function installThemeToggle(): void {
     document.documentElement.dataset.theme = next;
     localStorage.setItem("theme", next);
   };
-}
-
-// The config panel occupies the editor's slot so it never covers the preview:
-// mirror the overlay's hidden attribute onto #panes, and force split view on
-// open so the preview always sits beside it. The observer catches every close
-// path (the Style button, pane-mode change).
-function installConfigPlacement(): void {
-  const overlay = $("config-overlay");
-  const sync = () => {
-    $("panes").classList.toggle("config-open", !overlay.hidden);
-    if (!overlay.hidden && paneMode !== "split") setPaneMode("split");
-  };
-  new MutationObserver(sync).observe(overlay, { attributeFilter: ["hidden"] });
-  sync();
 }
 
 const STRUCTURE_SNIPPETS = new Set([
@@ -723,7 +694,10 @@ function chordOf(e: KeyboardEvent): string | null {
     e.key.length === 1 ? e.key.toUpperCase() : e.key
   }`;
 }
-function installShortcuts(): void {
+function installShortcuts(
+  toggleContents: () => void,
+  togglePages: () => void,
+): void {
   const bySnippet = new Map(
     SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((
       s,
@@ -733,20 +707,25 @@ function installShortcuts(): void {
     const chord = chordOf(e);
     if (!chord) return;
     const snippet = bySnippet.get(chord);
-    if (snippet) {
+    const m = MODES[Number(chord.slice(4)) - 1]; // Mod-1..3
+    if (snippet && mode === "write") {
       editor.dispatch(applySnippet(editor.state, snippet));
       editor.focus();
-    } else if (chord === "Mod-1") setPaneMode("editor");
-    else if (chord === "Mod-2") setPaneMode("split");
-    else if (chord === "Mod-3") setPaneMode("preview");
-    else if (chord === "Mod-,") toggleConfigPanel();
+    } else if (m) setMode(m);
+    else if (chord === "Mod-,") setMode("style");
+    else if (chord === "Mod-\\") toggleContents();
+    else if (chord === "Mod-.") togglePages();
     else return;
     e.preventDefault();
   }, true);
-  $("pane-toggle-editor").title += ` (${chordLabel("Mod-1")})`;
-  $("pane-toggle-split").title += ` (${chordLabel("Mod-2")})`;
-  $("pane-toggle-preview").title += ` (${chordLabel("Mod-3")})`;
-  $("config-button").title += ` (${chordLabel("Mod-,")})`;
+  MODES.forEach((m, i) => {
+    $("modes").querySelector(`[data-mode="${m}"]`)!.setAttribute(
+      "title",
+      `${m[0]!.toUpperCase()}${m.slice(1)} (${chordLabel(`Mod-${i + 1}`)})`,
+    );
+  });
+  $("tree-toggle").title += ` (${chordLabel("Mod-\\")})`;
+  $("pages-toggle").title += ` (${chordLabel("Mod-.")})`;
 }
 
 // Snippets live in a grouped dropdown (structure / block / inline) rather than
@@ -836,23 +815,24 @@ async function main(): Promise<void> {
   });
   reparse(text);
   buildSnippetToolbar();
-  installShortcuts();
-  $("config-button").onclick = () => {
-    toggleConfigPanel();
+  installShortcuts(
+    installColumnToggle("tree-toggle", "tree-hidden"),
+    installColumnToggle("pages-toggle", "pages-hidden"),
+  );
+  $("modes").onclick = (e) => {
+    const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
+      .mode as Mode | undefined;
+    if (m) setMode(m);
   };
-  $("pane-toggle-editor").onclick = () => {
-    setPaneMode(paneMode === "editor" ? "split" : "editor");
-  };
-  $("pane-toggle-split").onclick = () => {
-    setPaneMode("split");
-  };
-  $("pane-toggle-preview").onclick = () => {
-    setPaneMode(paneMode === "preview" ? "split" : "preview");
-  };
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem("mode");
+  } catch {
+    // storage blocked: start in Write
+  }
+  setMode(MODES.find((m) => m === saved) ?? "write");
   installGutters();
-  installTreeToggle();
   installThemeToggle();
-  installConfigPlacement();
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);
@@ -860,8 +840,12 @@ async function main(): Promise<void> {
     previewEl,
     $("page-indicator"),
   );
-  installStyleClicks(previewEl, styleCatalog, pickStyle);
-  installStyleHover(previewEl, styleCatalog);
+  installPreviewClicks(previewEl, styleCatalog, {
+    mode: () => mode,
+    style: pickStyle,
+    source: (line) => scrollEditorToLine(editor, line),
+  });
+  installStyleHover(previewEl, styleCatalog, () => mode);
   // Restore before opening the socket so the previous render is on screen
   // when the first update lands, instead of a blank preview.
   const key = cacheId(book, edition);

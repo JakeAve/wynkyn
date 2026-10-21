@@ -6,6 +6,10 @@ const SOURCE = `{matter: title-page}
 {title}
 My Book
 
+{matter: preface}
+{title}
+Before
+
 {part: one}
 {title}
 Part One
@@ -23,16 +27,31 @@ Family Tree
 
 Deno.test("tree mirrors front matter, part-nested chapters, back matter", () => {
   const tree = buildTree(parse(SOURCE));
-  assertEquals(tree.map((n) => [n.kind, n.label, n.anchorId, n.line]), [
-    ["matter", "title-page", "matter-title-page", 1],
-    ["part", "Part One", "one", 5],
-    ["matter", "appendix A", "matter-appendix-a", 15],
-  ]);
-  const part = tree[1]!;
-  assertEquals(part.children.map((n) => [n.label, n.anchorId, n.line]), [
-    ["The First Thaw", "thaw", 9], // em flattens into the label
-    ["crossing", "crossing", 13], // untitled chapter falls back to its slug
-  ]);
+  assertEquals(
+    tree.map((n) => [n.kind, n.group, n.label, n.anchorId, n.line]),
+    [
+      // the book's title would name every display page alike: its type
+      ["matter", "front", "Title page", "matter-title-page", 1],
+      ["matter", "front", "Before", "matter-preface", 5],
+      ["part", "body", "Part One", "one", 9],
+      ["matter", "back", "Family Tree", "matter-appendix-a", 19],
+    ],
+  );
+  const part = tree[2]!;
+  assertEquals(
+    part.children.map((n) => [n.group, n.label, n.anchorId, n.line]),
+    [
+      ["body", "The First Thaw", "thaw", 13], // em flattens into the label
+      ["body", "crossing", "crossing", 17], // untitled chapter: its slug
+    ],
+  );
+});
+
+Deno.test("untitled matter falls back to its humanized type: labelled appendix, contents", () => {
+  const tree = buildTree(
+    parse("{matter: toc}\n\n{matter: appendix | label: B}\n"),
+  );
+  assertEquals(tree.map((n) => n.label), ["Contents", "Appendix B"]);
 });
 
 Deno.test("top-level chapters appear without a part wrapper", () => {

@@ -1745,30 +1745,45 @@ anyway.
 ### 7.1 Overall Layout
 
 ```
-+-------------------------------------------------------------+
-|                      Tool Bar (fixed)                        |
++---------------------------------------------------------------+
+| [Contents] Book · Edition   Write|Style|Print   theme [Pages] |
 +-----------+----------------------------+----------------------+
 |           |                            |                      |
-|  Project  |        Plain BML           |   Preview (spread)   |
-|   Tree    |        (CodeMirror)        |   Odd page | Even    |
-|           |                            |                      |
+|   where   |   what you're changing     |      the result      |
+|  you are  |                            |                      |
 +-----------+----------------------------+----------------------+
 ```
 
-Three panes side by side under a fixed toolbar: project tree, BML editor, live
-preview. This is the primary editing surface. Document configuration (§7.5) and
-page setup (§7.7) open as overlays/panels rather than permanent panes, since
-they're edited far less often than the manuscript itself.
+Three columns under a fixed toolbar, decided by one rule: **left is where you
+are, middle is what you're changing, right is the result.** The toolbar's mode
+switch (Write ⌘1, Style ⌘2, Print ⌘3; ⌘, also opens Style) picks all three, and
+the mode persists across reloads:
+
+| Mode  | Left                    | Middle                          | Right                            |
+| ----- | ----------------------- | ------------------------------- | -------------------------------- |
+| Write | outline (§7.2)          | BML editor (§7.3)               | preview (§7.6)                   |
+| Style | book settings and parts | the chosen part's styles (§7.4) | preview (§7.6)                   |
+| Print | print sections          | page setup and export (§7.5)    | the first signature as it prints |
+
+Each side column has a toggle at its own edge of the toolbar — Contents at the
+far left before the book title (⌘\), Pages at the far right (⌘.) — drawn as a
+panel icon whose side is half filled while that column shows; both persist.
+Gutters between the columns drag to resize them. A hidden preview still lays out
+(it leaves the grid, never `display: none`), since Paged.js paginates by
+measuring.
 
 ### 7.2 Project Tree
 
-Reflects the `BmlDocument` tree (§5.1) directly — front matter blocks, parts,
-chapters (nested under their part per §3.2.3), back matter blocks — plus a book
-switcher at the root for moving between books in `books/`. Clicking a node
-scrolls the editor to and highlights the corresponding source range, and scrolls
-the preview pane to the corresponding page. The tree is read-only with respect
-to structure in v1 (reordering/dragging nodes is out of scope, §8) — it is a
-navigation aid, not a structural editor.
+Write's left column. Reflects the `BmlDocument` tree (§5.1) directly, grouped
+under Front matter, Chapters and Back matter headings: front matter blocks,
+parts with their chapters nested under them (§3.2.3), back matter blocks. Each
+row is labelled by its `{title}`, falling back to the slug for a chapter and the
+humanized matter type for matter ("Half title"); the half title and title page
+always show their type, since their title is the book's. The book switcher sits
+in the toolbar. Clicking a node scrolls the editor to and highlights the
+corresponding source range, and scrolls the preview pane to the corresponding
+page. The tree is read-only with respect to structure in v1 (reordering/dragging
+nodes is out of scope, §8) — it is a navigation aid, not a structural editor.
 
 ### 7.3 Markup Editing Pane
 
@@ -1790,9 +1805,12 @@ CodeMirror 6 over plain BML text.
 ### 7.4 Sentinel Styling
 
 A visual layer over the _existing_ `metadata.json` schema (§4) — no new file
-format, no new schema. Clicking a sentinel's rendered output in the preview, or
-its corresponding span in the editor, opens a style panel scoped to that
-sentinel.
+format, no new schema. In Style, clicking a sentinel's rendered output in the
+preview opens its style in the middle column; in Write the same click moves the
+editor cursor to its manuscript line (the nearest rendered block's `data-line`).
+Page furniture (page numbers, running heads) has no source line, so a click on
+it always opens its style, switching to Style. The hover outline shows only
+where a click would style: everything in Style, only furniture in Write.
 
 The panel exposes the selector model already implicit in `elements`/`is` (§4.5,
 §4.6):
@@ -1826,8 +1844,9 @@ cases.
 
 Form UI mapped 1:1 to `metadata.json`'s `page`, `fonts`, `numbering`, `running`,
 and `notes` sections (§4.3, §4.4, §4.7–§4.9) — replacing hand-editing JSON for
-the settings that apply to the whole book rather than one sentinel type. Opens
-as a panel/overlay, not a permanent pane (§7.1). Includes:
+the settings that apply to the whole book rather than one sentinel type. Its
+style settings are Style's columns and its print settings Print's (§7.1).
+Includes:
 
 - Page setup as one unit (§4.3): the book page size (named presets and custom
   dimensions), its margins, the sheet, folios per signature (or a booklet),
@@ -1849,7 +1868,8 @@ as a panel/overlay, not a permanent pane (§7.1). Includes:
 
 ### 7.6 Preview Pane
 
-The live, print-accurate spread view:
+The right column in Write and Style (§7.1): the live, print-accurate spread
+view.
 
 ```
 +-------------------+  +--------------------+

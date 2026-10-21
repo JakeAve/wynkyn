@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-mode="write">
   <head>
     <meta charset="utf-8">
     <title>Book Editor</title>
@@ -9,6 +9,12 @@
     // Resolve theme before first paint: explicit choice wins, else system.
     document.documentElement.dataset.theme = localStorage.theme ??
       (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    // The mode (Write/Style/Print) too, so the columns don't flash; app.ts owns it after.
+    try {
+      if (["style", "print"].includes(localStorage.mode)) {
+        document.documentElement.dataset.mode = localStorage.mode;
+      }
+    } catch {}
     </script>
     <style>
     /* ---- Ink: one flat plane, hairlines and type carry the hierarchy ---- */
@@ -28,6 +34,7 @@
       --hl: rgba(22, 22, 22, 0.07);
       /* The imposed sheet is paper-white in both themes too. */
       --sheet-paper: #fff;
+      --paper: #fffefc; /* book pages and page drawings */
       --sheet-edge: #b9b9b4;
       --sheet-slot: #e2e2de;
       --sheet-blank: #ededea;
@@ -182,14 +189,40 @@
     #toolbar .spacer {
       flex: 1;
     }
-    /* Segmented pane control: editor / split / preview */
-    .seg {
-      display: flex;
-      gap: 2px;
+    /* Mode switch, centred on the toolbar: Write / Style / Print. */
+    #toolbar {
+      position: relative;
     }
-    .seg .btn[aria-pressed="true"] {
+    #modes {
+      display: inline-flex;
+      gap: 2px;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    #modes .btn {
+      padding: 3px 14px;
+      min-height: 26px;
+    }
+    #modes .btn[aria-pressed="true"] {
       background: var(--inv-bg);
       color: var(--inv-fg);
+    }
+    @media (max-width: 1000px) {
+      #modes {
+        position: static;
+        transform: none;
+      }
+    }
+    /* Column toggles: the panel icon's side is half filled while it shows. */
+    .toggle[aria-pressed="true"] {
+      --pf: .35;
+    }
+    .toggle[aria-pressed="false"] svg {
+      opacity: .55;
     }
     /* Theme toggle shows the icon for the mode it switches to */
     :root[data-theme="dark"] .icon-moon,
@@ -470,6 +503,7 @@
        centred 1px hairline and are the drag handles. The preview is the hero:
        the editor holds a fixed reading measure, the preview takes the rest. */
     #panes {
+      position: relative;
       display: grid;
       grid-template-columns: var(--w-tree) 5px var(--w-editor) 5px minmax(0, 1fr);
       min-height: 0;
@@ -484,40 +518,47 @@
       background: linear-gradient(var(--muted), var(--muted)) 50% 0 / 3px 100%
         no-repeat;
     }
-    /* Pane toggles: hide one of editor/preview and let the other fill the row.
-       display:none removes the hidden pane from grid flow entirely, so the
-       template only declares tracks for the visible panes. */
-    #panes.pane-mode-editor,
-    #panes.pane-mode-preview {
-      grid-template-columns: var(--w-tree) 5px minmax(0, 1fr);
-    }
-    #panes.pane-mode-editor #preview,
-    #panes.pane-mode-preview #editor,
-    #panes.pane-mode-editor #gutter-editor,
-    #panes.pane-mode-preview #gutter-editor {
-      display: none;
-    }
-    /* Collapsible tree (toolbar toggle): drop the first two tracks. */
+    /* The columns (spec §7.1): left is where you are, middle is what you're
+       changing, right is the result. The mode shows one element per column;
+       display:none takes the others out of grid flow. The side toggles drop
+       a column and its gutter. */
     #panes.tree-hidden {
       grid-template-columns: var(--w-editor) 5px minmax(0, 1fr);
     }
-    #panes.tree-hidden.pane-mode-editor,
-    #panes.tree-hidden.pane-mode-preview {
+    #panes.pages-hidden {
+      grid-template-columns: var(--w-tree) 5px minmax(0, 1fr);
+    }
+    #panes.tree-hidden.pages-hidden {
       grid-template-columns: minmax(0, 1fr);
     }
-    #panes.tree-hidden #tree,
-    #panes.tree-hidden #gutter-tree {
+    :root[data-mode="write"] :is(#style-nav, #config-overlay, #sheet-view),
+    :root[data-mode="style"] :is(#tree, #editor, #sheet-view),
+    :root[data-mode="print"] :is(#tree, #editor),
+    :root:not([data-mode="write"]) #insert-menu,
+    #panes.tree-hidden :is(#tree, #style-nav, #gutter-tree),
+    #panes.pages-hidden :is(#sheet-view, #gutter-editor) {
       display: none;
     }
-    /* Config open: the panel takes the editor's slot so the preview is never
-       covered while styling. app.ts forces split mode while it is open, so
-       these rules only combine with .tree-hidden. */
-    #panes.config-open #editor {
-      display: none;
+    /* Hidden pages still lay out: Paged.js paginates by measuring, so the
+       preview leaves the grid but never goes display:none. */
+    :root[data-mode="print"] #preview,
+    #panes.pages-hidden #preview {
+      position: absolute;
+      inset: 0;
+      visibility: hidden;
     }
     #tree {
       overflow-y: auto;
-      padding: 8px 6px;
+      padding: 10px 8px;
+    }
+    :is(#tree, #style-nav) .nh {
+      font-size: var(--fs-sm);
+      font-weight: 500;
+      color: var(--muted);
+      padding: 10px 8px 4px;
+    }
+    :is(#tree, #style-nav) .nh:first-child {
+      padding-top: 2px;
     }
     #tree ul.tree-list {
       list-style: none;
@@ -596,7 +637,7 @@
     }
     /* Pages are paper: ink black, never the chrome's text color — even in dark mode. */
     .pagedjs_page {
-      background: #fffefc;
+      background: var(--paper);
       color: #141210;
       box-shadow: var(--page-shadow);
       margin-bottom: 16px;
@@ -605,35 +646,9 @@
       margin-left: calc(var(--pagedjs-width) + 8px);
     }
 
-    /* ---- config panel: a pane in the editor's slot, never over the preview ---- */
-    /* Until the app shell has its own columns, the slot holds them all: the
-       nav on the left, the work column beside it and, in print mode, the
-       sheet view under the work. */
-    #config-overlay {
-      min-width: 0;
-      min-height: 0;
-    }
-    #config-overlay:not([hidden]) {
-      display: grid;
-      grid-template-columns: 176px minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr) auto;
-    }
-    #config-overlay #style-nav {
-      grid-row: 1 / 3;
-      border-right: 1px solid var(--line);
-    }
-    #config-overlay #sheet-view {
-      grid-column: 2;
-      max-height: 45vh;
-      overflow-y: auto;
-      border-top: 1px solid var(--line);
-      padding: 10px 16px;
-    }
-    #config-overlay #sheet-view:empty {
-      display: none;
-    }
+    /* ---- style panel: the middle column in Style and Print ---- */
     /* Header (.phead) stays put; only the view (.pbody) scrolls. */
-    #style-work {
+    #config-overlay {
       display: flex;
       flex-direction: column;
       min-width: 0;
@@ -643,15 +658,6 @@
     #style-nav {
       overflow-y: auto;
       padding: 10px 8px;
-    }
-    #style-nav .nh {
-      font-size: var(--fs-sm);
-      font-weight: 500;
-      color: var(--muted);
-      padding: 10px 8px 4px;
-    }
-    #style-nav .nh:first-child {
-      padding-top: 2px;
     }
     #style-nav .ni {
       display: flex;
@@ -1302,6 +1308,9 @@
       display: grid;
       gap: 10px;
       align-content: start;
+      background: var(--desk);
+      overflow-y: auto;
+      padding: 16px;
     }
     #sheet-view .sheet {
       display: grid;
@@ -1317,7 +1326,6 @@
     #sheet-view .sheet svg {
       width: 100%;
       height: auto;
-      max-height: 150px;
     }
     #sheet-view .sheet figcaption {
       font-size: 11px;
@@ -1432,11 +1440,24 @@
   </head>
   <body>
     <div id="toolbar">
-      <button id="tree-toggle" class="btn" aria-pressed="true"
-        title="Hide contents">
-        <svg viewBox="0 0 16 16">
+      <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <symbol id="side" viewBox="0 0 16 16">
+          <rect x="2" y="3" width="3.5" height="10"
+            style="fill: currentColor; fill-opacity: var(--pf, 0); stroke: none" />
           <rect x="1.5" y="2.5" width="13" height="11" rx="1.2" />
           <line x1="5.5" y1="2.5" x2="5.5" y2="13.5" />
+        </symbol>
+        <symbol id="sideR" viewBox="0 0 16 16">
+          <rect x="10.5" y="3" width="3.5" height="10"
+            style="fill: currentColor; fill-opacity: var(--pf, 0); stroke: none" />
+          <rect x="1.5" y="2.5" width="13" height="11" rx="1.2" />
+          <line x1="10.5" y1="2.5" x2="10.5" y2="13.5" />
+        </symbol>
+      </svg>
+      <button id="tree-toggle" class="btn toggle" aria-pressed="true"
+        title="Contents" aria-label="Contents">
+        <svg>
+          <use href="#side" />
         </svg>
       </button>
       <button id="book-switcher" class="btn" title="Switch book">
@@ -1452,34 +1473,16 @@
           <path d="M4 6.5l4 4 4-4" />
         </svg>
       </button>
+      <span id="modes" role="group" aria-label="Mode">
+        <button class="btn" data-mode="write" title="Write">Write</button>
+        <button class="btn" data-mode="style" title="Style">Style</button>
+        <button class="btn" data-mode="print" title="Print">Print</button>
+      </span>
       <span class="spacer"></span>
       <details id="insert-menu">
         <summary>Insert</summary>
         <div id="snippet-buttons"></div>
       </details>
-      <span id="pane-toggles" class="seg">
-        <button id="pane-toggle-editor" class="btn" aria-pressed="false"
-          title="Editor only">
-          <svg viewBox="0 0 16 16">
-            <rect x="1.5" y="2.5" width="13" height="11" rx="1.2" />
-            <line x1="9.5" y1="2.5" x2="9.5" y2="13.5" opacity="0.4" />
-          </svg>
-        </button>
-        <button id="pane-toggle-split" class="btn" aria-pressed="true"
-          title="Split view">
-          <svg viewBox="0 0 16 16">
-            <rect x="1.5" y="2.5" width="13" height="11" rx="1.2" />
-            <line x1="8" y1="2.5" x2="8" y2="13.5" />
-          </svg>
-        </button>
-        <button id="pane-toggle-preview" class="btn" aria-pressed="false"
-          title="Preview only">
-          <svg viewBox="0 0 16 16">
-            <rect x="1.5" y="2.5" width="13" height="11" rx="1.2" />
-            <line x1="6.5" y1="2.5" x2="6.5" y2="13.5" opacity="0.4" />
-          </svg>
-        </button>
-      </span>
       <button id="theme-toggle" class="btn" title="Switch light/dark">
         <svg class="icon-moon" viewBox="0 0 16 16">
           <path d="M13.2 9.4A5.6 5.6 0 0 1 6.6 2.8a5.6 5.6 0 1 0 6.6 6.6z" />
@@ -1490,24 +1493,24 @@
             d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1" />
         </svg>
       </button>
-      <button id="config-button" class="btn" title="Style"
-        aria-label="Style panel">
-        <svg viewBox="0 0 16 16">
-          <path d="M2 4.5h6.2M11.8 4.5H14M2 11.5h2.2M7.8 11.5H14" />
-          <circle cx="10" cy="4.5" r="1.8" />
-          <circle cx="6" cy="11.5" r="1.8" />
+      <button id="pages-toggle" class="btn toggle" aria-pressed="true"
+        title="Pages" aria-label="Pages">
+        <svg>
+          <use href="#sideR" />
         </svg>
       </button>
     </div>
     <div id="panes">
-      <nav id="tree"></nav>
+      <nav id="tree" aria-label="Contents"></nav>
+      <nav id="style-nav"></nav>
       <div id="gutter-tree" class="gutter" role="separator"
         aria-orientation="vertical" title="Drag to resize"></div>
       <div id="editor"></div>
-      <div id="config-overlay" hidden></div>
+      <div id="config-overlay"></div>
       <div id="gutter-editor" class="gutter" role="separator"
         aria-orientation="vertical" title="Drag to resize"></div>
       <div id="preview"></div>
+      <div id="sheet-view"></div>
     </div>
     <div id="footer">
       <span id="page-indicator"></span>
