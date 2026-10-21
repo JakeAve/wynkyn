@@ -75,6 +75,8 @@ Deno.test({
         domCss: "",
         pagedCss,
         pageNumbering: pageNumberingConfig({}),
+        manuscriptVersion: "",
+        metadataVersion: null,
       }));
       await page.waitForSelector("html[data-paged=done]", { timeout: 60_000 });
       await assertPlate(page);

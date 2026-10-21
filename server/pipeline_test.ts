@@ -1,6 +1,6 @@
 // server/pipeline_test.ts
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { buildBook, listBooks, toHtml } from "./pipeline.ts";
+import { buildBook, contentVersion, listBooks, toHtml } from "./pipeline.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;
 
@@ -113,6 +113,38 @@ Deno.test("buildBook: an {only} token no edition answers to is a diagnostic", as
     assertEquals((await buildBook(dir, "b")).diagnostics, [
       { line: 9, message: '{only} names unknown edition "nosuch"' },
     ]);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("buildBook: a manuscript edit changes manuscriptVersion, not metadataVersion", async () => {
+  const dir = await onlyBook();
+  try {
+    await Deno.writeTextFile(`${dir}/b/metadata.json`, "{}");
+    const a = await buildBook(dir, "b");
+    assertEquals(
+      a.manuscriptVersion,
+      await contentVersion(await Deno.readTextFile(`${dir}/b/manuscript.md`)),
+    );
+    assertEquals(a.manuscriptVersion.length, 16);
+    const path = `${dir}/b/manuscript.md`;
+    await Deno.writeTextFile(path, (await Deno.readTextFile(path)) + "x");
+    const b = await buildBook(dir, "b");
+    assert(b.manuscriptVersion !== a.manuscriptVersion);
+    assertEquals(b.metadataVersion, a.metadataVersion);
+    assert(a.metadataVersion !== null);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("buildBook: metadataVersion is null without a metadata file", async () => {
+  const dir = await Deno.makeTempDir();
+  try {
+    await Deno.mkdir(`${dir}/b`);
+    await Deno.writeTextFile(`${dir}/b/manuscript.md`, "Hello.\n");
+    assertEquals((await buildBook(dir, "b")).metadataVersion, null);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

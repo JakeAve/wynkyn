@@ -1,6 +1,7 @@
 // web/src/preview.ts — Paged.js re-render + font links (spec §7.6).
 // Paged.js is the global from the vendored /vendor/paged.js (index.html loads
 // it, dev-server.ts serves it); there is no npm build to bundle.
+import type { ServerMessage } from "../../server/pipeline.ts";
 import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
 import {
   matchKey,
@@ -47,19 +48,7 @@ declare const BookPageMap: {
   ): Promise<RenderResult & { passes: number }>;
 };
 
-export interface UpdateMessage {
-  type: "update";
-  origin: string | null;
-  book: string;
-  bookTitle: string;
-  html: string;
-  baseCss: string;
-  domCss: string;
-  pagedCss: string;
-  pageNumbering: PageNumberingConfig;
-  fontLinks: string;
-  diagnostics: { line: number; message: string }[];
-}
+export type UpdateMessage = Extract<ServerMessage, { type: "update" }>;
 
 let currentBlobUrl: string | null = null;
 let rendering = false;
