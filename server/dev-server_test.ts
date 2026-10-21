@@ -685,6 +685,62 @@ Deno.test("rename rewrites {only} tokens in manuscript.md", async () => {
   }
 });
 
+Deno.test("rename: a stale save carrying the old token lands with the new one", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({
+    booksRoot: root,
+    port: 0,
+    saveDebounceMs: 40,
+  });
+  const base = `http://localhost:${server.port}`;
+  const post = (path: string, body: unknown) =>
+    fetch(`${base}/api/books/demo-book${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  // A tab open on the book before the rename, so its later saves are stale.
+  const ws = new WebSocket(
+    `ws://localhost:${server.port}/ws?book=demo-book&client=tab`,
+  );
+  const manuscript = `${root}/demo-book/manuscript.md`;
+  const settle = () => new Promise((r) => setTimeout(r, 150));
+  try {
+    await nextMessage(ws);
+    const renamed = await post("/editions/pocket/rename", { slug: "travel" });
+    assertEquals((await renamed.json()).ok, true);
+    await (await post("/manuscript", {
+      text: "{chapter: one}\n\n{only: pocket | default}\nP\n{/only}\n",
+      clientId: "tab",
+    })).body?.cancel();
+    await settle();
+    assertEquals(
+      await Deno.readTextFile(manuscript),
+      "{chapter: one}\n\n{only: travel | default}\nP\n{/only}\n",
+    );
+    // Once the tab saves without the old token it has caught up: `pocket`
+    // is free again for a new edition of that name.
+    await (await post("/manuscript", {
+      text: "{chapter: one}\n",
+      clientId: "tab",
+    }))
+      .body?.cancel();
+    await (await post("/manuscript", {
+      text: "{chapter: one}\n\n{only: pocket}\nP\n{/only}\n",
+      clientId: "tab",
+    })).body?.cancel();
+    await settle();
+    assertEquals(
+      await Deno.readTextFile(manuscript),
+      "{chapter: one}\n\n{only: pocket}\nP\n{/only}\n",
+    );
+  } finally {
+    ws.close();
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
 Deno.test("editions: the default edition renames by display name, through the pending save", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({

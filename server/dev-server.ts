@@ -77,6 +77,48 @@ export async function startServer(
 
   const saveDebounceMs = opts.saveDebounceMs ?? 250;
   const pendingSaves = new Map<string, PendingSave>();
+  // book → the manuscript write under way, so a rename reads what it lands.
+  const writing = new Map<string, Promise<void>>();
+  // EXPERIMENTAL (§3.2.9): book → edition renames whose {only} token a stale
+  // save may still carry (another tab, a debounced save not yet sent). Each
+  // lasts until every client connected at the rename has sent a save without
+  // the old token or disconnected.
+  const tokenRenames = new Map<
+    string,
+    { from: string; to: string; stale: Set<string> }[]
+  >();
+  const pruneRenames = (book: string) => {
+    const left = (tokenRenames.get(book) ?? []).filter((r) => r.stale.size);
+    if (left.length) tokenRenames.set(book, left);
+    else tokenRenames.delete(book);
+  };
+
+  // Lands a manuscript write; the watcher sees it and broadcasts, tagged with
+  // `origin` via recentWrites.
+  function writeManuscript(
+    book: string,
+    text: string,
+    origin: string | null,
+  ): Promise<void> {
+    recentWrites.set(book, origin);
+    const done: Promise<void> = Deno.writeTextFile(
+      `${booksRoot}/${book}/manuscript.md`,
+      text,
+    ).catch((err) => {
+      // No write means no filesystem event, so nothing will ever consume
+      // (and clear) the recentWrites entry above — drop it ourselves so it
+      // doesn't get misattributed to a later, unrelated broadcast for this
+      // book. There's no open HTTP response left to report this on (the
+      // {ok:true} response already went out), and per Global Constraints
+      // the server must never die on bad state, so just log it.
+      recentWrites.delete(book);
+      console.error(`save failed for book "${book}":`, err);
+    }).finally(() => {
+      if (writing.get(book) === done) writing.delete(book);
+    });
+    writing.set(book, done);
+    return done;
+  }
 
   async function handleSave(book: string, req: Request): Promise<Response> {
     if (!safeName(book)) return new Response("bad path", { status: 400 });
@@ -97,28 +139,23 @@ export async function startServer(
       return new Response("book not found", { status: 404 });
     }
     const clientId = typeof body.clientId === "string" ? body.clientId : null;
+    const pending: PendingSave = { text: body.text, clientId, timer: 0 };
+    // A save still carrying a renamed edition's old token gets the new one,
+    // and no origin, so its own tab reloads the rewritten text too.
+    for (const r of tokenRenames.get(book) ?? []) {
+      if (clientId !== null && !r.stale.has(clientId)) continue;
+      const next = renameOnlyToken(pending.text, r.from, r.to);
+      if (next !== pending.text) {
+        pending.text = next;
+        pending.clientId = null;
+      } else if (clientId !== null) r.stale.delete(clientId); // caught up
+    }
+    pruneRenames(book);
     const existing = pendingSaves.get(book);
     if (existing) clearTimeout(existing.timer);
-    const pending: PendingSave = { text: body.text, clientId, timer: 0 };
-    pending.timer = setTimeout(async () => {
+    pending.timer = setTimeout(() => {
       pendingSaves.delete(book);
-      recentWrites.set(book, pending.clientId);
-      try {
-        await Deno.writeTextFile(
-          `${booksRoot}/${book}/manuscript.md`,
-          pending.text,
-        );
-        // The watcher sees this write and broadcasts, tagged via recentWrites.
-      } catch (err) {
-        // No write means no filesystem event, so nothing will ever consume
-        // (and clear) the recentWrites entry above — drop it ourselves so it
-        // doesn't get misattributed to a later, unrelated broadcast for this
-        // book. There's no open HTTP response left to report this on (the
-        // {ok:true} response already went out), and per Global Constraints
-        // the server must never die on bad state, so just log it.
-        recentWrites.delete(book);
-        console.error(`save failed for book "${book}":`, err);
-      }
+      writeManuscript(book, pending.text, pending.clientId);
     }, saveDebounceMs);
     pendingSaves.set(book, pending);
     return Response.json({ ok: true });
@@ -438,17 +475,37 @@ export async function startServer(
     } catch {
       return new Response("edition not found", { status: 404 });
     }
-    // EXPERIMENTAL (§3.2.9): the edition's {only} token follows its slug. A
-    // manuscript save still in its debounce window is rewritten and landed now.
+    // EXPERIMENTAL (§3.2.9): the edition's {only} token follows its slug.
+    // Later saves carrying the old token are rewritten as they arrive.
+    const stale = new Set(
+      [...clients].filter((c) => c.book === book).map((c) => c.clientId),
+    );
+    if (stale.size) {
+      tokenRenames.set(book, [
+        ...tokenRenames.get(book) ?? [],
+        { from: edition, to: target, stale },
+      ]);
+    }
+    // A manuscript save still in its debounce window is rewritten and landed
+    // now; one already being written lands first, so the read below sees it.
     const pendingText = pendingSaves.get(book);
     if (pendingText) clearTimeout(pendingText.timer);
     pendingSaves.delete(book);
-    const manuscript = `${booksRoot}/${book}/manuscript.md`;
-    const text = pendingText?.text ?? await Deno.readTextFile(manuscript);
+    await writing.get(book);
+    const text = pendingText?.text ??
+      await Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`);
+    // A save that arrived meanwhile is newer, and already rewritten.
+    if (pendingSaves.has(book) || writing.has(book)) {
+      return Response.json({ ok: true });
+    }
     const next = renameOnlyToken(text, edition, target);
     if (next !== text || pendingText) {
-      recentWrites.set(book, null); // every editor reloads the rewritten text
-      await Deno.writeTextFile(manuscript, next);
+      // Rewritten text has no origin: every editor reloads it.
+      await writeManuscript(
+        book,
+        next,
+        next === text ? pendingText?.clientId ?? null : null,
+      );
     }
     return Response.json({ ok: true });
   }
@@ -603,7 +660,11 @@ export async function startServer(
       const message = await buildMessage(book, edition, null);
       if (socket.readyState === WebSocket.OPEN) socket.send(message);
     };
-    socket.onclose = () => clients.delete(client);
+    socket.onclose = () => {
+      clients.delete(client);
+      for (const r of tokenRenames.get(book) ?? []) r.stale.delete(clientId);
+      pruneRenames(book);
+    };
     socket.onerror = () => clients.delete(client);
     return response;
   }
