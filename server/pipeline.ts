@@ -2,7 +2,7 @@
 // (spec §5.4). Replaces the Plan 0 throwaway scripts/preview.ts; Plan 5's print
 // export composes the same pipeline.
 import { checkOnlySpans, parse } from "../parser/parser.ts";
-import { loadMetadata } from "../metadata/loader.ts";
+import { loadMetadataText } from "../metadata/loader.ts";
 import {
   generateDomCSS,
   generateFontLinks,
@@ -94,6 +94,27 @@ export interface BuildResult {
   pageNumbering: PageNumberingConfig; // per-zone folio style, for the page map
   fontLinks: string; // <link> tags for Google Fonts
   diagnostics: Diagnostic[];
+  manuscriptVersion: string; // contentVersion of the manuscript text built from
+  metadataVersion: string | null; // ... of the metadata file text; null if absent
+}
+
+/** What the dev server sends over the WebSocket. */
+export type ServerMessage = (BuildResult & { type: "update" }) | {
+  type: "error";
+  book: string;
+  edition: string | null;
+  message: string;
+};
+
+/** First 16 hex chars of SHA-256. Server-side only: crypto.subtle is undefined
+ * in browsers on plain http over a LAN IP. */
+export async function contentVersion(text: string): Promise<string> {
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(text),
+  );
+  return [...new Uint8Array(hash).slice(0, 8)]
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /** `seed`: the page map's starting folios (default {}); print export passes the last one. */
@@ -178,7 +199,8 @@ export async function buildBook(
   const doc = parse(source, { edition: editionToken(edition) });
   const tokens = editionTokens(await editionSlugs(booksRoot, book));
   const metaPath = metadataPath(booksRoot, book, edition);
-  const meta = await loadMetadata(metaPath);
+  const loaded = await loadMetadataText(metaPath);
+  const meta = loaded?.meta ?? null;
   if (meta === null && edition !== null) {
     // Missing metadata.json is fine (spec §4); a missing named edition is not.
     throw new Deno.errors.NotFound(`no such edition: ${book}/${edition}`);
@@ -205,5 +227,7 @@ export async function buildBook(
       ...doc.diagnostics,
       ...checkOnlySpans(doc.onlySpans, tokens),
     ],
+    manuscriptVersion: await contentVersion(source),
+    metadataVersion: loaded ? await contentVersion(loaded.text) : null,
   };
 }

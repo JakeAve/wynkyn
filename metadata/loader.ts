@@ -1,7 +1,10 @@
 import type { Metadata } from "./types.ts";
 import { upgradePageSetup } from "./upgrade.ts";
 
-export async function loadMetadata(path: string): Promise<Metadata | null> {
+/** The metadata file's parsed value and the exact text it was parsed from. */
+export async function loadMetadataText(
+  path: string,
+): Promise<{ meta: Metadata; text: string } | null> {
   let text: string;
   try {
     text = await Deno.readTextFile(path);
@@ -10,11 +13,15 @@ export async function loadMetadata(path: string): Promise<Metadata | null> {
     throw e;
   }
   try {
-    return upgradePageSetup(JSON.parse(text) as Metadata);
+    return { meta: upgradePageSetup(JSON.parse(text) as Metadata), text };
   } catch (e) {
     if (e instanceof SyntaxError) {
       throw new Error(`Invalid JSON in ${path}: ${e.message}`);
     }
     throw e;
   }
+}
+
+export async function loadMetadata(path: string): Promise<Metadata | null> {
+  return (await loadMetadataText(path))?.meta ?? null;
 }

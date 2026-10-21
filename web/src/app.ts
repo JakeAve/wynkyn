@@ -19,8 +19,8 @@ import {
   renderPreview,
   restoreCachedRender,
   scrollPreviewTo,
-  type UpdateMessage,
 } from "./preview.ts";
+import type { ServerMessage } from "../../server/pipeline.ts";
 import {
   cacheId,
   deleteCachedRender,
@@ -943,12 +943,7 @@ async function main(): Promise<void> {
   ws.onopen = () => setStatus("saved");
   ws.onclose = () => setStatus("offline");
   ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data) as UpdateMessage | {
-      type: "error";
-      origin: string | null;
-      book: string;
-      message: string;
-    };
+    const msg = JSON.parse(e.data) as ServerMessage;
     if (msg.type === "error") {
       setStatus("error", `build: ${brief(msg.message)}`);
       return;
@@ -964,7 +959,8 @@ async function main(): Promise<void> {
       setStatus("error", `preview: ${brief(err)}`);
       showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
     });
-    if (msg.origin !== clientId) {
+    // origin is still sent by dev-server.ts until the later tasks drop it.
+    if ((msg as { origin?: string | null }).origin !== clientId) {
       refreshFromRemote();
       refreshConfigFromRemote();
     }
