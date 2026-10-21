@@ -12,7 +12,7 @@ import { buildBook, listBooks, toHtml } from "./server/pipeline.ts";
 import {
   createEdition,
   editionSlugs,
-  editionToken,
+  editionTokens,
   listEditions,
   metadataPath,
   safeName,
@@ -118,7 +118,7 @@ if (import.meta.main) {
     const doc = parse(
       await Deno.readTextFile(`${BOOKS}/${book}/manuscript.md`),
     );
-    const tokens = [null, ...await editionSlugs(BOOKS, book)].map(editionToken);
+    const tokens = editionTokens(await editionSlugs(BOOKS, book));
     const diags = [
       ...doc.diagnostics,
       ...checkOnlySpans(doc.onlySpans, tokens),

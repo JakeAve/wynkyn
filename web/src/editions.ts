@@ -1,6 +1,6 @@
 // web/src/editions.ts — pure helpers for the book/edition switcher (no DOM).
-import type { EditionInfo } from "../../server/editions.ts";
-import { DEFAULT_EDITION_TOKEN, type OnlySpan } from "../../parser/types.ts";
+import { type EditionInfo, editionToken } from "../../server/editions.ts";
+import type { OnlySpan } from "../../parser/types.ts";
 
 export type { EditionInfo };
 
@@ -36,7 +36,7 @@ export function firstSpanLine(
   spans: OnlySpan[],
   edition: string | null,
 ): number | null {
-  const token = edition ?? DEFAULT_EDITION_TOKEN;
+  const token = editionToken(edition);
   return spans.find((s) => s.editions.includes(token))?.line ?? null;
 }
 

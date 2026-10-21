@@ -1,7 +1,7 @@
 // web/src/app.ts — client orchestrator: book selection, editor, WebSocket, panes.
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
-import { type BmlDocument, DEFAULT_EDITION_TOKEN } from "../../parser/types.ts";
+import type { BmlDocument } from "../../parser/types.ts";
 import {
   addIsNames,
   catalogFor,
@@ -53,6 +53,7 @@ import {
   prettySize,
   slugify,
 } from "./editions.ts";
+import { editionToken, titleCase } from "../../server/editions.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 
@@ -126,7 +127,7 @@ function reparse(text: string): void {
     return t?.name === "is" && !t.closing && t.slug ? [t.slug] : [];
   });
   applyDiagnostics(editor, doc.diagnostics);
-  setEditionSpans(editor, doc.onlySpans, edition ?? DEFAULT_EDITION_TOKEN);
+  setEditionSpans(editor, doc.onlySpans, editionToken(edition));
   const diag = $("diagnostics");
   const first = doc.diagnostics[0];
   diag.textContent = first
@@ -183,12 +184,6 @@ function highlightTreeNode(line: number): void {
   );
 }
 
-// "a-christmas-carol" → "A Christmas Carol" for the toolbar and picker.
-function prettify(slug: string): string {
-  return slug.split("-").map((w) => w ? w[0]!.toUpperCase() + w.slice(1) : w)
-    .join(" ");
-}
-
 async function api(url: string, init?: RequestInit): Promise<void> {
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(await res.text());
@@ -211,7 +206,7 @@ async function fetchEditions(name: string): Promise<EditionInfo[]> {
 function setCrumb(editions: EditionInfo[]): void {
   const cur = editions.find((e) => e.slug === edition);
   const name = cur ? editionLabel(cur) : "";
-  $("book-name").textContent = prettify(book);
+  $("book-name").textContent = titleCase(book);
   $("edition-name").textContent = name;
   document.title = `Book Editor — ${book} · ${name}`;
 }
@@ -232,7 +227,7 @@ const newForm = () => $("edition-new-form") as HTMLFormElement;
 function bookHits(): string[] {
   const q = bookSearch().value.trim().toLowerCase();
   return books.filter((b) =>
-    !q || b.includes(q) || prettify(b).toLowerCase().includes(q)
+    !q || b.includes(q) || titleCase(b).toLowerCase().includes(q)
   );
 }
 
@@ -244,7 +239,7 @@ function renderBooks(): void {
     row.tabIndex = -1; // the search box's arrows walk these
     row.setAttribute("role", "option");
     row.setAttribute("aria-selected", String(b === selBook));
-    row.textContent = prettify(b);
+    row.textContent = titleCase(b);
     row.title = b;
     row.onclick = () => selectBook(b);
     row.ondblclick = () => openEdition(b, b === book ? edition : null);

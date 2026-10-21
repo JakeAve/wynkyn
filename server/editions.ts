@@ -66,9 +66,15 @@ export function editionToken(slug: string | null): string {
   return slug ?? DEFAULT_EDITION_TOKEN;
 }
 
-// The picker's display name for a named edition — web/src/editions.ts
-// editionLabel's casing.
-function titleCase(slug: string): string {
+// Every token a book's {only} spans may name: the default edition's, then its
+// named editions' slugs.
+export function editionTokens(slugs: string[]): string[] {
+  return [null, ...slugs].map(editionToken);
+}
+
+// "a-christmas-carol" → "A Christmas Carol": a named edition's picker name,
+// and the editor's book names.
+export function titleCase(slug: string): string {
   return slug.split("-").map((w) => w ? w[0]!.toUpperCase() + w.slice(1) : w)
     .join(" ");
 }

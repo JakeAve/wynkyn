@@ -11,7 +11,12 @@ import {
   pageNumberingConfig,
 } from "../metadata/css-generator.ts";
 import { render } from "../renderer/render.ts";
-import { editionSlugs, editionToken, metadataPath } from "./editions.ts";
+import {
+  editionSlugs,
+  editionToken,
+  editionTokens,
+  metadataPath,
+} from "./editions.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 import type { Seed } from "../renderer/page-map-types.ts";
 
@@ -171,9 +176,7 @@ export async function buildBook(
   // EXPERIMENTAL {only} (spec §3.2.9): keep this edition's spans, flag tokens
   // no edition of this book answers to.
   const doc = parse(source, { edition: editionToken(edition) });
-  const tokens = [null, ...await editionSlugs(booksRoot, book)].map(
-    editionToken,
-  );
+  const tokens = editionTokens(await editionSlugs(booksRoot, book));
   const metaPath = metadataPath(booksRoot, book, edition);
   const meta = await loadMetadata(metaPath);
   if (meta === null && edition !== null) {
