@@ -30,7 +30,6 @@ import {
   textInputRaw,
 } from "./config-panel.ts";
 import {
-  crumb,
   icon,
   makeView,
   moreCss,
@@ -62,10 +61,7 @@ export function buildFurniture(
   // Every save in the part, advanced running heads included, repaints the dots.
   const v = makeView(panel);
   const ctx: PanelContext = { ...panel, queueSave: v.changed };
-  const back = () => ctx.go({ tab: "parts" });
-  return part === "folios"
-    ? [crumb("Page numbers", back), ...pageNumbers(ctx, v)]
-    : [crumb("Running heads", back), ...runningHeads(ctx, v)];
+  return part === "folios" ? pageNumbers(ctx, v) : runningHeads(ctx, v);
 }
 
 // What the page map drops where (renderer/folios.js, Chicago). Read-only:

@@ -512,8 +512,18 @@ async function ensureConfigPanel(): Promise<ConfigPanel | null> {
   if (configPanel) return configPanel;
   try {
     metadata = await fetchMetadata();
+    // Temporary columns inside the panel's slot until the app shell has its own.
+    const nav = document.createElement("nav");
+    nav.id = "style-nav";
+    const work = document.createElement("div");
+    work.id = "style-work";
+    const sheetView = document.createElement("div");
+    sheetView.id = "sheet-view";
+    $("config-overlay").replaceChildren(nav, work, sheetView);
     configPanel = createConfigPanel({
-      overlay: $("config-overlay"),
+      overlay: work,
+      nav,
+      sheetView,
       metadata,
       saveSections: saveMetadataSections,
       preview: previewLink($("preview"), styleCatalog),
@@ -527,13 +537,31 @@ async function ensureConfigPanel(): Promise<ConfigPanel | null> {
   }
 }
 
+let panelMode: "style" | "print" = "style";
+
+// ponytail: until the Write/Style/Print switch lands, the Style button cycles
+// closed → Style → Print → closed.
 async function toggleConfigPanel(): Promise<void> {
-  (await ensureConfigPanel())?.toggle();
+  const panel = await ensureConfigPanel();
+  if (!panel) return;
+  const overlay = $("config-overlay");
+  if (overlay.hidden) panelMode = "style";
+  else if (panelMode === "style") panelMode = "print";
+  else {
+    overlay.hidden = true;
+    return;
+  }
+  panel.setMode(panelMode);
+  overlay.hidden = false;
 }
 
 // Preview click → Styles section on that element (spec §7.4).
 async function pickStyle(key: string): Promise<void> {
-  (await ensureConfigPanel())?.selectStyle(key);
+  const panel = await ensureConfigPanel();
+  if (!panel) return;
+  panel.selectStyle(key);
+  panelMode = "style";
+  $("config-overlay").hidden = false;
 }
 
 async function fetchManuscript(name: string): Promise<string> {
@@ -658,7 +686,7 @@ function installThemeToggle(): void {
 // The config panel occupies the editor's slot so it never covers the preview:
 // mirror the overlay's hidden attribute onto #panes, and force split view on
 // open so the preview always sits beside it. The observer catches every close
-// path (close button, Esc, pane-mode change).
+// path (the Style button, pane-mode change).
 function installConfigPlacement(): void {
   const overlay = $("config-overlay");
   const sync = () => {

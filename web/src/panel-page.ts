@@ -2,7 +2,7 @@
 // Page: trim size and margins (page numbers and running heads are Page
 // furniture parts, panel-furniture.ts). Print: the sheet,
 // signatures and the imposition they derive to (§4.3), the first signature
-// drawn as it prints (R7), and the print export. Both write the `page`
+// drawn as it prints into the sheet view (R7), and the print export. Both write the `page`
 // section; Print reads the trim size the Page tab set.
 import type { Duplex, Flip, PageConfig } from "../../metadata/types.ts";
 import {
@@ -152,14 +152,13 @@ export function buildPageTab(panel: PanelContext): Node[] {
 export function buildPrintTab(ctx: PanelContext): Node[] {
   const page: PageConfig = ctx.meta.page ??= {};
   const readout = el("div", "readout");
-  const sheets = el("div", "sheets");
   // Redrawn on every edit and every repagination: a booklet's size and the
   // pages that land on each sheet both follow the book's page count.
   const redraw = () => {
     const pages = ctx.preview.pageCount();
     const setup = resolvePageSetup(page, { pageCount: pages || undefined });
     showSetup(setup, pages, readout);
-    drawSignature(setup, pages, page.flip ?? "short-edge", sheets);
+    drawSignature(setup, pages, page.flip ?? "short-edge", ctx.sheetView);
   };
   const v = makeView(ctx, redraw);
   const save = () => v.changed("page");
@@ -278,7 +277,6 @@ export function buildPrintTab(ctx: PanelContext): Node[] {
         () => page[FPS] === "booklet",
       ),
       folioRow,
-      sheets,
       readout,
     ]),
     exportSection(ctx, page),

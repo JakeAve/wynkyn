@@ -1,5 +1,5 @@
 // web/src/panel-parts.ts — the style panel's Book parts tab (spec R1, R2, R4):
-// the parts list, a detail view per part with one section per sub-element,
+// a detail view per part with one section per sub-element,
 // and Body text's own view (text, paragraphs, emphasis). Page furniture
 // parts are built in panel-furniture.ts.
 import type {
@@ -10,7 +10,6 @@ import type {
 import { parseLength } from "./config-data.ts";
 import { buildFurniture } from "./panel-furniture.ts";
 import {
-  crumb,
   icon,
   makeView,
   moreCss,
@@ -38,7 +37,7 @@ type Section = keyof Metadata;
 
 export function buildPartsTab(ctx: PanelContext, part?: string): Node[] {
   const p = part ? bookParts(ctx.meta).find((x) => x.id === part) : undefined;
-  if (!p) return partsList(ctx);
+  if (!p) return pickTip();
   if (p.id === "folios" || p.id === "heads") return buildFurniture(ctx, p.id);
   if (p.group === "custom") return isDetail(ctx, p);
   return p.id === "body" ? bodyDetail(ctx, p) : detail(ctx, p);
@@ -61,47 +60,14 @@ const cap = (s: string) =>
 const fmt = (n: number) => String(Math.round(n * 100) / 100);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// ---- list ----
-
-const GROUPS: Array<[BookPart["group"], string]> = [
-  ["furniture", "Page furniture"],
-  ["front", "Front matter"],
-  ["body", "Body"],
-  ["back", "Back matter"],
-  ["custom", "Custom styles"],
-];
-
-function partsList(ctx: PanelContext): Node[] {
-  const parts = bookParts(ctx.meta);
-  const out: Node[] = [];
-  for (const [group, title] of GROUPS) {
-    const mine = parts.filter((p) => p.group === group);
-    if (!mine.length) continue;
-    out.push(el(
-      "div",
-      "group",
-      el("h3", "", title),
-      ...mine.map((p) => {
-        const n = setCount(ctx.meta, p);
-        const b = el(
-          "button",
-          "part",
-          el("span", "n", p.name),
-          el("span", "c", n ? `${n} set` : ""),
-          icon("chevR"),
-        );
-        b.onclick = () => ctx.go({ tab: "parts", part: p.id });
-        return b;
-      }),
-    ));
-  }
-  out.push(el(
+// No part chosen: the nav lists them.
+function pickTip(): Node[] {
+  return [el(
     "p",
     "tip",
     icon("pointer"),
-    "Click anything in the preview to jump straight to its settings.",
-  ));
-  return out;
+    "Pick a part, or click anything in the preview to jump straight to its settings.",
+  )];
 }
 
 // ---- writing ----
@@ -216,7 +182,7 @@ function isDetail(ctx: PanelContext, part: BookPart): Node[] {
     ctx.queueSave("is");
   }, []);
   box.open = true;
-  return [crumb(part.name, () => ctx.go({ tab: "parts" })), box];
+  return [box];
 }
 
 function focusOf(key: string): string {
@@ -248,7 +214,6 @@ function detail(ctx: PanelContext, part: BookPart): Node[] {
   });
   recount();
   return [
-    crumb(part.name, () => ctx.go({ tab: "parts" })),
     ...blocks,
     footer(count, () => {
       for (const s of new Set(resets.flatMap((f) => f()))) ctx.queueSave(s);
@@ -798,7 +763,6 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
 
   recount();
   return [
-    crumb(part.name, () => ctx.go({ tab: "parts" })),
     text,
     paragraphs,
     emphasis,

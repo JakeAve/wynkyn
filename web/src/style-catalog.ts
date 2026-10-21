@@ -256,6 +256,7 @@ export interface PanelContext {
   queueSave(key: keyof Metadata): void;
   go(route: Route): void;
   preview: PreviewLink;
+  sheetView: HTMLElement; // where the Print view draws the signature
   // The Print tab's export: lands pending saves, then runs it on the server.
   exportPrint(req: ExportRequest): Promise<ExportResult>;
   onPages(redraw: () => void): void; // called after each preview render

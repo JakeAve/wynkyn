@@ -1,36 +1,43 @@
-// web/src/config-panel.ts — the style panel (spec R1): a header with four
-// tabs (Page · Fonts · Book parts · Print), save status and close, over a tab
-// body rendered from a Route. Each tab's builder lives in its own panel-*.ts;
-// this file owns the debounced save, routing, and the DOM helpers the
-// builders share. Reusable transforms live in config-data.ts with tests.
+// web/src/config-panel.ts — the style panel (spec R1) as columns: a nav of
+// book settings and parts (style mode) or print sections (print mode), and the
+// chosen route's view under a header with the save status. Print draws its
+// signature into a separate sheet view. Each view's builder lives in its own
+// panel-*.ts; this file owns the debounced save, routing, and the DOM helpers
+// the builders share. Reusable transforms live in config-data.ts with tests.
 import type { Metadata } from "../../metadata/types.ts";
 import { buildFontsTab } from "./panel-fonts.ts";
 import { buildPageTab, buildPrintTab } from "./panel-page.ts";
 import { buildPartsTab } from "./panel-parts.ts";
 import {
   addIsNames,
+  type BookPart,
+  bookParts,
   type ExportRequest,
   type ExportResult,
   type PanelContext,
   type PreviewLink,
   type Route,
   routeFor,
-  type TabId,
+  setCount,
 } from "./style-catalog.ts";
 
 const SAVE_DEBOUNCE_MS = 600;
 
+export type PanelMode = "style" | "print";
+
 export interface ConfigPanel {
-  toggle(): void;
+  setMode(mode: PanelMode): void; // swap the nav and body between style and print
   isDirty(): boolean; // sections touched but not yet handed to saveSections
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   markSaved(ok: boolean, detail?: string): void; // feedback from the save round-trip
-  selectStyle(key: string): void; // open the panel where a catalog entry is styled (§7.4)
+  selectStyle(key: string): void; // style mode, where a catalog entry is styled (§7.4)
   pagesChanged(): void; // the preview repaginated
 }
 
 export interface ConfigPanelOptions {
-  overlay: HTMLElement;
+  overlay: HTMLElement; // the middle column: header and the route's view
+  nav: HTMLElement; // the left column
+  sheetView: HTMLElement; // the right column in print mode
   metadata: Metadata;
   saveSections(sections: Partial<Metadata>): void;
   preview: PreviewLink;
@@ -38,12 +45,66 @@ export interface ConfigPanelOptions {
   exportPrint(req: ExportRequest): Promise<ExportResult>; // after saves land
 }
 
-const TABS: Array<[TabId, string]> = [
-  ["page", "Page"],
-  ["fonts", "Fonts"],
-  ["parts", "Book parts"],
-  ["print", "Print"],
+const GROUPS: Array<[BookPart["group"], string]> = [
+  ["furniture", "Page furniture"],
+  ["front", "Front matter"],
+  ["body", "Body"],
+  ["back", "Back matter"],
+  ["custom", "Custom styles"],
 ];
+
+// Print nav rows: the Print view's section focus keys (panel-page.ts).
+const PRINT: Array<[string, string]> = [
+  ["sheet", "Paper"],
+  ["folios-per-signature", "Signatures"],
+  ["export", "Export"],
+];
+
+interface NavRow {
+  id: string; // matches navId(route)
+  label: string;
+  count?: number;
+  route: Route;
+}
+
+// Which nav row a route belongs to.
+function navId(route: Route): string {
+  if (route.tab === "print") return `print:${route.focus ?? "sheet"}`;
+  return route.tab === "parts" ? route.part ?? "" : route.tab;
+}
+
+function styleNav(meta: Metadata): Array<[string, NavRow[]]> {
+  const parts = bookParts(meta);
+  const row = (p: BookPart, label = p.name): NavRow => ({
+    id: p.id,
+    label,
+    count: setCount(meta, p),
+    route: { tab: "parts", part: p.id },
+  });
+  const body = parts.find((p) => p.id === "body")!;
+  const out: Array<[string, NavRow[]]> = [[
+    "Book",
+    [
+      { id: "page", label: "Page size & margins", route: { tab: "page" } },
+      { id: "fonts", label: "Fonts", route: { tab: "fonts" } },
+      row(body),
+    ],
+  ]];
+  for (const [group, title] of GROUPS) {
+    const mine = parts.filter((p) => p.group === group && p !== body);
+    if (mine.length) out.push([title, mine.map((p) => row(p))]);
+  }
+  return out;
+}
+
+const PRINT_NAV: Array<[string, NavRow[]]> = [[
+  "Print",
+  PRINT.map(([focus, label]) => ({
+    id: `print:${focus}`,
+    label,
+    route: { tab: "print", focus },
+  })),
+]];
 
 export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   let meta = structuredClone(opts.metadata);
@@ -63,6 +124,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     setSaved("Saving…", "saving");
     clearTimeout(timer);
     timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
+    renderNav(); // the "N set" counts follow the edit
   };
 
   // Hands the dirty sections to saveSections now; the debounce ends here.
@@ -106,57 +168,64 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     dirty.clear();
     opts.saveSections(sections as Partial<Metadata>);
   }
-  let onPages: (() => void) | null = null; // the open tab's redraw, if any
+  let onPages: (() => void) | null = null; // the open view's redraw, if any
 
-  let route: Route = { tab: "page" }; // survives refresh()
+  // Both survive refresh(); the style route also survives a trip to print.
+  let route: Route = { tab: "parts", part: "folios" };
+  let styleRoute = route;
+  let current = navId(route); // the nav row to mark, kept past focus's flash
 
-  const tablist = document.createElement("div");
-  tablist.className = "tabs";
-  tablist.setAttribute("role", "tablist");
-  tablist.setAttribute("aria-label", "Style sections");
-  const tabs = TABS.map(([id, label]) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.setAttribute("role", "tab");
-    b.id = `cfg-tab-${id}`;
-    b.dataset.tab = id;
-    b.textContent = label;
-    b.onclick = () => go({ tab: id });
-    return b;
-  });
-  tablist.append(...tabs);
-  // Roving tablist: arrows move the selection, only the selected tab tabs in.
-  tablist.addEventListener("keydown", (e) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    e.preventDefault();
-    const i = TABS.findIndex(([id]) => id === route.tab);
-    const n = (i + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) %
-      TABS.length;
-    go({ tab: TABS[n]![0] });
-    tabs[n]!.focus();
-  });
-
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "ghost";
-  close.innerHTML =
-    '<svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-  close.setAttribute("aria-label", "Close style panel");
-  close.title = "Close (Esc)";
-  close.onclick = () => {
-    opts.overlay.hidden = true;
-  };
+  const crumbs = document.createElement("span");
+  crumbs.className = "crumbs";
   const head = document.createElement("div");
   head.className = "phead";
-  head.append(tablist, saved, close);
+  head.append(crumbs, saved);
   const body = document.createElement("div");
   body.className = "pbody";
-  body.setAttribute("role", "tabpanel");
   opts.overlay.replaceChildren(head, body);
 
   function go(next: Route): void {
     route = next;
+    if (next.tab !== "print") styleRoute = next;
+    current = navId(next);
     render();
+  }
+
+  function renderNav(): void {
+    const groups = route.tab === "print" ? PRINT_NAV : styleNav(meta);
+    opts.nav.setAttribute(
+      "aria-label",
+      route.tab === "print" ? "Print sections" : "Style sections",
+    );
+    crumbs.replaceChildren();
+    opts.nav.replaceChildren(...groups.flatMap(([title, rows]) => {
+      const h = document.createElement("div");
+      h.className = "nh";
+      h.textContent = title;
+      return [
+        h,
+        ...rows.map((r) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "ni";
+          const t = document.createElement("span");
+          t.className = "t";
+          t.textContent = r.label;
+          const k = document.createElement("span");
+          k.className = "k";
+          k.textContent = r.count ? `${r.count} set` : "";
+          b.append(t, k);
+          if (r.id === current) {
+            b.setAttribute("aria-current", "true");
+            const name = document.createElement("b");
+            name.textContent = r.label;
+            crumbs.append(`${title} / `, name);
+          }
+          b.onclick = () => go(r.route);
+          return b;
+        }),
+      ];
+    }));
   }
 
   function build(): Node[] {
@@ -166,6 +235,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       queueSave,
       go,
       preview: opts.preview,
+      sheetView: opts.sheetView,
       exportPrint: (req) => {
         flushSave();
         return opts.exportPrint(req);
@@ -188,17 +258,13 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
 
   function render(keepScroll = false): void {
     addIsNames(meta, opts.isNames());
-    for (const b of tabs) {
-      const on = b.dataset.tab === route.tab;
-      b.setAttribute("aria-selected", String(on));
-      b.tabIndex = on ? 0 : -1;
-    }
-    body.setAttribute("aria-labelledby", `cfg-tab-${route.tab}`);
+    renderNav();
     const top = body.scrollTop;
     // A hovered "On N pages" button that is replaced never gets its mouseleave.
     for (const e of document.querySelectorAll("[data-style-hl]")) {
       e.removeAttribute("data-style-hl");
     }
+    if (route.tab !== "print") opts.sheetView.replaceChildren();
     body.replaceChildren(...build());
     const focus = route.focus;
     if (focus) {
@@ -214,21 +280,11 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     } else body.scrollTop = keepScroll ? top : 0;
   }
 
-  opts.overlay.setAttribute("role", "dialog");
-  opts.overlay.setAttribute("aria-label", "Style");
-  opts.overlay.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      opts.overlay.hidden = true;
-      e.stopPropagation();
-    }
-  });
   render();
   return {
-    toggle: () => {
-      opts.overlay.hidden = !opts.overlay.hidden;
-      if (!opts.overlay.hidden) {
-        tabs.find((b) => b.tabIndex === 0)?.focus();
-      }
+    setMode: (mode) => {
+      if ((route.tab === "print") === (mode === "print")) return;
+      go(mode === "print" ? { tab: "print" } : styleRoute);
     },
     isDirty: () => dirty.size > 0,
     refresh(metadata: Metadata) {
@@ -248,7 +304,6 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     },
     pagesChanged: () => onPages?.(),
     selectStyle(key) {
-      opts.overlay.hidden = false;
       addIsNames(meta, opts.isNames());
       go(routeFor(key, meta));
     },

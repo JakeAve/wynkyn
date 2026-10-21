@@ -26,6 +26,14 @@
       --pick: rgba(22, 22, 22, 0.9);
       --hover-ring: rgba(22, 22, 22, 0.32);
       --hl: rgba(22, 22, 22, 0.07);
+      /* The imposed sheet is paper-white in both themes too. */
+      --sheet-paper: #fff;
+      --sheet-edge: #b9b9b4;
+      --sheet-slot: #e2e2de;
+      --sheet-blank: #ededea;
+      --sheet-ink: #161616;
+      --sheet-fold: #8f8f8a;
+      --sheet-cut: #a04545;
       --muted: #71716c;
       --inv-bg: #161616; /* inverted pill: active nav/segment */
       --inv-fg: #fbfbfa;
@@ -598,16 +606,89 @@
     }
 
     /* ---- config panel: a pane in the editor's slot, never over the preview ---- */
-    /* Header (.phead) stays put; only the tab body (.pbody) scrolls. */
+    /* Until the app shell has its own columns, the slot holds them all: the
+       nav on the left, the work column beside it and, in print mode, the
+       sheet view under the work. */
     #config-overlay {
       min-width: 0;
       min-height: 0;
     }
     #config-overlay:not([hidden]) {
+      display: grid;
+      grid-template-columns: 176px minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+    #config-overlay #style-nav {
+      grid-row: 1 / 3;
+      border-right: 1px solid var(--line);
+    }
+    #config-overlay #sheet-view {
+      grid-column: 2;
+      max-height: 45vh;
+      overflow-y: auto;
+      border-top: 1px solid var(--line);
+      padding: 10px 16px;
+    }
+    #config-overlay #sheet-view:empty {
+      display: none;
+    }
+    /* Header (.phead) stays put; only the view (.pbody) scrolls. */
+    #style-work {
       display: flex;
       flex-direction: column;
+      min-width: 0;
+      min-height: 0;
     }
-    /* Takes the slack between tabs and close; truncates in a narrow slot. */
+    /* Nav: small group headings, rows with a muted count, current inverted. */
+    #style-nav {
+      overflow-y: auto;
+      padding: 10px 8px;
+    }
+    #style-nav .nh {
+      font-size: var(--fs-sm);
+      font-weight: 500;
+      color: var(--muted);
+      padding: 10px 8px 4px;
+    }
+    #style-nav .nh:first-child {
+      padding-top: 2px;
+    }
+    #style-nav .ni {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      width: 100%;
+      background: none;
+      border: 0;
+      border-radius: var(--radius);
+      padding: 4px 8px;
+      text-align: left;
+      color: var(--fg);
+      cursor: pointer;
+    }
+    #style-nav .ni:hover {
+      background: var(--hover);
+    }
+    #style-nav .ni[aria-current="true"] {
+      background: var(--inv-bg);
+      color: var(--inv-fg);
+    }
+    #style-nav .ni .t {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #style-nav .ni .k {
+      font-size: var(--fs-sm);
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    #style-nav .ni[aria-current="true"] .k {
+      color: inherit;
+      opacity: .6;
+    }
+    /* Takes the slack after the crumbs; truncates in a narrow slot. */
     .cfg-saved {
       flex: 1;
       min-width: 0;
@@ -702,27 +783,15 @@
       padding: 10px 10px 10px 12px;
       border-bottom: 1px solid var(--line);
     }
-    #config-overlay .tabs {
-      display: flex;
-      gap: 2px;
-      flex: none;
-    }
-    #config-overlay .tabs button {
-      background: none;
-      border: 0;
-      border-radius: 999px;
-      padding: 4px 11px;
+    #config-overlay .crumbs {
       color: var(--muted);
-      cursor: pointer;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    #config-overlay .tabs button:hover {
+    #config-overlay .crumbs b {
       color: var(--fg);
-      background: var(--hover);
-    }
-    #config-overlay .tabs button[aria-selected="true"] {
-      background: var(--inv-bg);
-      color: var(--inv-fg);
+      font-weight: 600;
     }
     #config-overlay .pbody {
       overflow-y: auto;
@@ -1032,56 +1101,6 @@
       align-items: center;
       padding-top: 12px;
     }
-    #config-overlay .crumb {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 12px 0 6px;
-      border-bottom: 1px solid var(--line);
-    }
-    #config-overlay .crumb .ghost {
-      padding: 4px 6px 4px 2px;
-      font-size: 13.5px;
-    }
-    #config-overlay .crumb strong {
-      font-weight: 600;
-    }
-    #config-overlay .group {
-      padding: 14px 0 4px;
-    }
-    #config-overlay .group h3 {
-      margin: 0 0 4px;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--muted);
-    }
-    #config-overlay .part {
-      display: flex;
-      width: 100%;
-      align-items: center;
-      gap: 8px;
-      background: none;
-      border: 0;
-      border-bottom: 1px solid var(--soft);
-      padding: 8px 4px 8px 2px;
-      cursor: pointer;
-      text-align: left;
-      color: var(--fg);
-    }
-    #config-overlay .part:hover {
-      background: var(--hover);
-    }
-    #config-overlay .part .n {
-      flex: 1;
-    }
-    #config-overlay .part .c {
-      color: var(--muted);
-      font-size: 12px;
-      font-variant-numeric: tabular-nums;
-    }
-    #config-overlay .part svg {
-      color: var(--muted);
-    }
     #config-overlay .tip {
       margin: 16px 0 0;
       color: var(--muted);
@@ -1276,64 +1295,69 @@
     #config-overlay .readout.cfg-readout-bad p {
       color: var(--err);
     }
-    /* Print tab: the first signature as it prints. The sheet is paper-white in
-       both themes. Solid strokes are screen pixels; the fold's dashes are in
-       the SVG's units, inches, where its dash pattern is measured. */
-    #config-overlay .sheets {
+    /* Sheet view: the first signature as it prints. The sheet is paper-white
+       in both themes. Solid strokes are screen pixels; the fold's dashes are
+       in the SVG's units, inches, where its dash pattern is measured. */
+    #sheet-view {
       display: grid;
       gap: 10px;
-      padding: 6px 0 4px;
+      align-content: start;
     }
-    #config-overlay .sheet {
+    #sheet-view .sheet {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    #config-overlay .sheet figure {
+    #sheet-view .sheet figure {
       margin: 0;
       display: grid;
       gap: 3px;
       justify-items: center;
     }
-    #config-overlay .sheet svg {
+    #sheet-view .sheet svg {
       width: 100%;
       height: auto;
       max-height: 150px;
     }
-    #config-overlay .sheet figcaption {
+    #sheet-view .sheet figcaption {
       font-size: 11px;
       color: var(--muted);
     }
-    #config-overlay .sheet .paper {
-      fill: #fff;
-      stroke: #b9b9b4;
+    #sheet-view .sheet .paper {
+      fill: var(--sheet-paper);
+      stroke: var(--sheet-edge);
       stroke-width: 1px;
       vector-effect: non-scaling-stroke;
     }
-    #config-overlay .sheet .slot {
+    #sheet-view .sheet .slot {
       fill: none;
-      stroke: #e2e2de;
+      stroke: var(--sheet-slot);
       stroke-width: 1px;
       vector-effect: non-scaling-stroke;
     }
-    #config-overlay .sheet .slot.blank {
-      fill: #ededea;
+    #sheet-view .sheet .slot.blank {
+      fill: var(--sheet-blank);
     }
-    #config-overlay .sheet text {
-      fill: #161616;
+    #sheet-view .sheet text {
+      fill: var(--sheet-ink);
       text-anchor: middle;
       dominant-baseline: central;
       font-variant-numeric: tabular-nums;
     }
-    #config-overlay .sheet .fold {
-      stroke: #8f8f8a;
+    #sheet-view .sheet .fold {
+      stroke: var(--sheet-fold);
       stroke-width: .06;
       stroke-dasharray: .25 .18;
     }
-    #config-overlay .sheet .cut {
-      stroke: #a04545;
+    #sheet-view .sheet .cut {
+      stroke: var(--sheet-cut);
       stroke-width: 1.5px;
       vector-effect: non-scaling-stroke;
+    }
+    #sheet-view .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
     }
     #config-overlay .actions {
       display: flex;

@@ -14,7 +14,6 @@ const ICONS = {
   minus: '<path d="M4 8h8"/>',
   plus: '<path d="M4 8h8M8 4v8"/>',
   chevR: '<path d="M6.5 4 10.5 8l-4 4"/>',
-  chevL: '<path d="M9.5 4 5.5 8l4 4"/>',
   alignL: '<path d="M3 4h10M3 7h6M3 10h10M3 13h6"/>',
   alignC: '<path d="M3 4h10M5 7h6M3 10h10M5 13h6"/>',
   alignR: '<path d="M3 4h10M7 7h6M3 10h10M7 13h6"/>',
@@ -290,21 +289,4 @@ export function moreCss(
     hint,
   );
   return d;
-}
-
-export function crumb(name: string, back: () => void): HTMLElement {
-  const b = h(
-    "button",
-    { type: "button", class: "ghost" },
-    icon("chevL"),
-    "Book parts",
-  );
-  b.onclick = back;
-  return h(
-    "div",
-    { class: "crumb" },
-    b,
-    h("span", { style: "color:var(--muted)" }, "/"),
-    h("strong", {}, name),
-  );
 }
