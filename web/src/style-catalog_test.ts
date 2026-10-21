@@ -35,6 +35,13 @@ Deno.test("a paragraph inside a chapter resolves to paragraph, not chapter", () 
   assertEquals(matchKey([["em"], ["p"], ["bml"]], catalog), "em");
 });
 
+Deno.test("an {is} class wins over what it wraps", () => {
+  assertEquals(
+    matchKey([["p"], ["is-telegram", "div"], ["chapter"], ["bml"]], catalog),
+    "is.telegram",
+  );
+});
+
 const book = {
   fonts: { body: "Crimson Pro", display: "Cormorant Garamond" },
   elements: {

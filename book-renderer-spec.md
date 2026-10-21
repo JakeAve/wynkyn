@@ -1349,7 +1349,10 @@ Notes on specific keys:
 
 Styles for custom semantic blocks declared with `{is: class-name}` in the
 markup. Each key matches the slug used in BML. Values are CSS property objects.
-The renderer emits `.is-letter { ... }` etc.
+The renderer emits `.is-letter { ... }` etc. Paragraphs inside an `is` block are
+not indented unless the block sets `text-indent` (it inherits), so an
+`author-signature` aligns flush right. The style panel gives each `is` class one
+CSS box, and lists every class the manuscript uses, styled or not.
 
 ```json
 "is": {

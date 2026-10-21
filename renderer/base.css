@@ -11,6 +11,11 @@
    rule whose selector contains one, and it drops the whole grouped rule with
    it (docs/pagedjs-plus-combinator.md). The paragraph that opens a block after
    a title or a break is marked `.lead` by the renderer instead. */
+/* An `{is}` block's paragraphs take their indent from the block's own CSS
+   (none by default), so `text-align: center` centres and the box decides. */
+.bml .is p {
+  text-indent: inherit;
+}
 .bml p.has-dropcap,
 .bml p.lead,
 .bml blockquote p,

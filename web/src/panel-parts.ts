@@ -37,6 +37,7 @@ type Section = keyof Metadata;
 export function buildPartsTab(ctx: PanelContext, part?: string): Node[] {
   const p = part ? bookParts(ctx.meta).find((x) => x.id === part) : undefined;
   if (!p) return partsList(ctx);
+  if (p.group === "custom") return isDetail(ctx, p);
   return p.id === "body" ? bodyDetail(ctx, p) : detail(ctx, p);
 }
 
@@ -202,6 +203,18 @@ function labelOf(entry: StyleEntry, part: BookPart): string {
 }
 
 // The section's data-focus: the sub-element ("number"), or a flat type itself.
+// `{is}` classes are one-offs: a CSS box, no controls.
+function isDetail(ctx: PanelContext, part: BookPart): Node[] {
+  const { meta } = ctx;
+  const entry = catalogFor(meta).find((e) => e.key === part.keys[0])!;
+  const box = moreCss(`CSS for ${part.name}`, getProps(meta, entry), (next) => {
+    replaceOthers(meta, entry, [], next);
+    ctx.queueSave("is");
+  }, []);
+  box.open = true;
+  return [crumb(part.name, () => ctx.go({ tab: "parts" })), box];
+}
+
 function focusOf(key: string): string {
   const type = key.split(".")[0]!;
   return key.slice(type.length + 1) || type;

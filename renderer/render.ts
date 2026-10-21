@@ -370,7 +370,7 @@ function renderContent(
       return `<div class="columns columns-parallel" style="grid-template-columns: repeat(${node.count}, 1fr)">${cols}</div>`;
     }
     case "is":
-      return `<div class="is-${escapeHtml(node.className)}">${
+      return `<div class="is is-${escapeHtml(node.className)}">${
         renderChildren(node.children, ctx, opts)
       }</div>`;
     case "illustration": {

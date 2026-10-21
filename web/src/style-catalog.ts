@@ -152,6 +152,13 @@ const TOC_NESTED: StyleEntry[] = (["toc-part", "toc-chapter"] as const).flatMap(
     })),
 );
 
+// Give each `{is: name}` the manuscript uses an entry, empty if unstyled, so
+// it can be picked and styled before it has any CSS. The panel's save drops
+// the empty ones again.
+export function addIsNames(metadata: Metadata, names: Iterable<string>): void {
+  for (const n of names) (metadata.is ??= {})[n] ??= {};
+}
+
 export function catalogFor(metadata: Metadata): StyleEntry[] {
   const is = Object.keys(metadata.is ?? {}).map((name): StyleEntry => ({
     key: `is.${name}`,
@@ -363,13 +370,16 @@ export function setCount(metadata: Metadata, part: BookPart): number {
 // A selector's tokens must appear in order walking outward; the entry whose
 // innermost token matches nearest the click wins, so ".chapter .number" beats
 // ".chapter" for a click on the number. Multi-selector entries (prose-matter)
-// are comma-separated; any alternative may match.
+// are comma-separated; any alternative may match. An `{is}` class beats all of
+// that: wrapping text in one is how the author asks to style it apart.
 export function matchKey(
   chain: string[][],
   catalog: StyleEntry[],
 ): string | null {
-  let best: { key: string; depth: number; tokens: number } | null = null;
+  let best: { key: string; is: boolean; depth: number; tokens: number } | null =
+    null;
   for (const entry of catalog) {
+    const is = entry.section === "is";
     for (const alt of entry.selector.split(", ")) {
       // ".class" tokens match a class, bare ones ("p", "em") a tag name.
       const tokens = alt.trim().split(/\s+/)
@@ -377,10 +387,12 @@ export function matchKey(
       const depth = matchDepth(chain, tokens);
       if (depth === null) continue;
       if (
-        !best || depth < best.depth ||
-        (depth === best.depth && tokens.length > best.tokens)
+        !best || (is && !best.is) ||
+        (is === best.is &&
+          (depth < best.depth ||
+            (depth === best.depth && tokens.length > best.tokens)))
       ) {
-        best = { key: entry.key, depth, tokens: tokens.length };
+        best = { key: entry.key, is, depth, tokens: tokens.length };
       }
     }
   }

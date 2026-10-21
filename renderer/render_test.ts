@@ -415,7 +415,7 @@ Deno.test("poem, quote, epigraph, sidebar, pullquote, is, list, break markup", (
   );
   assertStringIncludes(html, '<aside class="sidebar">');
   assertStringIncludes(html, '<aside class="pullquote">');
-  assertStringIncludes(html, '<div class="is-telegram">');
+  assertStringIncludes(html, '<div class="is is-telegram">');
   assertStringIncludes(html, "<ul><li>one</li><li>two</li></ul>");
   assertStringIncludes(
     html,

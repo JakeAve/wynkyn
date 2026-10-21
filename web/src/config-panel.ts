@@ -8,6 +8,7 @@ import { buildFontsTab } from "./panel-fonts.ts";
 import { buildPageTab, buildPrintTab } from "./panel-page.ts";
 import { buildPartsTab } from "./panel-parts.ts";
 import {
+  addIsNames,
   type PanelContext,
   type PreviewLink,
   type Route,
@@ -30,6 +31,7 @@ export interface ConfigPanelOptions {
   metadata: Metadata;
   saveSections(sections: Partial<Metadata>): void;
   preview: PreviewLink;
+  isNames(): string[]; // `{is}` classes the manuscript uses
 }
 
 const TABS: Array<[TabId, string]> = [
@@ -84,6 +86,12 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
           if (family) filtered[alias] = family;
         }
         sections.fonts = filtered;
+      }
+      // Unstyled `{is}` classes (addIsNames) stay off disk.
+      if (sections.is) {
+        sections.is = Object.fromEntries(
+          Object.entries(sections.is).filter(([, p]) => Object.keys(p).length),
+        );
       }
       dirty.clear();
       opts.saveSections(sections as Partial<Metadata>);
@@ -156,6 +164,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   }
 
   function render(keepScroll = false): void {
+    addIsNames(meta, opts.isNames());
     for (const b of tabs) {
       const on = b.dataset.tab === route.tab;
       b.setAttribute("aria-selected", String(on));
@@ -216,6 +225,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     },
     selectStyle(key) {
       opts.overlay.hidden = false;
+      addIsNames(meta, opts.isNames());
       go(routeFor(key, meta));
     },
   };

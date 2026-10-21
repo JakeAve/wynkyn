@@ -2,7 +2,8 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
-import { catalogFor } from "./style-catalog.ts";
+import { addIsNames, catalogFor } from "./style-catalog.ts";
+import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
   fitPreview,
   installPageIndicator,
@@ -98,8 +99,14 @@ function onDocChanged(text: string): void {
   saveTimer = setTimeout(() => save(text), SAVE_DEBOUNCE_MS);
 }
 
+let isNames: string[] = []; // `{is}` classes in the manuscript, from reparse
+
 function reparse(text: string): void {
   const doc = parse(text);
+  isNames = text.split("\n").flatMap((line) => {
+    const t = parseSentinelLine(line);
+    return t?.name === "is" && !t.closing && t.slug ? [t.slug] : [];
+  });
   applyDiagnostics(editor, doc.diagnostics);
   const diag = $("diagnostics");
   const first = doc.diagnostics[0];
@@ -452,7 +459,11 @@ async function fetchMetadata(): Promise<Metadata> {
 }
 
 let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
-const styleCatalog = () => catalogFor(metadata ?? {});
+const styleCatalog = () => {
+  const m = metadata ?? {};
+  addIsNames(m, isNames);
+  return catalogFor(m);
+};
 
 async function ensureConfigPanel(): Promise<ConfigPanel | null> {
   if (configPanel) return configPanel;
@@ -463,6 +474,7 @@ async function ensureConfigPanel(): Promise<ConfigPanel | null> {
       metadata,
       saveSections: saveMetadataSections,
       preview: previewLink($("preview"), styleCatalog),
+      isNames: () => isNames,
     });
     return configPanel;
   } catch (err) {
