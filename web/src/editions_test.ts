@@ -1,9 +1,23 @@
 import { assertEquals } from "@std/assert";
-import { editionHref, editionLabel, slugify } from "./editions.ts";
+import {
+  editionHref,
+  editionLabel,
+  firstSpanLine,
+  lineFromHash,
+  passagesLabel,
+  prettySize,
+  slugify,
+} from "./editions.ts";
 
-Deno.test("editionLabel: unnamed edition, else prettified slug", () => {
-  assertEquals(editionLabel(null), "Unnamed edition");
-  assertEquals(editionLabel("large-print"), "Large Print");
+Deno.test("editionLabel: the server's resolved name", () => {
+  assertEquals(
+    editionLabel({ slug: null, name: "Standard", summary: "", passages: 0 }),
+    "Standard",
+  );
+  assertEquals(
+    editionLabel({ slug: "pocket", name: "Pocket", summary: "", passages: 2 }),
+    "Pocket",
+  );
 });
 
 Deno.test("slugify: lowercase, hyphens, no leading/trailing/double hyphens", () => {
@@ -19,4 +33,32 @@ Deno.test("editionHref: edition param only when named", () => {
     "?book=a-christmas-carol",
   );
   assertEquals(editionHref("a b", "pocket"), "?book=a%20b&edition=pocket");
+});
+
+Deno.test("prettySize: two lengths read as W × H unit", () => {
+  assertEquals(prettySize("5.25in 8in"), "5.25 × 8 in");
+  assertEquals(prettySize("148mm 210mm"), "148 × 210 mm");
+  assertEquals(prettySize("6in 230mm"), "6in × 230mm");
+  assertEquals(prettySize("A5"), "A5");
+});
+
+Deno.test("passagesLabel: singular and plural", () => {
+  assertEquals(passagesLabel(1), "1 passage of its own");
+  assertEquals(passagesLabel(3), "3 passages of its own");
+});
+
+Deno.test("firstSpanLine: first span naming the edition; null = default", () => {
+  const spans = [
+    { line: 4, endLine: 6, editions: ["pocket"] },
+    { line: 9, endLine: 11, editions: ["default", "pocket"] },
+  ];
+  assertEquals(firstSpanLine(spans, "pocket"), 4);
+  assertEquals(firstSpanLine(spans, null), 9);
+  assertEquals(firstSpanLine(spans, "gift"), null);
+});
+
+Deno.test("lineFromHash: only #line=N", () => {
+  assertEquals(lineFromHash("#line=12"), 12);
+  assertEquals(lineFromHash(""), null);
+  assertEquals(lineFromHash("#line=x"), null);
 });

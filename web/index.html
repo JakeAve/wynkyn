@@ -167,21 +167,35 @@
       padding: 0 10px;
       border-bottom: 1px solid var(--line);
     }
-    #book-switcher,
-    #edition-switcher {
+    /* Crumb: Book / Edition 5.25 × 8 in — either half opens #switcher. */
+    #crumb {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      min-width: 0;
+    }
+    #crumb .btn {
       display: flex;
       align-items: center;
-      gap: 8px;
-      white-space: nowrap;
+      gap: 6px;
       color: var(--fg);
+      padding: 5px 8px;
+    }
+    #crumb .btn[aria-expanded="true"] {
+      background: var(--hover);
     }
     #book-name {
-      font-weight: 650;
+      font-weight: 600;
       letter-spacing: -.01em;
-      font-size: 14px;
     }
-    #book-switcher .chev,
-    #edition-switcher .chev {
+    #crumb .slash {
+      color: var(--syn-p);
+    }
+    #edition-size {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    #crumb .chev {
       width: 12px;
       height: 12px;
       color: var(--muted);
@@ -285,155 +299,166 @@
       color: var(--muted);
     }
 
-    /* ---- book picker dialog ---- */
-    #book-dialog {
+    /* ---- book / edition switcher: books left, that book's editions right ---- */
+    #switcher {
+      position: fixed;
+      inset: 44px auto auto 10px; /* left follows the crumb, set on open */
+      margin: 0;
+      padding: 0;
+      width: 620px;
+      max-width: calc(100vw - 20px);
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 0;
-      width: 400px;
-      max-width: 90vw;
       background: var(--bg);
       color: var(--fg);
       box-shadow: 0 14px 36px var(--backdrop);
+      overflow: hidden;
     }
-    #book-dialog::backdrop {
-      background: var(--backdrop);
+    #switcher[open] {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+    }
+    #switcher::backdrop {
+      background: none;
+    }
+    .sw-books {
+      border-right: 1px solid var(--line);
+      background: var(--soft);
+      padding: 8px;
     }
     #book-search {
       width: 100%;
-      border: none;
-      border-bottom: 1px solid var(--line);
-      background: none;
-      padding: 12px 16px;
-      outline-offset: -2px;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg);
+      padding: 0 8px;
+      margin-bottom: 6px;
     }
     #book-search::placeholder {
       color: var(--muted);
     }
-    #book-list {
-      max-height: 50vh;
-      overflow-y: auto;
-      padding-bottom: 4px;
-    }
-    .book-row {
-      display: flex;
-      align-items: baseline;
-      gap: 12px;
-      width: 100%;
-      padding: 11px 16px;
-      background: none;
-      border: none;
-      border-bottom: 1px solid var(--soft);
-      cursor: pointer;
-      text-align: left;
-    }
-    .book-row:hover {
-      background: var(--hover);
-    }
-    .book-row[aria-current="true"] {
-      background: var(--inv-bg);
-      color: var(--inv-fg);
-    }
-    .book-row .book-num {
-      font: var(--fs-sm) ui-monospace, Menlo, monospace;
-      color: var(--muted);
-      width: 18px;
-      flex: none;
-    }
-    .book-row[aria-current="true"] .book-num,
-    .book-row[aria-current="true"] .book-slug {
-      color: inherit;
-      opacity: .65;
-    }
-    .book-row .book-title {
-      font-weight: 600;
-      letter-spacing: -.01em;
-    }
-    /* ---- edition switcher ---- */
-    #edition-switcher .edition-dot {
-      color: var(--muted);
-      margin-right: 2px;
-    }
-    #edition-name[data-unnamed] {
-      color: var(--muted);
-    }
-    #edition-dialog {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 0;
-      width: 400px;
-      max-width: 90vw;
-      background: var(--bg);
-      color: var(--fg);
-      box-shadow: 0 14px 36px var(--backdrop);
-    }
-    #edition-dialog::backdrop {
-      background: var(--backdrop);
-    }
+    #book-list,
     #edition-list {
       max-height: 50vh;
       overflow-y: auto;
     }
-    .edition-row {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      align-items: baseline;
-      column-gap: 10px;
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--soft);
+    .book-row {
+      display: block;
+      width: 100%;
+      padding: 4px 8px;
+      background: none;
+      border: none;
+      border-radius: var(--radius);
+      text-align: left;
       cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .edition-row:hover {
+    .book-row:hover {
       background: var(--hover);
     }
-    .edition-row[aria-current="true"] {
+    .book-row[aria-selected="true"] {
       background: var(--inv-bg);
       color: var(--inv-fg);
     }
-    .edition-row .edition-title {
-      font-weight: 600;
-    }
-    .edition-row .edition-title[data-unnamed] {
-      font-weight: 400;
+    .book-empty {
+      padding: 4px 8px;
       color: var(--muted);
     }
-    .edition-row[aria-current="true"] .edition-title[data-unnamed],
-    .edition-row[aria-current="true"] .edition-summary {
-      color: inherit;
-      opacity: .65;
+    .sw-eds {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
     }
-    .edition-row .edition-summary {
-      grid-column: 1 / -1;
-      font-size: var(--fs-sm);
-      color: var(--muted);
+    .ed-row {
+      display: grid;
+      grid-template-columns: 16px minmax(0, 1fr) auto;
+      gap: 2px 10px;
+      align-items: baseline;
+      padding: 8px;
+      border-radius: var(--radius);
+      cursor: pointer;
     }
-    .edition-row .edition-act {
+    .ed-row:hover,
+    .ed-row[aria-current="true"] {
+      background: var(--hover);
+    }
+    .ed-row .ck {
+      width: 14px;
+      height: 14px;
+      align-self: center;
+    }
+    .ed-row .nm {
+      font-weight: 500;
+    }
+    .ed-row .acts {
+      display: flex;
+      gap: 2px;
+    }
+    .ed-row .acts button,
+    .ed-row .diff {
       background: none;
       border: none;
-      color: inherit;
-      font-size: var(--fs-sm);
-      opacity: .6;
+      padding: 0 4px;
+      font-size: 12px;
+      color: var(--muted);
       cursor: pointer;
-      padding: 0 2px;
     }
-    .edition-row .edition-act:hover {
-      opacity: 1;
+    .ed-row .acts button:hover,
+    .ed-row .diff:hover {
+      color: var(--fg);
       text-decoration: underline;
     }
-    .edition-foot {
-      padding: 10px 16px;
+    .ed-row .setup,
+    .ed-row .diff,
+    .ed-row .sw-err {
+      grid-column: 2 / -1;
+    }
+    .ed-row .setup {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .ed-row .diff {
+      justify-self: start;
+      padding: 0;
+      color: var(--warn);
+      text-align: left;
+    }
+    .sw-err {
+      font-size: 12px;
+      color: var(--err);
+    }
+    .sw-err:empty {
+      display: none;
+    }
+    #switcher input:not(#book-search),
+    #switcher select {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg);
+      padding: 2px 6px;
+      min-width: 0;
+    }
+    .eds-foot {
+      margin-top: auto;
+      padding-top: 8px;
       border-top: 1px solid var(--line);
       display: flex;
-      justify-content: flex-end;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
     }
-    .book-row .book-slug {
-      margin-left: auto;
-      font-size: var(--fs-sm);
-      color: var(--muted);
+    .eds-foot form {
+      display: contents;
     }
-    .book-empty {
-      padding: 14px 16px;
-      color: var(--muted);
+    .eds-foot form[hidden] {
+      display: none;
+    }
+    .eds-foot .sw-err {
+      flex-basis: 100%;
     }
 
     /* ---- footer ---- */
@@ -1447,6 +1472,9 @@
           <rect x="1.5" y="2.5" width="13" height="11" rx="1.2" />
           <line x1="5.5" y1="2.5" x2="5.5" y2="13.5" />
         </symbol>
+        <symbol id="check" viewBox="0 0 16 16">
+          <path d="M3.5 8.5l3 3 6-7" />
+        </symbol>
         <symbol id="sideR" viewBox="0 0 16 16">
           <rect x="10.5" y="3" width="3.5" height="10"
             style="fill: currentColor; fill-opacity: var(--pf, 0); stroke: none" />
@@ -1460,19 +1488,24 @@
           <use href="#side" />
         </svg>
       </button>
-      <button id="book-switcher" class="btn" title="Switch book">
-        <span id="book-name"></span>
-        <svg class="chev tico" viewBox="0 0 16 16">
-          <path d="M4 6.5l4 4 4-4" />
-        </svg>
-      </button>
-      <button id="edition-switcher" class="btn" title="Switch edition" hidden>
-        <span class="edition-dot">·</span>
-        <span id="edition-name"></span>
-        <svg class="chev tico" viewBox="0 0 16 16">
-          <path d="M4 6.5l4 4 4-4" />
-        </svg>
-      </button>
+      <span id="crumb">
+        <button id="book-switcher" class="btn" title="Switch book"
+          aria-haspopup="dialog" aria-expanded="false">
+          <span id="book-name"></span>
+          <svg class="chev tico" viewBox="0 0 16 16">
+            <path d="M4 6.5l4 4 4-4" />
+          </svg>
+        </button>
+        <span class="slash">/</span>
+        <button id="edition-switcher" class="btn" title="Switch edition"
+          aria-haspopup="dialog" aria-expanded="false">
+          <span id="edition-name"></span>
+          <span id="edition-size"></span>
+          <svg class="chev tico" viewBox="0 0 16 16">
+            <path d="M4 6.5l4 4 4-4" />
+          </svg>
+        </button>
+      </span>
       <span id="modes" role="group" aria-label="Mode">
         <button class="btn" data-mode="write" title="Write">Write</button>
         <button class="btn" data-mode="style" title="Style">Style</button>
@@ -1518,15 +1551,25 @@
       <span id="page-problems"></span>
       <span id="status">Connecting…</span>
     </div>
-    <dialog id="book-dialog">
-      <input id="book-search" type="search" placeholder="Find a book…"
-        autocomplete="off">
-      <div id="book-list"></div>
-    </dialog>
-    <dialog id="edition-dialog">
-      <div id="edition-list"></div>
-      <div class="edition-foot">
-        <button id="edition-new" class="btn">New edition</button>
+    <dialog id="switcher" aria-label="Books and editions">
+      <div class="sw-books">
+        <input id="book-search" type="search" placeholder="Find a book…"
+          autocomplete="off" aria-label="Find a book">
+        <div id="book-list" role="listbox" aria-label="Books"></div>
+      </div>
+      <div class="sw-eds">
+        <div id="edition-list"></div>
+        <div class="eds-foot">
+          <button id="edition-new" class="btn">New edition</button>
+          <form id="edition-new-form" hidden>
+            <input name="name" placeholder="Edition name" required
+              aria-label="Edition name" autocomplete="off">
+            <label>from <select name="from"></select></label>
+            <button class="btn">Create</button>
+            <button type="button" class="btn" name="cancel">Cancel</button>
+            <span class="sw-err"></span>
+          </form>
+        </div>
       </div>
     </dialog>
     <script src="/vendor/paged.js"></script>

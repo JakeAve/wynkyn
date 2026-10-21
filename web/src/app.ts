@@ -41,7 +41,16 @@ import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
-import { editionHref, editionLabel, slugify } from "./editions.ts";
+import {
+  editionHref,
+  type EditionInfo,
+  editionLabel,
+  firstSpanLine,
+  lineFromHash,
+  passagesLabel,
+  prettySize,
+  slugify,
+} from "./editions.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 
@@ -177,206 +186,333 @@ function prettify(slug: string): string {
     .join(" ");
 }
 
-// The book switcher is a file-picker dialog: search + one row per book.
-function populateSwitcher(books: string[], active: string): void {
-  $("book-name").textContent = prettify(active);
-  const dialog = $("book-dialog") as HTMLDialogElement;
-  const search = $("book-search") as HTMLInputElement;
-  const list = $("book-list");
-  const render = () => {
-    const q = search.value.trim().toLowerCase();
-    list.innerHTML = "";
-    const hits = books.filter((b) =>
-      !q || b.includes(q) || prettify(b).toLowerCase().includes(q)
-    );
-    hits.forEach((b, i) => {
-      const row = document.createElement("button");
-      row.className = "book-row";
-      if (b === active) row.setAttribute("aria-current", "true");
-      const num = document.createElement("span");
-      num.className = "book-num";
-      num.textContent = String(i + 1).padStart(2, "0");
-      const title = document.createElement("span");
-      title.className = "book-title";
-      title.textContent = prettify(b);
-      const slug = document.createElement("span");
-      slug.className = "book-slug";
-      slug.textContent = b;
-      row.append(num, title, slug);
-      row.onclick = () => {
-        // Full navigation, not in-place teardown: clean WS/editor/tree state.
-        if (b === active) dialog.close();
-        else location.search = editionHref(b, null);
-      };
-      list.appendChild(row);
-    });
-    if (!hits.length) {
-      const empty = document.createElement("div");
-      empty.className = "book-empty";
-      empty.textContent = "No books match";
-      list.appendChild(empty);
-    }
-  };
-  search.oninput = render;
-  $("book-switcher").onclick = () => {
-    search.value = "";
-    render();
-    dialog.showModal();
-  };
-  dialog.onclick = (e) => {
-    if (e.target === dialog) dialog.close(); // backdrop click closes
-  };
-}
-
-interface EditionInfo {
-  slug: string | null;
-  summary: string;
-}
-
 async function api(url: string, init?: RequestInit): Promise<void> {
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(await res.text());
 }
 
-async function newEdition(): Promise<void> {
-  const name = prompt("Name the new edition (e.g. Pocket, Large print):");
-  if (!name) return;
-  const slug = slugify(name);
-  if (!slug) return setStatus("error", "edition name needs a letter or digit");
-  try {
-    await api(`/api/books/${encodeURIComponent(book)}/editions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ slug, from: edition }),
-    });
-    location.search = editionHref(book, slug);
-  } catch (err) {
-    setStatus("error", `new edition: ${brief(err)}`);
-  }
+const post = (url: string, body: unknown) =>
+  api(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+async function fetchEditions(name: string): Promise<EditionInfo[]> {
+  const res = await fetch(`/api/books/${encodeURIComponent(name)}/editions`);
+  if (!res.ok) throw new Error(`${res.status}`);
+  return ((await res.json()) as { editions: EditionInfo[] }).editions;
 }
 
-// The edition switcher: one row per edition with a one-line summary, and
-// rename/delete on named rows. Hidden for single-edition books — the concept
-// only appears once a second edition exists.
-function populateEditionSwitcher(editions: EditionInfo[]): void {
-  const button = $("edition-switcher");
-  const dialog = $("edition-dialog") as HTMLDialogElement;
-  const list = $("edition-list");
-  const name = $("edition-name");
-  button.hidden = editions.length < 2;
-  name.textContent = editionLabel(edition);
-  if (edition === null) name.dataset.unnamed = "";
-  else delete name.dataset.unnamed;
+// The crumb: Book / Edition, then what sets the edition apart — its page size.
+function setCrumb(editions: EditionInfo[]): void {
+  const cur = editions.find((e) => e.slug === edition);
+  const name = cur ? editionLabel(cur) : "";
+  $("book-name").textContent = prettify(book);
+  $("edition-name").textContent = name;
+  document.title = `Book Editor — ${book} · ${name}`;
+}
+function setCrumbSize(size: string | undefined): void {
+  $("edition-size").textContent = size ? prettySize(size) : "";
+}
 
-  const base = `/api/books/${encodeURIComponent(book)}/editions`;
-  list.innerHTML = "";
-  for (const e of editions) {
+// The switcher: books (with search) on the left, the selected book's editions
+// on the right. Every open re-fetches, so summaries follow page-size edits.
+let books: string[] = [];
+let selBook = ""; // the book whose editions the right side lists
+let selEditions: EditionInfo[] = [];
+let selGen = 0;
+const switcher = () => $("switcher") as HTMLDialogElement;
+const bookSearch = () => $("book-search") as HTMLInputElement;
+const newForm = () => $("edition-new-form") as HTMLFormElement;
+
+function bookHits(): string[] {
+  const q = bookSearch().value.trim().toLowerCase();
+  return books.filter((b) =>
+    !q || b.includes(q) || prettify(b).toLowerCase().includes(q)
+  );
+}
+
+function renderBooks(): void {
+  const hits = bookHits();
+  const rows: HTMLElement[] = hits.map((b) => {
+    const row = document.createElement("button");
+    row.className = "book-row";
+    row.tabIndex = -1; // the search box's arrows walk these
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", String(b === selBook));
+    row.textContent = prettify(b);
+    row.title = b;
+    row.onclick = () => selectBook(b);
+    row.ondblclick = () => openEdition(b, b === book ? edition : null);
+    return row;
+  });
+  if (!hits.length) {
+    const empty = document.createElement("div");
+    empty.className = "book-empty";
+    empty.textContent = "No books match";
+    rows.push(empty);
+  }
+  $("book-list").replaceChildren(...rows);
+  $("book-list").querySelector('[aria-selected="true"]')?.scrollIntoView({
+    block: "nearest",
+  });
+}
+
+async function selectBook(b: string): Promise<void> {
+  selBook = b;
+  renderBooks();
+  hideNewForm();
+  const gen = ++selGen;
+  try {
+    const eds = await fetchEditions(b);
+    if (gen !== selGen) return;
+    selEditions = eds;
+    if (b === book) setCrumb(eds);
+  } catch (err) {
+    if (gen !== selGen) return;
+    selEditions = [];
+    const msg = document.createElement("div");
+    msg.className = "sw-err";
+    msg.textContent = `editions: ${brief(err)}`;
+    $("edition-list").replaceChildren(msg);
+    return;
+  }
+  renderEditions();
+}
+
+// Full navigation, not in-place teardown: clean WS/editor/tree state. A line
+// rides along in the hash for main() to jump the editor to.
+function openEdition(b: string, slug: string | null, line?: number): void {
+  if (b === book && slug === edition) {
+    switcher().close();
+    if (line) {
+      setMode("write");
+      scrollEditorToLine(editor, line);
+    }
+    return;
+  }
+  location.href = editionHref(b, slug) + (line ? `#line=${line}` : "");
+}
+
+function renderEditions(): void {
+  const base = `/api/books/${encodeURIComponent(selBook)}/editions`;
+  const current = selBook === book ? edition : undefined;
+  $("edition-list").replaceChildren(...selEditions.map((e) => {
     const row = document.createElement("div");
-    row.className = "edition-row";
+    row.className = "ed-row";
     row.setAttribute("role", "button");
     row.tabIndex = 0;
-    if (e.slug === edition) row.setAttribute("aria-current", "true");
-    const title = document.createElement("span");
-    title.className = "edition-title";
-    title.textContent = editionLabel(e.slug);
-    if (e.slug === null) title.dataset.unnamed = "";
-    row.append(title);
-    if (e.slug !== null) {
-      const slug = e.slug;
-      const rename = document.createElement("button");
-      rename.className = "edition-act";
-      rename.textContent = "Rename";
-      rename.onclick = async (ev) => {
+    const ck = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    ck.setAttribute("class", "tico ck");
+    if (e.slug === current) {
+      row.setAttribute("aria-current", "true");
+      const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+      use.setAttribute("href", "#check");
+      ck.append(use);
+    }
+    const nm = document.createElement("span");
+    nm.className = "nm";
+    nm.textContent = editionLabel(e);
+    const err = document.createElement("span");
+    err.className = "sw-err";
+    const acts = document.createElement("span");
+    acts.className = "acts";
+    const act = (label: string, fn: () => void | Promise<void>) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.onclick = async (ev) => {
         ev.stopPropagation();
-        const next = slugify(
-          prompt("Rename edition:", editionLabel(slug)) ?? "",
-        );
-        if (!next || next === slug) return;
+        err.textContent = "";
         try {
-          await api(`${base}/${encodeURIComponent(slug)}/rename`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ slug: next }),
-          });
-          await deleteCachedRender(cacheId(book, slug));
-          location.search = editionHref(
-            book,
-            slug === edition ? next : edition,
-          );
-        } catch (err) {
-          setStatus("error", `rename: ${brief(err)}`);
+          await fn();
+        } catch (x) {
+          err.textContent = brief(x);
         }
       };
-      const del = document.createElement("button");
-      del.className = "edition-act";
-      del.textContent = "Delete";
-      del.onclick = async (ev) => {
-        ev.stopPropagation();
+      acts.append(b);
+    };
+    act("Rename", () => {
+      const input = document.createElement("input");
+      input.value = editionLabel(e);
+      input.setAttribute("aria-label", "Edition name");
+      input.onclick = (ev) => ev.stopPropagation();
+      input.onkeydown = (ev) => {
+        if (ev.key === "Escape") {
+          ev.preventDefault(); // cancel the rename, not the switcher
+          renderEditions();
+        } else if (ev.key === "Enter") {
+          ev.preventDefault();
+          err.textContent = "";
+          renameEdition(e, input.value).catch((x) =>
+            err.textContent = brief(x)
+          );
+        }
+      };
+      nm.replaceChildren(input);
+      input.select();
+    });
+    const slug = e.slug;
+    if (slug !== null) {
+      act("Delete", async () => {
         if (
           !confirm(
             `Delete the ${
-              editionLabel(slug)
+              editionLabel(e)
             } edition? The manuscript is untouched.`,
           )
         ) return;
-        try {
-          await api(`${base}/${encodeURIComponent(slug)}`, {
-            method: "DELETE",
-          });
-          await deleteCachedRender(cacheId(book, slug));
-          location.search = editionHref(
-            book,
-            slug === edition ? null : edition,
-          );
-        } catch (err) {
-          setStatus("error", `delete: ${brief(err)}`);
-        }
-      };
-      row.append(rename, del);
-    } else {
-      row.append(
-        document.createElement("span"),
-        document.createElement("span"),
-      );
+        await api(`${base}/${encodeURIComponent(slug)}`, { method: "DELETE" });
+        await deleteCachedRender(cacheId(selBook, slug));
+        if (selBook === book && slug === edition) {
+          location.search = editionHref(book, null);
+        } else await selectBook(selBook);
+      });
     }
-    const summary = document.createElement("span");
-    summary.className = "edition-summary";
-    summary.textContent = e.summary;
-    row.append(summary);
-    const go = () => {
-      if (e.slug === edition) dialog.close();
-      else location.search = editionHref(book, e.slug);
-    };
-    row.onclick = go;
+    const setup = document.createElement("span");
+    setup.className = "setup";
+    setup.textContent = e.summary;
+    row.append(ck, nm, acts, setup);
+    if (e.passages > 0) {
+      const diff = document.createElement("button");
+      diff.className = "diff";
+      diff.textContent = passagesLabel(e.passages);
+      diff.title = "Open this edition at its first passage";
+      diff.onclick = (ev) => {
+        ev.stopPropagation();
+        jumpToPassages(e.slug).catch((x) => err.textContent = brief(x));
+      };
+      row.append(diff);
+    }
+    row.append(err);
+    row.onclick = () => openEdition(selBook, e.slug);
     row.onkeydown = (ev) => {
+      if (ev.target !== row) return;
       if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault(); // don't let Space scroll the dialog
-        go();
+        ev.preventDefault(); // don't let Space scroll the list
+        openEdition(selBook, e.slug);
+      } else if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        ((ev.key === "ArrowDown"
+          ? row.nextElementSibling
+          : row.previousElementSibling) as HTMLElement | null)?.focus();
       }
     };
-    list.appendChild(row);
-  }
-  // Re-fetch on open, not just at page load: a page-size edit in the config
-  // panel changes the summary line without a navigation, and the row should
-  // reflect it the next time this dialog opens.
-  button.onclick = async () => {
-    try {
-      const res = await fetch(base);
-      const { editions: fresh } = (await res.json()) as {
-        editions: EditionInfo[];
-      };
-      populateEditionSwitcher(fresh);
-    } catch {
-      // stale summaries beat a switcher that silently fails to open
+    return row;
+  }));
+}
+
+// Named editions rename by slug (the server rewrites their {only} tokens);
+// the default edition only has a display name to change.
+async function renameEdition(e: EditionInfo, value: string): Promise<void> {
+  const base = `/api/books/${encodeURIComponent(selBook)}/editions`;
+  if (e.slug === null) {
+    await post(`${base}/default/rename`, { name: value });
+  } else {
+    const next = slugify(value);
+    if (!next) throw new Error("the name needs a letter or digit");
+    if (next !== e.slug) {
+      await post(`${base}/${encodeURIComponent(e.slug)}/rename`, {
+        slug: next,
+      });
+      await deleteCachedRender(cacheId(selBook, e.slug));
+      if (selBook === book && e.slug === edition) {
+        location.search = editionHref(book, next);
+        return;
+      }
     }
-    dialog.showModal();
+  }
+  await selectBook(selBook);
+}
+
+async function jumpToPassages(slug: string | null): Promise<void> {
+  const text = selBook === book
+    ? editor.state.doc.toString()
+    : await fetchManuscript(selBook);
+  openEdition(
+    selBook,
+    slug,
+    firstSpanLine(parse(text).onlySpans, slug) ?? undefined,
+  );
+}
+
+function hideNewForm(): void {
+  newForm().hidden = true;
+  $("edition-new").hidden = false;
+}
+
+function installSwitcher(): void {
+  const dialog = switcher();
+  const search = bookSearch();
+  const form = newForm();
+  const nameInput = form.elements.namedItem("name") as HTMLInputElement;
+  const from = form.elements.namedItem("from") as HTMLSelectElement;
+  const formErr = form.querySelector(".sw-err")!;
+  const crumbs = [$("book-switcher"), $("edition-switcher")];
+
+  search.oninput = () => {
+    const hits = bookHits();
+    if (!hits.includes(selBook) && hits[0]) selectBook(hits[0]);
+    else renderBooks();
   };
+  search.onkeydown = (e) => {
+    const hits = bookHits();
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const i = hits.indexOf(selBook) + (e.key === "ArrowDown" ? 1 : -1);
+      const next = hits[Math.min(Math.max(i, 0), hits.length - 1)];
+      if (next && next !== selBook) selectBook(next);
+    } else if (e.key === "Enter" && hits.includes(selBook)) {
+      e.preventDefault();
+      openEdition(selBook, selBook === book ? edition : null);
+    }
+  };
+  for (const b of crumbs) {
+    b.onclick = () => {
+      search.value = "";
+      dialog.style.left = `${$("crumb").getBoundingClientRect().left}px`;
+      dialog.showModal();
+      for (const c of crumbs) c.setAttribute("aria-expanded", "true");
+      search.focus();
+      selectBook(book);
+    };
+  }
+  dialog.onclose = () => {
+    for (const c of crumbs) c.setAttribute("aria-expanded", "false");
+  };
+  dialog.onclick = (e) => {
+    if (e.target === dialog) dialog.close(); // a click outside closes
+  };
+
   $("edition-new").onclick = () => {
-    dialog.close();
-    newEdition();
+    from.replaceChildren(
+      ...selEditions.map((e) =>
+        new Option(editionLabel(e), e.slug ?? "default")
+      ),
+    );
+    from.value = (selBook === book ? edition : null) ?? "default";
+    nameInput.value = "";
+    formErr.textContent = "";
+    $("edition-new").hidden = true;
+    form.hidden = false;
+    nameInput.focus();
   };
-  dialog.onclick = (ev) => {
-    if (ev.target === dialog) dialog.close();
+  (form.elements.namedItem("cancel") as HTMLButtonElement).onclick =
+    hideNewForm;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const slug = slugify(nameInput.value);
+    formErr.textContent = slug ? "" : "the name needs a letter or digit";
+    if (!slug) return;
+    try {
+      await post(`/api/books/${encodeURIComponent(selBook)}/editions`, {
+        slug,
+        from: from.value,
+      });
+      location.search = editionHref(selBook, slug);
+    } catch (err) {
+      formErr.textContent = brief(err);
+    }
   };
 }
 
@@ -425,6 +561,7 @@ async function doSave(text: string): Promise<void> {
 }
 
 function saveMetadataSections(sections: Partial<Metadata>): void {
+  if ("page" in sections) setCrumbSize(sections.page?.size);
   if (metaSaveInFlight) {
     queuedMetaSections = { ...queuedMetaSections, ...sections };
     return;
@@ -777,7 +914,7 @@ function buildSnippetToolbar(): void {
 
 async function main(): Promise<void> {
   const res = await fetch("/api/books");
-  const { books } = (await res.json()) as { books: string[] };
+  books = ((await res.json()) as { books: string[] }).books;
   if (!books.length) {
     setStatus("error", "no books found in books/");
     return;
@@ -786,25 +923,25 @@ async function main(): Promise<void> {
   book = requested && books.includes(requested) ? requested : books[0]!;
 
   // A failed editions fetch (old server still running, network blip) must not
-  // keep the whole app from booting — fall back to a single unnamed edition.
-  let editions: EditionInfo[] = [{ slug: null, summary: "" }];
+  // keep the whole app from booting — fall back to a single default edition.
+  let editions: EditionInfo[] = [{
+    slug: null,
+    name: "Standard",
+    summary: "",
+    passages: 0,
+  }];
   try {
-    const editionsRes = await fetch(
-      `/api/books/${encodeURIComponent(book)}/editions`,
-    );
-    if (!editionsRes.ok) throw new Error(`${editionsRes.status}`);
-    editions = ((await editionsRes.json()) as { editions: EditionInfo[] })
-      .editions;
+    editions = await fetchEditions(book);
   } catch (err) {
     setStatus("error", `editions: ${brief(err)} — restart the dev server?`);
   }
   const wanted = params.get("edition");
   edition = wanted && editions.some((e) => e.slug === wanted) ? wanted : null;
-  document.title = `Book Editor — ${book}${
-    edition ? ` · ${editionLabel(edition)}` : ""
-  }`;
-  populateSwitcher(books, book);
-  populateEditionSwitcher(editions);
+  setCrumb(editions);
+  installSwitcher();
+  fetchMetadata().then((m) => setCrumbSize(m.page?.size), () => {
+    // no size in the crumb; the Style panel reports the load error
+  });
 
   const text = await fetchManuscript(book);
   editor = createEditor({
@@ -830,7 +967,11 @@ async function main(): Promise<void> {
   } catch {
     // storage blocked: start in Write
   }
-  setMode(MODES.find((m) => m === saved) ?? "write");
+  // A switcher jump to an edition's first passage (`#line=N`) opens in Write.
+  const jump = lineFromHash(location.hash);
+  if (jump !== null) history.replaceState(null, "", location.search);
+  setMode(jump !== null ? "write" : MODES.find((m) => m === saved) ?? "write");
+  if (jump !== null) scrollEditorToLine(editor, jump);
   installGutters();
   installThemeToggle();
 
