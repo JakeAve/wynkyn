@@ -567,7 +567,7 @@ async function doSave(text: string): Promise<void> {
       if (disk.version !== base) {
         queuedSaveText = null; // based on the same stale version
         showDiskBanner(disk);
-        setStatus("error", "manuscript.md changed on disk");
+        setStatus("error", "something else touched the manuscript");
       }
       return;
     }
