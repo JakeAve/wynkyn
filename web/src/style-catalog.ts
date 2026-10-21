@@ -3,7 +3,12 @@
 // one, and how entries group into the style panel's book parts and tabs.
 // Pure: the DOM adapter lives in preview.ts, so this is unit-tested in Deno.
 import { selectorFor } from "../../metadata/css-generator.ts";
-import type { CssProps, Metadata } from "../../metadata/types.ts";
+import type {
+  CssProps,
+  FolioPosition,
+  Metadata,
+  Running,
+} from "../../metadata/types.ts";
 
 export interface StyleEntry {
   key: string; // "chapter.title"
@@ -112,28 +117,62 @@ const PARAGRAPH: StyleEntry = {
   selector: ".bml p",
 };
 
-const ZONES: Array<[string, string]> = [["front-matter", "front"], [
-  "body",
-  "body",
-], ["back-matter", "back"]];
-const PAGE_NUMBERS: StyleEntry[] = [
-  {
-    key: "numbering.pages",
-    group: "Page numbers",
-    label: "All page numbers",
-    path: ["numbering", "pages", "css"],
-    section: "numbering",
-    selector: `.pagedjs_margin-bottom-center`,
-  },
-  ...ZONES.map(([zone, name]) => ({
-    key: `numbering.pages.${zone}`,
-    group: "Page numbers",
-    label: titleCase(zone),
-    path: ["numbering", "pages", zone, "css"],
-    section: "numbering",
-    selector: `.pagedjs_${name}_page .pagedjs_margin-bottom-center`,
-  } as StyleEntry)),
-];
+const ZONES = [
+  ["front-matter", "front"],
+  ["body", "body"],
+  ["back-matter", "back"],
+] as const;
+
+// The margin boxes a folio sits in (§4.7): center is one box, outside is the
+// right box on recto and the left on verso, so a click on either is a folio.
+function folioBoxes(position: FolioPosition): string[] {
+  const [edge, where] = position.split("-");
+  return where === "center"
+    ? [`.pagedjs_margin-${edge}-center`]
+    : [`.pagedjs_margin-${edge}-right`, `.pagedjs_margin-${edge}-left`];
+}
+
+function pageNumberEntries(metadata: Metadata): StyleEntry[] {
+  const boxes = folioBoxes(
+    metadata.numbering?.pages?.position ?? "bottom-center",
+  );
+  return [
+    {
+      key: "numbering.pages",
+      group: "Page numbers",
+      label: "All page numbers",
+      path: ["numbering", "pages", "css"],
+      section: "numbering",
+      selector: boxes.join(", "),
+    },
+    ...ZONES.map(([zone, name]): StyleEntry => ({
+      key: `numbering.pages.${zone}`,
+      group: "Page numbers",
+      label: titleCase(zone),
+      path: ["numbering", "pages", zone, "css"],
+      section: "numbering",
+      selector: boxes.map((b) => `.pagedjs_${name}_page ${b}`).join(", "),
+    })),
+  ];
+}
+
+// The running head sharing a top folio's margin box, as "top right", if any.
+// Heads are body only and odd pages are recto, so outside is top-right on odd
+// and top-left on even. Heads are emitted after folios, so the head wins it.
+export function folioClash(
+  position: FolioPosition,
+  running: Running | undefined,
+): string | undefined {
+  const odd = (running?.odd ?? []).map((e) => e.area);
+  const even = (running?.even ?? []).map((e) => e.area);
+  if (position === "top-center") {
+    return [...odd, ...even].includes("top-center") ? "top center" : undefined;
+  }
+  if (position !== "top-outside") return undefined;
+  if (odd.includes("top-right")) return "top right";
+  if (even.includes("top-left")) return "top left";
+  return undefined;
+}
 
 // Per-level spans inside the contents: part and chapter rows get their own
 // number/label/page entries so "Book One" can be small caps while the part
@@ -172,14 +211,14 @@ export function catalogFor(metadata: Metadata): StyleEntry[] {
     ...STATIC_CATALOG,
     PARAGRAPH,
     ...TOC_NESTED,
-    ...PAGE_NUMBERS,
+    ...pageNumberEntries(metadata),
     ...runningEntries(metadata),
     ...is,
   ];
 }
 
-// One entry per margin area the running heads use. They are edited on the
-// Page tab, so the path is the whole `running` section.
+// One entry per margin area the running heads use. They are edited in the
+// Running heads part, so the path is the whole `running` section.
 function runningEntries(metadata: Metadata): StyleEntry[] {
   const areas = new Set(
     [...(metadata.running?.odd ?? []), ...(metadata.running?.even ?? [])]
@@ -238,12 +277,14 @@ export interface ExportResult {
 export interface BookPart {
   id: string;
   name: string;
-  group: "front" | "body" | "back" | "custom";
+  group: "furniture" | "front" | "body" | "back" | "custom";
   keys: string[]; // catalog entry keys, in display order
 }
 
 // [id, name, group, element types in display order]
 const PARTS: Array<[string, string, BookPart["group"], string[]]> = [
+  ["folios", "Page numbers", "furniture", ["numbering"]],
+  ["heads", "Running heads", "furniture", ["running"]],
   ["half-title", "Half title", "front", ["half-title"]],
   ["title-page", "Title page", "front", ["title-page"]],
   ["copyright", "Copyright", "front", ["copyright"]],
@@ -294,8 +335,8 @@ export function bookParts(metadata: Metadata): BookPart[] {
 // Where a preview pick (or a "Used by" chip) opens in the panel.
 export function routeFor(key: string, metadata: Metadata): Route {
   const type = typeOf(key);
-  if (type === "numbering") return { tab: "page", focus: "folios" };
-  if (type === "running") return { tab: "page", focus: "heads" };
+  if (type === "numbering") return { tab: "parts", part: "folios" };
+  if (type === "running") return { tab: "parts", part: "heads" };
   const part = bookParts(metadata).find((p) => p.keys.includes(key));
   if (!part) return { tab: "parts" };
   if (part.id === "body") {
@@ -335,6 +376,7 @@ export function usedBy(
     getProps(metadata, { path: ["elements", "body"] })["font-family"] ?? "body";
   const out: Array<{ label: string; route: Route }> = [];
   for (const part of bookParts(metadata)) {
+    if (part.group === "furniture") continue; // margin boxes: below
     const uses = part.keys.some((k) =>
       aliasOf(metadata, catalog.get(k)!.path, bodyAlias) === alias
     );
@@ -343,7 +385,7 @@ export function usedBy(
     }
   }
   // Margin boxes inherit nothing from the body: only an explicit font counts.
-  const pages = PAGE_NUMBERS.some((e) =>
+  const pages = pageNumberEntries(metadata).some((e) =>
     getProps(metadata, e)["font-family"] === alias
   );
   if (pages) {
@@ -360,20 +402,40 @@ export function usedBy(
   if (heads) {
     out.push({
       label: "Running heads",
-      route: { tab: "page", focus: "heads" },
+      route: routeFor("running", metadata),
     });
   }
   return out;
 }
 
 // The change count on a Book parts row: string props set across the part's
-// entries, plus the chapter/part numbering keys its opener view edits.
+// entries, plus the chapter/part numbering keys its opener view edits. Page
+// numbers add their position, gap and zone numerals; running heads count each
+// entry's keys bar its area, plus the gap.
 export function setCount(metadata: Metadata, part: BookPart): number {
+  if (part.id === "heads") {
+    const r = metadata.running;
+    return [...(r?.odd ?? []), ...(r?.even ?? [])].reduce(
+      (n, e) => n + Object.keys(e).filter((k) => k !== "area").length,
+      r?.gap ? 1 : 0,
+    );
+  }
   const catalog = new Map(catalogFor(metadata).map((e) => [e.key, e]));
   let n = 0;
   for (const k of part.keys) {
     const entry = catalog.get(k);
     if (entry) n += Object.keys(getProps(metadata, entry)).length;
+  }
+  if (part.id === "folios") {
+    const p = metadata.numbering?.pages;
+    const zones = ZONES.map(([z]) => p?.[z]);
+    return n + (p?.position ? 1 : 0) + (p?.gap ? 1 : 0) +
+      zones.reduce(
+        (m, z) =>
+          m + (z?.style !== undefined ? 1 : 0) +
+          (z?.show !== undefined ? 1 : 0),
+        0,
+      );
   }
   const numbering = part.id === "chapter"
     ? metadata.numbering?.chapters

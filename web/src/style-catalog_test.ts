@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import {
   bookParts,
   catalogFor,
+  folioClash,
   getProps,
   inheritedFont,
   matchKey,
@@ -64,17 +65,18 @@ const book = {
   is: { telegram: { "font-family": "monospace" } },
 };
 
-Deno.test("every catalog entry belongs to exactly one part or the Page tab", () => {
+Deno.test("every catalog entry belongs to exactly one part", () => {
   const parts = bookParts(book);
   const owners = new Map<string, number>();
   for (const p of parts) {
     for (const k of p.keys) owners.set(k, (owners.get(k) ?? 0) + 1);
   }
   for (const e of catalogFor(book)) {
-    const pageTab = e.section === "numbering" || e.section === "running";
-    assertEquals(owners.get(e.key) ?? 0, pageTab ? 0 : 1, e.key);
+    assertEquals(owners.get(e.key) ?? 0, 1, e.key);
   }
   assertEquals(parts.map((p) => p.name), [
+    "Page numbers",
+    "Running heads",
     "Half title",
     "Title page",
     "Copyright",
@@ -100,16 +102,24 @@ Deno.test("every catalog entry belongs to exactly one part or the Page tab", () 
     "em",
   ]);
   assertEquals(parts.at(-1)!.group, "custom");
+  assertEquals(parts.slice(0, 2).map((p) => [p.id, p.group]), [
+    ["folios", "furniture"],
+    ["heads", "furniture"],
+  ]);
 });
 
-Deno.test("routeFor sends folios and running heads to the Page tab", () => {
+Deno.test("routeFor sends folios and running heads to their furniture parts", () => {
   assertEquals(routeFor("numbering.pages.body", book), {
-    tab: "page",
-    focus: "folios",
+    tab: "parts",
+    part: "folios",
+  });
+  assertEquals(routeFor("numbering.pages", book), {
+    tab: "parts",
+    part: "folios",
   });
   assertEquals(routeFor("running.top-left", book), {
-    tab: "page",
-    focus: "heads",
+    tab: "parts",
+    part: "heads",
   });
   assertEquals(routeFor("paragraph", book), {
     tab: "parts",
@@ -166,8 +176,12 @@ Deno.test("usedBy counts inherited body font as Body", () => {
   assertEquals(usedBy(book, "display"), [
     { label: "Half title", route: { tab: "parts", part: "half-title" } },
     { label: "Chapter opener", route: { tab: "parts", part: "chapter" } },
-    { label: "Page numbers", route: { tab: "page", focus: "folios" } },
+    { label: "Page numbers", route: { tab: "parts", part: "folios" } },
   ]);
+  assertEquals(
+    usedBy(book, "body").find((u) => u.label === "Running heads")?.route,
+    { tab: "parts", part: "heads" },
+  );
 });
 
 Deno.test("setCount counts set props plus opener numbering keys", () => {
@@ -176,6 +190,20 @@ Deno.test("setCount counts set props plus opener numbering keys", () => {
   assertEquals(setCount(book, at("body")), 2);
   assertEquals(setCount(book, at("chapter")), 4); // 2 title props + style, prefix
   assertEquals(setCount(book, at("colophon")), 0);
+  assertEquals(setCount(book, at("folios")), 1); // pages.css font-family
+  assertEquals(setCount(book, at("heads")), 3); // 2 contents + 1 font
+  const placed = {
+    numbering: {
+      pages: {
+        position: "top-outside" as const,
+        gap: "6mm",
+        body: { show: false },
+      },
+    },
+    running: { gap: "3mm" },
+  };
+  assertEquals(setCount(placed, bookParts(placed)[0]!), 3);
+  assertEquals(setCount(placed, bookParts(placed)[1]!), 1);
 });
 
 Deno.test("nested matter sub-elements use the matter type", () => {
@@ -199,6 +227,59 @@ Deno.test("page numbers resolve by zone via Paged.js margin-box classes", () => 
     "pagedjs_front_page",
   ]];
   assertEquals(matchKey(chain, catalog), "numbering.pages.front-matter");
+});
+
+Deno.test("a folio click resolves in every position", () => {
+  const at = (
+    position: "bottom-center" | "bottom-outside" | "top-center" | "top-outside",
+  ) => catalogFor({ numbering: { pages: { position } } });
+  const click = (box: string, zone = "body") => [["pagedjs_margin-content"], [
+    "pagedjs_margin",
+    `pagedjs_margin-${box}`,
+  ], ["pagedjs_page", `pagedjs_${zone}_page`]];
+  assertEquals(
+    matchKey(click("bottom-center"), at("bottom-center")),
+    "numbering.pages.body",
+  );
+  assertEquals(
+    matchKey(click("top-center", "front"), at("top-center")),
+    "numbering.pages.front-matter",
+  );
+  for (const box of ["bottom-left", "bottom-right"]) {
+    assertEquals(
+      matchKey(click(box), at("bottom-outside")),
+      "numbering.pages.body",
+      box,
+    );
+    assertEquals(matchKey(click(box), at("bottom-center")), null, box);
+  }
+  for (const box of ["top-left", "top-right"]) {
+    assertEquals(
+      matchKey(click(box, "back"), at("top-outside")),
+      "numbering.pages.back-matter",
+      box,
+    );
+  }
+  // Without a zone class on the page, the shared entry matches.
+  assertEquals(
+    matchKey([["pagedjs_margin-top-right"]], at("top-outside")),
+    "numbering.pages",
+  );
+});
+
+Deno.test("folioClash names a running head in a top folio's box", () => {
+  const running = {
+    odd: [{ content: "chapter-title", area: "top-right" }],
+    even: [{ content: "book-title", area: "top-center" }],
+  };
+  assertEquals(folioClash("top-outside", running), "top right");
+  assertEquals(folioClash("top-center", running), "top center");
+  assertEquals(folioClash("bottom-center", running), undefined);
+  assertEquals(
+    folioClash("top-outside", { even: [{ content: "x", area: "top-right" }] }),
+    undefined, // top-right on a verso is the gutter side, not the folio's
+  );
+  assertEquals(folioClash("top-center", undefined), undefined);
 });
 
 Deno.test("is: classes come from metadata", () => {

@@ -1,12 +1,14 @@
 // web/src/panel-parts.ts — the style panel's Book parts tab (spec R1, R2, R4):
 // the parts list, a detail view per part with one section per sub-element,
-// and Body text's own view (text, paragraphs, emphasis).
+// and Body text's own view (text, paragraphs, emphasis). Page furniture
+// parts are built in panel-furniture.ts.
 import type {
   Metadata,
   NumberingStyle,
   StructureNumbering,
 } from "../../metadata/types.ts";
 import { parseLength } from "./config-data.ts";
+import { buildFurniture } from "./panel-furniture.ts";
 import {
   crumb,
   icon,
@@ -37,6 +39,7 @@ type Section = keyof Metadata;
 export function buildPartsTab(ctx: PanelContext, part?: string): Node[] {
   const p = part ? bookParts(ctx.meta).find((x) => x.id === part) : undefined;
   if (!p) return partsList(ctx);
+  if (p.id === "folios" || p.id === "heads") return buildFurniture(ctx, p.id);
   if (p.group === "custom") return isDetail(ctx, p);
   return p.id === "body" ? bodyDetail(ctx, p) : detail(ctx, p);
 }
@@ -61,6 +64,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 // ---- list ----
 
 const GROUPS: Array<[BookPart["group"], string]> = [
+  ["furniture", "Page furniture"],
   ["front", "Front matter"],
   ["body", "Body"],
   ["back", "Back matter"],

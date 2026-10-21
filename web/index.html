@@ -1090,6 +1090,107 @@
       gap: 8px;
       align-items: flex-start;
     }
+    /* Page numbers' position picker: a spread, four folio slots a page. */
+    #config-overlay .pospick {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      padding: 4px 0 6px;
+    }
+    #config-overlay .spread-mini {
+      display: flex;
+      box-shadow: var(--page-shadow);
+    }
+    #config-overlay .spread-mini .pm {
+      position: relative;
+      width: 58px;
+      height: 84px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+    }
+    #config-overlay .spread-mini .pm + .pm {
+      border-left: 0;
+    }
+    #config-overlay .spread-mini .pm::before {
+      content: "";
+      position: absolute;
+      inset: 14px 9px 16px;
+      background: repeating-linear-gradient(var(--line) 0 1px, transparent 1px
+        5px);
+    }
+    #config-overlay .pospick .slot {
+      position: absolute;
+      width: 10px;
+      height: 6px;
+      padding: 0;
+      border-radius: 2px;
+      border: 1px solid var(--muted);
+      background: none;
+    }
+    #config-overlay .pospick .slot:hover {
+      border-color: var(--fg);
+      background: none;
+    }
+    #config-overlay .pospick .slot[aria-pressed="true"] {
+      background: var(--fg);
+      border-color: var(--fg);
+    }
+    #config-overlay .pospick .slot.bc {
+      bottom: 5px;
+      left: 23px;
+    }
+    #config-overlay .pospick .slot.tc {
+      top: 4px;
+      left: 23px;
+    }
+    #config-overlay .pm.v .slot.bo {
+      bottom: 5px;
+      left: 6px;
+    }
+    #config-overlay .pm.r .slot.bo {
+      bottom: 5px;
+      right: 6px;
+    }
+    #config-overlay .pm.v .slot.to {
+      top: 4px;
+      left: 6px;
+    }
+    #config-overlay .pm.r .slot.to {
+      top: 4px;
+      right: 6px;
+    }
+    #config-overlay .pospick .label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    #config-overlay .pospick .label b {
+      display: block;
+      color: var(--fg);
+      font-weight: 500;
+      font-size: 13px;
+    }
+    /* "Where they're dropped": read-only rule rows. */
+    #config-overlay .rules {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    #config-overlay .rules li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--soft);
+    }
+    #config-overlay .rules li:last-child {
+      border-bottom: 0;
+    }
+    #config-overlay .rules li span:first-child {
+      color: var(--muted);
+    }
+    #config-overlay .rules li span:last-child {
+      text-align: right;
+    }
     #config-overlay .mdiag {
       display: grid;
       grid-template-columns: auto minmax(0,1fr) auto;
