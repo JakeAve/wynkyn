@@ -1,6 +1,10 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { parse } from "../parser/parser.ts";
-import { formatNumber, render } from "./render.ts";
+import { formatNumber, render as renderLined } from "./render.ts";
+
+// Existing tests assert markup shape; data-line has its own test at the bottom.
+const render: typeof renderLined = (doc, opts) =>
+  renderLined(doc, opts).replace(/ data-line="\d+"/g, "");
 
 Deno.test("formatNumber: all styles", () => {
   assertEquals(formatNumber(4, "arabic"), "4");
@@ -479,4 +483,45 @@ Deno.test("toc: level-1 slugged headings listed only when toc.headings is true (
 
   const off = render(parse(HEADINGS_BOOK));
   assert(!off.includes("toc-heading"));
+});
+
+Deno.test("render: blocks carry data-line", () => {
+  const html = renderLined(parse([
+    "{matter: half-title}", // 1
+    "{title}", // 2
+    "Orchard", // 3
+    "",
+    "{chapter: a}", // 5
+    "{title}", // 6
+    "One", // 7
+    "",
+    "First paragraph with *em*.", // 9
+    "",
+    "{heading}", // 11
+    "Part I", // 12
+    "",
+    "{quote}", // 14
+    "We hold these truths.", // 15
+    "",
+    "{poem}", // 17
+    "The apples fall\\", // 18
+    "in rows.", // 19
+    "{/poem}", // 20
+    "",
+    "- one", // 22
+    "- two", // 23
+    "",
+    "{break}", // 25
+  ].join("\n")));
+  const lines = (re: RegExp) => [...html.matchAll(re)].map((m) => m[1]);
+  assertEquals(lines(/<section class="matter[^>]*data-line="(\d+)"/g), ["1"]);
+  assertEquals(lines(/<section class="chapter[^>]*data-line="(\d+)"/g), ["5"]);
+  assertEquals(lines(/<h1 class="title" data-line="(\d+)"/g), ["2", "6"]);
+  assertEquals(lines(/<p class="lead" data-line="(\d+)"/g), ["9"]);
+  assertEquals(lines(/<h3 [^>]*data-line="(\d+)"/g), ["11"]);
+  assertEquals(lines(/<blockquote [^>]*data-line="(\d+)"/g), ["14"]);
+  assertEquals(lines(/<div class="poem" data-line="(\d+)"/g), ["17"]);
+  assertEquals(lines(/<li data-line="(\d+)"/g), ["22", "23"]);
+  assertEquals(lines(/<div class="break" data-line="(\d+)"/g), ["25"]);
+  assert(!/<(em|br)[^>]*data-line/.test(html), "inline nodes get no attribute");
 });

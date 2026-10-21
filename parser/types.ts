@@ -10,7 +10,20 @@ export interface BmlDocument {
   body: BodyBlock[];
   backMatter: MatterBlock[];
   diagnostics: Diagnostic[];
+  onlySpans: OnlySpan[]; // EXPERIMENTAL: every {only} span, kept or dropped
 }
+
+// EXPERIMENTAL (spec §2.9): `{only: a | b}` … `{/only}` gates whole blocks to
+// the named editions. `line`/`endLine` are the tag lines (endLine = last line
+// when unclosed).
+export interface OnlySpan {
+  line: number;
+  endLine: number;
+  editions: string[];
+}
+
+// The `{only}` token that names the book's default edition.
+export const DEFAULT_EDITION_TOKEN = "default";
 
 export type BodyBlock = Part | Chapter;
 

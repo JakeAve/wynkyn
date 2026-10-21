@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { parse } from "./parser.ts";
+import { checkOnlySpans, parse } from "./parser.ts";
 import type { Chapter, Paragraph, Part } from "./types.ts";
 import type {
   Break,
@@ -699,4 +699,65 @@ Deno.test("diagnostic: a toc without {title} is reported as a missing heading, n
   assertEquals(doc.diagnostics.map((d) => `${d.line}: ${d.message}`), [
     "1: {matter: toc} has no {title} — the contents page will render without a heading",
   ]);
+});
+
+const ONLY_SRC = [
+  "{chapter: one}", // 1
+  "Shared.", // 2
+  "", // 3
+  "{only: pocket | large-print}", // 4
+  "Gated.", // 5
+  "{/only}", // 6
+  "After.", // 7
+].join("\n");
+
+Deno.test("parse: {only} keeps its blocks for a listed edition and blanks them for others", () => {
+  const paras = (edition?: string) =>
+    (parse(ONLY_SRC, { edition }).body[0] as Chapter).children.map((p) => [
+      text(p as Paragraph),
+      p.line,
+    ]);
+  const all = [["Shared.", 2], ["Gated.", 5], ["After.", 7]];
+  assertEquals(paras("large-print"), all);
+  assertEquals(paras(), all);
+  assertEquals(paras("default"), [["Shared.", 2], ["After.", 7]]);
+  const doc = parse(ONLY_SRC, { edition: "default" });
+  assertEquals(doc.onlySpans, [{
+    line: 4,
+    endLine: 6,
+    editions: ["pocket", "large-print"],
+  }]);
+  assertEquals(doc.diagnostics, []);
+});
+
+Deno.test("parse: {only} misuse is diagnosed", () => {
+  const lines = (src: string[]) =>
+    parse(src.join("\n")).diagnostics.map((d) => d.line);
+  assertEquals(
+    lines([
+      "{chapter: a}",
+      "{quote}",
+      "x",
+      "{only: pocket}",
+      "y",
+      "{/only}",
+      "{/quote}",
+    ]),
+    [4],
+  );
+  assertEquals(
+    lines(["{chapter: a}", "{only: a}", "{only: b}", "{/only}", "{/only}"]),
+    [3],
+  );
+  assertEquals(lines(["{chapter: a}", "{only: pocket}", "x"]), [2]);
+  assertEquals(lines(["{chapter: a}", "x", "{/only}"]), [3]);
+  assertEquals(lines(["{chapter: a}", "{only}", "x", "{/only}"]), [2]);
+});
+
+Deno.test("checkOnlySpans: unknown edition tokens are named on the opening line", () => {
+  const { onlySpans } = parse(ONLY_SRC);
+  assertEquals(checkOnlySpans(onlySpans, ["default", "pocket"]), [{
+    line: 4,
+    message: '{only} names unknown edition "large-print"',
+  }]);
 });

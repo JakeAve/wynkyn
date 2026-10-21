@@ -9,12 +9,14 @@ import type {
   Component,
   ComponentName,
   ContentNode,
+  Diagnostic,
   DropcapParagraph,
   Heading,
   Illustration,
   Inline,
   List,
   MatterBlock,
+  OnlySpan,
   Part,
 } from "./types.ts";
 
@@ -80,13 +82,33 @@ interface OpenBlock {
   className?: string; // {is:} only
 }
 
-export function parse(source: string): BmlDocument {
+// EXPERIMENTAL: an {only} edition token that is not in `known` gets one
+// diagnostic on that span's opening line.
+export function checkOnlySpans(
+  spans: OnlySpan[],
+  known: string[],
+): Diagnostic[] {
+  return spans.flatMap((s) =>
+    s.editions.filter((e) => !known.includes(e)).map((e) => ({
+      line: s.line,
+      message: `{only} names unknown edition "${e}"`,
+    }))
+  );
+}
+
+// `opts.edition` keeps only the {only} spans that list it; without it (editor,
+// `bml check`) every span's content is parsed.
+export function parse(
+  source: string,
+  opts: { edition?: string } = {},
+): BmlDocument {
   const lines = source.split(/\r?\n/);
   const doc: BmlDocument = {
     frontMatter: [],
     body: [],
     backMatter: [],
     diagnostics: [],
+    onlySpans: [],
   };
 
   let zone: "front" | "body" | "back" = "front";
@@ -101,6 +123,43 @@ export function parse(source: string): BmlDocument {
 
   const diag = (line: number, message: string) =>
     doc.diagnostics.push({ line, message });
+
+  // EXPERIMENTAL {only} pre-pass: tag lines and dropped content become blank
+  // lines, so line numbers and the block-close lookahead see the gated text.
+  const onlyOpeners = new Set<number>();
+  const onlyStack: { span: OnlySpan; keep: boolean }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = i + 1;
+    const tag = parseSentinelLine(lines[i]!);
+    if (tag?.name === "only") {
+      lines[i] = "";
+      if (tag.closing) {
+        const open = onlyStack.pop();
+        if (open) open.span.endLine = line;
+        else diag(line, "stray closing tag {/only}");
+        continue;
+      }
+      const editions = [
+        ...(tag.slug ? [tag.slug] : []),
+        ...Object.keys(tag.params).filter((k) => tag.params[k] === ""),
+      ];
+      const span: OnlySpan = { line, endLine: lines.length, editions };
+      doc.onlySpans.push(span);
+      if (!editions.length) diag(line, "{only} names no edition");
+      if (onlyStack.length) diag(line, "{only} opened inside another {only}");
+      else onlyOpeners.add(line);
+      onlyStack.push({
+        span,
+        keep: (onlyStack.at(-1)?.keep ?? true) &&
+          (opts.edition === undefined || editions.includes(opts.edition)),
+      });
+      continue;
+    }
+    if (onlyStack.length && !onlyStack.at(-1)!.keep) lines[i] = "";
+  }
+  for (const { span } of onlyStack) {
+    diag(span.line, "{only} is never closed by {/only}");
+  }
 
   const structuralChildren = (line: number): ContentNode[] => {
     if (curChapter) return curChapter.children;
@@ -486,6 +545,13 @@ export function parse(source: string): BmlDocument {
     if (trimmed === "") {
       flushParagraph();
       popImplicitBlocks(line);
+      const open = blockStack.at(-1);
+      if (open && onlyOpeners.has(line)) {
+        diag(
+          line,
+          `{only} opened inside an open {${open.name}} block — it gates whole blocks`,
+        );
+      }
       continue;
     }
     const tag = parseSentinelLine(trimmed);

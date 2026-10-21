@@ -236,6 +236,31 @@ never appears in the output.
   `\%% not a comment`.
 - `\\` at the end of a line — a literal backslash, not a hard line break (§2.6).
 
+### 2.9 Edition Spans (EXPERIMENTAL)
+
+> **EXPERIMENTAL.** `{only}` may change or be removed in a later version. No
+> other sentinel's meaning depends on it.
+
+`{only}` gates a run of whole blocks to the named editions. Its edition list is
+the slug plus any further pipe-separated names. The book's default edition is
+named `default`.
+
+```
+{only: pocket | large-print}
+A note that appears only in the pocket and large-print editions.
+{/only}
+```
+
+- When rendering an edition, the span's content is kept if the edition is listed
+  and dropped otherwise. The `{only}` and `{/only}` lines are never part of the
+  output.
+- Line numbers never shift: tag lines and dropped content read as blank lines.
+- With no edition chosen (the editor, `bml check`), every span's content is
+  parsed.
+- `{only}` must open outside any block and outside another `{only}`, must be
+  closed by `{/only}`, and must name at least one edition. An edition name the
+  book does not define is an error.
+
 ---
 
 ## 3. Document Structure
