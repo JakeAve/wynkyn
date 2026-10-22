@@ -143,11 +143,20 @@ click-to-style), `ink-design` (tokens and patterns for the chrome),
   and skips the tests only if that fails.
 - Sample manuscripts start from Project Gutenberg `download.txt` in the book
   dir; strip the Gutenberg header/footer, never leave it in `manuscript.md`.
-- Commit messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.
-- Every change starts in a worktree on its own branch, even a one-line fix:
-  `git worktree add .worktrees/<name> -b feat/<name>` (or `fix/`, `chore/`),
-  then `deno task setup` there. Never edit or commit on `main` in the main
-  checkout; `main` only moves by merging a branch, and the branch is deleted
-  with its worktree once merged.
+- Every change starts in a worktree on its own branch, even a one-line fix, and
+  before the first edit. First get the main checkout current — it may be sitting
+  on an old merged branch with a stale `CLAUDE.md`:
+  `git checkout main && git pull origin main`. Then
+  `git worktree add .worktrees/<name> -b feat/<name> origin/main` (or `fix/`,
+  `chore/`; the branch must not already exist) and `deno task setup` there (git
+  hooks, this worktree's dev port in `.claude/launch.json`, `books/` symlinked
+  to the main library). Work, commit and push from inside the worktree. Never
+  edit or commit on `main` in the main checkout; `main` only moves by merging a
+  branch, and the branch is deleted with its worktree once merged
+  (`git worktree remove .worktrees/<name> && git branch -d feat/<name>`).
+- Edits made in the wrong checkout move with a tagged stash, never a bare one
+  (the stash stack is shared across worktrees): `git stash push -u -m <tag>`,
+  then `git stash apply` by SHA in the worktree and `git stash drop` it. Commit
+  messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.
 - `docs/` is local scratch (gitignored): specs, plans, todos. Never `git add`
   it; durable knowledge goes in the spec, a code comment or a skill reference.
