@@ -920,5 +920,5 @@ export async function startServer(
 
 if (import.meta.main) {
   const running = await startServer({ port: defaultPort() });
-  console.log(`book editor dev server → http://localhost:${running.port}/`);
+  console.log(`wynkyn dev server → http://localhost:${running.port}/`);
 }

@@ -1,4 +1,4 @@
-# book-editor-app
+# Wynkyn
 
 Web app for editing and printing hand-bound books. A book is `books/<slug>/`
 with `manuscript.md` (BML — semantic markup, spec §3), `metadata.json` (all

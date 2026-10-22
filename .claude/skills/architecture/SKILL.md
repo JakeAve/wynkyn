@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: Use before adding or moving code in book-editor-app — a new module, metadata key, sentinel, panel view, server route or test — or when deciding where something belongs and what may import what. Also use for the dev loop (git worktrees, ports, hot reload, test tiers, verifying in Chrome) and whenever Paged.js does something surprising in the preview or export. Read it even for a "small" change that crosses a directory boundary.
+description: Use before adding or moving code in Wynkyn — a new module, metadata key, sentinel, panel view, server route or test — or when deciding where something belongs and what may import what. Also use for the dev loop (git worktrees, ports, hot reload, test tiers, verifying in Chrome) and whenever Paged.js does something surprising in the preview or export. Read it even for a "small" change that crosses a directory boundary.
 ---
 
 # Architecture

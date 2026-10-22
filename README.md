@@ -1,4 +1,4 @@
-# book-editor-app
+# Wynkyn
 
 A web app for typesetting and printing hand-bound books.
 

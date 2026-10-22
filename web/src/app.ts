@@ -236,7 +236,7 @@ function setCrumb(editions: EditionInfo[]): void {
   const name = cur ? editionLabel(cur) : "";
   $("book-name").textContent = titleCase(book);
   $("edition-name").textContent = name;
-  document.title = `Book Editor — ${book} · ${name}`;
+  document.title = `Wynkyn — ${book} · ${name}`;
 }
 function setCrumbSize(size: string | undefined): void {
   $("edition-size").textContent = size ? prettySize(size) : "";
