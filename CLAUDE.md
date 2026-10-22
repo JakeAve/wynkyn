@@ -30,9 +30,10 @@ rewrite themselves on the next save.
   ref numbers, running heads)
 - `server/` `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket,
   watches book files)
-- `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored).
-  Paged.js paginates the preview. The Write/Style/Publish mode (`setMode` in
-  `app.ts`) decides three columns in `#panes`: `#tree` | `#editor` | `#preview`,
+- `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored);
+  `web/app.css` is the chrome's stylesheet and holds the Ink tokens. Paged.js
+  paginates the preview. The Write/Style/Publish mode (`setMode` in `app.ts`)
+  decides three columns in `#panes`: `#tree` | `#editor` | `#preview`,
   `#style-nav` | `#config-overlay` | `#preview`, or `#style-nav` |
   `#config-overlay` | `#sheet-view`; `preview.ts`'s `installPreviewClicks`
   routes a page click to the source line or the style by mode. `config-panel.ts`
@@ -53,8 +54,16 @@ mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
 
 ## Commands
 
-- `deno task test` all tests (`*_test.ts` next to each module)
-- `deno task dev` build client + live server at http://localhost:8000
+- `deno task setup` once per checkout: git hooks, `.claude/launch.json` with
+  this checkout's port, and in a worktree a `books/` symlink to the main library
+- `deno task dev` build client + live server. Main checkout:
+  http://localhost:8000; a worktree gets its own stable port (`server/port.ts`;
+  `PORT=` overrides). Book edits push live; app, renderer and server edits
+  rebuild or restart and the page reloads itself (`architecture` skill →
+  `references/dev-workflow.md`)
+- `deno task test` all tests (`*_test.ts` next to each module, ~50 s with
+  Chrome); `deno task test:fast` skips the Chrome tests (~10 s, what pre-commit
+  runs)
 - `deno task fonts` regenerate `metadata/fonts-catalog.ts` (every Google family,
   for the font picker) from Google's public catalog
 - `deno task bml list` books on disk
@@ -86,6 +95,14 @@ then the `convert-manuscript` skill (`.claude/skills/`) writes `manuscript.md`.
 Style afterwards in the app. Print: `bml export <slug> --proof` first on a new
 printer, check one signature by hand, then the real export.
 
+## Skills (`.claude/skills/`)
+
+Read the one that fits before starting: `architecture` (layers, where a change
+goes, dev loop, Paged.js quirks), `bookbinding` (folios, signatures, imposition,
+furniture rules), `ux-principles` (who it's for, the three-column rule,
+click-to-style), `ink-design` (tokens and patterns for the chrome),
+`convert-manuscript` (source text → BML).
+
 ## Conventions
 
 - Deno only, strict TS, `noUncheckedIndexedAccess`. No new deps without reason.
@@ -100,3 +117,5 @@ printer, check one signature by hand, then the real export.
 - Sample manuscripts start from Project Gutenberg `download.txt` in the book
   dir; strip the Gutenberg header/footer, never leave it in `manuscript.md`.
 - Commit messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.
+- `docs/` is local scratch (gitignored): specs, plans, todos. Never `git add`
+  it; durable knowledge goes in the spec, a code comment or a skill reference.

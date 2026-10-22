@@ -17,17 +17,22 @@ folded signatures for hand binding.
 ## Quick start
 
 ```sh
-deno task setup         # wire the git hooks (once, after cloning)
+deno task setup         # once per checkout: git hooks, dev port, books/ in a worktree
 deno task check         # deno fmt --check, lint, and type check
-deno task test          # run the suite
+deno task test          # the whole suite (needs Chrome); test:fast skips the browser tests
 deno task dev           # build the client + live server at http://localhost:8000
 ```
 
-`setup` points `core.hooksPath` at `.githooks/`, so `check` and `test` run on
-every commit and push.
+`setup` points `core.hooksPath` at `.githooks/`, so `check` and the fast tests
+run on every commit and the full suite on every push.
 
 `deno task dev` watches the book's files and pushes changes to the preview over
 a WebSocket, so editing the manuscript or the styling updates the page live.
+Editing the app itself rebuilds the bundle, restarts the server and reloads the
+page. Every git worktree gets its own port (the main checkout 8000, a worktree a
+stable one from its folder name; `PORT=` overrides), so several can run side by
+side; `books/` is gitignored, so `setup` links a worktree's to the main
+checkout's library.
 
 ## A book on disk
 
