@@ -35,7 +35,7 @@ Deno.test("base.css uses no adjacent-sibling combinator (Paged.js drops those ru
   // discards the whole grouped rule with it — so one `h1 + p` in a selector
   // list took `.verse`, `.stanza` and `.has-dropcap` down with it and every
   // printed book indented paragraphs that should have been flush.
-  // docs/pagedjs-plus-combinator.md.
+  // .claude/skills/architecture/references/pagedjs-plus-combinator.md.
   const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url))
     .replace(/\/\*[\s\S]*?\*\//g, "");
   const offenders = [...css.matchAll(/([^{}]+)\{/g)]

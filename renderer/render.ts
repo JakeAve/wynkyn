@@ -274,7 +274,7 @@ function componentText(
 // A paragraph that opens a block carries no indent: the first in its container
 // (a sidebar, a column, an untitled section) or directly after a title, a
 // heading or a break. That used to be `h1 + p` / `.break + p` in base.css, but
-// Paged.js drops `+` rules whole (docs/pagedjs-plus-combinator.md), so the
+// Paged.js drops `+` rules whole (.claude/skills/architecture/references/pagedjs-plus-combinator.md), so the
 // class is decided here.
 function opensBlock(prev: ContentNode | undefined): boolean {
   return !prev || prev.kind === "break" || prev.kind === "heading" ||

@@ -9,7 +9,7 @@
 }
 /* No `+` combinator anywhere in this file: Paged.js 0.4.3 silently drops every
    rule whose selector contains one, and it drops the whole grouped rule with
-   it (docs/pagedjs-plus-combinator.md). The paragraph that opens a block after
+   it (.claude/skills/architecture/references/pagedjs-plus-combinator.md). The paragraph that opens a block after
    a title or a break is marked `.lead` by the renderer instead. */
 /* An `{is}` block's paragraphs take their indent from the block's own CSS
    (none by default), so `text-align: center` centres and the box decides. */
@@ -214,7 +214,7 @@
    element continued from the previous page and sets text-align-last: justify
    on it. After a forced page break that element is a container (.bml),
    not a paragraph, and the property inherits into every intact <p> below it
-   (docs/pagedjs-justify-leak.md). Only honor the mark on a real paragraph. */
+   (.claude/skills/architecture/references/pagedjs-justify-leak.md). Only honor the mark on a real paragraph. */
 [data-align-last-split-element="justify"]:not(p) {
   text-align-last: auto;
 }
