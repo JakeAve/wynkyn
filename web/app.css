@@ -1349,8 +1349,8 @@ summary {
   color: var(--muted);
   cursor: pointer;
 }
-#config-overlay .tog:not([aria-pressed="true"]):hover {
-  color: var(--fg);
+#config-overlay .tog:not([aria-pressed="true"]):not(.primary):hover {
+  color: var(--fg); /* a primary toggle keeps its inverted text on hover */
 }
 #config-overlay .tog[aria-pressed="true"] {
   border-color: var(--inv-bg);
