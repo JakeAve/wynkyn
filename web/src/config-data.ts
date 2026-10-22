@@ -267,3 +267,16 @@ export function bumpLength(v: string, dir: 1 | -1, fallback: string): string {
   const n = Math.round((p.n + dir * stepFor(p.unit)) * 1000) / 1000;
   return `${n}${p.unit}`;
 }
+
+// Units the stepper offers. Absolute ones convert exactly; em, lh and % depend
+// on the font or box, so switching to or from them keeps the number.
+export const LENGTH_UNITS = ["pt", "mm", "in", "px", "em", "lh", "%"];
+const PT: Record<string, number> = { pt: 1, mm: 72 / 25.4, in: 72, px: 0.75 };
+
+export function convertLength(v: string, to: string): string {
+  const p = parseLength(v);
+  if (!p) return v;
+  const a = PT[p.unit], b = PT[to];
+  const n = a && b ? Math.round((p.n * a / b) * 100) / 100 : p.n;
+  return `${n}${to}`;
+}
