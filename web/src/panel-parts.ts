@@ -262,8 +262,11 @@ function block(
   ];
   if (ff && !(ff in fonts)) fontOpts.push({ label: ff, value: ff });
 
-  const caps = props["font-variant-caps"]?.includes("small-caps")
+  // all-small-caps shrinks the capitals too; small-caps keeps them full height.
+  const caps = props["font-variant-caps"] === "all-small-caps"
     ? "small"
+    : props["font-variant-caps"] === "small-caps"
+    ? "csc"
     : props["text-transform"] === "uppercase"
     ? "upper"
     : props["text-transform"] === "none"
@@ -348,6 +351,7 @@ function block(
             [
               { label: "Aa", value: "none", aria: "Normal case" },
               { label: "AA", value: "upper", aria: "Capitals" },
+              { label: "Aᴀ", value: "csc", aria: "Caps and small caps" },
               { label: "Small caps", value: "small" },
             ],
             caps,
@@ -362,7 +366,11 @@ function block(
                 meta,
                 entry,
                 "font-variant-caps",
-                c === "small" ? "all-small-caps" : undefined,
+                c === "small"
+                  ? "all-small-caps"
+                  : c === "csc"
+                  ? "small-caps"
+                  : undefined,
               );
               save();
             },
