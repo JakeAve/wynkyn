@@ -966,6 +966,55 @@ summary {
   margin-left: calc(var(--pagedjs-width) + 8px);
 }
 
+/* ---- print layer (web/src/print.ts): the imposed sheets, one per printed
+   page. Hidden on screen; while the dialog is open it is all that prints. ---- */
+#print-sheets {
+  display: none;
+}
+#print-sheets .print-sheet {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  break-after: page;
+}
+#print-sheets .pagedjs_page {
+  position: absolute;
+  margin: 0;
+  box-shadow: none;
+  background: none; /* the preview's paper tint would print as a grey fill */
+}
+@media print {
+  body.printing {
+    display: block;
+    height: auto !important;
+    max-height: none;
+    overflow: visible;
+    background: #fff;
+  }
+  body.printing > :not(#print-sheets) {
+    display: none !important;
+  }
+  body.printing #print-sheets {
+    display: block;
+  }
+  /* Paged.js's print rules stretch .pagedjs_pages, .pagedjs_page and
+     .pagedjs_sheet to the printed page and break after every page. Here the
+     sheet is the printed page (sized inline, !important) and the pages sit
+     on it at trim size. */
+  #print-sheets .print-sheet,
+  #print-sheets .pagedjs_page,
+  #print-sheets .pagedjs_sheet {
+    min-height: 0;
+    max-height: none;
+  }
+  #print-sheets .pagedjs_page,
+  #print-sheets .pagedjs_sheet {
+    height: var(--pagedjs-height) !important;
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
+
 /* ---- style panel: the middle column in Style and Print ---- */
 /* Header (.phead) stays put; only the view (.pbody) scrolls. */
 #config-overlay {

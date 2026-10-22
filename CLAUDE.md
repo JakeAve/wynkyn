@@ -44,7 +44,9 @@ rewrite themselves on the next save.
   Publish view draws the first signature with `server/imposition.ts` and exports
   through the dev server's `POST /api/books/<book>/export` (the same
   `exportBook` as `bml export`) and `POST /api/books/<book>/epub` (the same
-  `exportEpub` as `bml epub`).
+  `exportEpub` as `bml epub`); its Print button (`print.ts`) imposes the live
+  preview's pages onto sheet-sized print layers and opens the browser's print
+  dialog, no Chrome on the server.
 
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
 update the checksum in `server/vendor_test.ts`, then read the golden page-map

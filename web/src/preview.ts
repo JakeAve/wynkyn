@@ -352,14 +352,14 @@ export function previewLink(
     [...container.querySelectorAll(".pagedjs_page")].find((p) =>
       !p.closest(".preview-stage")
     ) ?? null;
+  const pages = () => [...container.querySelectorAll<HTMLElement>(
+    ":scope > :not(.preview-stage) .pagedjs_page",
+  )];
   return {
-    pageCount: () =>
-      container.querySelectorAll(":scope > :not(.preview-stage) .pagedjs_page")
-        .length,
+    pages,
+    pageCount: () => pages().length,
     endsWithColophon: () =>
-      [...container.querySelectorAll(
-        ":scope > :not(.preview-stage) .pagedjs_page",
-      )].at(-1)?.querySelector(".matter-colophon") != null,
+      pages().at(-1)?.querySelector(".matter-colophon") != null,
     pagesFor(key) {
       if (!countedOn?.isConnected) {
         counts.clear();

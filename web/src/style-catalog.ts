@@ -240,7 +240,8 @@ export interface Route {
 }
 
 export interface PreviewLink {
-  pageCount(): number; // pages in the live preview; 0 until it paginates
+  pages(): HTMLElement[]; // the live preview's pages in order; [] until it paginates
+  pageCount(): number; // pages().length
   endsWithColophon(): boolean; // the last page is the colophon (pinned last when printed)
   pagesFor(key: string): number;
   highlight(key: string, on: boolean): void;

@@ -12,6 +12,8 @@ import {
   type Flip,
   impose,
   type Imposition,
+  type Side,
+  sidesFor,
   type Slot,
 } from "./imposition.ts";
 import { metadataPath } from "./editions.ts";
@@ -36,29 +38,7 @@ export interface SheetGeometry {
   rows: number;
 }
 
-export interface Side {
-  label: string; // "sig 1 · sheet 2 · back"
-  slots: Slot[];
-}
-
-/** Order the sheet sides for a given output file. */
-export function sidesFor(
-  imp: Imposition,
-  mode: "duplex" | "fronts" | "backs",
-  reverseBacks: boolean,
-): Side[] {
-  const sides: Side[] = [];
-  imp.sheets.forEach((sh, i) => {
-    const n = (i % imp.sheetsPerSignature) + 1;
-    const label = (face: string) =>
-      `sig ${sh.signature + 1} · sheet ${n} · ${face}`;
-    if (mode !== "backs") {
-      sides.push({ label: label("front"), slots: sh.front });
-    }
-    if (mode !== "fronts") sides.push({ label: label("back"), slots: sh.back });
-  });
-  return mode === "backs" && reverseBacks ? sides.reverse() : sides;
-}
+export { type Side, sidesFor };
 
 /**
  * One landscape PDF page per side. `source` is the trim-size book PDF whose

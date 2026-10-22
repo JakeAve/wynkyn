@@ -47,6 +47,31 @@ export interface Imposition {
   wastedFolioSlots: number; // blank folio slots per signature (cut halves that are waste)
 }
 
+export interface Side {
+  label: string; // "sig 1 · sheet 2 · back"
+  slots: Slot[];
+}
+
+/** Order the sheet sides for one print run: duplex interleaves fronts and
+ * backs, fronts/backs are the two runs of a by-hand job. */
+export function sidesFor(
+  imp: Imposition,
+  mode: "duplex" | "fronts" | "backs",
+  reverseBacks: boolean,
+): Side[] {
+  const sides: Side[] = [];
+  imp.sheets.forEach((sh, i) => {
+    const n = (i % imp.sheetsPerSignature) + 1;
+    const label = (face: string) =>
+      `sig ${sh.signature + 1} · sheet ${n} · ${face}`;
+    if (mode !== "backs") {
+      sides.push({ label: label("front"), slots: sh.front });
+    }
+    if (mode !== "fronts") sides.push({ label: label("back"), slots: sh.back });
+  });
+  return mode === "backs" && reverseBacks ? sides.reverse() : sides;
+}
+
 export function impose(pageCount: number, cfg: ImposeConfig): Imposition {
   const grid = gridFor(cfg.sheet, cfg.page);
   if (!grid) {

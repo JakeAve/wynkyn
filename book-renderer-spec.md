@@ -2067,6 +2067,17 @@ proof needs `--pages`, the book's page count). The files land in
 panel's Export wrote them; the dev server serves them at
 `/api/books/<book>/export/<file>`.
 
+**Printing from the browser** (`web/src/print.ts`): the Publish tab's Print
+button needs no Chrome on the server. It clones the live preview's Paged.js
+pages onto sheet-sized print layers laid out by the same `impose()` and
+`sidesFor()` the exporter uses (one layer per sheet side, pages at their trim
+size, rotated slots turned 180°), overrides `@page` with the sheet size, and
+opens the browser's print dialog; `afterprint` removes the layer. A printer gets
+the sheets directly; Save as PDF gives the same file as `sheets.pdf`.
+`duplex:
+none` is two runs, Print fronts and Print backs, honouring `flip` and
+`reverse-backs`. Chrome and Edge; proofs stay with the exporter.
+
 ### 7.8 E-book Export
 
 `bml epub <book> [--edition e] [--out dir]`, or the Publish tab's E-book

@@ -2,8 +2,9 @@
 // Page: trim size and margins (page numbers and running heads are Page
 // furniture parts, panel-furniture.ts). Publish: the sheet,
 // signatures and the imposition they derive to (§4.3), the first signature
-// drawn as it prints into the sheet view (R7), and the print export. Both write the `page`
-// section; Publish reads the trim size the Page tab set, and exports the e-book (§7.8).
+// drawn as it prints into the sheet view (R7), printing from this browser and
+// the print export. Both write the `page` section; Publish reads the trim size
+// the Page tab set, and exports the e-book (§7.8).
 import type { Duplex, Flip, PageConfig } from "../../metadata/types.ts";
 import {
   DEFAULT_SIZE,
@@ -28,8 +29,14 @@ import {
   toggle,
 } from "./panel-controls.ts";
 import type { PanelContext } from "./style-catalog.ts";
-import { impose, type Slot } from "../../server/imposition.ts";
+import {
+  impose,
+  type Imposition,
+  sidesFor,
+  type Slot,
+} from "../../server/imposition.ts";
 import type { PageSetup } from "../../metadata/page-setup.ts";
+import { printSheets } from "./print.ts";
 
 const MARGINS = [
   ["top", "Top"],
@@ -202,8 +209,10 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       "Print the fronts, turn the stack over on that edge and put it back in, then print the backs. Last sheet first suits printers that stack face up.",
     ),
   ];
+  const printing = printSection(ctx, page);
   const showManual = () => {
     for (const m of manual) m.hidden = (page.duplex ?? "short-edge") !== "none";
+    printing.update();
   };
   showManual();
 
@@ -279,9 +288,101 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       folioRow,
       readout,
     ]),
+    printing.sec,
     exportSection(ctx, page),
     ebookSection(ctx),
   ];
+}
+
+// The pages as they land on sheets, from the live preview's count: the same
+// impose() the export runs, so the sheet view, the browser print and the
+// PDFs agree. Before the preview paginates, one signature's worth.
+function liveImposition(
+  ctx: PanelContext,
+  setup: Extract<PageSetup, { error: null }>,
+  pageCount: number,
+  flip: Flip,
+): Imposition {
+  return impose(pageCount || setup.pagesPerSignature, {
+    folios: setup.folios,
+    sheet: setup.sheetDims,
+    page: setup.page,
+    duplex: setup.duplex,
+    flip,
+    tail: pageCount && ctx.preview.endsWithColophon() ? 1 : 0,
+  });
+}
+
+// Print from this browser: the sheets, imposed like sheets.pdf, straight to
+// the print dialog, so the server needs no Chrome. A by-hand job is two runs,
+// fronts then backs, like its two PDFs. update() follows the duplex setting.
+function printSection(
+  ctx: PanelContext,
+  page: PageConfig,
+): { sec: HTMLElement; update(): void } {
+  const status = el("div", "export-status");
+  status.setAttribute("aria-live", "polite");
+  const run = (mode: "duplex" | "fronts" | "backs") => {
+    status.replaceChildren();
+    const pages = ctx.preview.pages();
+    if (!pages.length) {
+      status.append(
+        el("p", "err", "Nothing to print until the preview has paginated."),
+      );
+      return;
+    }
+    const setup = resolvePageSetup(page, { pageCount: pages.length });
+    if (setup.error !== null) {
+      status.append(el("p", "err", setup.error));
+      return;
+    }
+    const imp = liveImposition(
+      ctx,
+      setup,
+      pages.length,
+      page.flip ?? "short-edge",
+    );
+    printSheets(pages, sidesFor(imp, mode, page["reverse-backs"] === true), {
+      sheet: imp.sheet,
+      page: setup.page,
+      cols: imp.cols,
+      rows: imp.rows,
+    });
+  };
+  const btn = (label: string, mode: "duplex" | "fronts" | "backs") => {
+    const b = el("button", "tog primary", label);
+    b.type = "button";
+    b.onclick = () => run(mode);
+    return b;
+  };
+  const sheets = btn("Print sheets", "duplex");
+  const fronts = btn("Print fronts", "fronts");
+  const backs = btn("Print backs", "backs");
+  const dialog = el("p", "hint");
+  const update = () => {
+    const duplex = page.duplex ?? "short-edge";
+    sheets.hidden = duplex === "none";
+    fronts.hidden = backs.hidden = duplex !== "none";
+    dialog.textContent = duplex === "none"
+      ? "In the print dialog choose the sheet size and 100% scale, for the fronts and again for the backs."
+      : `In the print dialog choose the sheet size, 100% scale and two-sided on the ${
+        duplex === "short-edge" ? "short" : "long"
+      } edge.`;
+  };
+  update();
+  return {
+    update,
+    sec: section("Print", "print", [
+      el("div", "actions", sheets, fronts, backs),
+      el(
+        "p",
+        "hint",
+        "Prints the sheets from this browser (Chrome or Edge), nothing on the server. Save as PDF gives the same file the export does.",
+      ),
+      dialog,
+      status,
+    ]),
+  };
 }
 
 // One button: the EPUB, then a link to it. It reflows on the reader's screen,
@@ -407,14 +508,7 @@ function drawSignature(
 ): void {
   host.replaceChildren();
   if (setup.error !== null) return;
-  const imp = impose(pageCount || setup.pagesPerSignature, {
-    folios: setup.folios,
-    sheet: setup.sheetDims,
-    page: setup.page,
-    duplex: setup.duplex,
-    flip,
-    tail: pageCount && ctx.preview.endsWithColophon() ? 1 : 0,
-  });
+  const imp = liveImposition(ctx, setup, pageCount, flip);
   const first = imp.sheets.filter((sh) => sh.signature === 0);
   const { w: W, h: H } = imp.sheet;
   const { w: pw, h: ph } = setup.page;

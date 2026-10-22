@@ -61,6 +61,7 @@ const PUBLISH: Array<[string, Array<[string, string]>]> = [
   ["Print", [
     ["sheet", "Paper"],
     ["folios-per-signature", "Signatures"],
+    ["print", "Print"],
     ["export", "Export"],
   ]],
   ["E-book", [["ebook", "Export"]]],
