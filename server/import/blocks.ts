@@ -11,7 +11,7 @@ export type Block =
     | { kind: "quote"; text: string }
     | { kind: "break" }
     | { kind: "image"; src: string; alt: string }
-    | { kind: "toc"; titles: string[] } // the source's contents list, dropped later
+    | { kind: "toc" } // the source's contents list, dropped later
   )
   & { check?: string }; // a `%% check:` note the structure step attaches
 
@@ -19,7 +19,6 @@ export interface Source {
   name: string; // the file's name, for the summary comment
   title?: string;
   author?: string;
-  language?: string;
   year?: string;
   gutenberg?: string; // eBook number when the file came from Project Gutenberg
   tocTitles: string[]; // the file's own navigation, when it has one
@@ -31,6 +30,10 @@ export interface Source {
 export const esc = (t: string): string => t.replace(/\{/g, "\\{");
 
 export const squash = (t: string): string => t.replace(/\s+/g, " ").trim();
+
+/** Letters and digits only, lower case: how two headings are compared. */
+export const norm = (t: string): string =>
+  t.toLowerCase().replace(/\{\/?em\}/g, "").replace(/[^a-z0-9]+/g, "");
 
 /** Verse lines from raw source lines: a line indented deeper than the first is
  * the continuation of the line before it (how Gutenberg wraps long verse). */

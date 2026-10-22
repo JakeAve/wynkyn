@@ -36,10 +36,6 @@ export function formatDiagnostics(
   ).join("\n");
 }
 
-const safeSlug = (t: string) =>
-  t.toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "").split("-").slice(0, 4).join("-") || "book";
-
 if (import.meta.main) {
   const a = parseArgs(Deno.args, {
     string: [
@@ -118,6 +114,7 @@ if (import.meta.main) {
     );
   } else if (cmd === "import" && book) {
     const { importSource } = await import("./server/import/mod.ts");
+    const { slugify } = await import("./server/import/structure.ts");
     const file = book;
     const name = file.slice(file.lastIndexOf("/") + 1);
     const chapters = a.chapters === undefined || a.chapters === "auto"
@@ -130,7 +127,7 @@ if (import.meta.main) {
       parts: a.flat ? false : undefined,
       verse: a.prose ? false : undefined,
     });
-    const slug = a.slug ?? safeSlug(r.title);
+    const slug = a.slug ?? slugify(r.title, 4);
     if (!safeName(slug)) {
       console.error(`bad slug: ${slug}`);
       Deno.exit(2);

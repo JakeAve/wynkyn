@@ -21,6 +21,20 @@ function resolve(base: string, href: string): string {
   return out.join("/");
 }
 
+/** The text inside every `<tag>` of a document, squashed, empties dropped. */
+function innerTexts(doc: string, tag: string): string[] {
+  const out: string[] = [];
+  let depth = 0, buf = "";
+  for (const t of tokenize(doc)) {
+    if (t.type === "open" && t.name === tag) (depth = 1), (buf = "");
+    else if (depth && t.type === "close" && t.name === tag) {
+      depth = 0;
+      if (buf.trim()) out.push(buf.replace(/\s+/g, " ").trim());
+    } else if (depth && t.type === "text") buf += t.text;
+  }
+  return out;
+}
+
 export function readEpub(name: string, bytes: Uint8Array): Source {
   const files = unzipSync(bytes);
   const text = (p: string) => files[p] ? strFromU8(files[p]!) : undefined;
@@ -40,7 +54,6 @@ export function readEpub(name: string, bytes: Uint8Array): Source {
     name,
     title: textOf(opf, "dc:title"),
     author: textOf(opf, "dc:creator"),
-    language: textOf(opf, "dc:language"),
     tocTitles: [],
     blocks: [],
     images: {},
@@ -74,25 +87,11 @@ export function readEpub(name: string, bytes: Uint8Array): Source {
   const nav = [...manifest.values()].find((m) =>
     m.props.split(/\s+/).includes("nav")
   );
+  const ncx = ncxId ? manifest.get(ncxId) : undefined;
   if (nav && files[nav.href]) {
-    let inA = false, buf = "";
-    for (const t of tokenize(text(nav.href)!)) {
-      if (t.type === "open" && t.name === "a") (inA = true), (buf = "");
-      else if (t.type === "close" && t.name === "a") {
-        inA = false;
-        if (buf.trim()) src.tocTitles.push(buf.replace(/\s+/g, " ").trim());
-      } else if (inA && t.type === "text") buf += t.text;
-    }
-  } else if (ncxId && manifest.get(ncxId) && files[manifest.get(ncxId)!.href]) {
-    let inLabel = false, buf = "";
-    for (const t of tokenize(text(manifest.get(ncxId)!.href)!)) {
-      if (t.type === "open" && t.name === "navlabel") {
-        (inLabel = true), (buf = "");
-      } else if (t.type === "close" && t.name === "navlabel") {
-        inLabel = false;
-        if (buf.trim()) src.tocTitles.push(buf.replace(/\s+/g, " ").trim());
-      } else if (inLabel && t.type === "text") buf += t.text;
-    }
+    src.tocTitles = innerTexts(text(nav.href)!, "a");
+  } else if (ncx && files[ncx.href]) {
+    src.tocTitles = innerTexts(text(ncx.href)!, "navlabel");
   }
 
   for (const id of spine) {

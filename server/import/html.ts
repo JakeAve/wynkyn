@@ -7,21 +7,18 @@ import { tokenize } from "./xml.ts";
 
 const HEADING = /^h([1-6])$/;
 const EM = new Set(["i", "em", "cite"]);
-const SKIP = new Set(["head", "title", "nav", "sup", "sub", "table"]);
+const SKIP = new Set(["head", "nav", "sup", "sub", "table"]);
+const PARA = new Set(["p", "li", "figcaption", "dd", "dt"]);
 const BLOCK_OPEN = new Set([
-  "p",
   "pre",
-  "li",
   "div",
   "blockquote",
   "body",
   "section",
   "article",
   "figure",
-  "figcaption",
-  "dd",
-  "dt",
   "td",
+  ...PARA,
 ]);
 
 export function readHtml(src: string): { title?: string; blocks: Block[] } {
@@ -92,10 +89,7 @@ export function readHtml(src: string): { title?: string; blocks: Block[] } {
       const h = name.match(HEADING);
       if (h) start("heading", parseInt(h[1]!, 10));
       else if (name === "pre") start("pre");
-      else if (
-        name === "p" || name === "li" || name === "figcaption" ||
-        name === "dd" || name === "dt"
-      ) start("para");
+      else if (PARA.has(name)) start("para");
       else if (name === "blockquote") {
         flush();
         quote++;
@@ -129,10 +123,7 @@ export function readHtml(src: string): { title?: string; blocks: Block[] } {
         continue;
       }
       if (skip) continue;
-      if (
-        HEADING.test(name) || name === "p" || name === "pre" || name === "li" ||
-        name === "figcaption" || name === "dd" || name === "dt"
-      ) flush();
+      if (HEADING.test(name) || name === "pre" || PARA.has(name)) flush();
       else if (name === "blockquote") {
         flush();
         quote = Math.max(0, quote - 1);

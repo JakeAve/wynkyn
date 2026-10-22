@@ -18,11 +18,10 @@ export interface Backend {
   readonly store?: BookStore;
   listBooks(): Promise<string[]>;
   createBook(slug: string, title?: string): Promise<void>;
-  /** A book from an import run in the page (§7.9); `replace` re-imports. */
+  /** A book from an import run in the page (§7.9). */
   importBook(
     slug: string,
     r: { manuscript: string; images: Record<string, Uint8Array> },
-    replace?: boolean,
   ): Promise<void>;
   editions(book: string): Promise<EditionInfo[]>;
   manuscript(book: string): Promise<{ text: string; version: string }>;
@@ -89,13 +88,12 @@ export function httpBackend(): Backend {
     listBooks: () =>
       call<{ books: string[] }>("/api/books").then((r) => r.books),
     createBook: (slug, title) => post("/api/books", { slug, title }),
-    importBook: (slug, r, replace = false) =>
+    importBook: (slug, r) =>
       post(`/api/books/${encodeURIComponent(slug)}/import`, {
         manuscript: r.manuscript,
         images: Object.fromEntries(
           Object.entries(r.images).map(([k, v]) => [k, base64(v)]),
         ),
-        replace,
       }),
     editions: (book) =>
       call<{ editions: EditionInfo[] }>(editionsUrl(book)).then((r) =>
@@ -220,8 +218,8 @@ export function localBackend(
         throw new Error("book already exists");
       }
     },
-    async importBook(slug, r, replace = false) {
-      if (!await service.importBook(slug, assets.template, r, replace)) {
+    async importBook(slug, r) {
+      if (!await service.importBook(slug, assets.template, r)) {
         throw new Error("book already exists");
       }
     },

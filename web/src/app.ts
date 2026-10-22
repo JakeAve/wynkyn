@@ -1123,14 +1123,14 @@ function createManuscript(cancelable: boolean): void {
       );
       err.textContent = "";
       dlg.close();
-      const slug = await askTitle(
+      const got = await askTitle(
         r.title,
         `${file.name} · ${sizeLabel(file.size)}`,
         "Import",
       );
-      if (slug === null) return createManuscript(cancelable);
-      await backend.importBook(slug, r);
-      location.search = editionHref(slug, null);
+      if (!got) return createManuscript(cancelable);
+      await backend.importBook(got.slug, r);
+      location.search = editionHref(got.slug, null);
     } catch (e) {
       err.textContent = brief(e);
       if (!dlg.open) dlg.showModal();
@@ -1139,13 +1139,10 @@ function createManuscript(cancelable: boolean): void {
   $("create-blank").onclick = async () => {
     dlg.close();
     try {
-      const slug = await askTitle("", null, "Create book");
-      if (slug === null) return createManuscript(cancelable);
-      await backend.createBook(
-        slug,
-        ($("title-input") as HTMLInputElement).value,
-      );
-      location.search = editionHref(slug, null);
+      const got = await askTitle("", null, "Create book");
+      if (!got) return createManuscript(cancelable);
+      await backend.createBook(got.slug, got.title);
+      location.search = editionHref(got.slug, null);
     } catch (e) {
       err.textContent = brief(e);
       dlg.showModal();
@@ -1159,12 +1156,12 @@ const sizeLabel = (bytes: number) =>
     ? `${Math.max(1, Math.round(bytes / 1024))} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-/** The title dialog: resolves with the slug, or null for Back. */
+/** The title dialog: the title and its slug, or null for Back. */
 function askTitle(
   title: string,
   source: string | null,
   cta: string,
-): Promise<string | null> {
+): Promise<{ slug: string; title: string } | null> {
   const dlg = $("title-dlg") as HTMLDialogElement;
   const input = $("title-input") as HTMLInputElement;
   const slugEl = $("title-slug");
@@ -1181,10 +1178,7 @@ function askTitle(
   input.oninput = show;
   show();
   return new Promise((resolve) => {
-    let settled = false;
-    const finish = (v: string | null) => {
-      if (settled) return;
-      settled = true;
+    const finish = (v: { slug: string; title: string } | null) => {
       dlg.close();
       resolve(v);
     };
@@ -1196,7 +1190,7 @@ function askTitle(
         err.textContent = `“${slug}” is taken; pick another title.`;
         return;
       }
-      finish(slug);
+      finish({ slug, title: input.value });
     };
     dlg.oncancel = (e) => {
       e.preventDefault();

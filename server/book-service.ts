@@ -176,18 +176,15 @@ export class BookService {
   }
 
   /** A book from an import (spec §7.9): the manuscript, its images, and the
-   * template's metadata unless the book already has styling. `replace`
-   * re-imports over an existing manuscript; otherwise a taken slug is false. */
+   * template's metadata; false when the slug is taken. */
   async importBook(
     book: string,
     metadataText: string,
     r: { manuscript: string; images: Record<string, Uint8Array> },
-    replace = false,
   ): Promise<boolean> {
     checkNames(book, null);
     const manuscript = `${book}/manuscript.md`;
-    if (replace) await this.store.write(manuscript, r.manuscript);
-    else if (!await this.store.create(manuscript, r.manuscript)) return false;
+    if (!await this.store.create(manuscript, r.manuscript)) return false;
     const meta = metadataKey(book, null);
     if (!await this.store.exists(meta)) {
       await this.store.write(meta, metadataText);

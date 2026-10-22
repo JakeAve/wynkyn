@@ -3,7 +3,7 @@
 // contents list, "THE END"), pick the heading level that means "chapter",
 // group chapters under parts, split front and back matter, and record the
 // other readings that were plausible so the editor can offer them.
-import type { Block, Source } from "./blocks.ts";
+import { type Block, norm, type Source } from "./blocks.ts";
 
 export interface ImportOptions {
   /** Heading level whose headings start chapters; "none" for one chapter. */
@@ -50,7 +50,6 @@ export interface Outline {
   back: Section[];
   summary: string[]; // the `%%` block at the top of the manuscript
   readings: Reading[];
-  options: Required<ImportOptions>;
 }
 
 const PART_KW = /^(book|part|volume)\b/i;
@@ -83,8 +82,6 @@ const SMALL = new Set([
   "nor",
 ]);
 
-const norm = (t: string) =>
-  t.toLowerCase().replace(/\{\/?em\}/g, "").replace(/[^a-z0-9]+/g, "");
 const plain = (t: string) => t.replace(/\{\/?em\}/g, "").replace(/\\\{/g, "{");
 
 function roman(s: string): number | null {
@@ -131,7 +128,7 @@ export function slugify(t: string, words = 3): string {
 export function parseHeading(
   text: string,
   sub?: string,
-): { label?: string; title?: string; num?: number } {
+): { label?: string; title?: string } {
   const t = plain(text).trim().replace(/\.$/, "");
   const m = t.match(LABEL);
   if (m) {
@@ -144,11 +141,7 @@ export function parseHeading(
       "",
     );
     const title = rest || (sub ? plain(sub).replace(/\.$/, "") : "");
-    return {
-      label,
-      title: title ? titleCase(title) : undefined,
-      num: n ?? undefined,
-    };
+    return { label, title: title ? titleCase(title) : undefined };
   }
   const title = titleCase(t) +
     (sub ? `: ${titleCase(plain(sub).replace(/\.$/, ""))}` : "");
@@ -157,10 +150,9 @@ export function parseHeading(
 
 export function structure(src: Source, opts: ImportOptions = {}): Outline {
   const summary: string[] = [];
-  const dropped: string[] = [];
+  const dropped = new Set<string>();
   let blocks = src.blocks.slice();
-  const titleN = norm(src.title ?? "\u0000"),
-    authorN = norm(src.author ?? "\u0000");
+  const titleN = norm(src.title ?? ""), authorN = norm(src.author ?? "");
 
   // ---- the file's own furniture ------------------------------------------
   const startAt = blocks.findIndex((b) =>
@@ -173,7 +165,7 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
   );
   if (endAt >= 0) blocks = blocks.slice(0, endAt);
   if (startAt >= 0 || endAt >= 0 || src.gutenberg) {
-    dropped.push("the Project Gutenberg header and licence");
+    dropped.add("the Project Gutenberg header and licence");
   }
 
   const isJunk = (b: Block) => {
@@ -189,12 +181,12 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
       short && /^by[a-z]/.test(n) && authorN.length > 3 && n.endsWith(authorN)
     ) return true;
     if (/^the end\.?$|^finis\.?$/i.test(t)) {
-      dropped.push(`"${t}"`);
+      dropped.add(`"${t}"`);
       return true;
     }
     return b.kind === "heading" && JUNK_HEADING.test(t) && t.length < 60;
   };
-  if (blocks.some((b) => b.kind === "toc")) dropped.push("its contents list");
+  if (blocks.some((b) => b.kind === "toc")) dropped.add("its contents list");
   blocks = blocks.filter((b) => !isJunk(b));
 
   // A run of heading-like lines whose texts recur later as headings is the
@@ -221,9 +213,7 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
         )
       ).length;
       if (hits >= run.length * 0.6) {
-        if (!dropped.includes("its contents list")) {
-          dropped.push("its contents list");
-        }
+        dropped.add("its contents list");
         for (const b of run) {
           src.tocTitles.push(plain((b as { text: string }).text));
         }
@@ -320,6 +310,15 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
       content: [],
     };
   };
+  const startBack = (text: string): Section => ({
+    type: (BACK_KW.exec(text)?.[0] ?? "appendix").toLowerCase()
+      .replace(/^acknowledg$/, "acknowledgements").replace(
+        /^endnotes$/,
+        "notes",
+      ),
+    title: titleCase(text.replace(/\.$/, "")),
+    content: [],
+  });
   const target = (): Block[] =>
     backSection
       ? backSection.content
@@ -333,35 +332,15 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
     if (b.kind === "heading") {
       const text = plain(b.text);
       if (
-        body.length && !backSection && chapLevel !== null &&
-        b.level <= chapLevel && BACK_KW.test(text)
+        body.length && b.level <= (chapLevel ?? 2) &&
+        (backSection || BACK_KW.test(text))
       ) {
-        backSection = {
-          type: BACK_KW.exec(text)![0]!.toLowerCase().replace(
-            /^acknowledg$/,
-            "acknowledgements",
-          ).replace(/^endnotes$/, "notes"),
-          title: titleCase(text.replace(/\.$/, "")),
-          content: [],
-        };
+        backSection = startBack(text);
         back.push(backSection);
         continue;
       }
       if (backSection) {
-        if (b.level <= (chapLevel ?? 2)) {
-          backSection = {
-            type: BACK_KW.test(text)
-              ? BACK_KW.exec(text)![0]!.toLowerCase()
-              : "appendix",
-            title: titleCase(text.replace(/\.$/, "")),
-            content: [],
-          };
-          back.push(backSection);
-        } else {backSection.content.push({
-            kind: "heading",
-            level: 1,
-            text: b.text,
-          });}
+        backSection.content.push({ kind: "heading", level: 1, text: b.text });
         continue;
       }
       if (!body.length && FRONT_KW.test(text) && !PART_KW.test(text)) {
@@ -526,16 +505,7 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
       } became {heading} inside chapters.`,
     );
   }
-  const emCount = blocks.reduce(
-    (n, b) =>
-      n +
-      ((b.kind === "para" || b.kind === "quote"
-        ? b.text
-        : b.kind === "verse"
-        ? b.lines.join(" ")
-        : "").match(/\{em\}/g)?.length ?? 0),
-    0,
-  );
+  const emCount = JSON.stringify(blocks).split("{em}").length - 1;
   const imageCount = blocks.filter((b) => b.kind === "image").length;
   const bits = [
     emCount
@@ -556,22 +526,15 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
   ].filter(Boolean);
   summary.push(bits.join("; ") + ".");
   if (coverImages) {
-    dropped.push(
+    dropped.add(
       `${coverImages} image${
         coverImages === 1 ? "" : "s"
       } before the first chapter (a cover, a frontispiece)`,
     );
   }
-  if (dropped.length) {
-    summary.push(`Dropped: ${[...new Set(dropped)].join("; ")}.`);
-  }
+  if (dropped.size) summary.push(`Dropped: ${[...dropped].join("; ")}.`);
 
   const readings: Reading[] = [];
-  const current: Required<ImportOptions> = {
-    chapters: opts.chapters ?? "auto",
-    parts: wantParts,
-    verse: keepVerse,
-  };
   if (levels.length > 1 || (partLevel !== null)) {
     for (const l of levels) {
       readings.push({
@@ -618,5 +581,5 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
     summary.push("Another reading was possible: the import notes offer it.");
   }
 
-  return { src, front, body, back, summary, readings, options: current };
+  return { src, front, body, back, summary, readings };
 }

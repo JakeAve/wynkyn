@@ -14,7 +14,6 @@ export interface ImportResult {
   manuscript: string;
   images: Record<string, Uint8Array>; // images/<file> → bytes
   title: string;
-  author?: string;
   outline: Outline;
 }
 
@@ -47,7 +46,6 @@ export function importSource(
     manuscript,
     images,
     title: src.title ?? name.replace(/\.[^.]+$/, ""),
-    author: src.author,
     outline,
   };
 }

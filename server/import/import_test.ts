@@ -172,28 +172,23 @@ Deno.test("parseHeading and titleCase", () => {
   assertEquals(parseHeading("CHAPTER 4. The Carpet-Bag."), {
     label: "Chapter 4",
     title: "The Carpet-Bag",
-    num: 4,
   });
   assertEquals(parseHeading("STAVE I:  MARLEY'S GHOST"), {
     label: "Stave 1",
     title: "Marley's Ghost",
-    num: 1,
   });
   assertEquals(parseHeading("Letter 2"), {
     label: "Letter 2",
     title: undefined,
-    num: 2,
   });
   assertEquals(parseHeading("CHAPTER I.", "Down the Rabbit-Hole"), {
     label: "Chapter 1",
     title: "Down the Rabbit-Hole",
-    num: 1,
   });
   assertEquals(parseHeading("THE SISTERS"), { title: "The Sisters" });
   assertEquals(parseHeading("BOOK IV.  CHILDREN OF ADAM"), {
     label: "Book 4",
     title: "Children of Adam",
-    num: 4,
   });
   assertEquals(
     titleCase("THE FIRST OF THE THREE SPIRITS"),
@@ -278,7 +273,7 @@ Deno.test("epub reader: package metadata, nav, spine order, images", () => {
   };
   const r = importSource("two.epub", zipSync(files));
   assertEquals(r.title, "Two Chapters");
-  assertEquals(r.author, "B. Author");
+  assertEquals(r.outline.src.author, "B. Author");
   assertEquals(r.outline.src.gutenberg, "123");
   assertEquals(
     r.outline.src.year,

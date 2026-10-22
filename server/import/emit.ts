@@ -14,18 +14,12 @@ export interface Emitted {
   images: Record<string, Uint8Array>; // images/<file> → bytes
 }
 
-function countImages(o: Outline): number {
-  const inBlocks = (bs: Block[]) => bs.filter((b) => b.kind === "image").length;
-  let n = 0;
-  for (const sec of [...o.front, ...o.back]) n += inBlocks(sec.content);
-  for (const b of o.body) {
-    if (b.kind === "part") {
-      n += inBlocks(b.content);
-      for (const c of b.chapters) n += inBlocks(c.content);
-    } else n += inBlocks(b.content);
-  }
-  return n;
-}
+const everyBlock = (o: Outline): Block[] =>
+  [
+    ...o.front,
+    ...o.back,
+    ...o.body.flatMap((b) => b.kind === "part" ? [b, ...b.chapters] : [b]),
+  ].flatMap((x) => x.content);
 
 export function emit(o: Outline, today = new Date()): Emitted {
   const s = o.src;
@@ -33,7 +27,7 @@ export function emit(o: Outline, today = new Date()): Emitted {
   const images: Record<string, Uint8Array> = {};
   const usedImages = new Set<string>();
   const noImageFiles = Object.keys(s.images).length === 0;
-  const imageCount = countImages(o);
+  const imageCount = everyBlock(o).filter((b) => b.kind === "image").length;
   const title = s.title ?? s.name.replace(/\.[^.]+$/, "");
   const date = today.toLocaleDateString("en-GB", {
     day: "numeric",
@@ -157,8 +151,6 @@ export function emit(o: Outline, today = new Date()): Emitted {
         case "image":
           image(b);
           break;
-        case "toc":
-          break;
       }
       out.push("");
     }
@@ -166,14 +158,9 @@ export function emit(o: Outline, today = new Date()): Emitted {
 
   const section = (
     sec: { type: string; title?: string; content: Block[]; check?: string },
-    label?: string,
   ) => {
     if (sec.check) out.push(`%% check: ${sec.check}`);
-    out.push(
-      label
-        ? `{matter: ${sec.type} | label: ${label}}`
-        : `{matter: ${sec.type}}`,
-    );
+    out.push(`{matter: ${sec.type}}`);
     if (sec.title) out.push("{title}", line(sec.title));
     else if (
       !["dedication", "epigraph", "copyright", "colophon"].includes(sec.type)
@@ -213,16 +200,7 @@ export function emit(o: Outline, today = new Date()): Emitted {
     } else chapter(n);
   }
 
-  let appendix = 0;
-  for (const sec of o.back) {
-    section(
-      sec,
-      sec.type === "appendix" &&
-        o.back.filter((b) => b.type === "appendix").length > 1
-        ? String.fromCharCode(65 + appendix++)
-        : undefined,
-    );
-  }
+  for (const sec of o.back) section(sec);
 
   out.push("{matter: colophon}", "{typeface}", "%% fill in", "{printer}");
   out.push(

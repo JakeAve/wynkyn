@@ -3,12 +3,12 @@
 // START/END markers, hard-wrapped paragraphs, `_emphasis_`, `[Illustration:
 // caption]`, two-line headings ("CHAPTER I." then the title) and indented
 // verse. A contents list (a run of heading-like lines) becomes a `toc` block.
-import { esc, type Source, squash, verseLines } from "./blocks.ts";
+import { esc, norm, type Source, squash, verseLines } from "./blocks.ts";
 
 const START = /\*\*\* ?START OF/i;
 const END = /\*\*\* ?END OF/i;
 export const KEYWORD =
-  /^(chapter|part|book|stave|letter|canto|act|scene|section|prologue|epilogue|preface|introduction|foreword|afterword|appendix|epilogue|etymology|extracts|dedication|contents|conclusion|interlude)\b/i;
+  /^(chapter|part|book|stave|letter|canto|act|scene|section|prologue|epilogue|preface|introduction|foreword|afterword|appendix|etymology|extracts|dedication|contents|conclusion|interlude)\b/i;
 const NUMERAL = /^([IVXLCDM]+|\d+)\.?$/;
 const BREAK = /^(\*\s*){2,}$|^-{3,}$|^_{3,}$|^~{3,}$|^(•\s*){3,}$/;
 const MD_HEADING = /^(#{1,6})\s+(.+?)\s*#*$/;
@@ -51,7 +51,6 @@ export function readText(name: string, raw: string): Source {
       const k = m[1]!.toLowerCase(), v = m[2]!.trim();
       if (k === "title") src.title = v;
       else if (k === "author") src.author = v;
-      else if (k === "language") src.language = v;
       else if (k === "release date") src.gutenberg = v.match(/#(\d+)/)?.[1];
       else if (k === "original publication") {
         src.year = v.match(/\b(1[5-9]\d\d|20\d\d)\b/)?.[1];
@@ -89,14 +88,13 @@ export function readText(name: string, raw: string): Source {
   const capsAreHeadings = keywordCount < 2;
   // Every heading-like standalone line, so a contents list written in Title
   // Case ("The Sisters" for THE SISTERS) can be recognised by what it lists.
-  const normal = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const headingNorms = new Set<string>();
   for (const p of paras) {
     const t = p.map((l) => l.trim());
-    if (t.length === 1 && headingLike(t[0]!)) headingNorms.add(normal(t[0]!));
-    if (t.length === 2 && isKeyword(t[0]!)) headingNorms.add(normal(t[1]!));
+    if (t.length === 1 && headingLike(t[0]!)) headingNorms.add(norm(t[0]!));
+    if (t.length === 2 && isKeyword(t[0]!)) headingNorms.add(norm(t[1]!));
   }
-  const PAGED = /^(.*?)\s{2,}([ivxlcdm]+|\d+)\s*$/i; // "Dedication      vii"
+  const PAGED = /\s{2,}([ivxlcdm]+|\d+)\s*$/i; // "Dedication      vii"
 
   for (const p of paras) {
     const trimmed = p.map((l) => l.trim());
@@ -122,26 +120,16 @@ export function readText(name: string, raw: string): Source {
         continue;
       }
     }
-    // Contents entries: short lines ending in a page number, or a run of
-    // short lines most of which name a heading found elsewhere.
-    if (
-      trimmed.every((l) => l.length < 80 && PAGED.test(l)) &&
-      (trimmed.length >= 3 ||
-        PAGED.test(one ?? "") && headingLike(one!.match(PAGED)![1]!))
-    ) {
-      const titles = trimmed.map((l) => l.match(PAGED)![1]!.trim());
-      src.blocks.push({ kind: "toc", titles });
-      src.tocTitles.push(...titles);
-      continue;
-    }
+    // A contents list written in Title Case: short lines, most of which name
+    // a heading found elsewhere.
     if (
       trimmed.length >= 3 && trimmed.every((l) =>
         l.length <= 60 && !/[.!?,;:]$/.test(l)
       ) &&
-      trimmed.filter((l) => headingNorms.has(normal(l))).length >=
+      trimmed.filter((l) => headingNorms.has(norm(l))).length >=
         trimmed.length * 0.6
     ) {
-      src.blocks.push({ kind: "toc", titles: trimmed });
+      src.blocks.push({ kind: "toc" });
       src.tocTitles.push(...trimmed);
       continue;
     }
@@ -156,6 +144,12 @@ export function readText(name: string, raw: string): Source {
         src: "",
         alt: inline(squash(ill[1]!.replace(/_/g, "")), md),
       });
+      continue;
+    }
+    // A lone contents entry with its page number ("Dedication     vii").
+    if (one && PAGED.test(one) && headingLike(one.replace(PAGED, ""))) {
+      src.blocks.push({ kind: "toc" });
+      src.tocTitles.push(one.replace(PAGED, ""));
       continue;
     }
     if (one && (isKeyword(one) || (capsAreHeadings && isCaps(one)))) {
@@ -184,16 +178,8 @@ export function readText(name: string, raw: string): Source {
         headingLike(l.replace(/\s{2,}.*$/, "")) || /^\s*\d+\s*$/.test(l)
       )
     ) {
-      const titles = trimmed.map((l) =>
-        l.replace(/\s{2,}\d+\s*$/, "").replace(
-          /^(chapter|stave|book|part|letter|canto)\s+[ivxlcdm\d]+\.?\s*/i,
-          "",
-        ).trim()
-      ).filter(Boolean);
-      src.blocks.push({ kind: "toc", titles });
-      src.tocTitles.push(
-        ...trimmed.map((l) => l.replace(/\s{2,}\d+\s*$/, "").trim()),
-      );
+      src.blocks.push({ kind: "toc" });
+      src.tocTitles.push(...trimmed.map((l) => l.replace(PAGED, "").trim()));
       continue;
     }
     if (

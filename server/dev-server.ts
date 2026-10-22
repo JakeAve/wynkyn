@@ -263,7 +263,7 @@ export async function startServer(
         typeof body.images !== "object"
       ) {
         return new Response(
-          "body must be { manuscript: string, images: {path: base64}, replace?: boolean }",
+          "body must be { manuscript: string, images: {path: base64} }",
           { status: 400 },
         );
       }
@@ -278,7 +278,6 @@ export async function startServer(
         p[0]!,
         await Deno.readTextFile(TEMPLATE),
         { manuscript: body.manuscript, images },
-        body.replace === true,
       );
       return made
         ? Response.json({ ok: true }, { status: 201 })
