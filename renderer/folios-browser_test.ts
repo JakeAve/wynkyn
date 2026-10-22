@@ -344,7 +344,13 @@ Deno.test({
   fn: () =>
     withPage(async (page) => {
       const fromMap = await pass(page, centred, {});
-      assertEquals(fromMap.result.problems, []);
+      // The title is long enough to wrap on running pages (a warning, tested
+      // below); nothing else is expected.
+      assertEquals(
+        // deno-lint-ignore no-explicit-any
+        fromMap.result.problems.filter((p: any) => !p.warn),
+        [],
+      );
       const literal = await pass(page, {
         ...centred,
         css: centred.css
@@ -388,6 +394,72 @@ Deno.test({
       assert(
         // deno-lint-ignore no-explicit-any
         !result.problems.some((p: any) => p.message === "no page-map entry"),
+      );
+    }),
+});
+
+// An outside folio beside a centred head: Paged.js measures the recto row
+// (folio on the right only) wrong, squeezing the head; base.css lays such
+// rows out itself.
+const outsideFolio = (head: string) =>
+  build(
+    ["{chapter: one}", "{title}", "Chapter One", "", prose(10)].join("\n"),
+    {
+      ...metadata,
+      numbering: {
+        pages: { ...metadata.numbering!.pages, position: "top-outside" },
+      },
+      running: {
+        odd: [{ content: head, area: "top-center" }],
+        even: [{ content: head, area: "top-center" }],
+      },
+    },
+  );
+
+Deno.test({
+  name: "folios: a centred head beside an outside folio is as wide on a " +
+    "recto as on a verso",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      const { result, widths } = await pass(
+        page,
+        outsideFolio("The Great Gatsby"),
+        {},
+      );
+      assertEquals(result.problems, []);
+      const centre = (side: number) =>
+        new Set(
+          result.map.flatMap((p, i) =>
+            p.head && i % 2 === side ? [widths[i]![1]] : []
+          ),
+        );
+      const [recto, verso] = [centre(0), centre(1)];
+      assertEquals(recto.size, 1);
+      assertEquals(recto, verso);
+      // Centred on the text block: the side boxes match.
+      result.map.forEach((p, i) => {
+        if (p.head) assertEquals(widths[i]![0], widths[i]![2], `page ${i + 1}`);
+      });
+    }),
+});
+
+Deno.test({
+  name: "folios: a head that wraps to a second line is a warning",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      const { result } = await pass(
+        page,
+        outsideFolio("A Running Head Far Too Long for the Measure of Its Page"),
+        {},
+      );
+      const heads = result.map.flatMap((p, i) => p.head ? [i + 1] : []);
+      assert(heads.length >= 2, "running pages on both sides");
+      assertEquals(
+        // deno-lint-ignore no-explicit-any
+        (result.problems as any[]).map((p) => [p.page, p.warn, p.message]),
+        heads.map((n) => [n, true, "top-center margin box runs to 2 lines"]),
       );
     }),
 });

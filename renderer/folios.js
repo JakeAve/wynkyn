@@ -21,7 +21,7 @@
  * Seed and PageProblem are defined in ./page-map-types.ts; restated here for
  * this file's own checking.
  * @typedef {Record<string, string>} Seed anchor id → refText
- * @typedef {{ page: number | null; message: string }} PageProblem
+ * @typedef {{ page: number | null; message: string; warn?: true }} PageProblem
  * @typedef {{ map: PageEntry[]; seed: Seed; problems: PageProblem[] }} RenderResult
  */
 
@@ -311,6 +311,41 @@
     else style.setProperty("--running-off", '""');
   }
 
+  // A head or folio that runs to a second line: measured against the same
+  // box held to one line, so it holds for any font or line-height. A warning:
+  // it's a typographic flaw the preview shows, and never moves the text.
+  /**
+   * @param {Element} page @param {number} pageNumber
+   * @returns {PageProblem[]}
+   */
+  function wrappedMargins(page, pageNumber) {
+    /** @type {PageProblem[]} */
+    const problems = [];
+    for (const box of page.querySelectorAll(".pagedjs_margin.hasContent")) {
+      const content = /** @type {HTMLElement | null} */ (
+        box.querySelector(".pagedjs_margin-content")
+      );
+      if (!content) continue;
+      const height = content.offsetHeight;
+      content.style.whiteSpace = "nowrap";
+      const line = content.offsetHeight;
+      content.style.whiteSpace = "";
+      if (line > 0 && height > line * 1.5) {
+        const area = [...box.classList].find((c) =>
+          c.startsWith("pagedjs_margin-") && c !== "pagedjs_margin-content"
+        )?.slice("pagedjs_margin-".length);
+        problems.push({
+          page: pageNumber,
+          warn: true,
+          message: `${area} margin box runs to ${
+            Math.round(height / line)
+          } lines`,
+        });
+      }
+    }
+    return problems;
+  }
+
   Paged.registerHandlers(
     class Folios extends Paged.Handler {
       /** @param {any[]} args */
@@ -432,6 +467,7 @@
           else {
             this.problems.push({ page: i + 1, message: "no page-map entry" });
           }
+          this.problems.push(...wrappedMargins(page, i + 1));
         });
         /** @type {RenderResult} */
         this.chunker.pageMapResult = {

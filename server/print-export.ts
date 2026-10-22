@@ -286,8 +286,9 @@ export async function exportBook(
       toHtml(built, { seed: await readSeed(pageMapPath, inputHash) }),
     );
     pagination = rendered.problems;
-    if (pagination.length && !opts.force) {
-      throw new PaginationError(pagination);
+    const blocking = pagination.filter((p) => !p.warn);
+    if (blocking.length && !opts.force) {
+      throw new PaginationError(blocking);
     }
     source = rendered.pdf;
     const src = await PDFDocument.load(source);
@@ -297,7 +298,7 @@ export async function exportBook(
     await Deno.writeFile(`${out}/book.pdf`, source);
     files.push(`${out}/book.pdf`);
     // Only a clean render's seed is a fixed point worth starting from.
-    if (!pagination.length) {
+    if (!blocking.length) {
       await Deno.writeTextFile(
         pageMapPath,
         JSON.stringify({ inputHash, seed: rendered.seed }, null, 2) + "\n",

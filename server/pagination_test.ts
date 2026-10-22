@@ -10,6 +10,12 @@ import { hasChrome } from "../testing/chrome.ts";
 
 const ROOT = new URL("../testdata/", import.meta.url).pathname;
 const BOOKS = ["common-sense", "great-gatsby"];
+// Pages warned for a running head that runs to a second line (folios.js).
+// Common Sense's first chapter title is too long for a head until short
+// running titles exist.
+const WRAPPED_HEADS: Record<string, number[]> = {
+  "common-sense": [14, 16, 18],
+};
 
 interface Digest {
   zones: Record<string, [number, number]>;
@@ -71,7 +77,11 @@ function assertZonesOpenOnContent(
   label: string,
   { report, firstPageText }: Awaited<ReturnType<typeof paginate>>,
 ) {
-  assertEquals(report.problems, [], `${label}: page map problems`);
+  assertEquals(
+    report.problems.filter((p) => !p.warn),
+    [],
+    `${label}: page map problems`,
+  );
   for (const [zone, [first]] of Object.entries(report.digest.zones)) {
     assert(
       !report.digest.blanks.includes(first),
@@ -92,6 +102,11 @@ for (const book of BOOKS) {
       const result = await paginate(ROOT, book);
       const { report } = result;
       assertZonesOpenOnContent(book, result);
+      assertEquals(
+        report.problems.filter((p) => p.warn).map((p) => p.page),
+        WRAPPED_HEADS[book] ?? [],
+        `${book}: wrapped running heads`,
+      );
       assert(report.passes <= 2, `${book}: took ${report.passes} passes`);
 
       const golden = `${ROOT}${book}/page-map.json`;

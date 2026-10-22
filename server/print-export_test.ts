@@ -368,6 +368,32 @@ Deno.test("exportBook: pagination problems fail the export unless force", async 
   await Deno.stat(`${out}/book.pdf`);
 });
 
+Deno.test("exportBook: a warning is listed but never fails the export", async () => {
+  const root = await Deno.makeTempDir();
+  await Deno.mkdir(`${root}/book`);
+  await Deno.writeTextFile(`${root}/book/manuscript.md`, "{title}\nBook\n");
+  const out = await Deno.makeTempDir();
+  const warning: PageProblem = {
+    page: 2,
+    warn: true,
+    message: "top-center margin box runs to 2 lines",
+  };
+  const render = async () => {
+    const doc = await PDFDocument.create();
+    for (let i = 0; i < 4; i++) doc.addPage([396, 612]).drawText(String(i + 1));
+    return { pdf: await doc.save(), problems: [warning], passes: 1, seed: {} };
+  };
+  const s = await exportBook(root, "book", {
+    sheet: "legal",
+    duplex: "short-edge",
+    out,
+    render,
+  });
+  assertEquals(s.pagination, [warning]);
+  await Deno.stat(`${out}/book.pdf`);
+  await Deno.stat(`${out}/page-map.json`); // a warned render's seed still settles
+});
+
 Deno.test("exportBook: reuses page-map.json only for the identical input, and only a clean render's", async () => {
   const root = await Deno.makeTempDir();
   for (const book of ["book", "other"]) {

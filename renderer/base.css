@@ -245,6 +245,19 @@
 .bml :where(.matter-title-page) {
   text-align: center;
 }
+/* A top/bottom margin row holding a centre box and a side box (a centred head
+   beside an outside folio): Paged.js sizes it by measuring text, and 0.4.3
+   measures the right-only case wrong, squeezing recto heads. Lay those rows
+   out ourselves: centre at its natural width, the sides share the rest
+   equally, the same on both pages (§4.8). !important beats the template
+   Paged.js writes inline. Rows with only a centre or only side boxes keep
+   Paged.js's fixed templates. */
+.pagedjs_margin-top:has(> .pagedjs_margin-top-center.hasContent):has(> .pagedjs_margin-top-left.hasContent),
+.pagedjs_margin-top:has(> .pagedjs_margin-top-center.hasContent):has(> .pagedjs_margin-top-right.hasContent),
+.pagedjs_margin-bottom:has(> .pagedjs_margin-bottom-center.hasContent):has(> .pagedjs_margin-bottom-left.hasContent),
+.pagedjs_margin-bottom:has(> .pagedjs_margin-bottom-center.hasContent):has(> .pagedjs_margin-bottom-right.hasContent) {
+  grid-template-columns: 1fr auto 1fr !important;
+}
 /* The copyright page sits at the foot of its text block (§3.4.3); a book moves
    it with `copyright: { "justify-content": "flex-start" | "center" }`. Paged.js
    gives the page's content div a height, so stretch the tree on this page only.

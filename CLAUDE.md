@@ -48,6 +48,8 @@ rewrite themselves on the next save.
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
 update the checksum in `server/vendor_test.ts`, then read the golden page-map
 diff and re-check the no-reflow note on `layOut` in `renderer/folios.js`.
+`renderer/base.css` lays out centre-plus-side margin rows itself (0.4.3
+mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
 
 ## Commands
 

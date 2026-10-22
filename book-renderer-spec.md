@@ -1559,6 +1559,14 @@ box; `book-title` and literal strings are emitted as
 every page that carries no running head. Paged.js does the fragmentation for
 both preview and export (§5.4, §6), so no native-Chrome fallback is needed.
 
+A top or bottom row holding a centre box and a side box (a centred head beside
+an outside folio) is laid out by `renderer/base.css`, not by Paged.js's text
+measuring (0.4.3 squeezes the centre when only the right box has content): the
+centre takes its natural width and the two sides share the rest equally, so the
+head sits centred on the text block, the same on a recto as on a verso. Rows
+with only a centre or only side boxes keep Paged.js's layout. A head that still
+runs to a second line is a page-map warning (§5.4).
+
 Running entries apply to body pages only (`@page body:right` /
 `@page
 body:left`): front and back matter keep their folios (§4.7) but carry no
@@ -1750,9 +1758,13 @@ physical page where it has one:
 - the book's last anchor on no page — the render was cut short;
 - no fixed point after three passes.
 
-Print export fails on any problem, listing each as `page N: message`, before
-`book.pdf` is written; `bml export --force` prints them as warnings and exports
-anyway.
+One check is a **warning**, listed with the rest but never blocking an export: a
+margin box (running head or folio) that runs to a second line, measured against
+the same box held to one line (§4.8).
+
+Print export fails on any other problem, listing each as `page N: message`,
+before `book.pdf` is written; `bml export --force` prints them as warnings and
+exports anyway.
 
 ---
 

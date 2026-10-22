@@ -4,10 +4,14 @@
 /** Anchor id → the page number printed for it (TOC rows, `{ref}`). */
 export type Seed = Record<string, string>;
 
-/** `page` is the 1-based physical page; null for a book-wide problem. */
+/**
+ * `page` is the 1-based physical page; null for a book-wide problem. A `warn`
+ * problem is listed but never blocks an export.
+ */
 export interface PageProblem {
   page: number | null;
   message: string;
+  warn?: true;
 }
 
 export function formatProblem(p: PageProblem): string {
