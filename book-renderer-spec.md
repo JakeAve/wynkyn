@@ -2156,8 +2156,16 @@ folder slug is shown live under the field and the book can be renamed later. The
 button reads _Import_ or _Create book_. Blank then opens the editor on a
 half-title page carrying the title.
 
-**Import wizard.** After the title, an import decides whether to show what it
-found before opening the editor or to go straight there. Not yet designed.
+**No wizard.** An import always makes its best guess and opens the editor; the
+editor and preview are the review step. Structural decisions the detector could
+not settle (two heading patterns that both fire, verse or hard-wrapped prose)
+are not asked up front, when a new user cannot answer them, but offered
+afterwards: the import notes list opens with _Read it differently_ and the two
+or three alternative readings as pills. Picking one re-imports from the source
+file and replaces the manuscript, so re-import is the undo for a lossy choice
+such as reflowing verse. The section appears only when a second reading was
+plausible; most books never see it. Everything line-local is a `%% check:`
+comment, never a question.
 
 **The imported manuscript.** The importer writes BML in the house shape of the
 `convert-manuscript` skill (half-title, title page, copyright, toc, chapters
