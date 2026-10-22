@@ -125,9 +125,14 @@
         <div id="book-list" role="listbox" aria-label="Books"></div>
         <div class="sw-foot">
           <button id="book-new" class="btn">New book</button>
+          <button id="book-download" class="btn" hidden
+            title="This book's folder as a zip">Download</button>
           <button id="library-open" class="btn" hidden
             title="Choose a different folder or storage">Library…</button>
           <span id="book-err" class="sw-err"></span>
+          <p id="library-note" class="sw-note" hidden>Kept in this browser
+            only. Browsers clear site storage without asking, so download a
+            book to keep it.</p>
         </div>
       </div>
       <div class="sw-eds">
@@ -153,7 +158,9 @@
       <div class="acts">
         <button id="lib-reopen" class="btn" hidden></button>
         <button id="lib-pick" class="btn">Open my books folder…</button>
-        <button id="lib-browser" class="btn">Keep books in this browser</button>
+        <button id="lib-browser" class="btn">Keep books in this browser
+          <small>Not for the long run: browsers clear site storage. Download
+            what you want to keep.</small></button>
         <label class="btn">Import a folder into this browser…
           <input id="lib-import" type="file" webkitdirectory multiple hidden>
         </label>

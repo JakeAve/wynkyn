@@ -13,6 +13,8 @@ import type { BookStore } from "../../server/store.ts";
 
 export interface Backend {
   readonly kind: "http" | "local";
+  /** The folder the service runs over; only in-page (the app zips from it). */
+  readonly store?: BookStore;
   listBooks(): Promise<string[]>;
   createBook(slug: string): Promise<void>;
   editions(book: string): Promise<EditionInfo[]>;
@@ -167,6 +169,7 @@ export function localBackend(
   });
   return {
     kind: "local",
+    store,
     listBooks: () => service.list(),
     async createBook(slug) {
       if (!await service.createBook(slug, assets.template)) {

@@ -4,6 +4,7 @@
 // and again after a reload.
 import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
+import { unzipSync } from "fflate";
 import { hasChrome } from "../../testing/chrome.ts";
 import { serveSite } from "../../scripts/serve-site.ts";
 
@@ -49,6 +50,22 @@ Deno.test({
         await new Promise((r) => setTimeout(r, 50));
       }
       await page.locator('#status[data-kind="saved"]').waitFor();
+
+      // Download: the book's folder as a zip, named after it.
+      await page.locator("#book-switcher").click();
+      const [download] = await Promise.all([
+        page.waitForEvent("download"),
+        page.locator("#book-download").click(),
+      ]);
+      assertEquals(download.suggestedFilename(), "demo-book.zip");
+      const zip = unzipSync(await Deno.readFile((await download.path())!));
+      assert("demo-book/manuscript.md" in zip);
+      assert(
+        new TextDecoder().decode(zip["demo-book/manuscript.md"]).includes(
+          "typed in the browser",
+        ),
+      );
+      await page.keyboard.press("Escape");
 
       // The choice of library is remembered: no dialog, same book, the edit.
       await page.goto(`${url}?book=demo-book`);

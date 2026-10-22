@@ -55,6 +55,7 @@ import {
   slugify,
 } from "./editions.ts";
 import { editionToken, titleCase } from "../../server/editions.ts";
+import { zipBook } from "./book-zip.ts";
 import {
   type Backend,
   hasServer,
@@ -516,6 +517,24 @@ function installSwitcher(): void {
       $("book-err").textContent = brief(err);
     }
   };
+  // The selected book's folder as a zip: the way out of browser storage.
+  const download = $("book-download");
+  download.hidden = !backend.store;
+  download.onclick = async () => {
+    try {
+      const zip = await zipBook(backend.store!, selBook);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(
+        new Blob([zip], { type: "application/zip" }),
+      );
+      a.download = `${selBook}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      $("book-err").textContent = brief(err);
+    }
+  };
+  $("library-note").hidden = localStorage.getItem("library") !== "browser";
   // Forget the choice of library and pick again on the next load.
   $("library-open").hidden = backend.kind !== "local";
   $("library-open").onclick = () => {
@@ -801,8 +820,11 @@ async function chooseLibrary(): Promise<BookStore> {
   return new Promise((resolve) => {
     const dlg = $("library") as HTMLDialogElement;
     const err = $("lib-err");
+    // Persisted storage is evicted last; the browser may still say no.
+    const persist = () => navigator.storage.persist?.().catch(() => false);
     const done = (store: BookStore, kind: "folder" | "browser") => {
       localStorage.setItem("library", kind);
+      if (kind === "browser") persist();
       dlg.close();
       resolve(store);
     };
