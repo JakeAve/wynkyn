@@ -158,16 +158,45 @@ export class BookService {
   // ---- writing ----------------------------------------------------------
 
   /** A new book from a template's metadata; false when the slug is taken. */
-  async createBook(book: string, metadataText: string): Promise<boolean> {
+  async createBook(
+    book: string,
+    metadataText: string,
+    title = book,
+  ): Promise<boolean> {
     checkNames(book, null);
     const manuscript = `${book}/manuscript.md`;
     const made = await this.store.create(
       manuscript,
-      `{matter: half-title}\n{title}\n${book}\n`,
+      `{matter: half-title}\n{title}\n${title.trim() || book}\n`,
     );
     if (!made) return false;
     await this.store.write(metadataKey(book, null), metadataText);
     this.notify([manuscript, metadataKey(book, null)]);
+    return true;
+  }
+
+  /** A book from an import (spec §7.9): the manuscript, its images, and the
+   * template's metadata unless the book already has styling. `replace`
+   * re-imports over an existing manuscript; otherwise a taken slug is false. */
+  async importBook(
+    book: string,
+    metadataText: string,
+    r: { manuscript: string; images: Record<string, Uint8Array> },
+    replace = false,
+  ): Promise<boolean> {
+    checkNames(book, null);
+    const manuscript = `${book}/manuscript.md`;
+    if (replace) await this.store.write(manuscript, r.manuscript);
+    else if (!await this.store.create(manuscript, r.manuscript)) return false;
+    const meta = metadataKey(book, null);
+    if (!await this.store.exists(meta)) {
+      await this.store.write(meta, metadataText);
+    }
+    for (const [path, data] of Object.entries(r.images)) {
+      if (!/^images\/[^/]+$/.test(path)) throw bad("bad image path");
+      await this.store.write(`${book}/${path}`, data);
+    }
+    this.notify([manuscript, meta]);
     return true;
   }
 

@@ -66,6 +66,7 @@ import {
 import {
   browserFolder,
   canPickFolder,
+  createBooksFolder,
   handleStore,
   importBooks,
   pickFolder,
@@ -73,6 +74,7 @@ import {
   reopenFolder,
 } from "./fs-store.ts";
 import type { BookStore } from "../../server/store.ts";
+import { importSource } from "../../server/import/mod.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 
@@ -167,6 +169,7 @@ function reparse(text: string): void {
     return t?.name === "is" && !t.closing && t.slug ? [t.slug] : [];
   });
   applyDiagnostics(editor, doc.diagnostics);
+  renderImportNotes(text);
   setEditionSpans(editor, doc.onlySpans, editionToken(edition));
   const diag = $("diagnostics");
   const first = doc.diagnostics[0];
@@ -506,16 +509,9 @@ function installSwitcher(): void {
     if (e.target === dialog) dialog.close(); // a click outside closes
   };
 
-  // ponytail: prompt() for the name; a form if books get more fields.
-  $("book-new").onclick = async () => {
-    const slug = slugify(prompt("Name the new book:") ?? "");
-    if (!slug) return;
-    try {
-      await backend.createBook(slug);
-      location.search = editionHref(slug, null);
-    } catch (err) {
-      $("book-err").textContent = brief(err);
-    }
+  $("book-new").onclick = () => {
+    dialog.close();
+    createManuscript(true);
   };
   // The selected book's folder as a zip: the way out of browser storage.
   const download = $("book-download");
@@ -828,8 +824,9 @@ async function chooseLibrary(): Promise<BookStore> {
       };
     }
     $("lib-pick").hidden = !canPickFolder();
-    // The safe default is the pill: the remembered folder, else a new one.
-    $("lib-pick").classList.toggle("primary", !remembered);
+    $("lib-new").hidden = !canPickFolder();
+    $("lib-new").onclick = () =>
+      createBooksFolder().then((d) => done(handleStore(d), "folder"), fail);
     $("lib-pick").onclick = () =>
       pickFolder().then((d) => done(handleStore(d), "folder"), fail);
     $("lib-browser").onclick = () =>
@@ -1096,18 +1093,172 @@ function installShortcuts(
   $("pages-toggle").title += ` (${chordLabel("Mod-.")})`;
 }
 
+// ---- Create a new manuscript (spec §7.9) ------------------------------------
+// Import a file, or start blank; both ask for a title, then open the book.
+// `cancelable` is false for an empty library, where there is nothing to go
+// back to.
+function createManuscript(cancelable: boolean): void {
+  const dlg = $("create") as HTMLDialogElement;
+  const err = $("create-err");
+  err.textContent = "";
+  $("create-sub").textContent = cancelable
+    ? "Add another book to this library."
+    : "Your library is empty. How do you want to begin?";
+  const cancel = $("create-cancel");
+  cancel.hidden = !cancelable;
+  cancel.onclick = () => dlg.close();
+  dlg.oncancel = (e) => {
+    if (!cancelable) e.preventDefault();
+  };
+  const input = $("create-file") as HTMLInputElement;
+  input.value = "";
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      err.textContent = "Reading…";
+      const r = importSource(
+        file.name,
+        new Uint8Array(await file.arrayBuffer()),
+      );
+      err.textContent = "";
+      dlg.close();
+      const slug = await askTitle(
+        r.title,
+        `${file.name} · ${sizeLabel(file.size)}`,
+        "Import",
+      );
+      if (slug === null) return createManuscript(cancelable);
+      await backend.importBook(slug, r);
+      location.search = editionHref(slug, null);
+    } catch (e) {
+      err.textContent = brief(e);
+      if (!dlg.open) dlg.showModal();
+    }
+  };
+  $("create-blank").onclick = async () => {
+    dlg.close();
+    try {
+      const slug = await askTitle("", null, "Create book");
+      if (slug === null) return createManuscript(cancelable);
+      await backend.createBook(
+        slug,
+        ($("title-input") as HTMLInputElement).value,
+      );
+      location.search = editionHref(slug, null);
+    } catch (e) {
+      err.textContent = brief(e);
+      dlg.showModal();
+    }
+  };
+  dlg.showModal();
+}
+
+const sizeLabel = (bytes: number) =>
+  bytes < 1024 * 1024
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+/** The title dialog: resolves with the slug, or null for Back. */
+function askTitle(
+  title: string,
+  source: string | null,
+  cta: string,
+): Promise<string | null> {
+  const dlg = $("title-dlg") as HTMLDialogElement;
+  const input = $("title-input") as HTMLInputElement;
+  const slugEl = $("title-slug");
+  const err = $("title-err");
+  const src = $("title-source");
+  src.hidden = source === null;
+  src.textContent = source ?? "";
+  $("title-ok").textContent = cta;
+  err.textContent = "";
+  input.value = title;
+  const show = () => {
+    slugEl.textContent = `${slugify(input.value) || "untitled"}/`;
+  };
+  input.oninput = show;
+  show();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (v: string | null) => {
+      if (settled) return;
+      settled = true;
+      dlg.close();
+      resolve(v);
+    };
+    $("title-back").onclick = () => finish(null);
+    ($("title-form") as HTMLFormElement).onsubmit = (e) => {
+      e.preventDefault();
+      const slug = slugify(input.value) || "untitled";
+      if (books.includes(slug)) {
+        err.textContent = `“${slug}” is taken; pick another title.`;
+        return;
+      }
+      finish(slug);
+    };
+    dlg.oncancel = (e) => {
+      e.preventDefault();
+      finish(null);
+    };
+    dlg.showModal();
+    input.focus();
+    input.select();
+  });
+}
+
+// ---- Import notes (spec §7.9): the `%% check:` lines, listed in the footer --
+function renderImportNotes(text: string): void {
+  const btn = $("import-notes");
+  const list = $("import-notes-list");
+  const notes = text.split("\n").flatMap((l, i) =>
+    l.startsWith("%% check:") ? [{ line: i + 1, text: l.slice(9).trim() }] : []
+  );
+  btn.hidden = !notes.length;
+  if (!notes.length) {
+    list.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+    return;
+  }
+  btn.textContent = `${notes.length} import note${
+    notes.length > 1 ? "s" : ""
+  } to check`;
+  list.replaceChildren();
+  const h = document.createElement("div");
+  h.className = "h";
+  h.textContent =
+    "Places the importer guessed. Click one to go there; delete the %% check: line when you’re happy with it.";
+  list.append(h);
+  for (const n of notes) {
+    const b = document.createElement("button");
+    b.type = "button";
+    const l = document.createElement("span");
+    l.className = "l";
+    l.textContent = `line ${n.line}`;
+    const t = document.createElement("span");
+    t.textContent = n.text;
+    b.append(l, t);
+    b.onclick = () => {
+      list.hidden = true;
+      btn.setAttribute("aria-expanded", "false");
+      scrollEditorToLine(editor, n.line);
+      editor.focus();
+    };
+    list.append(b);
+  }
+  btn.onclick = () => {
+    list.hidden = !list.hidden;
+    btn.setAttribute("aria-expanded", String(!list.hidden));
+  };
+}
+
 async function main(): Promise<void> {
   backend = await connect();
   books = await backend.listBooks();
   if (!books.length) {
     // An empty library: the first book is the only thing to do.
-    const slug = slugify(
-      prompt("No books here yet. Name your first book:") ?? "",
-    );
-    if (slug) {
-      await backend.createBook(slug);
-      location.search = editionHref(slug, null);
-    } else setStatus("error", "no books in this library");
+    createManuscript(false);
     return;
   }
   const requested = params.get("book");

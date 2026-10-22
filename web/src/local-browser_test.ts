@@ -128,3 +128,110 @@ Deno.test({
     }
   },
 });
+
+const TINY = `Title: Tiny Book
+
+Author: A. Writer
+
+*** START OF THE PROJECT GUTENBERG EBOOK TINY BOOK ***
+
+CHAPTER I.
+The Start
+
+It was a dark and stormy night.
+
+CHAPTER II.
+The End
+
+And then it was over.
+
+*** END OF THE PROJECT GUTENBERG EBOOK TINY BOOK ***
+`;
+
+Deno.test({
+  name: "first run: Welcome → browser storage → import a text file → title → " +
+    "the editor, with import notes in the footer",
+  ignore: !hasChrome || !siteBuilt,
+  async fn() {
+    const site = serveSite(DIST, 0);
+    const browser = await chromium.launch({ channel: "chrome" });
+    const tmp = await Deno.makeTempDir();
+    const file = `${tmp}/tiny-book.txt`;
+    await Deno.writeTextFile(file, TINY);
+    try {
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.locator("#library[open]").waitFor();
+      const welcome = await page.locator("#library").innerText();
+      assert(
+        welcome.includes("Your books are yours"),
+        `the privacy line is on the Welcome: ${welcome}`,
+      );
+      await page.locator("#lib-browser").click();
+      // An empty library goes straight to Create a new manuscript.
+      await page.locator("#create[open]").waitFor();
+      assert(
+        await page.locator("#create-cancel").isHidden(),
+        "no Cancel on an empty library",
+      );
+      await page.locator("#create-file").setInputFiles(file);
+      await page.locator("#title-dlg[open]").waitFor();
+      assertEquals(
+        await page.locator("#title-input").inputValue(),
+        "Tiny Book",
+      );
+      assertEquals(await page.locator("#title-slug").innerText(), "tiny-book/");
+      await page.locator("#title-ok").click();
+
+      await page.waitForURL(/book=tiny-book/);
+      await page.locator("#preview .pagedjs_page").first().waitFor();
+      const text = await page.locator("#editor .cm-content").innerText();
+      assert(text.includes("{chapter: the-start}"), "the import landed");
+      assert(text.includes("%% check:"), "guesses are flagged");
+      const notes = page.locator("#import-notes");
+      await notes.waitFor({ state: "visible" });
+      assert(
+        (await notes.innerText()).includes("import note"),
+        "the footer counts the notes",
+      );
+      await notes.click();
+      await page.locator("#import-notes-list button").first().click();
+      assert(
+        await page.locator("#import-notes-list").isHidden(),
+        "picking a note closes the list",
+      );
+
+      // The switcher's New book runs the same dialog, now with a Cancel.
+      await page.locator("#book-switcher").click();
+      await page.locator("#book-new").click();
+      await page.locator("#create[open]").waitFor();
+      assert(
+        await page.locator("#create-cancel").isVisible(),
+        "Cancel once the library has a book",
+      );
+      await page.locator("#create-blank").click();
+      await page.locator("#title-dlg[open]").waitFor();
+      await page.locator("#title-input").fill("Tiny Book");
+      await page.locator("#title-ok").click();
+      assert(
+        (await page.locator("#title-err").innerText()).includes("taken"),
+        "a taken slug is refused",
+      );
+      await page.locator("#title-input").fill("Second Book");
+      await page.locator("#title-ok").click();
+      await page.waitForURL(/book=second-book/);
+      await page.locator("#preview .pagedjs_page").first().waitFor();
+      assert(
+        (await page.locator("#editor .cm-content").innerText()).includes(
+          "Second Book",
+        ),
+        "the blank book opens on its title",
+      );
+      await page.close();
+    } finally {
+      await browser.close();
+      await site.shutdown();
+      await Deno.remove(tmp, { recursive: true });
+    }
+  },
+});

@@ -123,6 +123,9 @@
     <div id="footer">
       <span id="page-indicator"></span>
       <span id="diagnostics"></span>
+      <button id="import-notes" type="button" hidden
+        aria-expanded="false"></button>
+      <div id="import-notes-list" role="list" hidden></div>
       <span id="page-problems"></span>
     </div>
     <dialog id="switcher" aria-label="Books and editions">
@@ -157,25 +160,75 @@
         </div>
       </div>
     </dialog>
-    <dialog id="library" aria-labelledby="library-title">
-      <h2 id="library-title">Where are your books?</h2>
-      <p>A book is a folder with a <code>manuscript.md</code> and a
-        <code>metadata.json</code>. Wynkyn edits those files in place;
-        nothing leaves this computer.</p>
+    <dialog id="library" class="ask" aria-labelledby="library-title">
+      <h2 id="library-title">Welcome to Wynkyn</h2>
+      <p>It looks like you don’t have any manuscripts yet. Choose where to keep
+        them to get started.</p>
       <div class="choices">
         <button id="lib-reopen" class="choice primary" hidden></button>
-        <button id="lib-pick" class="choice">Open my books folder…
-          <small>Edits land in the folder you pick. Chrome, Edge or
-            Brave.</small></button>
+        <button id="lib-new" class="choice">Create a new folder on my device
+          <small>Wynkyn creates a Books folder where you choose. Chrome, Edge
+            or Brave.</small></button>
+        <button id="lib-pick" class="choice">Select an existing folder on my
+          device
+          <small>You already have a Wynkyn books folder on your
+            device.</small></button>
         <button id="lib-browser" class="choice">Keep books in this browser
-          <small>Not for the long run: browsers clear site storage. Download
-            what you want to keep.</small></button>
-        <label class="choice">Import a folder into this browser…
-          <small>Copies a folder into browser storage.</small>
-          <input id="lib-import" type="file" webkitdirectory multiple hidden>
-        </label>
+          <small>Works in this browser, but browsers can clear site storage, so
+            <b>download what you want to keep</b>.</small></button>
+        <button class="choice" disabled>Save books in the cloud
+          <span class="pill">Paid · Coming soon</span>
+          <small>Backed up and editable from any device.</small></button>
       </div>
+      <p class="privacy"><b>Your books are yours.</b> Wynkyn never reads,
+        analyses, trains on, shares or sells your manuscripts, and never will.
+        Free users store everything on device.</p>
+      <label class="small-link">Already have Wynkyn book folders? Import them
+        into this browser…
+        <input id="lib-import" type="file" webkitdirectory multiple hidden>
+      </label>
       <span id="lib-err" class="sw-err"></span>
+    </dialog>
+    <dialog id="create" class="ask" aria-labelledby="create-title">
+      <h2 id="create-title">Create a new manuscript</h2>
+      <p id="create-sub">Your library is empty. How do you want to begin?</p>
+      <div class="choices">
+        <label class="choice">Import a file
+          <small>Word, EPUB, plain text, Markdown or HTML. From Google Docs:
+            File › Download › Microsoft Word.</small>
+          <input id="create-file" type="file" hidden
+            accept=".txt,.md,.markdown,.html,.htm,.xhtml,.epub,text/plain,text/markdown,text/html,application/epub+zip">
+        </label>
+        <button class="choice" disabled>Import from the web
+          <span class="pill">Coming soon</span>
+          <small>Project Gutenberg and most sites don’t allow a page to fetch
+            them. Download the file and import it instead.</small></button>
+        <button id="create-blank" class="choice">Start blank
+          <small>A title page and nothing else.</small></button>
+      </div>
+      <div class="ask-foot">
+        <span id="create-err" class="sw-err"></span>
+        <button id="create-cancel" class="btn" type="button"
+          hidden>Cancel</button>
+      </div>
+    </dialog>
+    <dialog id="title-dlg" class="ask" aria-labelledby="title-dlg-title">
+      <form id="title-form" method="dialog">
+        <h2 id="title-dlg-title">Choose a book title</h2>
+        <p id="title-source" hidden></p>
+        <label class="field">Title
+          <input id="title-input" name="title" autocomplete="off"
+            placeholder="Untitled">
+        </label>
+        <p class="hint">Folder: <code id="title-slug">untitled/</code> · you
+          can rename the book later</p>
+        <div class="ask-foot">
+          <span id="title-err" class="sw-err"></span>
+          <button id="title-back" class="btn" type="button">Back</button>
+          <button id="title-ok" class="btn primary" type="submit">Create
+            book</button>
+        </div>
+      </form>
     </dialog>
     <script src="vendor/paged.js"></script>
     <script type="module" src="web/app.js"></script>

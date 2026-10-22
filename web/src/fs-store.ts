@@ -149,6 +149,15 @@ export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
   return dir;
 }
 
+/** A new "Books" folder inside a folder the user picks, remembered like a
+ * picked one. The picker has no "create here" mode, so this is two steps. */
+export async function createBooksFolder(): Promise<FileSystemDirectoryHandle> {
+  const parent = await showDirectoryPicker({ mode: "readwrite", id: "books" });
+  const dir = await parent.getDirectoryHandle("Books", { create: true });
+  await idb("readwrite", (s) => s.put(dir, "library"));
+  return dir;
+}
+
 export async function rememberedFolder(): Promise<
   FileSystemDirectoryHandle | null
 > {
