@@ -3,7 +3,11 @@
 // service over the author's own folder (web/src/backend.ts), so the site is
 // the shell, the bundle, Paged.js and the two files the service reads.
 const OUT = "dist";
-const FILES: Record<string, string> = {
+export const FILES: Record<string, string> = {
+  // For agents and tooling, not the app: /llms.txt is the entry point.
+  "web/llms.txt": "llms.txt",
+  "book-renderer-spec.md": "spec.md",
+  ".claude/skills/convert-manuscript/SKILL.md": "convert-manuscript.md",
   "web/index.html": "index.html",
   "web/app.js": "web/app.js",
   "web/app.css": "web/app.css",
@@ -12,10 +16,14 @@ const FILES: Record<string, string> = {
   "templates/metadata.json": "templates/metadata.json",
 };
 
-await Deno.remove(OUT, { recursive: true }).catch(() => {});
-for (const [src, dest] of Object.entries(FILES)) {
-  const to = `${OUT}/${dest}`;
-  await Deno.mkdir(to.slice(0, to.lastIndexOf("/")), { recursive: true });
-  await Deno.copyFile(src, to);
+if (import.meta.main) await build();
+
+export async function build(): Promise<void> {
+  await Deno.remove(OUT, { recursive: true }).catch(() => {});
+  for (const [src, dest] of Object.entries(FILES)) {
+    const to = `${OUT}/${dest}`;
+    await Deno.mkdir(to.slice(0, to.lastIndexOf("/")), { recursive: true });
+    await Deno.copyFile(src, to);
+  }
+  console.log(`${OUT}/: ${Object.keys(FILES).length} files`);
 }
-console.log(`${OUT}/: ${Object.keys(FILES).length} files`);

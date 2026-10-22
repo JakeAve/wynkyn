@@ -1,5 +1,5 @@
 import type { Metadata } from "./types.ts";
-import { upgradePageSetup } from "./upgrade.ts";
+import { upgradeMetadata } from "./upgrade.ts";
 
 /** The metadata file's parsed value and the exact text it was parsed from. */
 export async function loadMetadataText(
@@ -21,7 +21,7 @@ export function parseMetadataText(
   path: string,
 ): { meta: Metadata; text: string } {
   try {
-    return { meta: upgradePageSetup(JSON.parse(text) as Metadata), text };
+    return { meta: upgradeMetadata(JSON.parse(text) as Metadata), text };
   } catch (e) {
     if (e instanceof SyntaxError) {
       throw new Error(`Invalid JSON in ${path}: ${e.message}`);

@@ -12,7 +12,7 @@ import {
   NotFoundError,
   type ServerMessage,
 } from "./pipeline.ts";
-import { upgradePageSetup } from "../metadata/upgrade.ts";
+import { upgradeMetadata } from "../metadata/upgrade.ts";
 import type { Metadata } from "../metadata/types.ts";
 import {
   classifyChange,
@@ -423,7 +423,7 @@ export class BookService {
     try {
       // Upgraded on the way out, so the panel edits (and then saves back) the
       // current shape — that is what retires a legacy `print` section on disk.
-      const metadata = upgradePageSetup(JSON.parse(text) as Metadata);
+      const metadata = upgradeMetadata(JSON.parse(text) as Metadata);
       return { metadata: metadata as Record<string, unknown>, text };
     } catch {
       throw new ServiceError(

@@ -1,0 +1,53 @@
+# Wynkyn
+
+> Wynkyn typesets and prints hand-bound books from plain files, free, in the
+> browser. An author writes a manuscript in BML (a small semantic markup for
+> prose) and keeps all styling in a metadata.json beside it. The app lays the
+> book out with Paged.js, shows the real pages live, prints them imposed into
+> folded signatures, and writes a reflowable EPUB.
+
+If an author says "I'm on wynkyn.jakeave.deno.net, help me with my book", this
+page is where to start. The app is static: nothing is stored on this site. In
+Chrome, Edge or Brave the app opens a folder on the author's own machine (File
+System Access API) and rereads it on change, so editing the files on disk is
+the same as editing in the app. Other browsers keep books in browser storage
+only; the author can download a book as a zip from the app.
+
+## A book is a folder
+
+```
+<slug>/
+  manuscript.md      BML source: the words and their structure, nothing visual
+  metadata.json      every styling decision: page size, margins, fonts, element
+                     CSS, numbering, running heads, notes, contents, e-book
+  editions/<e>.json  optional: named editions, each a complete metadata file
+  images/            referenced from the manuscript
+```
+
+`metadata.json` carries a top-level `"spec"` (currently `0.6`), the version of
+the spec below that the file complies with. A file without it predates the
+key. The app warns when a book is newer than the app, and keeps unknown keys.
+A new book starts from the house style: /templates/metadata.json
+
+## Read these
+
+- /spec.md — the full specification. For helping an author, read §3 (the BML
+  language: syntax, sentinels, front/body/back matter, cross-references) and
+  §4 (the metadata.json schema, section by section). §1, §2 and §5 onward
+  describe the application's own architecture and build plan; skip them
+  unless you are working on Wynkyn itself.
+- /convert-manuscript.md — the recipe for turning a plain-text source (a
+  Project Gutenberg download, a pasted draft, an OCR'd scan) into a
+  well-shaped BML manuscript, with the finishing checks.
+
+## Working with an author
+
+- Keep the separation: never put a font, size, colour or page break in BML.
+  "Make the chapter titles bigger" is a `metadata.json` edit under `elements`;
+  "add an epigraph" is a BML edit.
+- Every section with a heading needs its `{title}` sentinel; a bare first line
+  leaves the contents page and running heads empty.
+- After editing `manuscript.md`, the editor's lint gutter in the app shows
+  parse diagnostics; aim for zero.
+- Source: https://github.com/JakeAve/wynkyn (Deno; `deno task bml check <book>`
+  runs the same diagnostics from a checkout).

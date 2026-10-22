@@ -1150,6 +1150,7 @@ books/
 
 ```json
 {
+  "spec": "0.6",
   "name": "Standard",
   "page": { ... },
   "fonts": { ... },
@@ -1162,6 +1163,13 @@ books/
   "ebook": { ... }
 }
 ```
+
+`spec` is the version of this specification the file complies with, as written
+at the head of §3. The template stamps it on new books and the loader stamps it
+on files that lack one (they predate the key). The app compares it to its own
+`SPEC_VERSION` (`metadata/upgrade.ts`) and warns on a book newer than itself;
+unknown keys are kept, never dropped. Bumping `spec` after an on-load upgrade is
+not done yet; see the todo in `docs/`.
 
 ### 4.3 Section: `page`
 

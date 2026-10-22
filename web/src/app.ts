@@ -44,6 +44,7 @@ import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
+import { isNewerSpec, SPEC_VERSION } from "../../metadata/upgrade.ts";
 import {
   editionHref,
   type EditionInfo,
@@ -866,6 +867,17 @@ function showBrowserBanner(): void {
   };
 }
 
+// metadata.json written by a newer Wynkyn than this one: say so, keep going.
+// Unknown keys fall through to the renderer's defaults, nothing is dropped.
+function showSpecBanner(spec: string | undefined): void {
+  const el = $("spec-banner");
+  el.hidden = !isNewerSpec(spec);
+  if (!el.hidden) {
+    el.querySelector("span")!.textContent =
+      `This book's metadata.json follows spec ${spec}, newer than this app's ${SPEC_VERSION}. Settings it doesn't know are kept but not shown.`;
+  }
+}
+
 async function connect(): Promise<Backend> {
   if (await hasServer()) return httpBackend();
   showBrowserBanner();
@@ -1130,7 +1142,10 @@ async function main(): Promise<void> {
   edition = wanted && editions.some((e) => e.slug === wanted) ? wanted : null;
   setCrumb(editions);
   installSwitcher();
-  fetchMetadata().then((m) => setCrumbSize(m.metadata.page?.size), () => {
+  fetchMetadata().then((m) => {
+    setCrumbSize(m.metadata.page?.size);
+    showSpecBanner(m.metadata.spec);
+  }, () => {
     // no size in the crumb; the Style panel reports the load error
   });
 

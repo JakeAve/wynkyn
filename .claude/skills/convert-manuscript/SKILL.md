@@ -7,6 +7,8 @@ description: Use when turning a plain-text source (Project Gutenberg download.tx
 
 Grammar: `book-renderer-spec.md` §3 (read §3.2–§3.7 once). Verify with
 `deno task bml check <slug>` — zero diagnostics is the floor, not the goal.
+(Without the checkout, on the hosted app, the editor's lint gutter reports
+the same diagnostics; `grep` checks below run on the file as usual.)
 The goal is the house shape below. `books/a-christmas-carol/manuscript.md`
 is the reference example; copy its structure.
 

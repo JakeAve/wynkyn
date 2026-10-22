@@ -1,5 +1,10 @@
 import { assertEquals } from "@std/assert";
-import { upgradePageSetup } from "./upgrade.ts";
+import {
+  isNewerSpec,
+  SPEC_VERSION,
+  upgradeMetadata,
+  upgradePageSetup,
+} from "./upgrade.ts";
 
 Deno.test("upgradePageSetup folds a print section into page", () => {
   assertEquals(
@@ -59,4 +64,37 @@ Deno.test("upgradePageSetup preserves every other section", () => {
   assertEquals(upgraded.fonts, { body: "EB Garamond" });
   assertEquals(upgraded.notes, { placement: "endnote" });
   assertEquals(upgraded.print, undefined);
+});
+
+Deno.test("upgradeMetadata stamps spec on an unversioned file only", () => {
+  assertEquals(upgradeMetadata({ page: { size: "A5" } }), {
+    spec: SPEC_VERSION,
+    page: { size: "A5" },
+  });
+  assertEquals(upgradeMetadata({ spec: "9.0" }), { spec: "9.0" });
+});
+
+Deno.test("isNewerSpec compares numerically, not as strings", () => {
+  assertEquals(isNewerSpec(undefined), false);
+  assertEquals(isNewerSpec(SPEC_VERSION), false);
+  assertEquals(isNewerSpec("0.5"), false);
+  assertEquals(isNewerSpec("0.10"), true);
+  assertEquals(isNewerSpec("1.0"), true);
+});
+
+// The number lives in three places on purpose (the app's constant, the house
+// template, the spec's §3 heading); this is what keeps them one number.
+Deno.test("SPEC_VERSION matches the template and the spec heading", async () => {
+  const root = new URL("../", import.meta.url);
+  const template = JSON.parse(
+    await Deno.readTextFile(new URL("templates/metadata.json", root)),
+  );
+  assertEquals(template.spec, SPEC_VERSION);
+  const spec = await Deno.readTextFile(
+    new URL("book-renderer-spec.md", root),
+  );
+  assertEquals(
+    spec.match(/^## 3\. .*Specification \(v([\d.]+)\)/m)?.[1],
+    SPEC_VERSION,
+  );
 });
