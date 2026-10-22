@@ -31,7 +31,6 @@ export interface ConfigPanel {
   setMode(mode: PanelMode): void; // swap the nav and body between style and publish
   isDirty(): boolean; // sections touched but not yet handed to saveSections
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
-  markSaved(ok: boolean, detail?: string): void; // feedback from the save round-trip
   selectStyle(key: string): void; // style mode, where a catalog entry is styled (§7.4)
   pagesChanged(): void; // the preview repaginated
 }
@@ -42,6 +41,7 @@ export interface ConfigPanelOptions {
   sheetView: HTMLElement; // the right column in publish mode
   metadata: Metadata;
   saveSections(sections: Partial<Metadata>): void;
+  onEdit(): void; // an edit is queued; saveSections follows after the debounce
   preview: PreviewLink;
   isNames(): string[]; // `{is}` classes the manuscript uses
   exportPrint(req: ExportRequest): Promise<ExportResult>; // after saves land
@@ -120,17 +120,9 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   const dirty = new Set<keyof Metadata>();
   let timer = 0;
 
-  const saved = document.createElement("span");
-  saved.className = "cfg-saved";
-  saved.setAttribute("aria-live", "polite");
-  const setSaved = (text: string, state: "saving" | "ok" | "error") => {
-    saved.textContent = text;
-    saved.dataset.state = state;
-  };
-
   const queueSave = (key: keyof Metadata): void => {
     dirty.add(key);
-    setSaved("Saving…", "saving");
+    opts.onEdit();
     clearTimeout(timer);
     timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
   };
@@ -188,7 +180,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   crumbs.className = "crumbs";
   const head = document.createElement("div");
   head.className = "phead";
-  head.append(crumbs, saved);
+  head.append(crumbs);
   const body = document.createElement("div");
   body.className = "pbody";
   opts.overlay.replaceChildren(head, body);
@@ -303,17 +295,6 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     refresh(metadata: Metadata) {
       meta = structuredClone(metadata);
       render(true);
-    },
-    markSaved(ok, detail) {
-      if (dirty.size) return; // a newer edit is already queued — stay on "Saving…"
-      const at = new Date().toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-      setSaved(
-        ok ? `Saved ${at}` : `Not saved — ${detail ?? "error"}`,
-        ok ? "ok" : "error",
-      );
     },
     pagesChanged: () => onPages?.(),
     selectStyle(key) {

@@ -65,24 +65,41 @@ const clientId = crypto.randomUUID();
 const params = new URLSearchParams(location.search);
 const $ = (id: string) => document.getElementById(id)!;
 
-// Author-facing status: a glyph + a plain phrase; the raw error goes in the
-// tooltip rather than the footer.
+// Author-facing status in the toolbar: a glyph + a short phrase, so it clears
+// the mode switch; the detail goes in the tooltip. "Saved" says how long ago.
 type StatusKind = "connecting" | "saved" | "saving" | "error" | "offline";
 const STATUS_TEXT: Record<StatusKind, string> = {
   connecting: "Connecting…",
   saved: "Saved",
   saving: "Saving…",
   error: "Not saved",
-  offline: "Disconnected — restart the server and reload",
+  offline: "Disconnected",
 };
+let lastSaved: Date | null = null; // when a manuscript or metadata save last landed
+const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+function ago(then: Date): string {
+  const s = Math.round((Date.now() - then.getTime()) / 1000);
+  if (s < 5) return "just now";
+  if (s < 60) return rtf.format(-s, "second");
+  if (s < 3600) return rtf.format(-Math.floor(s / 60), "minute");
+  if (s < 86400) return rtf.format(-Math.floor(s / 3600), "hour");
+  return rtf.format(-Math.floor(s / 86400), "day");
+}
+
 function setStatus(kind: StatusKind, detail?: string): void {
   const el = $("status");
-  el.textContent = detail && kind === "error"
-    ? `${STATUS_TEXT[kind]} — ${detail}`
+  el.textContent = kind === "saved" && lastSaved
+    ? `Saved ${ago(lastSaved)}`
     : STATUS_TEXT[kind];
   el.dataset.kind = kind;
-  el.title = detail ?? "";
+  el.title = kind === "saved" && lastSaved
+    ? `Saved at ${lastSaved.toLocaleTimeString()}`
+    : detail ?? "";
 }
+setInterval(() => {
+  if ($("status").dataset.kind === "saved") setStatus("saved");
+}, 1000);
 
 // Short, readable tail of an error for the footer; full text stays in the title.
 function brief(err: unknown): string {
@@ -584,7 +601,8 @@ async function doSave(text: string): Promise<void> {
     if (diskOffer?.version === base) hideDiskBanner(); // it was our own save
     if (editor.state.doc.toString() === (ok.text ?? text)) {
       dirty = false;
-      setStatus("saved");
+      lastSaved = new Date();
+      if (!metaSaveInFlight && !configPanel?.isDirty()) setStatus("saved");
     }
   } catch (err) {
     setStatus("error", brief(err));
@@ -620,9 +638,13 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
     });
     if (!res.ok) throw new Error(await res.text());
     metaBase = ((await res.json()) as { version: string }).version;
-    configPanel?.markSaved(true);
+    lastSaved = new Date();
+    if (
+      !dirty && !saveInFlight && !queuedMetaSections && !configPanel?.isDirty()
+    ) {
+      setStatus("saved");
+    }
   } catch (err) {
-    configPanel?.markSaved(false, brief(err));
     setStatus("error", `config: ${brief(err)}`);
   } finally {
     metaSaveInFlight = false;
@@ -724,6 +746,7 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         sheetView: $("sheet-view"),
         metadata,
         saveSections: saveMetadataSections,
+        onEdit: () => setStatus("saving"),
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
         exportPrint,
@@ -1086,17 +1109,19 @@ async function main(): Promise<void> {
     `ws://${location.host}/ws${editionHref(book, edition)}&client=${clientId}`,
   );
   ws.onopen = () => setStatus("saved");
-  ws.onclose = () => setStatus("offline");
+  ws.onclose = () => setStatus("offline", "Restart the server and reload");
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data) as ServerMessage;
     if (msg.type === "error") {
       if (msg.save === "metadata") { // accepted, then the write failed
-        configPanel?.markSaved(false, brief(msg.message));
         setStatus("error", `config not saved — ${brief(msg.message)}`);
       } else setStatus("error", `build: ${brief(msg.message)}`);
       return;
     }
-    if (!dirty && !saveInFlight && !diskOffer) setStatus("saved");
+    if (
+      !dirty && !saveInFlight && !metaSaveInFlight && !configPanel?.isDirty() &&
+      !diskOffer
+    ) setStatus("saved");
     renderPreview(msg, previewEl, key).then((problems) => {
       showPageProblems(problems);
       refreshPageIndicator();
