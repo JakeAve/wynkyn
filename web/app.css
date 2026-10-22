@@ -1,0 +1,1867 @@
+/* ---- Ink: one flat plane, hairlines and type carry the hierarchy ---- */
+:root {
+  color-scheme: light;
+  --bg: #fbfbfa; /* the single chrome surface */
+  --desk: #f1f1ef; /* the desk the pages sit on */
+  --line: #e7e7e4; /* hairlines */
+  --soft: #f3f3f1; /* row separators inside lists */
+  --hover: #efefec;
+  /* editor: selection tinted from --syn-key, a quieter active line,
+     search hits from --warn, a faint band on structural sentinels */
+  --sel: rgba(85, 101, 85, .22);
+  --active: rgba(22, 22, 22, .028);
+  --match: rgba(201, 168, 106, .34);
+  --match-cur: rgba(201, 168, 106, .7);
+  --struct: rgba(122, 106, 79, .07);
+  --off: .38; /* opacity of text the open edition skips */
+  --fg: #161616;
+  /* Outlines drawn on the pages, which are paper-white in both themes:
+     fixed dark ink, so dark mode does not override them. */
+  --pick: rgba(22, 22, 22, 0.9);
+  --hover-ring: rgba(22, 22, 22, 0.32);
+  --hl: rgba(22, 22, 22, 0.07);
+  /* The imposed sheet is paper-white in both themes too. */
+  --sheet-paper: #fff;
+  --paper: #fffefc; /* book pages and page drawings */
+  --sheet-edge: #b9b9b4;
+  --sheet-slot: #e2e2de;
+  --sheet-blank: #ededea;
+  --sheet-ink: #161616;
+  --sheet-fold: #8f8f8a;
+  --sheet-cut: #a04545;
+  --muted: #71716c;
+  --inv-bg: #161616; /* inverted pill: active nav/segment */
+  --inv-fg: #fbfbfa;
+  --syn-k: #111111; /* {sentinel} names */
+  --syn-c: #a3a39e; /* %% comments */
+  --syn-t: #4c4c48; /* prose */
+  --syn-p: #9c9c98; /* brackets, punctuation */
+  --syn-slug: #7a6a4f;
+  --syn-key: #556555;
+  --ok: #4d7a4d;
+  --warn: #8a6d3b;
+  --err: #a04545;
+  --page-shadow: 0 1px 2px rgba(0, 0, 0, .07), 0 8px 22px rgba(0, 0, 0, .09);
+  --backdrop: rgba(0, 0, 0, .22);
+  --radius: 6px;
+  --fs: 13.5px;
+  --fs-sm: 11px;
+  /* Pane widths — dragged by the gutters, persisted in localStorage. */
+  --w-tree: 230px;
+  --w-editor: clamp(380px, 36%, 600px);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111111;
+  --desk: #0a0a0a;
+  --line: #262626;
+  --soft: #1a1a1a;
+  --hover: #1d1d1d;
+  --sel: rgba(157, 184, 157, .24);
+  --active: rgba(255, 255, 255, .025);
+  --match: rgba(201, 168, 106, .24);
+  --match-cur: rgba(201, 168, 106, .55);
+  --struct: rgba(194, 173, 131, .06);
+  --fg: #ececea;
+  --muted: #93938d;
+  --inv-bg: #ececea;
+  --inv-fg: #111111;
+  --syn-k: #ececea;
+  --syn-c: #6e6e6a;
+  --syn-t: #b3b3af;
+  --syn-p: #767672;
+  --syn-slug: #c2ad83;
+  --syn-key: #9db89d;
+  --ok: #94b894;
+  --warn: #c9a86a;
+  --err: #d98a8a;
+  --page-shadow: 0 2px 4px rgba(0, 0, 0, .5), 0 12px 30px rgba(0, 0, 0, .6);
+  --backdrop: rgba(0, 0, 0, .55);
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font: var(--fs)/1.45 system-ui, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  display: grid;
+  grid-template-rows: 46px minmax(0, 1fr) 30px;
+  overflow: hidden;
+}
+button,
+select,
+input,
+textarea,
+summary {
+  font: inherit;
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
+}
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+/* ---- shared control look: borderless ghosts ---- */
+.btn,
+#config-overlay button {
+  background: none;
+  color: var(--muted);
+  border: none;
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover,
+#config-overlay button:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.btn[aria-pressed="true"] {
+  color: var(--fg);
+}
+.btn svg,
+.tico {
+  display: block;
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.caption {
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  letter-spacing: .1em;
+  font-weight: 600;
+}
+
+/* ---- toolbar ---- */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+/* Crumb: Book / Edition 5.25 × 8 in — either half opens #switcher. */
+#crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+#crumb .btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg);
+  padding: 5px 8px;
+}
+#crumb .btn[aria-expanded="true"] {
+  background: var(--hover);
+}
+#book-name {
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+#crumb .slash {
+  color: var(--syn-p);
+}
+#edition-size {
+  color: var(--muted);
+  font-size: 12px;
+}
+#crumb .chev {
+  width: 12px;
+  height: 12px;
+  color: var(--muted);
+}
+#toolbar .spacer {
+  flex: 1;
+}
+/* Mode switch, centred on the toolbar: Write / Style / Print. */
+#toolbar {
+  position: relative;
+}
+#modes {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+#modes .btn {
+  padding: 3px 14px;
+  min-height: 26px;
+}
+#modes .btn[aria-pressed="true"] {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+@media (max-width: 1000px) {
+  #modes {
+    position: static;
+    transform: none;
+  }
+}
+/* Column toggles: the panel icon's side is half filled while it shows. */
+.toggle[aria-pressed="true"] {
+  --pf: .35;
+}
+.toggle[aria-pressed="false"] svg {
+  opacity: .55;
+}
+/* Theme toggle shows the icon for the mode it switches to */
+:root[data-theme="dark"] .icon-moon,
+:root[data-theme="light"] .icon-sun {
+  display: none;
+}
+/* ---- book / edition switcher: books left, that book's editions right ---- */
+#switcher {
+  position: fixed;
+  inset: 44px auto auto 10px; /* left follows the crumb, set on open */
+  margin: 0;
+  padding: 0;
+  width: 620px;
+  max-width: calc(100vw - 20px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 14px 36px var(--backdrop);
+  overflow: hidden;
+}
+#switcher[open] {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+#switcher::backdrop {
+  background: none;
+}
+.sw-books {
+  border-right: 1px solid var(--line);
+  background: var(--soft);
+  padding: 8px;
+}
+#book-search {
+  width: 100%;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 0 8px;
+  margin-bottom: 6px;
+}
+#book-search::placeholder {
+  color: var(--muted);
+}
+#book-list,
+#edition-list {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.book-row {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.book-row:hover {
+  background: var(--hover);
+}
+.book-row[aria-selected="true"] {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+.book-empty {
+  padding: 4px 8px;
+  color: var(--muted);
+}
+.sw-eds {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ed-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: baseline;
+  padding: 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.ed-row:hover,
+.ed-row[aria-current="true"] {
+  background: var(--hover);
+}
+.ed-row .ck {
+  width: 14px;
+  height: 14px;
+  align-self: center;
+}
+.ed-row .nm {
+  font-weight: 500;
+}
+.ed-row .acts {
+  display: flex;
+  gap: 2px;
+}
+.ed-row .acts button,
+.ed-row .diff {
+  background: none;
+  border: none;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ed-row .acts button:hover,
+.ed-row .diff:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+.ed-row .setup,
+.ed-row .diff,
+.ed-row .sw-err {
+  grid-column: 2 / -1;
+}
+.ed-row .setup {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ed-row .diff {
+  justify-self: start;
+  padding: 0;
+  color: var(--warn);
+  text-align: left;
+}
+.sw-err {
+  font-size: 12px;
+  color: var(--err);
+}
+.sw-err:empty {
+  display: none;
+}
+#switcher input:not(#book-search),
+#switcher select {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 2px 6px;
+  min-width: 0;
+}
+.eds-foot {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.eds-foot form {
+  display: contents;
+}
+.eds-foot form[hidden] {
+  display: none;
+}
+.eds-foot .sw-err {
+  flex-basis: 100%;
+}
+
+/* ---- footer ---- */
+#footer {
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 14px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+#diagnostics {
+  color: var(--warn);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+#page-problems {
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+}
+#page-problems button {
+  font: inherit;
+  color: var(--warn);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+#page-problems button:disabled {
+  cursor: default;
+}
+#status {
+  margin-left: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+#status[data-kind="saved"] {
+  color: var(--ok);
+}
+#status[data-kind="saved"]::before {
+  background: var(--ok);
+}
+#status[data-kind="error"],
+#status[data-kind="offline"] {
+  color: var(--err);
+}
+#status[data-kind="error"]::before,
+#status[data-kind="offline"]::before {
+  background: var(--err);
+}
+
+/* ---- panes ---- */
+/* One flat plane: panes share the chrome background; 5px gutters render a
+   centred 1px hairline and are the drag handles. The preview is the hero:
+   the editor holds a fixed reading measure, the preview takes the rest. */
+#panes {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--w-tree) 5px var(--w-editor) 5px minmax(0, 1fr);
+  min-height: 0;
+}
+.gutter {
+  cursor: col-resize;
+  background: linear-gradient(var(--line), var(--line)) 50% 0 / 1px 100%
+    no-repeat;
+}
+.gutter:hover,
+.gutter.dragging {
+  background: linear-gradient(var(--muted), var(--muted)) 50% 0 / 3px 100%
+    no-repeat;
+}
+/* The columns (spec §7.1): left is where you are, middle is what you're
+   changing, right is the result. The mode shows one element per column;
+   display:none takes the others out of grid flow. The side toggles drop
+   a column and its gutter. */
+#panes.tree-hidden {
+  grid-template-columns: var(--w-editor) 5px minmax(0, 1fr);
+}
+#panes.pages-hidden {
+  grid-template-columns: var(--w-tree) 5px minmax(0, 1fr);
+}
+#panes.tree-hidden.pages-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+:root[data-mode="write"] :is(#style-nav, #config-overlay, #sheet-view),
+:root[data-mode="style"] :is(#tree, #editor, #sheet-view),
+:root[data-mode="publish"] :is(#tree, #editor),
+#panes.tree-hidden :is(#tree, #style-nav, #gutter-tree),
+#panes.pages-hidden :is(#sheet-view, #gutter-editor) {
+  display: none;
+}
+/* Hidden pages still lay out: Paged.js paginates by measuring, so the
+   preview leaves the grid but never goes display:none. */
+:root[data-mode="publish"] #preview,
+#panes.pages-hidden #preview {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+#tree {
+  overflow-y: auto;
+  padding: 10px 8px;
+}
+:is(#tree, #style-nav) .nh {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--muted);
+  padding: 10px 8px 4px;
+}
+:is(#tree, #style-nav) .nh:first-child {
+  padding-top: 2px;
+}
+#tree ul.tree-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#tree button.tree-node {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: inherit;
+  padding: 5px 10px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#tree button.tree-node:hover {
+  background: var(--hover);
+}
+#tree button.tree-node[aria-current="true"] {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+#tree .tree-matter {
+  color: var(--muted);
+}
+#tree button.tree-node[aria-current="true"].tree-matter {
+  color: var(--inv-fg);
+}
+#tree .tree-part {
+  font-weight: 600;
+}
+#editor {
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#editor .cm-editor {
+  flex: 1;
+  min-height: 0;
+}
+/* Changed-on-disk banner: the buffer has unsaved edits and the file moved
+   under it. Rare and it blocks saving, so it is the one loud thing in the
+   chrome: an err-tinted block with a bar, and bordered buttons. */
+#disk-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px 12px 12px 14px;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--err);
+  background: color-mix(in srgb, var(--err) 10%, var(--bg));
+}
+#disk-banner[hidden] {
+  display: none;
+}
+#disk-banner .msg {
+  flex: 1 1 240px;
+}
+#disk-banner strong {
+  display: block;
+  color: var(--err);
+}
+#disk-banner .msg span {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+#disk-banner .acts {
+  display: flex;
+  gap: 6px;
+}
+#disk-banner .btn {
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--sheet-edge);
+}
+#disk-banner .btn:hover {
+  background: var(--hover);
+}
+/* ---- editor: search hits, sentinels by kind, {only} spans ---- */
+#editor .cm-searchMatch {
+  background: var(--match);
+  border-radius: 2px;
+}
+#editor .cm-searchMatch.cm-searchMatch-selected {
+  background: var(--match-cur);
+  box-shadow: 0 0 0 1px var(--warn);
+}
+#editor .cm-selectionMatch {
+  background: none;
+  box-shadow: 0 0 0 1px var(--sel);
+  border-radius: 2px;
+}
+#editor .cm-searchMatch .cm-selectionMatch {
+  box-shadow: none;
+}
+#editor .cm-textfield {
+  background: var(--soft);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+#editor .cm-button {
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+#editor .cm-button:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+#editor .cm-lineNumbers .cm-gutterElement {
+  position: relative;
+  padding-left: 12px;
+}
+#editor .cm-lineNumbers .cm-gutterElement.cm-bml-struct {
+  color: var(--syn-slug);
+}
+#editor .cm-lineNumbers .cm-gutterElement.cm-bml-struct::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: calc(50% - 3px);
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--syn-slug);
+}
+#editor .cm-lineNumbers .cm-gutterElement.cm-bml-cond {
+  box-shadow: inset -1px 0 0 var(--warn);
+}
+#editor .cm-line.cm-bml-struct {
+  background-color: var(--struct);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+#editor .cm-line.cm-bml-field,
+#editor .cm-line.cm-bml-field * {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+#editor .cm-line.cm-bml-rail {
+  box-shadow: inset 1px 0 0 var(--syn-p);
+}
+#editor .cm-line.cm-bml-strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+#editor .cm-line.cm-bml-italic {
+  font-style: italic;
+}
+#editor .cm-bml-wrap,
+#editor .cm-bml-wrap * {
+  color: var(--syn-p);
+  font-weight: 400;
+  opacity: .8;
+}
+#editor .cm-bml-it {
+  color: var(--fg);
+  font-style: italic;
+}
+/* %% ──── draws as a hairline rule (its text shows while the cursor is on it) */
+#editor .cm-line.cm-bml-rule:not(.cm-activeLine) {
+  white-space: pre;
+  contain: inline-size; /* its long dash run must not widen the editor */
+  overflow: hidden;
+  background: linear-gradient(var(--line), var(--line)) center / 100% 1px
+    no-repeat;
+}
+#editor .cm-line.cm-bml-rule:not(.cm-activeLine) * {
+  color: transparent;
+}
+#editor .cm-line.cm-bml-label,
+#editor .cm-line.cm-bml-label * {
+  font-variant: small-caps;
+  font-style: normal;
+  letter-spacing: .08em;
+  color: var(--syn-c);
+}
+#editor .cm-line.cm-bml-off {
+  opacity: var(--off);
+}
+#editor .cm-bml-cond-tag {
+  font: 10.5px system-ui, sans-serif;
+  color: var(--warn);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 5px;
+  margin-left: 8px;
+}
+/* the find/replace bar (search-panel.ts) */
+.cm-bml-find {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  font: var(--fs)/1.4 system-ui, sans-serif;
+}
+.cm-bml-find .field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--soft);
+}
+.cm-bml-find .field:focus-within {
+  border-color: var(--fg);
+  background: var(--bg);
+}
+.cm-bml-find input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  color: var(--fg);
+  font-size: 13px;
+}
+.cm-bml-find input::placeholder {
+  color: var(--muted);
+}
+.cm-bml-find .acts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.cm-bml-find button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.cm-bml-find button:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.cm-bml-find .opt {
+  font: 11px ui-monospace, Menlo, monospace;
+  padding: 2px 5px;
+  white-space: nowrap;
+}
+.cm-bml-find .opt[aria-pressed="true"] {
+  color: var(--fg);
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.cm-bml-find .ghost {
+  padding: 2px 7px;
+  font-size: 14px;
+}
+.cm-bml-find .btn {
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+.cm-bml-find .count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+/* insert popovers (editor-insert.ts): `{` completions, the ⌘K list of
+   every sentinel, and the wrap bar over a selection */
+#editor .cm-tooltip {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px var(--backdrop), 0 16px 40px var(--backdrop);
+  font: var(--fs)/1.4 system-ui, sans-serif;
+}
+#editor .cm-tooltip-autocomplete,
+#editor .cm-bml-palette {
+  padding: 6px;
+}
+#editor .cm-tooltip.cm-tooltip-autocomplete > ul,
+#editor .cm-bml-palette ul {
+  font: inherit;
+  width: 340px;
+  min-width: 0;
+  max-height: 22em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden auto;
+}
+#editor .cm-tooltip-autocomplete > ul > li,
+#editor .cm-bml-palette li:not(.grp) {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  line-height: 1.4;
+  cursor: pointer;
+}
+#editor .cm-tooltip-autocomplete > ul > completion-section,
+#editor .cm-bml-palette .grp {
+  display: block;
+  border: none;
+  opacity: 1;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  padding: 6px 8px 3px;
+}
+#editor :is(.cm-completionLabel, .cm-bml-palette code) {
+  font: 12.5px ui-monospace, Menlo, monospace;
+  color: var(--fg);
+}
+#editor .cm-completionMatchedText {
+  text-decoration: none;
+  font-weight: 600;
+}
+#editor :is(.cm-completionDetail, .cm-bml-palette .d) {
+  margin: 0;
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+#editor :is(.cm-tooltip-autocomplete, .cm-bml-palette) .f {
+  font: 10.5px ui-monospace, Menlo, monospace;
+  color: var(--syn-p);
+}
+#editor .cm-tooltip-autocomplete > ul > li[aria-selected],
+#editor .cm-bml-palette li[aria-selected="true"] {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+#editor :is(.cm-tooltip-autocomplete li[aria-selected], .cm-bml-palette li[aria-selected="true"]) :is(code, .cm-completionLabel, .cm-completionDetail, .d, .f) {
+  color: var(--inv-fg);
+}
+#editor :is(.cm-tooltip-autocomplete li[aria-selected], .cm-bml-palette li[aria-selected="true"]) :is(.cm-completionDetail, .d, .f) {
+  opacity: .7;
+}
+#editor .cm-bml-palette input {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 28px;
+  margin-bottom: 4px;
+  padding: 0 8px;
+  border: 1px solid var(--fg);
+  border-radius: var(--radius);
+  color: var(--fg);
+  font-size: 13px;
+}
+#editor .cm-bml-palette input::placeholder {
+  color: var(--muted);
+}
+#editor .cm-bml-wrapbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+}
+.cm-editor:not(.cm-focused) .cm-bml-wrapbar {
+  visibility: hidden; /* e.g. while the find bar selects a hit */
+}
+#editor .cm-bml-wrapbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 4px 9px;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  color: var(--fg);
+  cursor: pointer;
+}
+#editor .cm-bml-wrapbar button:hover {
+  background: var(--hover);
+}
+#editor .cm-bml-wrapbar .vsep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--line);
+}
+#editor .cm-bml-wrapbar kbd {
+  font: 10px ui-monospace, Menlo, monospace;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--muted);
+}
+#preview {
+  background: var(--desk);
+  overflow: auto;
+  padding: 16px;
+  position: relative;
+}
+/* A new render is staged invisibly beside the live pages and swapped in when
+   complete, so the preview never flashes empty mid-render. */
+/* --preview-zoom: 1 is essential — Paged.js paginates by measuring rects,
+   and a zoomed stage makes it fit twice as much text per page. */
+/* First load: nothing live yet, only the hidden stage — say so. */
+#preview:not(:has(> :not(.preview-stage)))::before {
+  content: "Rendering pages…";
+  color: var(--muted);
+  display: block;
+  text-align: center;
+  padding-top: 40vh;
+}
+#preview .preview-stage {
+  visibility: hidden;
+  position: absolute;
+  inset: 16px;
+  --preview-zoom: 1;
+}
+/* Spread layout (spec §7.6): two book pages per row, page 1 recto-alone.
+   --preview-zoom is set by fitPreview() so a full spread always fits the pane. */
+.pagedjs_pages {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 8px;
+  zoom: var(--preview-zoom, 1);
+}
+/* Pages are paper: ink black, never the chrome's text color — even in dark mode. */
+.pagedjs_page {
+  background: var(--paper);
+  color: #141210;
+  box-shadow: var(--page-shadow);
+  margin-bottom: 16px;
+}
+.pagedjs_pages .pagedjs_page:first-child {
+  margin-left: calc(var(--pagedjs-width) + 8px);
+}
+
+/* ---- style panel: the middle column in Style and Print ---- */
+/* Header (.phead) stays put; only the view (.pbody) scrolls. */
+#config-overlay {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* Nav: small group headings, rows with a muted count, current inverted. */
+#style-nav {
+  overflow-y: auto;
+  padding: 10px 8px;
+}
+#style-nav .ni {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  text-align: left;
+  color: var(--fg);
+  cursor: pointer;
+}
+#style-nav .ni:hover {
+  background: var(--hover);
+}
+#style-nav .ni[aria-current="true"] {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+#style-nav .ni .t {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#style-nav .ni .k {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+#style-nav .ni[aria-current="true"] .k {
+  color: inherit;
+  opacity: .6;
+}
+.cfg-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0;
+  /* so a full-width .cfg-error drops to its own line instead of
+     squeezing the control it belongs to down to nothing */
+  flex-wrap: wrap;
+}
+.cfg-label {
+  width: 110px;
+  flex: none;
+  color: var(--muted);
+}
+.cfg-field input[type=text],
+.cfg-field select,
+.cfg-field textarea {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+}
+.cfg-row {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cfg-error {
+  color: var(--err);
+  flex-basis: 100%;
+}
+.cfg-entry {
+  border-top: 1px dashed var(--line);
+  padding-top: 6px;
+  margin-top: 6px;
+}
+/* Click-to-style: hovered, highlighted ("on N pages") and picked
+   elements in the preview; the pick stays solid over the others */
+[data-style-hover],
+[data-style-hl] {
+  outline: 1px solid var(--hover-ring);
+  outline-offset: 3px;
+}
+[data-style-hl] {
+  background: var(--hl);
+}
+[data-style-selected] {
+  outline: 1px solid var(--pick);
+  outline-offset: 3px;
+}
+.pagedjs_page .bml *,
+.pagedjs_margin-content {
+  cursor: pointer;
+}
+/* ---- style panel controls (web/src/panel-controls.ts), scoped so they cannot collide ---- */
+#config-overlay svg.i {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+#config-overlay .phead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+#config-overlay .crumbs {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#config-overlay .crumbs b {
+  color: var(--fg);
+  font-weight: 600;
+}
+#config-overlay .pbody {
+  overflow-y: auto;
+  padding: 4px 16px 28px;
+  flex: 1;
+  min-height: 0;
+  container-type: inline-size;
+}
+#config-overlay .sec {
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  border-radius: 4px;
+  transition: background-color .8s cubic-bezier(.16,1,.3,1);
+}
+#config-overlay .sec:last-child {
+  border-bottom: 0;
+}
+#config-overlay .sec.flash {
+  background: var(--hover);
+  transition: none;
+}
+#config-overlay .sech {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+#config-overlay .sech h3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -.005em;
+}
+#config-overlay .where {
+  background: none;
+  border: 0;
+  padding: 2px 6px;
+  margin-right: -6px;
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#config-overlay .where:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+#config-overlay .where svg.i {
+  width: 13px;
+  height: 13px;
+}
+#config-overlay .row {
+  display: grid;
+  grid-template-columns: 116px minmax(0,1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+#config-overlay .row[hidden] {
+  display: none;
+}
+#config-overlay .lbl {
+  color: var(--muted);
+  position: relative;
+  padding-left: 11px;
+}
+#config-overlay .row.set .lbl {
+  color: var(--fg);
+}
+#config-overlay .row.set .lbl::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: .55em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fg);
+}
+#config-overlay .ctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+#config-overlay .from {
+  color: var(--muted);
+  font-size: 12px;
+}
+#config-overlay .st {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+#config-overlay .st:focus-within {
+  border-color: var(--muted);
+}
+#config-overlay .st button {
+  background: none;
+  border: 0;
+  height: 100%;
+  width: 26px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+#config-overlay .st button:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+#config-overlay .st input {
+  width: 44px;
+  border: 0;
+  background: none;
+  text-align: right;
+  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+#config-overlay .st input::placeholder {
+  color: var(--muted);
+  opacity: .75;
+}
+#config-overlay .st .u {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0 4px 0 2px;
+  min-width: 18px;
+}
+/* the unit as a quiet picker: no caret, a faint chip on hover */
+#config-overlay .st select.u {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  height: 20px;
+  margin-left: 3px;
+  padding: 0 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+#config-overlay .st select.u:hover,
+#config-overlay .st select.u:focus-visible {
+  color: var(--fg);
+  background: var(--hover);
+}
+#config-overlay .seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 2px);
+  flex-wrap: wrap;
+}
+#config-overlay .seg button {
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 2px 9px;
+  min-height: 22px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+#config-overlay .seg button:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+#config-overlay .seg button[aria-checked="true"],
+#config-overlay .tog[aria-pressed="true"] {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+#config-overlay .tog {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 2px 10px;
+  min-height: 28px;
+  color: var(--muted);
+  cursor: pointer;
+}
+#config-overlay .tog:not([aria-pressed="true"]):hover {
+  color: var(--fg);
+}
+#config-overlay .tog[aria-pressed="true"] {
+  border-color: var(--inv-bg);
+}
+#config-overlay select.sel,
+#config-overlay input.txt {
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 0 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+#config-overlay select.sel {
+  padding-right: 4px;
+  cursor: pointer;
+}
+#config-overlay input.txt {
+  width: 140px;
+}
+/* font picker (font-picker.ts): a button in the family's own face that
+   opens a search popup over the whole Google catalog */
+#config-overlay .fontpick {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+#config-overlay .fontbtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 30px;
+  padding: 0 6px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+#config-overlay .fontbtn:hover {
+  border-color: var(--hover-ring);
+}
+#config-overlay .fontbtn .fam {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+#config-overlay .fontbtn .i {
+  flex: none;
+  color: var(--muted);
+}
+#config-overlay .fontpop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  width: max(100%, 320px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px var(--backdrop), 0 16px 40px var(--backdrop);
+}
+#config-overlay .fontpop .find {
+  all: unset;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--fg);
+  border-radius: var(--radius);
+  color: var(--fg);
+  font-size: 13px;
+}
+#config-overlay .fontpop .find::placeholder {
+  color: var(--muted);
+}
+#config-overlay .fontpop .seg {
+  align-self: flex-start;
+}
+#config-overlay .fontpop ul {
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden auto;
+}
+#config-overlay .fontpop li {
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  font-size: 17px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg);
+  cursor: pointer;
+}
+#config-overlay .fontpop li[hidden] {
+  display: none;
+}
+#config-overlay .fontpop li.grp {
+  font: var(--fs-sm) system-ui, sans-serif;
+  color: var(--muted);
+  padding: 8px 8px 3px;
+  cursor: default;
+}
+#config-overlay .fontpop li.typed {
+  font: var(--fs) system-ui, sans-serif;
+}
+#config-overlay .fontpop li:not(.grp):hover {
+  background: var(--hover);
+}
+#config-overlay .fontpop li[aria-selected="true"] {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+#config-overlay .spec {
+  font-size: 22px;
+  line-height: 1;
+  width: 30px;
+  text-align: center;
+  color: var(--fg);
+}
+#config-overlay .sample {
+  margin: 6px 0 2px 11px;
+  font-size: 21px;
+  line-height: 1.3;
+  color: var(--fg);
+  text-wrap: pretty;
+}
+#config-overlay .uses {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 6px 0 2px 11px;
+}
+#config-overlay .uses .from {
+  margin-right: 2px;
+}
+#config-overlay .chip {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: pointer;
+}
+#config-overlay .chip:hover {
+  background: var(--hover);
+}
+#config-overlay .range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+#config-overlay .range input {
+  flex: 1;
+  min-width: 80px;
+  accent-color: var(--fg);
+}
+#config-overlay .range output {
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+}
+#config-overlay details.more {
+  margin-top: 2px;
+}
+#config-overlay details.more summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 6px 0;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+#config-overlay details.more summary::-webkit-details-marker {
+  display: none;
+}
+#config-overlay details.more summary:hover {
+  color: var(--fg);
+}
+#config-overlay details.more summary svg {
+  transition: transform .2s cubic-bezier(.16,1,.3,1);
+}
+#config-overlay details.more[open] summary svg {
+  transform: rotate(90deg);
+}
+#config-overlay details.more textarea {
+  width: 100%;
+  min-height: 62px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 6px 8px;
+  font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  resize: vertical;
+}
+#config-overlay .hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 2px 0 0;
+}
+#config-overlay .hint.warn {
+  color: var(--warn);
+  margin: 4px 0 0 11px;
+}
+#config-overlay .foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+}
+#config-overlay .tip {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+/* Page numbers' position picker: a spread, four folio slots a page. */
+#config-overlay .pospick {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 4px 0 6px;
+}
+#config-overlay .spread-mini {
+  display: flex;
+  box-shadow: var(--page-shadow);
+}
+#config-overlay .spread-mini .pm {
+  position: relative;
+  width: 58px;
+  height: 84px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+#config-overlay .spread-mini .pm + .pm {
+  border-left: 0;
+}
+#config-overlay .spread-mini .pm::before {
+  content: "";
+  position: absolute;
+  inset: 14px 9px 16px;
+  background: repeating-linear-gradient(var(--line) 0 1px, transparent 1px
+    5px);
+}
+#config-overlay .pospick .slot {
+  position: absolute;
+  width: 10px;
+  height: 6px;
+  padding: 0;
+  border-radius: 2px;
+  border: 1px solid var(--muted);
+  background: none;
+}
+#config-overlay .pospick .slot:hover {
+  border-color: var(--fg);
+  background: none;
+}
+#config-overlay .pospick .slot[aria-pressed="true"] {
+  background: var(--fg);
+  border-color: var(--fg);
+}
+/* the other furniture's slot: page number in the heads picker, and back */
+#config-overlay .pospick .slot.taken {
+  border-style: dashed;
+  background: var(--line);
+}
+#config-overlay .pospick .slot.taken[aria-pressed="true"] {
+  border: 1px solid var(--err);
+  background: var(--err);
+}
+#config-overlay .pospick .slot.bc {
+  bottom: 5px;
+  left: 23px;
+}
+#config-overlay .pospick .slot.tc {
+  top: 4px;
+  left: 23px;
+}
+#config-overlay .pm.v .slot.bo {
+  bottom: 5px;
+  left: 6px;
+}
+#config-overlay .pm.r .slot.bo {
+  bottom: 5px;
+  right: 6px;
+}
+#config-overlay .pm.v .slot.to {
+  top: 4px;
+  left: 6px;
+}
+#config-overlay .pm.r .slot.to {
+  top: 4px;
+  right: 6px;
+}
+#config-overlay .pospick .label {
+  color: var(--muted);
+  font-size: 12px;
+}
+#config-overlay .pospick .label b {
+  display: block;
+  color: var(--fg);
+  font-weight: 500;
+  font-size: 13px;
+}
+/* "Where they're dropped": read-only rule rows. */
+#config-overlay .rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#config-overlay .rules li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--soft);
+}
+#config-overlay .rules li:last-child {
+  border-bottom: 0;
+}
+#config-overlay .rules li span:first-child {
+  color: var(--muted);
+}
+#config-overlay .rules li span:last-child {
+  text-align: right;
+}
+#config-overlay .mdiag {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  grid-template-rows: auto auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  justify-items: center;
+  padding: 6px 0 2px;
+}
+#config-overlay .mdiag .stage {
+  grid-area: 2 / 2;
+  display: flex;
+  align-items: stretch;
+}
+#config-overlay .mpage {
+  position: relative;
+  height: 138px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+#config-overlay .mpage.v {
+  opacity: .45;
+  border-right: 0;
+}
+#config-overlay .mblock {
+  position: absolute;
+  background: repeating-linear-gradient(var(--hover) 0 3px, transparent 3px
+    7px);
+}
+#config-overlay .mdiag .mt {
+  grid-area: 1 / 2;
+}
+#config-overlay .mdiag .mb {
+  grid-area: 3 / 2;
+}
+#config-overlay .mdiag .mi {
+  grid-area: 2 / 1;
+}
+#config-overlay .mdiag .mo {
+  grid-area: 2 / 3;
+}
+/* Narrow slot: the side steppers would overlap the drawing, so Inside and
+   Outside move to a row of their own under it. */
+@container (max-width: 400px) {
+  #config-overlay .mdiag {
+    grid-template-columns: 1fr 1fr;
+  }
+  #config-overlay .mdiag .stage {
+    grid-area: 2 / 1 / 3 / 3;
+  }
+  #config-overlay .mdiag .mt {
+    grid-area: 1 / 1 / 2 / 3;
+  }
+  #config-overlay .mdiag .mb {
+    grid-area: 3 / 1 / 4 / 3;
+  }
+  #config-overlay .mdiag .mi {
+    grid-area: 4 / 1;
+  }
+  #config-overlay .mdiag .mo {
+    grid-area: 4 / 2;
+  }
+}
+#config-overlay .mlab {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+#config-overlay .readout {
+  color: var(--muted);
+  display: grid;
+  gap: 4px;
+  padding: 4px 0 0 11px;
+}
+#config-overlay .readout p {
+  margin: 0;
+}
+#config-overlay .readout p:first-child {
+  color: var(--fg);
+}
+#config-overlay .readout.cfg-readout-bad p {
+  color: var(--err);
+}
+/* Sheet view: the first signature as it prints. The sheet is paper-white
+   in both themes. Solid strokes are screen pixels; the fold's dashes are
+   in the SVG's units, inches, where its dash pattern is measured. */
+#sheet-view {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  background: var(--desk);
+  overflow-y: auto;
+  padding: 16px;
+}
+#sheet-view .sheet {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+#sheet-view .sheet figure {
+  margin: 0;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+}
+#sheet-view .sheet svg {
+  width: 100%;
+  height: auto;
+}
+#sheet-view .sheet figcaption {
+  font-size: 11px;
+  color: var(--muted);
+}
+#sheet-view .sheet .paper {
+  fill: var(--sheet-paper);
+  stroke: var(--sheet-edge);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+#sheet-view .sheet .slot {
+  fill: none;
+  stroke: var(--sheet-slot);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+#sheet-view .sheet .slot.blank {
+  fill: var(--sheet-blank);
+}
+#sheet-view .sheet text {
+  fill: var(--sheet-ink);
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: tabular-nums;
+}
+#sheet-view .sheet .fold {
+  stroke: var(--sheet-fold);
+  stroke-width: .06;
+  stroke-dasharray: .25 .18;
+}
+#sheet-view .sheet .cut {
+  stroke: var(--sheet-cut);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+#sheet-view .hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+#config-overlay .actions {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+}
+#config-overlay .tog.primary {
+  background: var(--inv-bg);
+  border-color: var(--inv-bg);
+  color: var(--inv-fg);
+}
+#config-overlay .tog:disabled {
+  opacity: .5;
+  cursor: progress;
+}
+#config-overlay .export-status {
+  display: grid;
+  gap: 4px;
+  padding-top: 6px;
+  justify-items: start;
+}
+#config-overlay .export-status p {
+  margin: 0;
+}
+#config-overlay .export-status .err,
+#config-overlay .export-status ul {
+  color: var(--err);
+}
+#config-overlay .export-status ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+#config-overlay .files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 4px 0;
+}
+#config-overlay .files a {
+  color: var(--fg);
+  text-underline-offset: 2px;
+}
+#config-overlay button,
+#config-overlay select,
+#config-overlay input,
+#config-overlay textarea {
+  font: inherit;
+}
+#config-overlay .ghost {
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--muted);
+  padding: 6px 9px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+#config-overlay .ghost:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+@media (prefers-reduced-motion: reduce) {
+  #config-overlay * {
+    transition: none !important;
+  }
+}
