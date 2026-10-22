@@ -12,6 +12,13 @@ polish) is open. `bml export` is the print-export command
 is the e-book export (`server/epub-export.ts`, spec §7.8), the same render split
 into XHTML files and zipped with fflate.
 
+`metadata.json` carries a top-level `spec` (the spec version it complies with).
+`SPEC_VERSION` in `metadata/upgrade.ts` is the source of truth; the template and
+the spec's §3 heading must match it (`upgrade_test.ts` checks). The loader
+stamps it on files without one; the app warns on a book newer than itself. The
+hosted site also serves `/llms.txt`, `/spec.md` and `/convert-manuscript.md` for
+agents helping an author (`scripts/build-site.ts`).
+
 Page setup lives in one `page` section: `size`, `margins`, `sheet`,
 `folios-per-signature` (a number or `"booklet"`), `duplex`, and for backs
 printed by hand `flip` and `reverse-backs`. The retired `print` section is

@@ -2016,7 +2016,8 @@ summary {
   font-size: 12px;
   line-height: 1.35;
 }
-#browser-banner {
+#browser-banner,
+#spec-banner {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2027,9 +2028,11 @@ summary {
   font-size: 13px;
   line-height: 1.4;
 }
-#browser-banner[hidden] {
+#browser-banner[hidden],
+#spec-banner[hidden] {
   display: none;
 }
-#browser-banner span {
+#browser-banner span,
+#spec-banner span {
   flex: 1;
 }

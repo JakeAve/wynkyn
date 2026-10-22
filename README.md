@@ -93,6 +93,10 @@ deno task build:site  # the hosted app as plain files in dist/
 deno task serve:site  # serve dist/ on :8010 the way a static host would
 ```
 
+The hosted site also serves `/llms.txt`, `/spec.md` and
+`/convert-manuscript.md`, so an AI agent told "I'm on this site, help me with my
+book" can find the format and the house conventions.
+
 `setup` points `core.hooksPath` at `.githooks/`, so `check` and the fast tests
 run on every commit and the full suite on every push. CI does the same on every
 push and pull request.
