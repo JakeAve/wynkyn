@@ -324,7 +324,9 @@ Deno.test("toc leader content becomes the --leader custom property, not ::before
   });
   assertStringIncludes(
     css,
-    '.matter-toc .leader {\n  --leader: ". ";\n  opacity: 0.5;\n}',
+    `.matter-toc .leader {\n  --leader: "${
+      ". ".repeat(20)
+    }";\n  opacity: 0.5;\n}`,
   );
   assert(!css.includes(".matter-toc .leader::before"));
 });

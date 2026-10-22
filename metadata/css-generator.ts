@@ -50,7 +50,11 @@ function rule(
     if (prop === "content" && selector.endsWith(".leader")) {
       // TOC leaders repeat the string many times from base.css; hand it over
       // as a custom property instead of a single ::before content (spec §4.5).
-      decls.push(`  --leader: ${JSON.stringify(value)};`);
+      // Padded so base.css's fixed number of repeats outruns any row: a
+      // short unit like ". " would otherwise stop short of the entry.
+      const unit = String(value);
+      const padded = unit.repeat(Math.ceil(40 / Math.max(unit.length, 1)));
+      decls.push(`  --leader: ${JSON.stringify(padded)};`);
     } else if (prop === "content") {
       pseudo.push(`  content: ${JSON.stringify(value)};`);
     } else if (prop === "font-family") {
