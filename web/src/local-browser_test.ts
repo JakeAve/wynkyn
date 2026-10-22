@@ -37,12 +37,19 @@ Deno.test({
       await edit.click();
       await page.keyboard.press("Control+End");
       await page.keyboard.type("\nA line typed in the browser.");
+      // Reading while the page's writable stream is mid-commit throws
+      // NotReadableError (seen on the CI runner); that just means not yet.
       const stored = () =>
         page.evaluate(async () => {
           const root = await navigator.storage.getDirectory();
           const book = await root.getDirectoryHandle("demo-book");
           const fh = await book.getFileHandle("manuscript.md");
-          return (await fh.getFile()).text();
+          try {
+            return await (await fh.getFile()).text();
+          } catch (e) {
+            if ((e as DOMException).name === "NotReadableError") return "";
+            throw e;
+          }
         });
       const deadline = Date.now() + 10_000;
       while (!(await stored()).includes("typed in the browser")) {

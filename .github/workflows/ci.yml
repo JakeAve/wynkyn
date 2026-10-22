@@ -15,5 +15,7 @@ jobs:
         with:
           deno-version: v2.x
       - run: deno task check
-      - run: deno task build:web
+      # build:site (not build:web): local-browser_test drives dist/, the
+      # hosted site that every push to main deploys.
+      - run: deno task build:site
       - run: deno task test

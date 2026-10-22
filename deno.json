@@ -43,6 +43,8 @@
   "exclude": [
     "**/testdata/",
     ".claude/",
+    ".worktrees/",
+    "dist/",
     "web/app.js",
     "vendor/"
   ],
