@@ -710,6 +710,7 @@
     /* %% ──── draws as a hairline rule (its text shows while the cursor is on it) */
     #editor .cm-line.cm-bml-rule:not(.cm-activeLine) {
       white-space: pre;
+      contain: inline-size; /* its long dash run must not widen the editor */
       overflow: hidden;
       background: linear-gradient(var(--line), var(--line)) center / 100% 1px
         no-repeat;
@@ -719,9 +720,6 @@
     }
     #editor .cm-line.cm-bml-label,
     #editor .cm-line.cm-bml-label * {
-      white-space: pre;
-      overflow: hidden;
-      text-overflow: ellipsis;
       font-variant: small-caps;
       font-style: normal;
       letter-spacing: .08em;
