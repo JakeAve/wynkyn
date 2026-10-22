@@ -673,8 +673,8 @@ const fetchMetadata = (): Promise<
   { metadata: Metadata; version: string | null }
 > => backend.metadata(book, edition);
 
-// The server's exports need Chrome and a folder on disk: the hosted app has
-// neither. Print (print.ts) runs in this browser instead.
+// The server's print export needs Chrome and a folder on disk: the hosted
+// app has neither. Print (print.ts) runs in this browser instead.
 const NO_SERVER_EXPORT =
   "Not available here: Print from this browser instead, or export with the desktop app.";
 
@@ -726,23 +726,9 @@ async function exportPrint(req: ExportRequest): Promise<ExportResult> {
 }
 
 async function exportEpub(): Promise<EpubResult> {
-  if (backend.kind === "local") return { error: NO_SERVER_EXPORT };
   while (metaSaveInFlight) await metaSaveDone;
-  const q = edition === null ? "" : `?edition=${encodeURIComponent(edition)}`;
-  const base = `/api/books/${encodeURIComponent(book)}`;
   try {
-    const res = await fetch(`${base}/epub${q}`, { method: "POST" });
-    if (!res.ok) return { error: await res.text() };
-    const r = await res.json() as { file: string; documents: number };
-    return {
-      documents: r.documents,
-      file: {
-        name: r.file,
-        url: `${base}/export/${encodeURIComponent(r.file)}${
-          q ? `${q}&` : "?"
-        }v=${Date.now()}`,
-      },
-    };
+    return await backend.exportEpub(book, edition);
   } catch (err) {
     return { error: brief(err) };
   }

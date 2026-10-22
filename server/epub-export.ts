@@ -5,10 +5,11 @@
 import { strToU8, zipSync } from "fflate";
 import { parse } from "../parser/parser.ts";
 import type { BmlDocument } from "../parser/types.ts";
-import { loadMetadata } from "../metadata/loader.ts";
+import { parseMetadataText } from "../metadata/loader.ts";
 import { escapeHtml, type TocRow, tocRows } from "../renderer/render.ts";
 import { buildBook, resolveImages } from "./pipeline.ts";
-import { editionToken, metadataPath } from "./editions.ts";
+import { editionToken, metadataKey } from "./editions.ts";
+import { asStore, type BookStore } from "./store.ts";
 
 export interface EpubOptions {
   edition?: string | null; // null/undefined = the unnamed edition
@@ -325,38 +326,47 @@ export async function stableIdentifier(seed: string): Promise<string> {
   }-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export async function exportEpub(
-  booksRoot: string,
+export interface EpubBytes {
+  epub: Uint8Array<ArrayBuffer>;
+  documents: number; // content documents in reading order
+  diagnostics: number;
+}
+
+/** The package from a store: the browser builds it in the page, the CLI and
+ * dev server write it to the export dir (exportEpub). */
+export async function epubBytes(
+  root: string | BookStore,
   book: string,
-  opts: EpubOptions = {},
-): Promise<EpubSummary> {
-  const bookDir = `${booksRoot}/${book}`;
-  let source: string;
-  try {
-    source = await Deno.readTextFile(`${bookDir}/manuscript.md`);
-  } catch {
-    throw new Error(`no such book: ${book}`);
-  }
+  opts: { edition?: string | null; baseCss?: string } = {},
+): Promise<EpubBytes> {
+  const store = asStore(root);
+  const source = await store.readText(`${book}/manuscript.md`);
+  if (source === null) throw new Error(`no such book: ${book}`);
   const edition = opts.edition ?? null;
   // Notes go to the end of their block: a reader has no page foot to float to.
-  const b = await buildBook(booksRoot, book, {
+  const b = await buildBook(store, book, {
     edition,
     imageUrlPrefix: "images",
     notes: { placement: "endnote" },
+    baseCss: opts.baseCss,
   });
   // ponytail: parses the manuscript a second time for the TOC rows and the
   // author; return the tree from buildBook if that ever shows up.
   const doc = parse(source, { edition: editionToken(edition) });
-  const m = (await loadMetadata(metadataPath(booksRoot, book, edition))) ?? {};
+  const metaText = await store.readText(metadataKey(book, edition));
+  const m = metaText === null
+    ? {}
+    : parseMetadataText(metaText, metadataKey(book, edition)).meta;
   const images: Record<string, Uint8Array> = {};
-  const resolved = await resolveImages(booksRoot, book, "images");
+  const resolved = await resolveImages(store, book, "images");
   const cover = m.ebook?.cover ? resolved[m.ebook.cover] : undefined;
   const used = new Set(
     [...b.html.matchAll(/src="images\/([^"]+)"/g)].map((x) => `images/${x[1]}`),
   );
   if (cover) used.add(cover);
   for (const name of used) {
-    images[name] = await Deno.readFile(`${bookDir}/${name}`);
+    const bytes = await store.read(`${book}/${name}`);
+    if (bytes) images[name] = bytes;
   }
   const epub = buildEpub({
     html: b.html,
@@ -371,14 +381,27 @@ export async function exportEpub(
     images,
     cover,
   });
+  return {
+    epub: new Uint8Array(epub),
+    documents: splitBlocks(b.html).length + (cover ? 1 : 0),
+    diagnostics: b.diagnostics.length,
+  };
+}
+
+export async function exportEpub(
+  booksRoot: string,
+  book: string,
+  opts: EpubOptions = {},
+): Promise<EpubSummary> {
+  const edition = opts.edition ?? null;
+  const { epub, documents, diagnostics } = await epubBytes(booksRoot, book, {
+    edition,
+  });
+  const bookDir = `${booksRoot}/${book}`;
   const out = opts.out ??
     (edition === null ? `${bookDir}/export` : `${bookDir}/export/${edition}`);
   await Deno.mkdir(out, { recursive: true });
   const file = `${out}/book.epub`;
   await Deno.writeFile(file, epub);
-  return {
-    file,
-    documents: splitBlocks(b.html).length + (cover ? 1 : 0),
-    diagnostics: b.diagnostics.length,
-  };
+  return { file, documents, diagnostics };
 }

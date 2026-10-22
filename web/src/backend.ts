@@ -10,6 +10,7 @@ import {
   type SaveResult,
 } from "../../server/book-service.ts";
 import type { BookStore } from "../../server/store.ts";
+import type { EpubResult } from "./style-catalog.ts";
 
 export interface Backend {
   readonly kind: "http" | "local";
@@ -34,6 +35,8 @@ export interface Backend {
   renameEdition(book: string, edition: string, slug: string): Promise<void>;
   renameDefault(book: string, name: string): Promise<void>;
   deleteEdition(book: string, edition: string): Promise<void>;
+  /** The e-book, as a link to open or save; `error` when it failed. */
+  exportEpub(book: string, edition: string | null): Promise<EpubResult>;
   /** Builds now and on every change; `onClose` when the server goes away. */
   subscribe(
     book: string,
@@ -118,6 +121,25 @@ export function httpBackend(): Backend {
       call(`${editionsUrl(book)}/${encodeURIComponent(edition)}`, {
         method: "DELETE",
       }),
+    async exportEpub(book, edition) {
+      const q = edition === null
+        ? ""
+        : `?edition=${encodeURIComponent(edition)}`;
+      const base = `/api/books/${encodeURIComponent(book)}`;
+      const res = await fetch(`${base}/epub${q}`, { method: "POST" });
+      if (!res.ok) return { error: await res.text() };
+      const r = await res.json() as { file: string; documents: number };
+      // A fresh query per export, so the viewer never shows a cached file.
+      return {
+        documents: r.documents,
+        file: {
+          name: r.file,
+          url: `${base}/export/${encodeURIComponent(r.file)}${
+            q ? `${q}&` : "?"
+          }v=${Date.now()}`,
+        },
+      };
+    },
     subscribe(book, edition, clientId, onMessage, onClose) {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const ws = new WebSocket(
@@ -188,6 +210,13 @@ export function localBackend(
       service.renameEdition(book, edition, slug),
     renameDefault: (book, name) => service.renameDefault(book, name),
     deleteEdition: (book, edition) => service.deleteEdition(book, edition),
+    async exportEpub(book, edition) {
+      const { epub, documents } = await service.exportEpub(book, edition);
+      const url = URL.createObjectURL(
+        new Blob([epub], { type: "application/epub+zip" }),
+      );
+      return { documents, file: { name: "book.epub", url } };
+    },
     subscribe: (book, edition, clientId, onMessage) =>
       service.subscribe(book, edition, clientId, onMessage),
   };

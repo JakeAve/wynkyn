@@ -24,6 +24,7 @@ import {
   safeName,
 } from "./editions.ts";
 import type { BookStore } from "./store.ts";
+import { type EpubBytes, epubBytes } from "./epub-export.ts";
 
 /** A refused request; `status` is the HTTP status the dev server answers with. */
 export class ServiceError extends Error {
@@ -226,6 +227,16 @@ export class BookService {
     const base = await this.currentMetadata(book, edition);
     const save = this.queueMetaSave(book, edition, base, sections);
     return { version: await contentVersion(save.text) };
+  }
+
+  /** The e-book (spec §7.8), built from the current files. */
+  async exportEpub(book: string, edition: string | null): Promise<EpubBytes> {
+    checkNames(book, edition);
+    await this.flushMetadata(book, edition);
+    return epubBytes(this.store, book, {
+      edition,
+      baseCss: this.buildOpts.baseCss,
+    });
   }
 
   /** Lands a debounced metadata save now (an export reads the file). */

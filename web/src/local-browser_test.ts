@@ -67,6 +67,14 @@ Deno.test({
       );
       await page.keyboard.press("Escape");
 
+      // The e-book is built in the page: a blob link, no server.
+      await page.locator('#modes [data-mode="publish"]').click();
+      await page.getByRole("button", { name: "Export EPUB" }).click();
+      const link = page.locator(".export-status a", { hasText: "book.epub" });
+      await link.waitFor();
+      assert((await link.getAttribute("href"))!.startsWith("blob:"));
+      await page.locator('#modes [data-mode="write"]').click();
+
       // The choice of library is remembered: no dialog, same book, the edit.
       await page.goto(`${url}?book=demo-book`);
       await page.locator('#status[data-kind="saved"]').waitFor();
