@@ -2,6 +2,7 @@
 // panel (spec §7.5). No DOM: everything here is unit-tested in Deno.
 import type {
   CssProps,
+  FolioPosition,
   NumberingStyle,
   Running,
   RunningEntry,
@@ -182,6 +183,35 @@ export function runningSummary(running: Running | undefined): {
     italic: agree((e) => e["font-style"] === "italic") ?? false,
     font: agree((e) => e["font-family"]),
   };
+}
+
+// The simple view's head positions, as [odd area, even area]: odd pages are
+// recto, so outside is the right box on odd and the left on even.
+export const HEAD_AREAS: Record<FolioPosition, [odd: string, even: string]> = {
+  "top-outside": ["top-right", "top-left"],
+  "top-center": ["top-center", "top-center"],
+  "bottom-outside": ["bottom-right", "bottom-left"],
+  "bottom-center": ["bottom-center", "bottom-center"],
+};
+
+// Where the first head on each side sits, as one mirrored position; undefined
+// when there are no heads or they sit where no position puts them.
+export function headPosition(
+  running: Running | undefined,
+): FolioPosition | undefined {
+  const odd = running?.odd?.[0]?.area;
+  const even = running?.even?.[0]?.area;
+  if (!odd && !even) return undefined;
+  return (Object.keys(HEAD_AREAS) as FolioPosition[]).find((p) =>
+    (!odd || HEAD_AREAS[p][0] === odd) && (!even || HEAD_AREAS[p][1] === even)
+  );
+}
+
+// Move the first head on each side to a position; further entries stay put.
+export function setHeadPosition(running: Running, at: FolioPosition): void {
+  const [odd, even] = HEAD_AREAS[at];
+  if (running.odd?.[0]) running.odd[0].area = odd;
+  if (running.even?.[0]) running.even[0].area = even;
 }
 
 // Write one shared property to every entry on both sides; undefined deletes.

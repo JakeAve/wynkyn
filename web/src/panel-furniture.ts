@@ -15,11 +15,14 @@ import {
 } from "../../metadata/css-generator.ts";
 import {
   formatCssLines,
+  HEAD_AREAS,
+  headPosition,
   makeRunningEntry,
   MARGIN_AREAS,
   parseCssLines,
   RUNNING_CONTENT_CHOICES,
   runningSummary,
+  setHeadPosition,
   setRunningShared,
   splitRunningEntry,
 } from "./config-data.ts";
@@ -120,6 +123,67 @@ const POSITIONS: Array<[FolioPosition, string, string]> = [
   ["bottom-center", "bc", "Bottom center"],
 ];
 
+// A two-page spread, four slots a page; both pages light the chosen position.
+// The slot the other furniture (page number or head) sits in is marked taken;
+// `clash` says what to do when the two share a box on body pages.
+function positionPicker(o: {
+  at: () => FolioPosition | undefined;
+  set: (pos: FolioPosition) => void;
+  taken: () => FolioPosition | undefined;
+  takenBy: string;
+  clash: () => string | undefined;
+  unset?: () => [name: string, note: string]; // what to say when `at` is undefined
+}): { nodes: HTMLElement[]; paint: () => void } {
+  const name = el("b", "");
+  const note = el("span", "");
+  const clash = el("p", "hint");
+  const slots: Array<[FolioPosition, HTMLButtonElement]> = [];
+  const paint = () => {
+    const at = o.at();
+    const taken = o.taken();
+    for (const [pos, b] of slots) {
+      b.setAttribute("aria-pressed", String(pos === at));
+      b.classList.toggle("taken", pos === taken);
+      const label = POSITIONS.find(([p]) => p === pos)![2];
+      b.title = pos === taken ? `${label} (${o.takenBy} here)` : label;
+    }
+    name.textContent = at
+      ? POSITIONS.find(([p]) => p === at)![2]
+      : o.unset?.()[0] ?? "";
+    note.textContent = at ? "Mirrored on facing pages." : o.unset?.()[1] ?? "";
+    const text = o.clash();
+    clash.hidden = !text;
+    clash.textContent = text ?? "";
+  };
+  const pageOf = (side: "v" | "r") =>
+    el(
+      "div",
+      `pm ${side}`,
+      ...POSITIONS.map(([pos, cls, label]) => {
+        const b = el("button", `slot ${cls}`);
+        b.type = "button";
+        b.setAttribute(
+          "aria-label",
+          `${label}, ${side === "v" ? "left" : "right"} page`,
+        );
+        b.onclick = () => {
+          o.set(pos);
+          paint();
+        };
+        slots.push([pos, b]);
+        return b;
+      }),
+    );
+  const picker = el(
+    "div",
+    "pospick",
+    el("div", "spread-mini", pageOf("v"), pageOf("r")),
+    el("div", "label", name, note),
+  );
+  paint();
+  return { nodes: [picker, clash], paint };
+}
+
 function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
   const numbering = ctx.meta.numbering ??= {};
   const live = () => numbering.pages; // the dots read the current value
@@ -156,54 +220,27 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
     ctx.queueSave("numbering");
   };
 
-  // Position: a two-page spread, four slots a page; both pages light the
-  // chosen position. The default, bottom center, is stored as no key.
-  const name = el("b", "");
-  const clash = el("p", "hint");
-  const slots: Array<[FolioPosition, HTMLButtonElement]> = [];
-  const paint = () => {
-    const at = live()?.position ?? "bottom-center";
-    for (const [pos, b] of slots) {
-      b.setAttribute("aria-pressed", String(pos === at));
-    }
-    name.textContent = POSITIONS.find(([p]) => p === at)?.[2] ?? at;
-    const area = folioClash(at, ctx.meta.running);
-    clash.hidden = !area;
-    clash.textContent = area
-      ? `A running head is set at ${area} too, so body pages show the head there instead of the number. Move one of them.`
-      : "";
-  };
-  const pageOf = (side: "v" | "r") =>
-    el(
-      "div",
-      `pm ${side}`,
-      ...POSITIONS.map(([pos, cls, label]) => {
-        const b = el("button", `slot ${cls}`);
-        b.type = "button";
-        b.title = label;
-        b.setAttribute(
-          "aria-label",
-          `${label}, ${side === "v" ? "left" : "right"} page`,
-        );
-        b.onclick = () => {
-          const p = numbering.pages ??= {};
-          if (pos === "bottom-center") delete p.position;
-          else p.position = pos;
-          tidy();
-          paint();
-          ctx.queueSave("numbering");
-        };
-        slots.push([pos, b]);
-        return b;
-      }),
-    );
-  const picker = el(
-    "div",
-    "pospick",
-    el("div", "spread-mini", pageOf("v"), pageOf("r")),
-    el("div", "label", name, "Mirrored on facing pages."),
-  );
-  paint();
+  // The default, bottom center, is stored as no key.
+  const position = positionPicker({
+    at: () => live()?.position ?? "bottom-center",
+    set: (pos) => {
+      const p = numbering.pages ??= {};
+      if (pos === "bottom-center") delete p.position;
+      else p.position = pos;
+      tidy();
+      ctx.queueSave("numbering");
+    },
+    taken: () => headPosition(ctx.meta.running),
+    takenBy: "running head",
+    clash: () => {
+      const area = folioClash(
+        live()?.position ?? "bottom-center",
+        ctx.meta.running,
+      );
+      return area &&
+        `A running head is set at ${area} too, so body pages show the head there instead of the number. Move one of them.`;
+    },
+  });
 
   const FOLIO = ["font-size", "font-family", "font-style"];
   const zones = ZONES.map(([zone, label]) => {
@@ -236,8 +273,7 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
 
   return [
     section("Position", "position", [
-      picker,
-      clash,
+      ...position.nodes,
       view.mark(
         row(
           "Gap from text",
@@ -346,6 +382,7 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
   const advanced = advancedHeads(ctx, running, () => {
     drawSimple();
     drawSummary();
+    position.paint();
   });
   const details = el(
     "details",
@@ -362,6 +399,7 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
   details.addEventListener("change", () => {
     drawSimple();
     drawSummary();
+    position.paint();
   });
 
   const drawSummary = () => {
@@ -377,7 +415,28 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
     ctx.queueSave("running");
     advanced.render();
     drawSummary();
+    position.paint();
   };
+
+  const folioAt = () => ctx.meta.numbering?.pages?.position ?? "bottom-center";
+  const position = positionPicker({
+    at: () => headPosition(running),
+    set: (pos) => {
+      setHeadPosition(running, pos);
+      changed();
+    },
+    taken: folioAt,
+    takenBy: "page number",
+    clash: () => {
+      const area = folioClash(folioAt(), running);
+      return area &&
+        `The page number is set at ${area} too, so body pages show the head there instead of the number. Move one of them.`;
+    },
+    unset: () =>
+      running.odd?.length || running.even?.length
+        ? ["Custom", "Placed under More CSS and layout."]
+        : ["No heads", "Choose what the heads say first."],
+  });
 
   const sideRow = (side: "odd" | "even", label: string, current: string) => {
     const options = HEADS.some((o) => o.value === current)
@@ -393,12 +452,14 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
           const entries = running[side] ??= [];
           if (entries[0]) entries[0].content = v;
           else {
-            // First head on this side: mirror the other side's styling.
+            // First head on this side: mirror the other side's styling and
+            // position.
             const other = running[side === "odd" ? "even" : "odd"]?.[0];
+            const at = HEAD_AREAS[headPosition(running) ?? "top-outside"];
             entries.push({
               ...other,
               content: v,
-              area: side === "odd" ? "top-right" : "top-left",
+              area: side === "odd" ? at[0] : at[1],
             });
           }
           changed();
@@ -485,8 +546,8 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
   drawSimple();
   drawSummary();
   return [
-    section("Content", "content", [
-      content,
+    section("Position", "position", [
+      ...position.nodes,
       view.mark(
         row(
           "Gap from text",
@@ -504,6 +565,7 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
         () => !!running.gap,
       ),
     ]),
+    section("Content", "content", [content]),
     section("Type", "type", [type, details]),
     dropped([
       ["Blank and display pages", "No head"],
