@@ -2,6 +2,11 @@
 // Placed beside base.css (not a .ts module, so no import — just a text-based
 // structural check), following the repo's X_test.ts-next-to-X convention.
 import { assert, assertEquals } from "@std/assert";
+import { chromium } from "playwright";
+import { generateDomCSS } from "../metadata/css-generator.ts";
+import { parse } from "../parser/parser.ts";
+import { hasChrome } from "../testing/chrome.ts";
+import { render } from "./render.ts";
 
 Deno.test("TOC rules in base.css keep zero own-specificity via :where() (review fix, plan 7 task 4)", () => {
   const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url))
@@ -63,4 +68,98 @@ Deno.test("display matter's page rule outranks the zone rules regardless of CSS 
       `"${sel}" must outrank .zone-front`,
     );
   }
+});
+
+Deno.test({
+  name:
+    "lines and opening paragraphs stay flush even when a book sets its own paragraph indent",
+  ignore: !hasChrome,
+  fn: async () => {
+    const html = render(parse([
+      "{matter: title-page}",
+      "{title}",
+      "T",
+      "{publisher}",
+      "Scribner",
+      "{matter: dedication}",
+      "Once again\\",
+      "to Zelda",
+      "{chapter: a}",
+      "{title}",
+      "A",
+      "",
+      "Opening.",
+      "",
+      "Indented.",
+      "",
+      "{heading}",
+      "H",
+      "",
+      "After heading.",
+      "",
+      "{pullquote}",
+      "Pulled.",
+      "{/pullquote}",
+      "",
+      "After pullquote.",
+      "",
+      "{poem}",
+      "A line.",
+      "{/poem}",
+      "{attribution}",
+      "Anon.",
+      "",
+      "{sidebar}",
+      "Boxed.",
+      "{/sidebar}",
+      "",
+      "{columns: 2}",
+      "Left.",
+      "",
+      "{col}",
+      "",
+      "Right.",
+      "{/columns}",
+      "{matter: colophon}",
+      "{typeface}",
+      "Set in Garamond.",
+    ].join("\n")));
+    const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url)) +
+      generateDomCSS({
+        elements: {
+          paragraph: { "text-indent": "20px" },
+          colophon: { "text-indent": "7px" },
+        },
+      });
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(`<style>${css}</style>${html}`);
+      const indents = Object.fromEntries(
+        await page.$$eval(
+          ".bml p",
+          (ps) =>
+            ps.map((p) => [p.textContent!, getComputedStyle(p).textIndent]),
+        ),
+      );
+      assertEquals(indents, {
+        "Scribner": "0px",
+        "Once againto Zelda": "0px",
+        "Opening.": "0px",
+        "Indented.": "20px",
+        "After heading.": "0px",
+        "Pulled.": "0px",
+        "After pullquote.": "20px",
+        "A line.": "0px",
+        "Anon.": "0px",
+        "Boxed.": "0px",
+        "Left.": "0px",
+        "Right.": "0px",
+        // The section's own indent reaches its lines.
+        "Set in Garamond.": "7px",
+      });
+    } finally {
+      await browser.close();
+    }
+  },
 });

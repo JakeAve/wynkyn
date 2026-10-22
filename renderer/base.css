@@ -19,6 +19,8 @@
 .bml p.has-dropcap,
 .bml p.lead,
 .bml blockquote p,
+.bml .pullquote p,
+.bml .attribution,
 .bml .stanza,
 .bml .verse {
   text-indent: 0;
@@ -215,12 +217,20 @@
 .bml .matter-colophon {
   page: display;
 }
-/* Title and copyright pages set lines, not prose: no paragraph indent, and a
-   title page is centred unless the book says otherwise. :where() keeps these
-   under any two-class override from metadata. */
-.bml :where(.matter-title-page, .matter-copyright) p {
-  text-indent: 0;
+/* Display matter sets lines, not prose: its paragraphs take their indent from
+   the section (none by default), so centred lines centre and a book can still
+   say `dedication: { "text-indent": "1.5em" }`. Two classes outrank the
+   metadata's `.bml p`; after `.lead` above so the section decides there too. */
+.bml .matter-half-title p,
+.bml .matter-title-page p,
+.bml .matter-copyright p,
+.bml .matter-dedication p,
+.bml .matter-epigraph p,
+.bml .matter-colophon p {
+  text-indent: inherit;
 }
+/* A title page is centred unless the book says otherwise. :where() keeps this
+   under any two-class override from metadata. */
 .bml :where(.matter-title-page) {
   text-align: center;
 }

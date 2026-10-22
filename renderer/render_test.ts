@@ -169,6 +169,22 @@ Deno.test("a paragraph after a title or a break is marked .lead, not indented", 
   assertStringIncludes(html, "<p>Plain.</p>");
 });
 
+Deno.test("a paragraph after a heading or first in its container is .lead", () => {
+  const html = render(
+    parse(
+      "{matter: dedication}\nFor Zelda\n\n{chapter: a}\n{title}\nA\n\nOne.\n\n" +
+        "{heading}\nH\n\nAfter heading.\n\n{sidebar}\nBoxed.\n\nSecond.\n{/sidebar}\n\n" +
+        "Resumed.",
+    ),
+  );
+  assertStringIncludes(html, '<p class="lead">For Zelda</p>');
+  assertStringIncludes(html, '<p class="lead">After heading.</p>');
+  assertStringIncludes(html, '<p class="lead">Boxed.</p>');
+  assertStringIncludes(html, "<p>Second.</p>");
+  // After a block the text may be a new paragraph; it keeps its indent.
+  assertStringIncludes(html, "<p>Resumed.</p>");
+});
+
 Deno.test("endnotes collect at the end of the structural block", () => {
   const html = render(
     parse(

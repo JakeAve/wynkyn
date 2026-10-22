@@ -1270,8 +1270,13 @@ styles the emphasis element (§3.2.7) inside its parent, so
 `title-page → subtitle → em` is `.matter-title-page .subtitle em`. `paragraph`
 styles body paragraphs (`.bml p`); its typical keys are `text-indent` (the base
 default is `1.5em`) and `margin-top` in `lh` units for space between paragraphs
-(`"0.5lh"`). The paragraph that opens a block (`.lead`, after a title or break)
-and the drop-cap paragraph stay flush and tight whatever `paragraph` says.
+(`"0.5lh"`). The paragraph that opens a block (`.lead`: first in its container,
+or after a title, heading or break) and the drop-cap paragraph stay flush and
+tight whatever `paragraph` says; one after a quote, poem, list or other block
+keeps its indent. Pullquote text and attributions are flush. Display matter
+(half-title, title-page, copyright, dedication, epigraph, colophon) sets lines,
+not prose: its paragraphs take `text-indent` from the section, none by default,
+so `"dedication": { "text-indent": "1.5em" }` indents a dedication.
 
 ```json
 "elements": {
