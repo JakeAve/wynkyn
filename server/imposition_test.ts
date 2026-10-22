@@ -92,6 +92,15 @@ Deno.test("impose: pads to a signature multiple with blanks at the end", () => {
   assertEquals(pages(last.back), [null, null]); // 14, 15 blank
 });
 
+Deno.test("impose: a tail page lands last, the blanks before it", () => {
+  const r = impose(13, { ...base, folios: 1, tail: 1 });
+  const last = r.sheets[3]!;
+  assertEquals(pages(last.front), [13, null]); // page 16 is the colophon
+  assertEquals(pages(last.back), [null, null]); // 13, 14, 15 blank
+  // No padding to absorb: the tail stays where it is.
+  assertEquals(pages(impose(4, { ...base, tail: 1 }).sheets[0]!.front), [4, 1]);
+});
+
 Deno.test("impose: odd folio count on a 4-up sheet leaves a blank folio slot", () => {
   const r = impose(12, { ...base, folios: 3, page: { w: 3.5, h: 8.5 } });
   assertEquals(r.sheetsPerSignature, 2);

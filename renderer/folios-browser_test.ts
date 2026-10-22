@@ -197,7 +197,10 @@ Deno.test({
       assertEquals(map[0].display, true);
       const one = map.findIndex((p) => p.anchors.includes("one"));
       assertEquals(map[one].folioText, "1");
-      assert(map.slice(1, one).every((p) => /^[ivx]+$/.test(p.folioText)));
+      // (the blank verso ahead of a recto opener shows none)
+      assert(
+        map.slice(1, one).every((p) => p.blank || /^[ivx]+$/.test(p.folioText)),
+      );
 
       const folios = anchorFolios(map);
       for (const [id, text] of Object.entries(second.toc)) {

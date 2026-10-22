@@ -70,6 +70,15 @@
 :where(.bml .matter) {
   break-before: page;
 }
+/* Chicago: front- and back-matter sections, parts and the body open on a
+   recto. The copyright page is the title page's verso, and the colophon is
+   pinned to the last page when printed (server/imposition.ts), so neither
+   earns a blank. */
+:where(.bml .part),
+:where(.bml .body-start),
+:where(.bml .matter:not(.matter-copyright):not(.matter-colophon)) {
+  break-before: right;
+}
 .bml .title,
 .bml .number {
   text-indent: 0;

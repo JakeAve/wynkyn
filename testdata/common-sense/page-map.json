@@ -2,39 +2,46 @@
   "zones": {
     "front": [
       1,
-      6
+      10
     ],
     "body": [
-      7,
-      58
+      11,
+      64
     ],
     "back": [
-      59,
-      76
+      65,
+      82
     ]
   },
   "anchors": {
     "matter-preface": "i",
-    "matter-half-title": "ii",
-    "matter-title-page": "iii",
-    "matter-toc": "iv",
-    "matter-introduction": "v",
+    "matter-half-title": "iii",
+    "matter-title-page": "v",
+    "matter-toc": "vii",
+    "matter-introduction": "ix",
     "part-one": "1",
     "origin-of-government": "2",
     "monarchy": "9",
     "1-samuel-8": "12",
-    "part-two": "20",
-    "american-affairs": "21",
-    "fnref-massanello": "39",
-    "note-massanello": "39",
-    "american-ability": "41",
-    "fnref-burgh-representation": "51",
-    "note-burgh-representation": "51",
-    "matter-appendix": "53",
-    "matter-address": "63",
-    "fnref-barclay-address": "65",
-    "note-barclay-address": "65",
-    "matter-colophon": "70"
+    "part-two": "21",
+    "american-affairs": "22",
+    "fnref-massanello": "40",
+    "note-massanello": "40",
+    "american-ability": "42",
+    "fnref-burgh-representation": "52",
+    "note-burgh-representation": "52",
+    "matter-appendix": "55",
+    "matter-address": "65",
+    "fnref-barclay-address": "67",
+    "note-barclay-address": "67",
+    "matter-colophon": "72"
   },
-  "blanks": []
+  "blanks": [
+    2,
+    4,
+    6,
+    8,
+    30,
+    64
+  ]
 }

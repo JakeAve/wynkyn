@@ -30,7 +30,10 @@ Deno.test("zones, matter classes and ids", () => {
     html,
     '<section class="matter matter-half-title zone-front" id="matter-half-title">',
   );
-  assertStringIncludes(html, '<section class="chapter zone-body" id="one">');
+  assertStringIncludes(
+    html,
+    '<section class="chapter zone-body body-start" id="one">',
+  );
   assertStringIncludes(
     html,
     '<section class="matter matter-colophon zone-back" id="matter-colophon">',
@@ -40,7 +43,10 @@ Deno.test("zones, matter classes and ids", () => {
 
 Deno.test("zone class goes on parts, not on the chapters inside them", () => {
   const html = render(parse("{part: p}\n{chapter: a}\nX\n{chapter: b}\nY"));
-  assertStringIncludes(html, '<section class="part zone-body" id="p">');
+  assertStringIncludes(
+    html,
+    '<section class="part zone-body body-start" id="p">',
+  );
   assertStringIncludes(html, '<section class="chapter" id="a">');
   assertEquals(html.match(/zone-body/g)?.length, 1);
 });
@@ -54,7 +60,10 @@ Deno.test("chapter: id from slug, numbered title per opts.numbering", () => {
       },
     },
   );
-  assertStringIncludes(html, '<section class="chapter zone-body" id="thaw">');
+  assertStringIncludes(
+    html,
+    '<section class="chapter zone-body body-start" id="thaw">',
+  );
   assertStringIncludes(html, '<div class="number">I.</div>');
   assertStringIncludes(html, '<h1 class="title">The First Thaw</h1>');
 });
@@ -71,7 +80,10 @@ Deno.test("chapter numbers continue across parts; parts numbered separately", ()
       },
     },
   );
-  assertStringIncludes(html, '<section class="part zone-body" id="one">');
+  assertStringIncludes(
+    html,
+    '<section class="part zone-body body-start" id="one">',
+  );
   assertStringIncludes(html, '<div class="number">Part I</div>');
   assertStringIncludes(html, '<div class="number">Part II</div>');
   // chapter c is the third chapter overall

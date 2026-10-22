@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { pageNumberingConfig } from "../metadata/css-generator.ts";
+import { parse } from "../parser/parser.ts";
 import { PAGED_JS, toHtml } from "../server/pipeline.ts";
 import { hasChrome } from "../testing/chrome.ts";
 
@@ -68,6 +69,7 @@ Deno.test({
         book: "t",
         edition: null,
         bookTitle: "T",
+        doc: parse(""),
         fontLinks: "",
         diagnostics: [],
         html: body,
