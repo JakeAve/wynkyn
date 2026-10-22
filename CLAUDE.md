@@ -76,8 +76,10 @@ mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
   `deno task serve:site` serves it on http://localhost:8010 the way any static
   host would (no API: the app picks a folder and runs the service itself). Deno
   Deploy builds it with that task and serves `dist/` (second-brain
-  `playbooks/deno-deploy.md`); the app's server-side Proof / Export / EPUB
-  buttons say so and Print runs in the browser
+  `playbooks/deno-deploy.md`). There, Print and Export EPUB run in the browser
+  (`web/src/book-zip.ts` zips a book for download out of browser storage); the
+  Chrome print export (Proof / Export) says it isn't available; browsers without
+  the File System Access API get a banner pointing at Chrome, Edge or Brave
 - `deno task test` all tests (`*_test.ts` next to each module, ~50 s with
   Chrome); `deno task test:fast` skips the Chrome tests (~10 s, what pre-commit
   runs). `web/src/local-browser_test.ts` drives the built `dist/` with no

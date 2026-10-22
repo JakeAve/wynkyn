@@ -90,3 +90,34 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "local library: a browser without the File System Access API " +
+    "gets the banner and no folder button",
+  ignore: !hasChrome || !siteBuilt,
+  async fn() {
+    const site = serveSite(DIST, 0);
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      await page.addInitScript(() => {
+        // deno-lint-ignore no-explicit-any
+        delete (globalThis as any).showDirectoryPicker;
+      });
+      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.locator("#library[open]").waitFor();
+      assertEquals(await page.locator("#lib-pick").isVisible(), false);
+      assertEquals(await page.locator("#browser-banner").isVisible(), true);
+      // The modal library dialog sits over the banner until a library is chosen.
+      await page.locator("#lib-import").setInputFiles(
+        new URL("../../server/testdata/demo-book", import.meta.url).pathname,
+      );
+      await page.locator('#status[data-kind="saved"]').waitFor();
+      await page.locator("#browser-banner-close").click();
+      assertEquals(await page.locator("#browser-banner").isVisible(), false);
+    } finally {
+      await browser.close();
+      await site.shutdown();
+    }
+  },
+});

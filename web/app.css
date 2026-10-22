@@ -1986,6 +1986,9 @@ summary {
   font-size: 13px;
   line-height: 1.4;
 }
+#browser-banner[hidden] {
+  display: none;
+}
 #browser-banner span {
   flex: 1;
 }
