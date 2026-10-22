@@ -237,8 +237,8 @@ export async function localAssets(): Promise<
   { baseCss: string; template: string }
 > {
   const [baseCss, template] = await Promise.all([
-    fetch("/renderer/base.css").then((r) => r.text()),
-    fetch("/templates/metadata.json").then((r) => r.text()),
+    fetch("renderer/base.css").then((r) => r.text()),
+    fetch("templates/metadata.json").then((r) => r.text()),
   ]);
   return { baseCss, template };
 }
