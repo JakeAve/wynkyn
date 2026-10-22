@@ -14,7 +14,10 @@ export const hasChrome: boolean = Deno.env.get("SKIP_CHROME")
       });
       await browser.close();
       return true;
-    } catch {
+    } catch (e) {
+      // On CI a missing Chrome must fail the run, not quietly skip every
+      // browser test and go green.
+      if (Deno.env.get("CI")) throw e;
       return false;
     }
   })();
