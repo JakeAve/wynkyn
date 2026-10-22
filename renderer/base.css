@@ -91,21 +91,32 @@
 :where(.bml .chapter) > .title {
   break-after: avoid;
 }
-.bml blockquote {
+/* Zero own-specificity so a book's `quote`, `epigraph` and `poem` margins win
+   (a bare `.bml blockquote` outranks the generated `.quote`). An epigraph is a
+   block as wide as its longest line, centred, so verse keeps its lines and the
+   attribution sets right against them. */
+:where(.bml blockquote) {
   margin: 1em 2em;
 }
-.bml .break {
+:where(.bml .epigraph) {
+  width: fit-content;
+  max-width: 100%;
+  margin: 1em auto;
+}
+/* Zero own-specificity, like blockquote above, so a book's `break` and
+   `illustration` styles win. */
+:where(.bml .break) {
   text-align: center;
   margin: 1em 0;
 }
-.bml .poem,
-.bml .verses {
+:where(.bml .poem),
+:where(.bml .verses) {
   margin: 1em 0;
 }
 .bml .verse .number {
   padding-right: 0.3em;
 }
-.bml figure {
+:where(.bml figure) {
   margin: 1em 0;
   text-align: center;
 }

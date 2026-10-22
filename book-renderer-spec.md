@@ -637,7 +637,8 @@ The morning came slowly...
 #### 3.5.5 Epigraphs (Chapter-Level)
 
 A quotation opening a chapter. Placed after the chapter title, before the first
-paragraph.
+paragraph. An epigraph, here or book-level, is set as a block as wide as its
+longest line and centred; `"epigraph": { "margin-left": … }` overrides that.
 
 ```
 {chapter: river}
@@ -1341,7 +1342,7 @@ so `"dedication": { "text-indent": "1.5em" }` indents a dedication.
   "subheading": { "font-size": "11pt", "font-style": "italic" },
 
   "epigraph": {
-    "text": { "font-size": "9.5pt", "font-style": "italic", "margin-left": "15%" },
+    "text": { "font-size": "9.5pt", "font-style": "italic" },
     "attribution": { "font-size": "8.5pt", "text-align": "right" }
   },
 

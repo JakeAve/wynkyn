@@ -108,8 +108,7 @@
     "epigraph": {
       "text": {
         "font-size": "9.5pt",
-        "font-style": "italic",
-        "margin-left": "15%"
+        "font-style": "italic"
       },
       "attribution": {
         "font-size": "8.5pt",

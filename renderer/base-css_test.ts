@@ -163,3 +163,78 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name:
+    "a book's quote, poem, break and illustration margins beat base.css; an epigraph centres as wide as its longest line",
+  ignore: !hasChrome,
+  fn: async () => {
+    const html = render(parse([
+      "{chapter: a}",
+      "{title}",
+      "A",
+      "",
+      "{quote}",
+      "Quoted.",
+      "{/quote}",
+      "",
+      "{poem}",
+      "A line.",
+      "{/poem}",
+      "",
+      "{break}",
+      "",
+      "{illustration: fig}",
+      "",
+      "{epigraph}",
+      "Short line,\\",
+      "and a longer second line.",
+      "{attribution}",
+      "Anon.",
+    ].join("\n")));
+    const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url)) +
+      generateDomCSS({
+        elements: {
+          quote: { "margin-left": "30px" },
+          poem: { "margin-left": "40px" },
+          break: { "margin-top": "50px" },
+          illustration: { "margin-top": "60px" },
+        },
+      });
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(
+        `<style>body { margin: 0; width: 600px }${css}</style>${html}`,
+      );
+      const m = await page.evaluate(() => {
+        const box = (s: string) => {
+          const r = document.querySelector(s)!.getBoundingClientRect();
+          return [Math.round(r.left), Math.round(r.right)];
+        };
+        const text = document.querySelector(".epigraph .text")!;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        return {
+          quote: getComputedStyle(document.querySelector(".quote")!).marginLeft,
+          poem: getComputedStyle(document.querySelector(".poem")!).marginLeft,
+          break: getComputedStyle(document.querySelector(".break")!).marginTop,
+          illustration: getComputedStyle(
+            document.querySelector(".illustration")!,
+          ).marginTop,
+          epigraph: box(".epigraph"),
+          longest: Math.round(range.getBoundingClientRect().width),
+        };
+      });
+      assertEquals(m.quote, "30px");
+      assertEquals(m.poem, "40px");
+      assertEquals(m.break, "50px");
+      assertEquals(m.illustration, "60px");
+      const [left, right] = m.epigraph as [number, number];
+      assertEquals(right - left, m.longest, "shrinks to its longest line");
+      assert(Math.abs(left - (600 - right)) <= 1, `centred: ${left}..${right}`);
+    } finally {
+      await browser.close();
+    }
+  },
+});
