@@ -852,8 +852,21 @@ async function chooseLibrary(): Promise<BookStore> {
   });
 }
 
+// Without the File System Access API (Firefox, Safari) the app can't open
+// the author's folder, and Safari can't write browser storage from a page
+// either: say so once, and point at the browsers that can.
+function showBrowserBanner(): void {
+  if (canPickFolder() || localStorage.getItem("browser-banner") === "1") return;
+  $("browser-banner").hidden = false;
+  $("browser-banner-close").onclick = () => {
+    $("browser-banner").hidden = true;
+    localStorage.setItem("browser-banner", "1");
+  };
+}
+
 async function connect(): Promise<Backend> {
   if (await hasServer()) return httpBackend();
+  showBrowserBanner();
   const [assets, store] = await Promise.all([localAssets(), chooseLibrary()]);
   return localBackend(store, assets);
 }

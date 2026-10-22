@@ -1975,3 +1975,17 @@ summary {
   font-weight: normal;
   margin-top: 2px;
 }
+#browser-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.4;
+}
+#browser-banner span {
+  flex: 1;
+}
