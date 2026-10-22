@@ -162,13 +162,16 @@
       <p>A book is a folder with a <code>manuscript.md</code> and a
         <code>metadata.json</code>. Wynkyn edits those files in place;
         nothing leaves this computer.</p>
-      <div class="acts">
-        <button id="lib-reopen" class="btn" hidden></button>
-        <button id="lib-pick" class="btn">Open my books folder…</button>
-        <button id="lib-browser" class="btn">Keep books in this browser
+      <div class="choices">
+        <button id="lib-reopen" class="choice primary" hidden></button>
+        <button id="lib-pick" class="choice">Open my books folder…
+          <small>Edits land in the folder you pick. Chrome, Edge or
+            Brave.</small></button>
+        <button id="lib-browser" class="choice">Keep books in this browser
           <small>Not for the long run: browsers clear site storage. Download
             what you want to keep.</small></button>
-        <label class="btn">Import a folder into this browser…
+        <label class="choice">Import a folder into this browser…
+          <small>Copies a folder into browser storage.</small>
           <input id="lib-import" type="file" webkitdirectory multiple hidden>
         </label>
       </div>

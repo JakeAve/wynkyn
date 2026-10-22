@@ -828,6 +828,8 @@ async function chooseLibrary(): Promise<BookStore> {
       };
     }
     $("lib-pick").hidden = !canPickFolder();
+    // The safe default is the pill: the remembered folder, else a new one.
+    $("lib-pick").classList.toggle("primary", !remembered);
     $("lib-pick").onclick = () =>
       pickFolder().then((d) => done(handleStore(d), "folder"), fail);
     $("lib-browser").onclick = () =>

@@ -1946,16 +1946,64 @@ summary {
   font-size: 13px;
   line-height: 1.4;
 }
-#library .acts {
+/* Choice list: a column of full-width rows, each a title with an optional
+   <small> note, for a dialog that asks one question. Rows separate with
+   --soft; `.primary` is the inverted pill, for the safe default. */
+.choices {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
+  margin: 0 -10px;
 }
-#library .acts .btn {
-  justify-content: flex-start;
-  height: auto;
-  padding: 8px 10px;
+.choice {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 10px;
+  border: 0;
+  border-top: 1px solid var(--soft);
+  border-radius: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.choice[hidden] {
+  display: none;
+}
+.choice:first-child,
+.choice[hidden] + .choice,
+.choice.primary + .choice {
+  border-top: 0;
+}
+.choice:hover {
+  background: var(--hover);
+}
+.choice:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: -2px;
+}
+.choice small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.choice.primary {
+  margin-bottom: 4px;
+  border-top: 0;
+  border-radius: var(--radius);
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+.choice.primary:hover {
+  background: var(--inv-bg);
+  opacity: .92;
+}
+.choice.primary small {
+  color: var(--inv-fg);
+  opacity: .7;
 }
 #library .sw-err {
   display: block;
@@ -1967,13 +2015,6 @@ summary {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
-}
-#library .btn small {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: normal;
-  margin-top: 2px;
 }
 #browser-banner {
   display: flex;

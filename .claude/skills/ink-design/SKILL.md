@@ -34,7 +34,14 @@ editor reconfigure.
 ## Patterns
 
 - **Ghost buttons** (`.btn`): no background, no border, `--muted` text, radius
-  `--radius`; hover gets `--hover`, the active one is the inverted pill.
+  `--radius`; hover gets `--hover`, the active one is the inverted pill. They
+  are one-line labels (`white-space: nowrap`); text that may wrap is not a
+  `.btn`.
+- **Choice lists** (`.choices` > `.choice`): a dialog that asks one question
+  answers it with full-width rows, a `--fg` title over an optional `<small>`
+  note in `--muted`, separated with `--soft`, `--hover` wash. The safe default
+  carries `.primary` — the inverted pill, the one place it means "recommended"
+  rather than "active". The library dialog (`#library`) is the reference.
 - **Sections** separate with a 1px `--line`, never a box or a card. Rows inside
   a list separate with `--soft`.
 - **Hierarchy** is weight, size and `--muted`, not colour. There are no
