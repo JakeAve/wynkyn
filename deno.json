@@ -1,12 +1,13 @@
 {
   "tasks": {
-    "setup": "git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/pre-push",
+    "setup": "deno run --allow-read --allow-write --allow-run=git --allow-env scripts/setup.ts",
     "check": "deno fmt --check . && deno lint . && deno check",
     "test": "deno test --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys",
+    "test:fast": "SKIP_CHROME=1 deno task test",
     "build:web": "deno check web/src/app.ts && deno bundle --platform browser --output web/app.js web/src/app.ts",
+    "dev": "deno task build:web && (deno bundle --watch --platform browser --output web/app.js web/src/app.ts & deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys --watch=web/app.js,web/index.html,web/app.css,renderer/,vendor/ server/dev-server.ts)",
     "bml": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys bml.ts",
-    "dev": "deno task build:web && deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys server/dev-server.ts",
-    "pre-commit": "deno task check && deno task test",
+    "pre-commit": "deno task check && deno task test:fast",
     "pre-push": "deno task check && deno task test",
     "fonts": "deno run --allow-net=fonts.google.com --allow-write=metadata metadata/update-fonts.ts && deno fmt metadata/fonts-catalog.ts"
   },

@@ -7,6 +7,7 @@ import {
   type ServerMessage,
 } from "./pipeline.ts";
 import { watchTree } from "./watch.ts";
+import { defaultPort } from "./port.ts";
 import { upgradePageSetup } from "../metadata/upgrade.ts";
 import type { Metadata } from "../metadata/types.ts";
 import {
@@ -75,7 +76,13 @@ export async function startServer(
   opts: ServerOptions = {},
 ): Promise<RunningServer> {
   const booksRoot = opts.booksRoot ?? "books";
-  await Deno.stat(booksRoot); // fail fast at startup if the root is missing
+  try {
+    await Deno.stat(booksRoot); // fail fast at startup if the root is missing
+  } catch {
+    throw new Error(
+      `${booksRoot}/ not found — in a worktree, \`deno task setup\` links it to the main checkout's library`,
+    );
+  }
 
   // watchFs reports resolved absolute paths (on macOS /var/… is realpathed to
   // /private/var/…), so map events back to book names via the root's realpath.
@@ -912,6 +919,6 @@ export async function startServer(
 }
 
 if (import.meta.main) {
-  const running = await startServer({ port: Number(Deno.args[0] ?? "8000") });
+  const running = await startServer({ port: defaultPort() });
   console.log(`book editor dev server → http://localhost:${running.port}/`);
 }

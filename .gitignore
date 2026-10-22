@@ -9,3 +9,4 @@ web/app.js
 .playwright-profile
 .impeccable
 .worktrees
+.claude/launch.json

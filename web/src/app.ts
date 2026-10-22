@@ -1109,7 +1109,20 @@ async function main(): Promise<void> {
     `ws://${location.host}/ws${editionHref(book, edition)}&client=${clientId}`,
   );
   ws.onopen = () => setStatus("saved");
-  ws.onclose = () => setStatus("offline", "Restart the server and reload");
+  ws.onclose = () => {
+    // `deno task dev` restarts the server when app code changes; follow it
+    // back with a fresh page, unless that would drop an unsaved edit.
+    setStatus("offline", "Reconnecting…");
+    const retry = setInterval(async () => {
+      const up = await fetch("/").then((r) => r.ok, () => false);
+      if (!up) return;
+      clearInterval(retry);
+      if (
+        dirty || saveInFlight || metaSaveInFlight || configPanel?.isDirty()
+      ) setStatus("offline", "Server restarted — reload to reconnect");
+      else location.reload();
+    }, 500);
+  };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data) as ServerMessage;
     if (msg.type === "error") {

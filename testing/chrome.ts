@@ -3,15 +3,18 @@
 // gives up after 15s. Cached per process.
 import { chromium } from "playwright";
 
-export const hasChrome: boolean = await (async () => {
-  try {
-    const browser = await chromium.launch({
-      channel: "chrome",
-      timeout: 15_000,
-    });
-    await browser.close();
-    return true;
-  } catch {
-    return false;
-  }
-})();
+// `SKIP_CHROME=1` (the `test:fast` task, pre-commit) skips the browser tests outright.
+export const hasChrome: boolean = Deno.env.get("SKIP_CHROME")
+  ? false
+  : await (async () => {
+    try {
+      const browser = await chromium.launch({
+        channel: "chrome",
+        timeout: 15_000,
+      });
+      await browser.close();
+      return true;
+    } catch {
+      return false;
+    }
+  })();
