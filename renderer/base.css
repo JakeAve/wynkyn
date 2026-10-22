@@ -224,3 +224,16 @@
 .bml :where(.matter-title-page) {
   text-align: center;
 }
+/* The copyright page sits at the foot of its text block (§3.4.3); a book moves
+   it with `copyright: { "justify-content": "flex-start" | "center" }`. Paged.js
+   gives the page's content div a height, so stretch the tree on this page only.
+   Unpaged (EPUB) it is a plain column. */
+.pagedjs_page_content > div > .bml:has(> .matter-copyright) {
+  height: 100%;
+}
+:where(.bml .matter-copyright) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}

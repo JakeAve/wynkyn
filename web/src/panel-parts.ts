@@ -162,6 +162,7 @@ const LABELS: Record<string, string> = {
   break: "Scene break",
   footnote: "Note text",
   "verses.number": "Verse numbers",
+  copyright: "Whole page",
   "copyright.isbn": "ISBN",
 };
 
@@ -501,6 +502,37 @@ function extrasFor(
         v.mark(row("Ornament", o), () => "content" in getProps(meta, entry)),
       ],
       controlled: ["content"],
+    };
+  }
+  if (entry.key === "copyright") {
+    // base.css stacks the page at the foot; Bottom stores nothing.
+    const cur = getProps(meta, entry)["justify-content"];
+    return {
+      rows: [v.mark(
+        row(
+          "On the page",
+          seg(
+            [
+              { label: "Top", value: "flex-start" },
+              { label: "Middle", value: "center" },
+              { label: "Bottom", value: "flex-end" },
+            ],
+            cur ?? "flex-end",
+            (j) => {
+              put(
+                meta,
+                entry,
+                "justify-content",
+                j === "flex-end" ? undefined : j,
+              );
+              v.changed(entry.section);
+            },
+            "Copyright position on the page",
+          ),
+        ),
+        () => "justify-content" in getProps(meta, entry),
+      )],
+      controlled: ["justify-content"],
     };
   }
   if (entry.key === "footnote") {

@@ -34,6 +34,7 @@ const ELEMENTS: Array<[string, string, string[]]> = [
     "epigraph",
     "imprint",
   ]],
+  ["Copyright", "copyright", []], // the page: position, shared type
   ["Copyright", "copyright", ["copyright-line", "rights", "isbn", "edition"]],
   ["Dedication", "dedication", []],
   ["Contents", "toc", [

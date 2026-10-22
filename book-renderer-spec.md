@@ -476,6 +476,11 @@ Printed and bound by hand in Edinburgh
 %%  Add CIP data here if seeking library distribution
 ```
 
+The copyright page sits at the foot of its text block by default, as is
+conventional. `"justify-content"` on the `copyright` section moves it:
+`"flex-start"` (top), `"center"` (middle) or `"flex-end"` (bottom, the default).
+The style panel's Copyright part sets it as "On the page".
+
 #### 3.4.4 Dedication
 
 ```
