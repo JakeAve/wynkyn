@@ -3,7 +3,8 @@
 // digest. `UPDATE_GOLDEN=1 deno task test` rewrites the golden files.
 import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
-import { buildBook, toHtml } from "./pipeline.ts";
+import { buildBook } from "./pipeline.ts";
+import { toHtml } from "./export-html.ts";
 import type { PageProblem } from "../renderer/page-map-types.ts";
 import type { Metadata } from "../metadata/types.ts";
 import { hasChrome } from "../testing/chrome.ts";

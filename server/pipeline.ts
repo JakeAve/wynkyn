@@ -1,8 +1,10 @@
-// server/pipeline.ts — one build of one book: files on disk → HTML + CSS strings
-// (spec §5.4). Replaces the Plan 0 throwaway scripts/preview.ts; Plan 5's print
-// export composes the same pipeline.
+// server/pipeline.ts — one build of one book: files in a BookStore → HTML + CSS
+// strings (spec §5.4). Pure over the store, so it runs in Deno (the server,
+// the CLI, print export) and in the browser (the hosted app builds the book
+// itself from the author's own folder). Export-only pieces that need Deno —
+// the vendored Paged.js, the driver, toHtml — live in export-html.ts.
 import { checkOnlySpans, parse } from "../parser/parser.ts";
-import { loadMetadataText } from "../metadata/loader.ts";
+import { parseMetadataText } from "../metadata/loader.ts";
 import {
   generateDomCSS,
   generateFontLinks,
@@ -15,74 +17,25 @@ import {
   editionSlugs,
   editionToken,
   editionTokens,
-  metadataPath,
+  metadataKey,
 } from "./editions.ts";
+import { asStore, type BookStore } from "./store.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
-import type { Seed } from "../renderer/page-map-types.ts";
 import type { NotesConfig } from "../metadata/types.ts";
-
-const BASE_CSS = await Deno.readTextFile(
-  new URL("../renderer/base.css", import.meta.url),
-);
-// Paged.js 0.4.3, vendored (see server/vendor_test.ts). Shared by toHtml and
-// the browser tests so nothing loads it from a CDN.
-export const PAGED_JS = await Deno.readTextFile(
-  new URL("../vendor/pagedjs/paged.js", import.meta.url),
-);
-const PLATES_JS = await Deno.readTextFile(
-  new URL("../renderer/plates.js", import.meta.url),
-);
-const FOLIOS_JS = await Deno.readTextFile(
-  new URL("../renderer/folios.js", import.meta.url),
-);
-
-// Export driver (spec §5.4): starting from BOOK_SEED (the last export's settled
-// folios, or {}), re-render until the page map's folios are the ones the
-// render was seeded with, then leave the outcome on <html> for
-// pdf.ts — data-paged=done|error|fatal plus a JSON report in
-// data-paged-report. "error" is pagination problems (--force exports anyway);
-// "fatal" is the driver itself failing (e.g. Paged.js didn't load), which
-// never exports.
-// The book's <style> is fed to Paged.js explicitly and removed, so it isn't
-// also applied unpolished; Paged.js's removeStyles is never called.
-const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
-  const root = document.documentElement;
-  const styleEl = document.getElementById("book-css");
-  const css = { [location.href]: styleEl.textContent };
-  styleEl.remove();
-  const html = document.body.innerHTML;
-  document.body.innerHTML = "";
-  let previewer = null;
-  let passes = 0;
-  let report;
-  try {
-    const r = await BookPageMap.settle(async (seed) => {
-      previewer?.polisher.destroy();
-      document.querySelector(".pagedjs_pages")?.remove();
-      passes++;
-      previewer = new Paged.Previewer({ pageMap: { seed, numbering: BOOK_NUMBERING } });
-      return (await previewer.preview(html, [css], document.body)).pageMapResult;
-    }, BOOK_SEED);
-    report = {
-      problems: r.problems,
-      passes: r.passes,
-      digest: BookPageMap.digest(r.map),
-      seed: r.seed,
-    };
-  } catch (err) {
-    report = { fatal: String(err), passes };
-  }
-  root.dataset.pagedReport = JSON.stringify(report);
-  root.dataset.paged = report.fatal ? "fatal" : report.problems.length ? "error" : "done";
-});`;
 
 // spec §4.11 item 8: try these in order for each {illustration:}/{dropcap|image:} slug.
 const IMAGE_EXT_ORDER = ["svg", "png", "jpg", "jpeg", "webp"];
 
+export class NotFoundError extends Error {}
+
 export interface BuildOptions {
   imageUrlPrefix?: string; // default /books/<book>/images
+  /** Where the page finds an image, by its file name; overrides the prefix
+   * (the browser serves its own files as object URLs). */
+  imageUrl?: (book: string, name: string) => string | Promise<string>;
   edition?: string | null; // null/undefined = the unnamed edition (metadata.json)
   notes?: NotesConfig; // overrides metadata's note placement (the e-book wants endnotes)
+  baseCss?: string; // renderer/base.css; Deno callers may leave it to be read from disk
 }
 
 export interface BuildResult {
@@ -101,7 +54,7 @@ export interface BuildResult {
   metadataVersion: string | null; // ... of the metadata file text; null if absent
 }
 
-/** What the dev server sends over the WebSocket. */
+/** What the book service sends to a subscribed editor. */
 export type ServerMessage = (BuildResult & { type: "update" }) | {
   type: "error";
   book: string;
@@ -110,8 +63,8 @@ export type ServerMessage = (BuildResult & { type: "update" }) | {
   save?: "metadata"; // a debounced metadata write failed (else a build error)
 };
 
-/** First 16 hex chars of SHA-256. Server-side only: crypto.subtle is undefined
- * in browsers on plain http over a LAN IP. */
+/** First 16 hex chars of SHA-256. Needs a secure context: crypto.subtle is
+ * undefined in browsers on plain http over a LAN IP. */
 export async function contentVersion(text: string): Promise<string> {
   const hash = await crypto.subtle.digest(
     "SHA-256",
@@ -121,33 +74,8 @@ export async function contentVersion(text: string): Promise<string> {
     .map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** `seed`: the page map's starting folios (default {}); print export passes the last one. */
-export function toHtml(b: BuildResult, opts: { seed?: Seed } = {}): string {
-  const json = (v: unknown) => JSON.stringify(v).replaceAll("<", "\\u003c");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${b.bookTitle}</title>
-${b.fontLinks}
-<style id="book-css">${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
-<script>const BOOK_NUMBERING = ${json(b.pageNumbering)};
-const BOOK_SEED = ${json(opts.seed ?? {})};</script>
-<script>${PAGED_JS}</script>
-<script>${PLATES_JS}</script>
-<script>${FOLIOS_JS}</script>
-<script>${DRIVER_JS}</script>
-</head><body>${b.html}</body></html>`;
-}
-
-export async function listBooks(booksRoot: string): Promise<string[]> {
-  const books: string[] = [];
-  for await (const e of Deno.readDir(booksRoot)) {
-    if (!e.isDirectory) continue;
-    try {
-      await Deno.stat(`${booksRoot}/${e.name}/manuscript.md`);
-      books.push(e.name);
-    } catch {
-      // directory without a manuscript — not a book
-    }
-  }
-  return books.sort();
+export function listBooks(root: string | BookStore): Promise<string[]> {
+  return asStore(root).list();
 }
 
 export function extractBookTitle(doc: BmlDocument, fallback: string): string {
@@ -165,56 +93,84 @@ export function extractBookTitle(doc: BmlDocument, fallback: string): string {
   return fallback;
 }
 
-export async function resolveImages(
-  bookDir: string,
-  urlPrefix: string,
+/** slug → the file name that serves it, from the book's images/ folder. */
+export async function imageFiles(
+  store: BookStore,
+  book: string,
 ): Promise<Record<string, string>> {
   const bySlug = new Map<string, Map<string, string>>(); // slug → ext → filename
-  try {
-    for await (const f of Deno.readDir(`${bookDir}/images`)) {
-      if (!f.isFile) continue;
-      const dot = f.name.lastIndexOf(".");
-      if (dot <= 0) continue;
-      const slug = f.name.slice(0, dot);
-      const ext = f.name.slice(dot + 1).toLowerCase();
-      let exts = bySlug.get(slug);
-      if (!exts) bySlug.set(slug, exts = new Map());
-      exts.set(ext, f.name);
-    }
-  } catch {
-    return {}; // no images/ directory — unresolved slugs render placeholders
+  for (const name of await store.listDir(`${book}/images`)) {
+    const dot = name.lastIndexOf(".");
+    if (dot <= 0) continue;
+    const slug = name.slice(0, dot);
+    const ext = name.slice(dot + 1).toLowerCase();
+    let exts = bySlug.get(slug);
+    if (!exts) bySlug.set(slug, exts = new Map());
+    exts.set(ext, name);
   }
-  const images: Record<string, string> = {};
+  const files: Record<string, string> = {};
   for (const [slug, exts] of bySlug) {
     const ext = IMAGE_EXT_ORDER.find((e) => exts.has(e));
-    const name = ext ? exts.get(ext)! : [...exts.values()].sort()[0]!;
-    images[slug] = `${urlPrefix}/${name}`;
+    files[slug] = ext ? exts.get(ext)! : [...exts.values()].sort()[0]!;
+  }
+  return files; // no images/ folder → {}: unresolved slugs render placeholders
+}
+
+export async function resolveImages(
+  root: string | BookStore,
+  book: string,
+  urlPrefix: string,
+  imageUrl?: BuildOptions["imageUrl"],
+): Promise<Record<string, string>> {
+  const images: Record<string, string> = {};
+  for (
+    const [slug, name] of Object.entries(await imageFiles(asStore(root), book))
+  ) {
+    images[slug] = imageUrl
+      ? await imageUrl(book, name)
+      : `${urlPrefix}/${name}`;
   }
   return images;
 }
 
+// Deno callers (CLI, exports, tests) don't carry base.css around; read it once.
+// ponytail: a Deno.* reference inside a function is fine for the browser
+// bundle, which only ever passes `baseCss`.
+let baseCssOnDisk: Promise<string> | undefined;
+const defaultBaseCss = () =>
+  baseCssOnDisk ??= Deno.readTextFile(
+    new URL("../renderer/base.css", import.meta.url),
+  );
+
 export async function buildBook(
-  booksRoot: string,
+  root: string | BookStore,
   book: string,
   opts: BuildOptions = {},
 ): Promise<BuildResult> {
-  const bookDir = `${booksRoot}/${book}`;
+  const store = asStore(root);
   const edition = opts.edition ?? null;
   const imageUrlPrefix = opts.imageUrlPrefix ?? `/books/${book}/images`;
-  const source = await Deno.readTextFile(`${bookDir}/manuscript.md`);
+  const source = await store.readText(`${book}/manuscript.md`);
+  if (source === null) throw new NotFoundError(`no such book: ${book}`);
   // EXPERIMENTAL {only} (spec §3.2.9): keep this edition's spans, flag tokens
   // no edition of this book answers to.
   const doc = parse(source, { edition: editionToken(edition) });
-  const tokens = editionTokens(await editionSlugs(booksRoot, book));
-  const metaPath = metadataPath(booksRoot, book, edition);
-  const loaded = await loadMetadataText(metaPath);
+  const tokens = editionTokens(await editionSlugs(store, book));
+  const metaPath = metadataKey(book, edition);
+  const text = await store.readText(metaPath);
+  const loaded = text === null ? null : parseMetadataText(text, metaPath);
   const meta = loaded?.meta ?? null;
   if (meta === null && edition !== null) {
     // Missing metadata.json is fine (spec §4); a missing named edition is not.
-    throw new Deno.errors.NotFound(`no such edition: ${book}/${edition}`);
+    throw new NotFoundError(`no such edition: ${book}/${edition}`);
   }
   const m = meta ?? {};
-  const images = await resolveImages(bookDir, imageUrlPrefix);
+  const images = await resolveImages(
+    store,
+    book,
+    imageUrlPrefix,
+    opts.imageUrl,
+  );
   const bookTitle = extractBookTitle(doc, book);
   return {
     book,
@@ -227,7 +183,7 @@ export async function buildBook(
       toc: m.toc,
       images,
     }),
-    baseCss: BASE_CSS,
+    baseCss: opts.baseCss ?? await defaultBaseCss(),
     domCss: generateDomCSS(m),
     pagedCss: generatePagedCSS(m, { bookTitle }),
     pageNumbering: pageNumberingConfig(m),

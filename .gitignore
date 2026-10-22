@@ -10,3 +10,4 @@ web/app.js
 .impeccable
 .worktrees
 .claude/launch.json
+dist

@@ -1,6 +1,12 @@
 // server/pipeline_test.ts
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { buildBook, contentVersion, listBooks, toHtml } from "./pipeline.ts";
+import {
+  buildBook,
+  contentVersion,
+  listBooks,
+  NotFoundError,
+} from "./pipeline.ts";
+import { toHtml } from "./export-html.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;
 
@@ -62,7 +68,7 @@ Deno.test("buildBook with an edition: same HTML, that edition's CSS", async () =
   assert(pocket.fontLinks.includes("family=Crimson+Pro"));
   await assertRejects(
     () => buildBook(ROOT, "demo-book", { edition: "no-such" }),
-    Deno.errors.NotFound,
+    NotFoundError,
   );
 });
 

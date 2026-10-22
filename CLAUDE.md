@@ -28,12 +28,21 @@ rewrite themselves on the next save.
   handlers, imported by `web/src/app.ts`: `plates.js` (full-page illustrations
   as plates, inlined by `toHtml`) and `folios.js` (the page map: folios, TOC and
   ref numbers, running heads)
-- `server/` `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket,
-  watches book files)
+- `server/` `store.ts` (`BookStore`: where a library's files live — `diskStore`
+  for a folder; the browser has its own in `web/src/fs-store.ts`); `pipeline.ts`
+  (`buildBook`, pure over a store, so it runs in Deno and in the browser);
+  `book-service.ts` (`BookService`: saves with version checks, metadata merges,
+  editions, rebuild pushes — runtime-agnostic, over a store); `dev-server.ts`
+  (HTTP/WebSocket in front of the service over `books/`, plus the Chrome
+  exports); `export-html.ts` (`toHtml` + the vendored Paged.js, Deno only)
 - `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored);
-  `web/app.css` is the chrome's stylesheet and holds the Ink tokens. Paged.js
-  paginates the preview. The Write/Style/Publish mode (`setMode` in `app.ts`)
-  decides three columns in `#panes`: `#tree` | `#editor` | `#preview`,
+  `web/src/backend.ts` is what the app talks to: `httpBackend` (the dev server)
+  or `localBackend` (the same `BookService` run in the page over the author's
+  own folder via the File System Access API, or the browser's private storage) —
+  the hosted site has no server at all (`deno task build:site` → `dist/`, plain
+  files); `web/app.css` is the chrome's stylesheet and holds the Ink tokens.
+  Paged.js paginates the preview. The Write/Style/Publish mode (`setMode` in
+  `app.ts`) decides three columns in `#panes`: `#tree` | `#editor` | `#preview`,
   `#style-nav` | `#config-overlay` | `#preview`, or `#style-nav` |
   `#config-overlay` | `#sheet-view`; `preview.ts`'s `installPreviewClicks`
   routes a page click to the source line or the style by mode. `config-panel.ts`
@@ -63,9 +72,16 @@ mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
   `PORT=` overrides). Book edits push live; app, renderer and server edits
   rebuild or restart and the page reloads itself (`architecture` skill →
   `references/dev-workflow.md`)
+- `deno task build:site` the hosted app as plain files in `dist/` (gitignored);
+  `deno task serve:site` serves it on http://localhost:8010 the way any static
+  host would (no API: the app picks a folder and runs the service itself). Deno
+  Deploy builds it with that task and serves `dist/` (second-brain
+  `playbooks/deno-deploy.md`); the app's server-side Proof / Export / EPUB
+  buttons say so and Print runs in the browser
 - `deno task test` all tests (`*_test.ts` next to each module, ~50 s with
   Chrome); `deno task test:fast` skips the Chrome tests (~10 s, what pre-commit
-  runs)
+  runs). `web/src/local-browser_test.ts` drives the built `dist/` with no
+  server, so build the site first or it is skipped
 - `deno task fonts` regenerate `metadata/fonts-catalog.ts` (every Google family,
   for the font picker) from Google's public catalog
 - `deno task bml list` books on disk

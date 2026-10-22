@@ -8,10 +8,21 @@ import { upgradePageSetup } from "../metadata/upgrade.ts";
 import { parse } from "../parser/parser.ts";
 import { DEFAULT_EDITION_TOKEN } from "../parser/types.ts";
 import { parseSentinelLine } from "../parser/sentinel.ts";
+import { asStore, type BookStore } from "./store.ts";
 
 // One path segment: no separators, no dot-dot, no leading dot.
 export function safeName(name: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name) && !name.includes("..");
+}
+
+/** The edition's metadata file, relative to the library root (a store path). */
+export function metadataKey(
+  book: string,
+  edition: string | null = null,
+): string {
+  return edition === null
+    ? `${book}/metadata.json`
+    : `${book}/editions/${edition}.json`;
 }
 
 export function metadataPath(
@@ -19,9 +30,7 @@ export function metadataPath(
   book: string,
   edition: string | null = null,
 ): string {
-  return edition === null
-    ? `${booksRoot}/${book}/metadata.json`
-    : `${booksRoot}/${book}/editions/${edition}.json`;
+  return `${booksRoot}/${metadataKey(book, edition)}`;
 }
 
 // Who a changed file affects: every client on the book, or one edition's clients.
@@ -88,39 +97,27 @@ export interface EditionInfo {
 
 // Named edition slugs, sorted; [] for a single-edition book.
 export async function editionSlugs(
-  booksRoot: string,
+  root: string | BookStore,
   book: string,
 ): Promise<string[]> {
-  const slugs: string[] = [];
-  try {
-    for await (const e of Deno.readDir(`${booksRoot}/${book}/editions`)) {
-      if (e.isFile && e.name.endsWith(".json")) {
-        slugs.push(e.name.slice(0, -".json".length));
-      }
-    }
-  } catch {
-    // no editions/ directory — a single-edition book
-  }
-  return slugs.sort();
+  // No editions/ directory — a single-edition book — lists as [].
+  const names = await asStore(root).listDir(`${book}/editions`);
+  return names.filter((n) => n.endsWith(".json"))
+    .map((n) => n.slice(0, -".json".length)).sort();
 }
 
 export async function listEditions(
-  booksRoot: string,
+  root: string | BookStore,
   book: string,
 ): Promise<EditionInfo[]> {
-  let spans: { editions: string[] }[] = [];
-  try {
-    spans = parse(
-      await Deno.readTextFile(`${booksRoot}/${book}/manuscript.md`),
-    ).onlySpans;
-  } catch {
-    // no manuscript — no passages
-  }
+  const store = asStore(root);
+  const source = await store.readText(`${book}/manuscript.md`);
+  const spans = source === null ? [] : parse(source).onlySpans; // no manuscript — no passages
   const info = async (slug: string | null): Promise<EditionInfo> => {
     let meta: Metadata | null = null;
     try {
       meta = JSON.parse(
-        await Deno.readTextFile(metadataPath(booksRoot, book, slug)),
+        (await store.readText(metadataKey(book, slug))) ?? "",
       ) as Metadata;
     } catch {
       // missing or corrupt — the row still lists, just without a summary
@@ -136,7 +133,7 @@ export async function listEditions(
     };
   };
   const out = [await info(null)];
-  for (const slug of await editionSlugs(booksRoot, book)) {
+  for (const slug of await editionSlugs(store, book)) {
     out.push(await info(slug));
   }
   return out;
@@ -161,23 +158,21 @@ export function renameOnlyToken(
   }).join("\n");
 }
 
-// Writes a new named edition. Throws Deno.errors.AlreadyExists on a duplicate.
+// Writes a new named edition; false (nothing written) on a duplicate.
 // The default edition's display `name` is not copied: it names that edition only.
-export async function createEdition(
-  booksRoot: string,
+export function createEdition(
+  root: string | BookStore,
   book: string,
   slug: string,
   metadata: unknown,
-): Promise<void> {
+): Promise<boolean> {
   let copy = metadata;
   if (copy !== null && typeof copy === "object" && !Array.isArray(copy)) {
     const { name: _name, ...rest } = copy as Record<string, unknown>;
     copy = rest;
   }
-  await Deno.mkdir(`${booksRoot}/${book}/editions`, { recursive: true });
-  await Deno.writeTextFile(
-    metadataPath(booksRoot, book, slug),
+  return asStore(root).create(
+    metadataKey(book, slug),
     JSON.stringify(copy, null, 2) + "\n",
-    { createNew: true },
   );
 }

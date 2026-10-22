@@ -123,6 +123,12 @@
         <input id="book-search" type="search" placeholder="Find a book…"
           autocomplete="off" aria-label="Find a book">
         <div id="book-list" role="listbox" aria-label="Books"></div>
+        <div class="sw-foot">
+          <button id="book-new" class="btn">New book</button>
+          <button id="library-open" class="btn" hidden
+            title="Choose a different folder or storage">Library…</button>
+          <span id="book-err" class="sw-err"></span>
+        </div>
       </div>
       <div class="sw-eds">
         <div id="edition-list"></div>
@@ -138,6 +144,21 @@
           </form>
         </div>
       </div>
+    </dialog>
+    <dialog id="library" aria-labelledby="library-title">
+      <h2 id="library-title">Where are your books?</h2>
+      <p>A book is a folder with a <code>manuscript.md</code> and a
+        <code>metadata.json</code>. Wynkyn edits those files in place;
+        nothing leaves this computer.</p>
+      <div class="acts">
+        <button id="lib-reopen" class="btn" hidden></button>
+        <button id="lib-pick" class="btn">Open my books folder…</button>
+        <button id="lib-browser" class="btn">Keep books in this browser</button>
+        <label class="btn">Import a folder into this browser…
+          <input id="lib-import" type="file" webkitdirectory multiple hidden>
+        </label>
+      </div>
+      <span id="lib-err" class="sw-err"></span>
     </dialog>
     <script src="/vendor/paged.js"></script>
     <script type="module" src="/web/app.js"></script>

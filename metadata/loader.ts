@@ -12,6 +12,14 @@ export async function loadMetadataText(
     if (e instanceof Deno.errors.NotFound) return null;
     throw e;
   }
+  return parseMetadataText(text, path);
+}
+
+/** The file's text → its upgraded value; `path` only names it in the error. */
+export function parseMetadataText(
+  text: string,
+  path: string,
+): { meta: Metadata; text: string } {
   try {
     return { meta: upgradePageSetup(JSON.parse(text) as Metadata), text };
   } catch (e) {

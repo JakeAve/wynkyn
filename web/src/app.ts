@@ -55,6 +55,23 @@ import {
   slugify,
 } from "./editions.ts";
 import { editionToken, titleCase } from "../../server/editions.ts";
+import {
+  type Backend,
+  hasServer,
+  httpBackend,
+  localAssets,
+  localBackend,
+} from "./backend.ts";
+import {
+  browserFolder,
+  canPickFolder,
+  handleStore,
+  importBooks,
+  pickFolder,
+  rememberedFolder,
+  reopenFolder,
+} from "./fs-store.ts";
+import type { BookStore } from "../../server/store.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 
@@ -107,15 +124,9 @@ function brief(err: unknown): string {
 }
 
 let editor: EditorView;
+let backend: Backend; // the dev server, or the service in-page over a folder
 let book: string;
 let edition: string | null = null; // null = the unnamed edition (metadata.json)
-
-function metadataUrl(): string {
-  const b = encodeURIComponent(book);
-  return edition === null
-    ? `/api/books/${b}/metadata`
-    : `/api/books/${b}/editions/${encodeURIComponent(edition)}/metadata`;
-}
 let parseTimer = 0;
 let saveTimer = 0;
 let saveInFlight = false;
@@ -212,23 +223,8 @@ function highlightTreeNode(line: number): void {
   );
 }
 
-async function api(url: string, init?: RequestInit): Promise<void> {
-  const res = await fetch(url, init);
-  if (!res.ok) throw new Error(await res.text());
-}
-
-const post = (url: string, body: unknown) =>
-  api(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-async function fetchEditions(name: string): Promise<EditionInfo[]> {
-  const res = await fetch(`/api/books/${encodeURIComponent(name)}/editions`);
-  if (!res.ok) throw new Error(`${res.status}`);
-  return ((await res.json()) as { editions: EditionInfo[] }).editions;
-}
+const fetchEditions = (name: string): Promise<EditionInfo[]> =>
+  backend.editions(name);
 
 // The crumb: Book / Edition, then what sets the edition apart — its page size.
 function setCrumb(editions: EditionInfo[]): void {
@@ -322,7 +318,6 @@ function openEdition(b: string, slug: string | null, line?: number): void {
 }
 
 function renderEditions(): void {
-  const base = `/api/books/${encodeURIComponent(selBook)}/editions`;
   const current = selBook === book ? edition : undefined;
   $("edition-list").replaceChildren(...selEditions.map((e) => {
     const row = document.createElement("div");
@@ -388,7 +383,7 @@ function renderEditions(): void {
             } edition? The manuscript is untouched.`,
           )
         ) return;
-        await api(`${base}/${encodeURIComponent(slug)}`, { method: "DELETE" });
+        await backend.deleteEdition(selBook, slug);
         await deleteCachedRender(cacheId(selBook, slug));
         if (selBook === book && slug === edition) {
           location.search = editionHref(book, null);
@@ -431,16 +426,14 @@ function renderEditions(): void {
 // Named editions rename by slug (the server rewrites their {only} tokens);
 // the default edition only has a display name to change.
 async function renameEdition(e: EditionInfo, value: string): Promise<void> {
-  const base = `/api/books/${encodeURIComponent(selBook)}/editions`;
   if (e.slug === null) {
-    await post(`${base}/default/rename`, { name: value });
+    await backend.renameDefault(selBook, value);
   } else {
     const next = slugify(value);
     if (!next) throw new Error("the name needs a letter or digit");
     if (next !== e.slug) {
-      const done = post(`${base}/${encodeURIComponent(e.slug)}/rename`, {
-        slug: next,
-      }).then(() => selBook === book ? rebaseAfterRename() : undefined);
+      const done = backend.renameEdition(selBook, e.slug, next)
+        .then(() => selBook === book ? rebaseAfterRename() : undefined);
       renaming = done.catch(() => {});
       await done;
       await deleteCachedRender(cacheId(selBook, e.slug));
@@ -512,6 +505,24 @@ function installSwitcher(): void {
     if (e.target === dialog) dialog.close(); // a click outside closes
   };
 
+  // ponytail: prompt() for the name; a form if books get more fields.
+  $("book-new").onclick = async () => {
+    const slug = slugify(prompt("Name the new book:") ?? "");
+    if (!slug) return;
+    try {
+      await backend.createBook(slug);
+      location.search = editionHref(slug, null);
+    } catch (err) {
+      $("book-err").textContent = brief(err);
+    }
+  };
+  // Forget the choice of library and pick again on the next load.
+  $("library-open").hidden = backend.kind !== "local";
+  $("library-open").onclick = () => {
+    localStorage.removeItem("library");
+    location.href = "/";
+  };
+
   $("edition-new").onclick = () => {
     from.replaceChildren(
       ...selEditions.map((e) =>
@@ -533,10 +544,7 @@ function installSwitcher(): void {
     formErr.textContent = slug ? "" : "the name needs a letter or digit";
     if (!slug) return;
     try {
-      await post(`/api/books/${encodeURIComponent(selBook)}/editions`, {
-        slug,
-        from: from.value,
-      });
+      await backend.createEdition(selBook, slug, from.value);
       location.search = editionHref(selBook, slug);
     } catch (err) {
       formErr.textContent = brief(err);
@@ -570,27 +578,17 @@ function setSaveInFlight(on: boolean): void {
 async function doSave(text: string): Promise<void> {
   try {
     await renaming; // a rename's token rewrite moves `base`
-    const res = await fetch(
-      `/api/books/${encodeURIComponent(book)}/manuscript`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text, clientId, base }),
-      },
-    );
-    if (res.status === 409) {
-      const disk = await res.json() as { text: string; version: string };
+    const ok = await backend.saveManuscript(book, { text, clientId, base });
+    if ("conflict" in ok) {
       // Equal: Reload or Keep mine already settled on this version, and a
       // Keep mine save may be queued behind this one — leave it.
-      if (disk.version !== base) {
+      if (ok.version !== base) {
         queuedSaveText = null; // based on the same stale version
-        showDiskBanner(disk);
+        showDiskBanner(ok);
         setStatus("error", "something else touched the manuscript");
       }
       return;
     }
-    if (!res.ok) throw new Error(await res.text());
-    const ok = await res.json() as { version: string; text?: string };
     base = ok.version;
     // The server rewrote the save (a renamed edition's token): take its text,
     // unless the author has typed past what was sent.
@@ -631,13 +629,7 @@ function saveMetadataSections(sections: Partial<Metadata>): void {
 
 async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
   try {
-    const res = await fetch(metadataUrl(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sections }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    metaBase = ((await res.json()) as { version: string }).version;
+    metaBase = (await backend.saveMetadata(book, edition, sections)).version;
     lastSaved = new Date();
     if (
       !dirty && !saveInFlight && !queuedMetaSections && !configPanel?.isDirty()
@@ -658,15 +650,14 @@ async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
   }
 }
 
-async function fetchMetadata(): Promise<
+const fetchMetadata = (): Promise<
   { metadata: Metadata; version: string | null }
-> {
-  const res = await fetch(metadataUrl());
-  if (!res.ok) {
-    throw new Error(`metadata load failed: ${res.status} ${await res.text()}`);
-  }
-  return await res.json() as { metadata: Metadata; version: string | null };
-}
+> => backend.metadata(book, edition);
+
+// The server's exports need Chrome and a folder on disk: the hosted app has
+// neither. Print (print.ts) runs in this browser instead.
+const NO_SERVER_EXPORT =
+  "Not available here: Print from this browser instead, or export with the desktop app.";
 
 let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
 const styleCatalog = () => {
@@ -677,6 +668,9 @@ const styleCatalog = () => {
 
 // The Publish tab's exports, run once every style save has reached the server.
 async function exportPrint(req: ExportRequest): Promise<ExportResult> {
+  if (backend.kind === "local") {
+    return { error: NO_SERVER_EXPORT, problems: [], files: [] };
+  }
   while (metaSaveInFlight) await metaSaveDone;
   const q = edition === null ? "" : `?edition=${encodeURIComponent(edition)}`;
   const base = `/api/books/${encodeURIComponent(book)}/export`;
@@ -713,6 +707,7 @@ async function exportPrint(req: ExportRequest): Promise<ExportResult> {
 }
 
 async function exportEpub(): Promise<EpubResult> {
+  if (backend.kind === "local") return { error: NO_SERVER_EXPORT };
   while (metaSaveInFlight) await metaSaveDone;
   const q = edition === null ? "" : `?edition=${encodeURIComponent(edition)}`;
   const base = `/api/books/${encodeURIComponent(book)}`;
@@ -789,12 +784,70 @@ async function pickStyle(key: string): Promise<void> {
   (await ensureConfigPanel())?.selectStyle(key);
 }
 
-async function fetchManuscript(
+const fetchManuscript = (
   name: string,
-): Promise<{ text: string; version: string }> {
-  const res = await fetch(`/api/books/${encodeURIComponent(name)}/manuscript`);
-  if (!res.ok) throw new Error(`manuscript load failed: ${res.status}`);
-  return await res.json() as { text: string; version: string };
+): Promise<{ text: string; version: string }> => backend.manuscript(name);
+
+// Without a server the app needs a folder: the author's own books/ (the File
+// System Access API, Chromium), or this browser's private storage. The choice
+// is remembered; "Library…" in the switcher forgets it.
+async function chooseLibrary(): Promise<BookStore> {
+  const remembered = await rememberedFolder();
+  const pref = localStorage.getItem("library");
+  if (
+    pref === "folder" && remembered && await reopenFolder(remembered, false)
+  ) return handleStore(remembered);
+  if (pref === "browser") return handleStore(await browserFolder());
+  return new Promise((resolve) => {
+    const dlg = $("library") as HTMLDialogElement;
+    const err = $("lib-err");
+    const done = (store: BookStore, kind: "folder" | "browser") => {
+      localStorage.setItem("library", kind);
+      dlg.close();
+      resolve(store);
+    };
+    const fail = (e: unknown) => {
+      if ((e as Error).name !== "AbortError") err.textContent = brief(e);
+    };
+    const reopen = $("lib-reopen");
+    reopen.hidden = !remembered;
+    if (remembered) {
+      reopen.textContent = `Open “${remembered.name}” again`;
+      reopen.onclick = async () => {
+        if (await reopenFolder(remembered, true)) {
+          done(handleStore(remembered), "folder");
+        } else err.textContent = "The folder wasn't allowed.";
+      };
+    }
+    $("lib-pick").hidden = !canPickFolder();
+    $("lib-pick").onclick = () =>
+      pickFolder().then((d) => done(handleStore(d), "folder"), fail);
+    $("lib-browser").onclick = () =>
+      browserFolder().then((d) => done(handleStore(d), "browser"), fail);
+    const input = $("lib-import") as HTMLInputElement;
+    input.onchange = async () => {
+      if (!input.files?.length) return;
+      try {
+        const store = handleStore(await browserFolder());
+        const books = await importBooks(store, input.files);
+        if (!books.length) {
+          err.textContent =
+            "No book found: a book is a folder with a manuscript.md.";
+          return;
+        }
+        done(store, "browser");
+      } catch (e) {
+        fail(e);
+      }
+    };
+    dlg.showModal();
+  });
+}
+
+async function connect(): Promise<Backend> {
+  if (await hasServer()) return httpBackend();
+  const [assets, store] = await Promise.all([localAssets(), chooseLibrary()]);
+  return localBackend(store, assets);
 }
 
 // An update built from a version the buffer isn't based on: fetch the current
@@ -1021,10 +1074,17 @@ function installShortcuts(
 }
 
 async function main(): Promise<void> {
-  const res = await fetch("/api/books");
-  books = ((await res.json()) as { books: string[] }).books;
+  backend = await connect();
+  books = await backend.listBooks();
   if (!books.length) {
-    setStatus("error", "no books found in books/");
+    // An empty library: the first book is the only thing to do.
+    const slug = slugify(
+      prompt("No books here yet. Name your first book:") ?? "",
+    );
+    if (slug) {
+      await backend.createBook(slug);
+      location.search = editionHref(slug, null);
+    } else setStatus("error", "no books in this library");
     return;
   }
   const requested = params.get("book");
@@ -1105,11 +1165,7 @@ async function main(): Promise<void> {
     restoreCachedRender(cached, previewEl);
     refreshPageIndicator();
   }
-  const ws = new WebSocket(
-    `ws://${location.host}/ws${editionHref(book, edition)}&client=${clientId}`,
-  );
-  ws.onopen = () => setStatus("saved");
-  ws.onclose = () => {
+  const onClose = () => {
     // `deno task dev` restarts the server when app code changes; follow it
     // back with a fresh page, unless that would drop an unsaved edit.
     setStatus("offline", "Reconnecting…");
@@ -1123,8 +1179,7 @@ async function main(): Promise<void> {
       else location.reload();
     }, 500);
   };
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data) as ServerMessage;
+  const onMessage = (msg: ServerMessage) => {
     if (msg.type === "error") {
       if (msg.save === "metadata") { // accepted, then the write failed
         setStatus("error", `config not saved — ${brief(msg.message)}`);
@@ -1148,6 +1203,7 @@ async function main(): Promise<void> {
     if (msg.manuscriptVersion !== base) refreshFromRemote();
     if (msg.metadataVersion !== metaBase) refreshConfigFromRemote();
   };
+  backend.subscribe(book, edition, clientId, onMessage, onClose);
 }
 
 main();

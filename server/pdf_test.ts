@@ -1,7 +1,8 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { PDFDocument } from "pdf-lib";
 import { renderPdf } from "./pdf.ts";
-import { buildBook, toHtml } from "./pipeline.ts";
+import { buildBook } from "./pipeline.ts";
+import { toHtml } from "./export-html.ts";
 import { hasChrome } from "../testing/chrome.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;

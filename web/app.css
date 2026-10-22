@@ -1914,3 +1914,50 @@ summary {
     transition: none !important;
   }
 }
+
+/* The books column's footer and the library dialog (no server: pick a folder). */
+.sw-foot {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+#library {
+  margin: auto;
+  padding: 20px 22px;
+  width: 440px;
+  max-width: calc(100vw - 20px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 14px 36px var(--backdrop);
+}
+#library h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+#library p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+#library .acts {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+#library .acts .btn {
+  justify-content: flex-start;
+  height: auto;
+  padding: 8px 10px;
+}
+#library .sw-err {
+  display: block;
+  margin-top: 10px;
+}

@@ -20,11 +20,12 @@ import { metadataPath } from "./editions.ts";
 import { type PageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import { missingFonts } from "./local-fonts.ts";
-import { buildBook, toHtml } from "./pipeline.ts";
+import { buildBook } from "./pipeline.ts";
+import { toHtml } from "./export-html.ts";
 import { type RenderedPdf, renderPdf } from "./pdf.ts";
 import {
-  formatProblem,
   type PageProblem,
+  PaginationError,
   type Seed,
 } from "../renderer/page-map-types.ts";
 
@@ -146,16 +147,7 @@ export interface ExportSummary {
   missingFonts: string[]; // neither Google nor installed: drawn in a fallback
 }
 
-/** The render settled with page-map problems and `force` was not set. */
-export class PaginationError extends Error {
-  constructor(readonly problems: PageProblem[]) {
-    super(
-      `pagination problems (--force to export anyway):\n${
-        problems.map((p) => `  ${formatProblem(p)}`).join("\n")
-      }`,
-    );
-  }
-}
+export { PaginationError };
 
 function assertWholeNumber(value: number, label: string): void {
   if (!Number.isInteger(value) || value < 1) {

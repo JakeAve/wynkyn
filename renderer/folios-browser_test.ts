@@ -7,7 +7,7 @@ import {
   pageNumberingConfig,
 } from "../metadata/css-generator.ts";
 import type { Metadata } from "../metadata/types.ts";
-import { PAGED_JS } from "../server/pipeline.ts";
+import { PAGED_JS } from "../server/export-html.ts";
 import { render } from "./render.ts";
 import "./folios.js";
 import { hasChrome } from "../testing/chrome.ts";

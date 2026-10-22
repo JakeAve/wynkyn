@@ -22,14 +22,23 @@ pure        pure          pure+2 js     disk, Chrome   browser only
 - `renderer/` is tree → HTML plus `base.css` and two classic scripts,
   `plates.js` and `folios.js`, that run inside Paged.js. The server inlines
   them; Deno imports them for tests.
-- `server/` owns every side effect: reading books, watching, HTTP/WebSocket,
-  Chrome, PDF. `pipeline.ts` (`buildBook`) is the shared entry; `dev-server.ts`
-  and `bml.ts` are two front doors to the same functions.
+- `server/` owns every side effect, behind one seam: `store.ts`'s `BookStore`
+  is the only way book files are read or written (`diskStore` here,
+  `web/src/fs-store.ts` in the browser, a Node store for the desktop app
+  later). `pipeline.ts` (`buildBook`) and `book-service.ts` (`BookService`:
+  everything an editor does to a library) are pure over a store and run in
+  the browser too. Front doors: `dev-server.ts` (HTTP/WebSocket over
+  `books/`, plus the Chrome exports), `bml.ts` (CLI), and
+  `web/src/backend.ts`'s `localBackend` (the service in-page). `export-html.ts`,
+  `print-export.ts`, `pdf.ts`, `epub-export.ts`, `local-fonts.ts` are Deno
+  only and never imported by `web/`.
 - `web/` bundles to the browser. It may import from `server/` only what is pure
-  at load: `imposition.ts`, the helpers in `editions.ts`, and *types* from
-  `pipeline.ts`. A module that touches `Deno.*` at the top level breaks the
-  bundle, so if the browser needs a helper that lives beside I/O, move the
-  helper, never the I/O.
+  at load: `imposition.ts`, `editions.ts`, `store.ts`, `pipeline.ts`,
+  `book-service.ts` and their types. A `Deno.*` reference inside a function
+  body bundles fine (it is never called in the browser); one at the top level
+  breaks the bundle, so if the browser needs a helper that lives beside I/O,
+  move the helper, never the I/O. The app reaches the server only through
+  `backend.ts`; `app.ts` never calls `fetch` for book data itself.
 
 Chrome-driven tests under `renderer/` and `server/` may import
 `server/pipeline.ts` and `testing/chrome.ts`; production code in `renderer/`
@@ -41,7 +50,8 @@ never imports from `server/`.
 | --- | --- |
 | New metadata key | `metadata/types.ts` → `css-generator.ts` + its test → spec §4 → `templates/metadata.json` if it has a house default → `web/src/style-catalog.ts` if it's clickable or listed → a control in `panel-*.ts` → `metadata/upgrade.ts` only if an old key is renamed |
 | New sentinel | spec §3 → `parser/` → `renderer/render.ts` → `base.css` → `style-catalog.ts` → `web/src/snippets.ts` for the editor's insert menu |
-| New server endpoint | logic in a `server/` sibling module exported as a plain function; `dev-server.ts` routes to it; `bml.ts` gets the same function if it makes sense on the CLI |
+| New server endpoint | a method on `BookService` (over the store, throwing `ServiceError` with the status); `dev-server.ts` routes to it; `web/src/backend.ts` gets it on `Backend` for both `httpBackend` and `localBackend`; `bml.ts` gets the same function if it makes sense on the CLI |
+| Anything that reads or writes a book file | through the `BookStore` only, never `Deno.*` — or it stops working in the browser and the desktop app |
 | New panel view | build from `panel-controls.ts` primitives into `panel-page.ts`, `panel-fonts.ts`, `panel-parts.ts` or `panel-furniture.ts`; `config-panel.ts` only routes and saves |
 | Anything a page click should reach | `style-catalog.ts` maps the rendered class to the metadata path; `preview.ts` is only the DOM adapter |
 | Pagination behaviour (folios, heads, TOC numbers, blanks) | `renderer/folios.js`, then read the golden page-map diff (`UPDATE_GOLDEN=1 deno task test`) before accepting it |

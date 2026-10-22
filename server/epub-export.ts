@@ -349,7 +349,7 @@ export async function exportEpub(
   const doc = parse(source, { edition: editionToken(edition) });
   const m = (await loadMetadata(metadataPath(booksRoot, book, edition))) ?? {};
   const images: Record<string, Uint8Array> = {};
-  const resolved = await resolveImages(bookDir, "images");
+  const resolved = await resolveImages(booksRoot, book, "images");
   const cover = m.ebook?.cover ? resolved[m.ebook.cover] : undefined;
   const used = new Set(
     [...b.html.matchAll(/src="images\/([^"]+)"/g)].map((x) => `images/${x[1]}`),

@@ -9,7 +9,8 @@
 //                                → exit 1 on pagination problems unless --force
 //   deno task bml epub <book> [--edition e] [--out dir] → books/<book>/export/book.epub
 import { parseArgs } from "@std/cli/parse-args";
-import { buildBook, listBooks, toHtml } from "./server/pipeline.ts";
+import { buildBook, listBooks, NotFoundError } from "./server/pipeline.ts";
+import { toHtml } from "./server/export-html.ts";
 import {
   createEdition,
   editionSlugs,
@@ -20,7 +21,7 @@ import {
 } from "./server/editions.ts";
 import { checkOnlySpans, parse } from "./parser/parser.ts";
 
-export { toHtml } from "./server/pipeline.ts";
+export { toHtml } from "./server/export-html.ts";
 
 // Test seam: lets tests point the CLI at a scratch books root instead of "books".
 const BOOKS = Deno.env.get("BML_BOOKS") ?? "books";
@@ -91,14 +92,9 @@ if (import.meta.main) {
       );
       Deno.exit(1);
     }
-    try {
-      await createEdition(BOOKS, book, sub, source);
-    } catch (e) {
-      if (e instanceof Deno.errors.AlreadyExists) {
-        console.error(`edition already exists: ${book}/${sub}`);
-        Deno.exit(1);
-      }
-      throw e;
+    if (!await createEdition(BOOKS, book, sub, source)) {
+      console.error(`edition already exists: ${book}/${sub}`);
+      Deno.exit(1);
     }
     console.log(`created ${metadataPath(BOOKS, book, sub)}`);
   } else if (cmd === "new" && book) {
@@ -141,7 +137,7 @@ if (import.meta.main) {
     try {
       b = await buildBook(BOOKS, book, { edition });
     } catch (e) {
-      if (e instanceof Deno.errors.NotFound) {
+      if (e instanceof NotFoundError) {
         console.error(`no such edition: ${book}/${edition}`);
         Deno.exit(1);
       }

@@ -26,6 +26,12 @@ await Deno.writeTextFile(
         runtimeExecutable: "deno",
         runtimeArgs: ["task", "dev"],
         port,
+      }, {
+        // The hosted app's build, served as plain files (no server API).
+        name: "site",
+        runtimeExecutable: "deno",
+        runtimeArgs: ["task", "serve:site"],
+        port: 8010,
       }],
     },
     null,

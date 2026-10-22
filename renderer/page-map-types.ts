@@ -17,3 +17,14 @@ export interface PageProblem {
 export function formatProblem(p: PageProblem): string {
   return p.page === null ? p.message : `page ${p.page}: ${p.message}`;
 }
+
+/** The render settled with page-map problems and `force` was not set. */
+export class PaginationError extends Error {
+  constructor(readonly problems: PageProblem[]) {
+    super(
+      `pagination problems (--force to export anyway):\n${
+        problems.map((p) => `  ${formatProblem(p)}`).join("\n")
+      }`,
+    );
+  }
+}

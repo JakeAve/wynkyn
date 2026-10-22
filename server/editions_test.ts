@@ -1,5 +1,5 @@
 // server/editions_test.ts
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import {
   classifyChange,
   createEdition,
@@ -133,10 +133,7 @@ Deno.test("createEdition: writes editions/<slug>.json, refuses a duplicate", asy
       JSON.parse(await Deno.readTextFile(`${root}/b/editions/pocket.json`)),
       { page: { size: "A6" } },
     );
-    await assertRejects(
-      () => createEdition(root, "b", "pocket", {}),
-      Deno.errors.AlreadyExists,
-    );
+    assertEquals(await createEdition(root, "b", "pocket", {}), false);
   } finally {
     await Deno.remove(root, { recursive: true });
   }
