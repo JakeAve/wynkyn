@@ -8,7 +8,9 @@ with `manuscript.md` (BML — semantic markup, spec §3 / `bml-spec-v06.md`),
 ask. Plans 0–5 and 7 are done (parser, live server, editor, config panel,
 sentinel styling, print export, table of contents); Plan 6 (integration &
 polish) is open. `bml export` is the print-export command
-(`server/print-export.ts`, `server/imposition.ts`, `server/pdf.ts`).
+(`server/print-export.ts`, `server/imposition.ts`, `server/pdf.ts`); `bml epub`
+is the e-book export (`server/epub-export.ts`, spec §7.8), the same render split
+into XHTML files and zipped with fflate.
 
 Page setup lives in one `page` section: `size`, `margins`, `sheet`,
 `folios-per-signature` (a number or `"booklet"`), `duplex`, and for backs
@@ -29,18 +31,19 @@ rewrite themselves on the next save.
 - `server/` `pipeline.ts` (`buildBook`) + `dev-server.ts` (HTTP/WebSocket,
   watches book files)
 - `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored).
-  Paged.js paginates the preview. The Write/Style/Print mode (`setMode` in
+  Paged.js paginates the preview. The Write/Style/Publish mode (`setMode` in
   `app.ts`) decides three columns in `#panes`: `#tree` | `#editor` | `#preview`,
   `#style-nav` | `#config-overlay` | `#preview`, or `#style-nav` |
   `#config-overlay` | `#sheet-view`; `preview.ts`'s `installPreviewClicks`
   routes a page click to the source line or the style by mode. `config-panel.ts`
   is the panel shell (nav, routing, debounced `queueSave`); `panel-page.ts`
-  (Page + Print views), `panel-fonts.ts`, `panel-parts.ts` (Book parts list and
-  detail views) build the views from `panel-controls.ts` primitives;
+  (Page + Publish views), `panel-fonts.ts`, `panel-parts.ts` (Book parts list
+  and detail views) build the views from `panel-controls.ts` primitives;
   `style-catalog.ts` maps preview clicks and book parts to metadata keys. The
-  Print view draws the first signature with `server/imposition.ts` and exports
-  through the dev server's `POST /api/books/<book>/export`, the same
-  `exportBook` as `bml export`.
+  Publish view draws the first signature with `server/imposition.ts` and exports
+  through the dev server's `POST /api/books/<book>/export` (the same
+  `exportBook` as `bml export`) and `POST /api/books/<book>/epub` (the same
+  `exportEpub` as `bml epub`).
 
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
 update the checksum in `server/vendor_test.ts`, then read the golden page-map
@@ -63,6 +66,11 @@ diff and re-check the no-reflow note on `layOut` in `renderer/folios.js`.
   `page-map.json` (the settled seed, keyed by a hash of the render's inputs, so
   a re-export of an unchanged book takes one pass); needs Google Chrome
   installed; fails on page-map problems unless `--force`
+- `deno task bml epub <book> [--edition e] [--out dir]` → `book.epub` in the
+  same export dir; EPUB 3, reflowable, no Chrome needed.
+  `brew install
+  epubcheck` enables the validator test in
+  `server/epub-export_test.ts`
 - `deno task bml edition <book> new <slug> [--from e]` copy an edition under a
   new name. Editions are styling-only variants: `metadata.json` is the unnamed
   edition, `editions/<slug>.json` are named ones, manuscript and images shared.

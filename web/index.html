@@ -510,14 +510,14 @@
     }
     :root[data-mode="write"] :is(#style-nav, #config-overlay, #sheet-view),
     :root[data-mode="style"] :is(#tree, #editor, #sheet-view),
-    :root[data-mode="print"] :is(#tree, #editor),
+    :root[data-mode="publish"] :is(#tree, #editor),
     #panes.tree-hidden :is(#tree, #style-nav, #gutter-tree),
     #panes.pages-hidden :is(#sheet-view, #gutter-editor) {
       display: none;
     }
     /* Hidden pages still lay out: Paged.js paginates by measuring, so the
        preview leaves the grid but never goes display:none. */
-    :root[data-mode="print"] #preview,
+    :root[data-mode="publish"] #preview,
     #panes.pages-hidden #preview {
       position: absolute;
       inset: 0;
@@ -1822,7 +1822,7 @@
       <span id="modes" role="group" aria-label="Mode">
         <button class="btn" data-mode="write" title="Write">Write</button>
         <button class="btn" data-mode="style" title="Style">Style</button>
-        <button class="btn" data-mode="print" title="Print">Print</button>
+        <button class="btn" data-mode="publish" title="Publish">Publish</button>
       </span>
       <span class="spacer"></span>
       <button id="theme-toggle" class="btn" title="Switch light/dark">

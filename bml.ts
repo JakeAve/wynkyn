@@ -7,6 +7,7 @@
 //   deno task bml export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none]
 //                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]
 //                                → exit 1 on pagination problems unless --force
+//   deno task bml epub <book> [--edition e] [--out dir] → books/<book>/export/book.epub
 import { parseArgs } from "@std/cli/parse-args";
 import { buildBook, listBooks, toHtml } from "./server/pipeline.ts";
 import {
@@ -200,9 +201,23 @@ if (import.meta.main) {
       console.error(`export failed: ${(e as Error).message}`);
       Deno.exit(1);
     }
+  } else if (cmd === "epub" && book) {
+    const { exportEpub } = await import("./server/epub-export.ts");
+    try {
+      const s = await exportEpub(BOOKS, book, { edition, out: a.out });
+      if (s.diagnostics) {
+        console.error(
+          `${s.diagnostics} parse diagnostic(s) — run: bml check ${book}`,
+        );
+      }
+      console.log(`wrote ${s.file} (${s.documents} documents)`);
+    } catch (e) {
+      console.error(`epub failed: ${(e as Error).message}`);
+      Deno.exit(1);
+    }
   } else {
     console.error(
-      "usage: bml list | new <slug> | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]",
+      "usage: bml list | new <slug> | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force] | epub <book> [--edition e] [--out dir]",
     );
     Deno.exit(2);
   }

@@ -233,7 +233,7 @@ export function scrollPreviewTo(
 }
 
 // The app's mode (spec §7.1): what the middle column edits.
-export type Mode = "write" | "style" | "print";
+export type Mode = "write" | "style" | "publish";
 
 // The stylable node at or above `target` and its catalog key: matchKey picks
 // the entry from the target's class+tag chain, closest() finds the node its
@@ -356,6 +356,10 @@ export function previewLink(
     pageCount: () =>
       container.querySelectorAll(":scope > :not(.preview-stage) .pagedjs_page")
         .length,
+    endsWithColophon: () =>
+      [...container.querySelectorAll(
+        ":scope > :not(.preview-stage) .pagedjs_page",
+      )].at(-1)?.querySelector(".matter-colophon") != null,
     pagesFor(key) {
       if (!countedOn?.isConnected) {
         counts.clear();

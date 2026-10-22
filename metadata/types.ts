@@ -119,4 +119,12 @@ export interface Metadata {
   print?: LegacyPrintConfig; // legacy; folded into `page` on load
   notes?: NotesConfig;
   toc?: TocConfig;
+  ebook?: EbookConfig;
+}
+
+/** The e-book export (spec §4.12): what an EPUB carries that print does not. */
+export interface EbookConfig {
+  identifier?: string; // e.g. "urn:isbn:9780000000000"; default: a stable urn:uuid from the book slug
+  language?: string; // BCP 47, default "en"
+  cover?: string; // image slug in images/
 }

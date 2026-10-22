@@ -1,20 +1,21 @@
 // web/src/config-panel.ts — the style panel (spec R1) as columns: a nav of
-// book settings and parts (style mode) or print sections (print mode), and the
-// chosen route's view under a header with the save status. Print draws its
+// book settings and parts (style mode) or publish sections (publish mode), and the
+// chosen route's view under a header with the save status. Publish draws its
 // signature into a separate sheet view. Each view's builder lives in its own
 // panel-*.ts; this file owns the debounced save, routing, and the DOM helpers
 // the builders share. Reusable transforms live in config-data.ts with tests.
 import type { Metadata } from "../../metadata/types.ts";
 import { buildFontsTab } from "./panel-fonts.ts";
-import { buildPageTab, buildPrintTab } from "./panel-page.ts";
+import { buildPageTab, buildPublishTab } from "./panel-page.ts";
 import { buildPartsTab } from "./panel-parts.ts";
 import {
   addIsNames,
   type BookPart,
   bookParts,
   catalogFor,
+  type EpubResult,
   type ExportRequest,
-  type ExportResult,
+  ExportResult,
   type PanelContext,
   type PreviewLink,
   type Route,
@@ -24,10 +25,10 @@ import {
 
 const SAVE_DEBOUNCE_MS = 600;
 
-export type PanelMode = "style" | "print";
+export type PanelMode = "style" | "publish";
 
 export interface ConfigPanel {
-  setMode(mode: PanelMode): void; // swap the nav and body between style and print
+  setMode(mode: PanelMode): void; // swap the nav and body between style and publish
   isDirty(): boolean; // sections touched but not yet handed to saveSections
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   markSaved(ok: boolean, detail?: string): void; // feedback from the save round-trip
@@ -38,12 +39,13 @@ export interface ConfigPanel {
 export interface ConfigPanelOptions {
   overlay: HTMLElement; // the middle column: header and the route's view
   nav: HTMLElement; // the left column
-  sheetView: HTMLElement; // the right column in print mode
+  sheetView: HTMLElement; // the right column in publish mode
   metadata: Metadata;
   saveSections(sections: Partial<Metadata>): void;
   preview: PreviewLink;
   isNames(): string[]; // `{is}` classes the manuscript uses
   exportPrint(req: ExportRequest): Promise<ExportResult>; // after saves land
+  exportEpub(): Promise<EpubResult>;
 }
 
 const GROUPS: Array<[BookPart["group"], string]> = [
@@ -54,11 +56,14 @@ const GROUPS: Array<[BookPart["group"], string]> = [
   ["custom", "Custom styles"],
 ];
 
-// Print nav rows: the Print view's section focus keys (panel-page.ts).
-const PRINT: Array<[string, string]> = [
-  ["sheet", "Paper"],
-  ["folios-per-signature", "Signatures"],
-  ["export", "Export"],
+// Publish nav rows: the Publish view's section focus keys (panel-page.ts).
+const PUBLISH: Array<[string, Array<[string, string]>]> = [
+  ["Print", [
+    ["sheet", "Paper"],
+    ["folios-per-signature", "Signatures"],
+    ["export", "Export"],
+  ]],
+  ["E-book", [["ebook", "Export"]]],
 ];
 
 interface NavRow {
@@ -70,7 +75,7 @@ interface NavRow {
 
 // Which nav row a route belongs to.
 function navId(route: Route): string {
-  if (route.tab === "print") return `print:${route.focus ?? "sheet"}`;
+  if (route.tab === "publish") return `publish:${route.focus ?? "sheet"}`;
   return route.tab === "parts" ? route.part ?? "" : route.tab;
 }
 
@@ -99,14 +104,16 @@ function styleNav(meta: Metadata): Array<[string, NavRow[]]> {
   return out;
 }
 
-const PRINT_NAV: Array<[string, NavRow[]]> = [[
-  "Print",
-  PRINT.map(([focus, label]) => ({
-    id: `print:${focus}`,
+const PUBLISH_NAV: Array<[string, NavRow[]]> = PUBLISH.map((
+  [group, rows],
+) => [
+  group,
+  rows.map(([focus, label]) => ({
+    id: `publish:${focus}`,
     label,
-    route: { tab: "print", focus },
+    route: { tab: "publish", focus },
   })),
-]];
+]);
 
 export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   let meta = structuredClone(opts.metadata);
@@ -172,7 +179,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   }
   let onPages: (() => void) | null = null; // the open view's redraw, if any
 
-  // Both survive refresh(); the style route also survives a trip to print.
+  // Both survive refresh(); the style route also survives a trip to publish.
   let route: Route = { tab: "parts", part: "folios" };
   let styleRoute = route;
   let current = navId(route); // the nav row to mark, kept past focus's flash
@@ -188,16 +195,16 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
 
   function go(next: Route): void {
     route = next;
-    if (next.tab !== "print") styleRoute = next;
+    if (next.tab !== "publish") styleRoute = next;
     current = navId(next);
     render();
   }
 
   function renderNav(): void {
-    const groups = route.tab === "print" ? PRINT_NAV : styleNav(meta);
+    const groups = route.tab === "publish" ? PUBLISH_NAV : styleNav(meta);
     opts.nav.setAttribute(
       "aria-label",
-      route.tab === "print" ? "Print sections" : "Style sections",
+      route.tab === "publish" ? "Publish sections" : "Style sections",
     );
     crumbs.replaceChildren();
     opts.nav.replaceChildren(...groups.flatMap(([title, rows]) => {
@@ -242,6 +249,10 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         flushSave();
         return opts.exportPrint(req);
       },
+      exportEpub: () => {
+        flushSave();
+        return opts.exportEpub();
+      },
       onPages: (redraw) => {
         onPages = redraw;
       },
@@ -251,8 +262,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         return buildPageTab(ctx);
       case "fonts":
         return buildFontsTab(ctx);
-      case "print":
-        return buildPrintTab(ctx);
+      case "publish":
+        return buildPublishTab(ctx);
       case "parts":
         return buildPartsTab(ctx, route.part);
     }
@@ -266,7 +277,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     for (const e of document.querySelectorAll("[data-style-hl]")) {
       e.removeAttribute("data-style-hl");
     }
-    if (route.tab !== "print") opts.sheetView.replaceChildren();
+    if (route.tab !== "publish") opts.sheetView.replaceChildren();
     body.replaceChildren(...build());
     const focus = route.focus;
     if (focus) {
@@ -285,8 +296,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   render();
   return {
     setMode: (mode) => {
-      if ((route.tab === "print") === (mode === "print")) return;
-      go(mode === "print" ? { tab: "print" } : styleRoute);
+      if ((route.tab === "publish") === (mode === "publish")) return;
+      go(mode === "publish" ? { tab: "publish" } : styleRoute);
     },
     isDirty: () => dirty.size > 0,
     refresh(metadata: Metadata) {

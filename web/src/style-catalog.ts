@@ -230,7 +230,7 @@ function runningEntries(metadata: Metadata): StyleEntry[] {
 
 // ---- Style panel: tabs, book parts, routes (spec R1) ----
 
-export type TabId = "page" | "fonts" | "parts" | "print";
+export type TabId = "page" | "fonts" | "parts" | "publish";
 
 export interface Route {
   tab: TabId;
@@ -240,6 +240,7 @@ export interface Route {
 
 export interface PreviewLink {
   pageCount(): number; // pages in the live preview; 0 until it paginates
+  endsWithColophon(): boolean; // the last page is the colophon (pinned last when printed)
   pagesFor(key: string): number;
   highlight(key: string, on: boolean): void;
   reveal(key: string): void;
@@ -250,9 +251,10 @@ export interface PanelContext {
   queueSave(key: keyof Metadata): void;
   go(route: Route): void;
   preview: PreviewLink;
-  sheetView: HTMLElement; // where the Print view draws the signature
-  // The Print tab's export: lands pending saves, then runs it on the server.
+  sheetView: HTMLElement; // where the Publish view draws the signature
+  // The Publish tab's exports: land pending saves, then run on the server.
   exportPrint(req: ExportRequest): Promise<ExportResult>;
+  exportEpub(): Promise<EpubResult>;
   onPages(redraw: () => void): void; // called after each preview render
 }
 
@@ -260,6 +262,12 @@ export interface ExportRequest {
   proof: boolean;
   force: boolean; // export despite page-map problems
   pages?: number; // proof page count; a booklet proof needs one
+}
+
+export interface EpubResult {
+  error?: string; // the export failed outright
+  file?: { name: string; url: string }; // set once the .epub was written
+  documents?: number; // content documents in reading order
 }
 
 export interface ExportResult {
