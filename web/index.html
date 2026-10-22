@@ -448,7 +448,10 @@
       cursor: default;
     }
     #status {
-      margin-left: auto;
+      margin-left: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -1032,23 +1035,6 @@
       color: inherit;
       opacity: .6;
     }
-    /* Takes the slack after the crumbs; truncates in a narrow slot. */
-    .cfg-saved {
-      flex: 1;
-      min-width: 0;
-      text-align: right;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: var(--muted);
-      font-size: 12px;
-      white-space: nowrap;
-    }
-    .cfg-saved[data-state="ok"] {
-      color: var(--ok);
-    }
-    .cfg-saved[data-state="error"] {
-      color: var(--err);
-    }
     .cfg-field {
       display: flex;
       align-items: center;
@@ -1263,6 +1249,20 @@
       border: 0;
       background: none;
       text-align: right;
+      padding: 0 2px;
+      font-variant-numeric: tabular-nums;
+      outline: none;
+    }
+    #config-overlay .st input::placeholder {
+      color: var(--muted);
+      opacity: .75;
+    }
+    #config-overlay .st .u {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0 4px 0 2px;
+      min-width: 18px;
+    }
     /* the unit as a quiet picker: no caret, a faint chip on hover */
     #config-overlay .st select.u {
       -webkit-appearance: none;
@@ -1282,20 +1282,6 @@
     #config-overlay .st select.u:focus-visible {
       color: var(--fg);
       background: var(--hover);
-    }
-      padding: 0 2px;
-      font-variant-numeric: tabular-nums;
-      outline: none;
-    }
-    #config-overlay .st input::placeholder {
-      color: var(--muted);
-      opacity: .75;
-    }
-    #config-overlay .st .u {
-      color: var(--muted);
-      font-size: 12px;
-      padding: 0 4px 0 2px;
-      min-width: 18px;
     }
     #config-overlay .seg {
       display: inline-flex;
@@ -1839,6 +1825,7 @@
           </svg>
         </button>
       </span>
+      <span id="status">Connecting…</span>
       <span id="modes" role="group" aria-label="Mode">
         <button class="btn" data-mode="write" title="Write">Write</button>
         <button class="btn" data-mode="style" title="Style">Style</button>
@@ -1894,7 +1881,6 @@
       <span id="page-indicator"></span>
       <span id="diagnostics"></span>
       <span id="page-problems"></span>
-      <span id="status">Connecting…</span>
     </div>
     <dialog id="switcher" aria-label="Books and editions">
       <div class="sw-books">
