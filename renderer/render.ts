@@ -515,12 +515,15 @@ function renderChapter(
   n: number,
   opts: RenderOptions,
   zone?: Zone,
+  start = false, // the first body block: base.css opens the body on a recto
 ): string {
   return renderBlockWithNotes(ch.children, opts, (ctx) => {
     const inner = renderChildren(ch.children, ctx, opts);
-    return `<section class="chapter${zoneClass(zone)}" id="${
-      escapeHtml(ch.slug)
-    }"${dl(ch)}>${numberDiv(n, opts.numbering?.chapters)}${inner}</section>`;
+    return `<section class="chapter${zoneClass(zone)}${
+      start ? " body-start" : ""
+    }" id="${escapeHtml(ch.slug)}"${dl(ch)}>${
+      numberDiv(n, opts.numbering?.chapters)
+    }${inner}</section>`;
   }, zone);
 }
 
@@ -571,7 +574,7 @@ function renderMatter(
   }, zone);
 }
 
-interface TocRow {
+export interface TocRow {
   cls: string; // "toc-front" | "toc-part" | "toc-chapter" | "toc-heading" | "toc-back" (+ " in-part")
   href: string;
   label: string;
@@ -592,13 +595,15 @@ function tocRow(r: TocRow): string {
   }</a>${subtitle}<span class="leader"></span><a class="page" href="#${href}"></a></div>`;
 }
 
-function generateToc(doc: BmlDocument, opts: RenderOptions): string {
-  const rows: string[] = [];
+/** The contents rows in reading order — the printed TOC and the e-book's nav
+ * document (server/epub-export.ts) are both set from them. */
+export function tocRows(doc: BmlDocument, opts: RenderOptions): TocRow[] {
+  const rows: TocRow[] = [];
   const matterRows = (blocks: MatterBlock[], cls: string) => {
     for (const m of blocks) {
       if (DISPLAY_MATTER.has(m.type)) continue;
       const label = titleOf(m.children);
-      if (label) rows.push(tocRow({ cls, href: matterId(m), label }));
+      if (label) rows.push({ cls, href: matterId(m), label });
     }
   };
   matterRows(doc.frontMatter, "toc-front");
@@ -607,21 +612,21 @@ function generateToc(doc: BmlDocument, opts: RenderOptions): string {
   let chapterNo = 0;
   const chapterRow = (ch: Chapter, inPart: boolean) => {
     const number = numberText(++chapterNo, opts.numbering?.chapters);
-    rows.push(tocRow({
+    rows.push({
       cls: `toc-chapter${inPart ? " in-part" : ""}`,
       href: ch.slug,
       label: titleOf(ch.children) ?? (number ? "" : ch.slug),
       number,
       subtitle: componentText(ch.children, "subtitle"),
-    }));
+    });
     if (opts.toc?.headings) {
       for (const c of ch.children) {
         if (c.kind === "heading" && c.level === 1 && c.slug) {
-          rows.push(tocRow({
+          rows.push({
             cls: `toc-heading${inPart ? " in-part" : ""}`,
             href: c.slug,
             label: inlinePlainText(c.inlines),
-          }));
+          });
         }
       }
     }
@@ -629,20 +634,24 @@ function generateToc(doc: BmlDocument, opts: RenderOptions): string {
   for (const b of doc.body) {
     if (b.kind === "part") {
       const number = numberText(++partNo, opts.numbering?.parts);
-      rows.push(tocRow({
+      rows.push({
         cls: "toc-part",
         href: b.slug,
         label: titleOf(b.children) ?? (number ? "" : b.slug),
         number,
         subtitle: componentText(b.children, "subtitle"),
-      }));
+      });
       for (const c of b.children) if (c.kind === "chapter") chapterRow(c, true);
     } else {
       chapterRow(b, false);
     }
   }
   matterRows(doc.backMatter, "toc-back");
-  return `<nav class="toc">${rows.join("")}</nav>`;
+  return rows;
+}
+
+function generateToc(doc: BmlDocument, opts: RenderOptions): string {
+  return `<nav class="toc">${tocRows(doc, opts).map(tocRow).join("")}</nav>`;
 }
 
 function renderPart(
@@ -651,6 +660,7 @@ function renderPart(
   chapterNo: { n: number },
   opts: RenderOptions,
   zone: Zone,
+  start = false,
 ): string {
   const contentKids = part.children.filter((c) =>
     c.kind !== "chapter"
@@ -664,9 +674,9 @@ function renderPart(
     .filter((c): c is Chapter => c.kind === "chapter")
     .map((ch) => renderChapter(ch, ++chapterNo.n, opts))
     .join("");
-  return `<section class="part${zoneClass(zone)}" id="${
-    escapeHtml(part.slug)
-  }"${dl(part)}>${
+  return `<section class="part${zoneClass(zone)}${
+    start ? " body-start" : ""
+  }" id="${escapeHtml(part.slug)}"${dl(part)}>${
     numberDiv(partNo, opts.numbering?.parts)
   }${head}${chapters}</section>`;
 }
@@ -678,11 +688,13 @@ export function render(doc: BmlDocument, opts: RenderOptions = {}): string {
   }
   let partNo = 0;
   const chapterNo = { n: 0 };
-  for (const b of doc.body) {
+  doc.body.forEach((b, i) => {
+    // The first body block carries `body-start` too: base.css opens the body
+    // on a recto, and no selector can pick it out (Paged.js drops `+`).
     if (b.kind === "part") {
-      out.push(renderPart(b, ++partNo, chapterNo, opts, "body"));
-    } else out.push(renderChapter(b, ++chapterNo.n, opts, "body"));
-  }
+      out.push(renderPart(b, ++partNo, chapterNo, opts, "body", i === 0));
+    } else out.push(renderChapter(b, ++chapterNo.n, opts, "body", i === 0));
+  });
   for (const m of doc.backMatter) out.push(renderMatter(m, doc, opts, "back"));
   out.push(`</article>`);
   return out.join("");

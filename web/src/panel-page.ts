@@ -1,9 +1,9 @@
-// web/src/panel-page.ts — the style panel's Page and Print tabs (spec R1).
+// web/src/panel-page.ts — the style panel's Page and Publish tabs (spec R1).
 // Page: trim size and margins (page numbers and running heads are Page
-// furniture parts, panel-furniture.ts). Print: the sheet,
+// furniture parts, panel-furniture.ts). Publish: the sheet,
 // signatures and the imposition they derive to (§4.3), the first signature
 // drawn as it prints into the sheet view (R7), and the print export. Both write the `page`
-// section; Print reads the trim size the Page tab set.
+// section; Publish reads the trim size the Page tab set, and exports the e-book (§7.8).
 import type { Duplex, Flip, PageConfig } from "../../metadata/types.ts";
 import {
   DEFAULT_SIZE,
@@ -149,7 +149,7 @@ export function buildPageTab(panel: PanelContext): Node[] {
   ];
 }
 
-export function buildPrintTab(ctx: PanelContext): Node[] {
+export function buildPublishTab(ctx: PanelContext): Node[] {
   const page: PageConfig = ctx.meta.page ??= {};
   const readout = el("div", "readout");
   // Redrawn on every edit and every repagination: a booklet's size and the
@@ -158,7 +158,7 @@ export function buildPrintTab(ctx: PanelContext): Node[] {
     const pages = ctx.preview.pageCount();
     const setup = resolvePageSetup(page, { pageCount: pages || undefined });
     showSetup(setup, pages, readout);
-    drawSignature(setup, pages, page.flip ?? "short-edge", ctx.sheetView);
+    drawSignature(ctx, setup, pages, page.flip ?? "short-edge", ctx.sheetView);
   };
   const v = makeView(ctx, redraw);
   const save = () => v.changed("page");
@@ -280,7 +280,49 @@ export function buildPrintTab(ctx: PanelContext): Node[] {
       readout,
     ]),
     exportSection(ctx, page),
+    ebookSection(ctx),
   ];
+}
+
+// One button: the EPUB, then a link to it. It reflows on the reader's screen,
+// so nothing above it (sheet, signatures, folios) applies.
+function ebookSection(ctx: PanelContext): HTMLElement {
+  const status = el("div", "export-status");
+  status.setAttribute("aria-live", "polite");
+  const btn = el("button", "tog primary", "Export EPUB");
+  btn.type = "button";
+  btn.onclick = async () => {
+    btn.disabled = true;
+    status.replaceChildren(el("p", "", "Building the e-book…"));
+    const r = await ctx.exportEpub();
+    btn.disabled = false;
+    status.replaceChildren();
+    if (r.error || !r.file) {
+      status.append(el("p", "err", r.error ?? "The export failed."));
+      return;
+    }
+    const a = el("a", "", r.file.name);
+    a.href = r.file.url;
+    a.download = r.file.name;
+    status.append(
+      el("p", "", `${r.documents} documents.`),
+      el("div", "files", a),
+      el(
+        "p",
+        "hint",
+        "Open it in Apple Books, or send it to a Kindle, to check it.",
+      ),
+    );
+  };
+  return section("E-book", "ebook", [
+    el("div", "actions", btn),
+    el(
+      "p",
+      "hint",
+      "An EPUB reflows to the reader's screen: paper, signatures and page numbers do not apply. Notes go to the end of their chapter. Cover, language and identifier come from the ebook section of metadata.json.",
+    ),
+    status,
+  ]);
 }
 
 // The derived half of the setup: what these values actually produce on paper.
@@ -357,6 +399,7 @@ const SHOWN_SHEETS = 4; // a booklet can run to dozens; the first few tell the s
 // the book pages that land on it, the folds dashed and the cuts solid. Uses
 // the same impose() the export does, so the drawing is the printed sheet.
 function drawSignature(
+  ctx: PanelContext,
   setup: PageSetup,
   pageCount: number,
   flip: Flip,
@@ -370,6 +413,7 @@ function drawSignature(
     page: setup.page,
     duplex: setup.duplex,
     flip,
+    tail: pageCount && ctx.preview.endsWithColophon() ? 1 : 0,
   });
   const first = imp.sheets.filter((sh) => sh.signature === 0);
   const { w: W, h: H } = imp.sheet;

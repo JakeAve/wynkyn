@@ -19,6 +19,7 @@ import {
 } from "./editions.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 import type { Seed } from "../renderer/page-map-types.ts";
+import type { NotesConfig } from "../metadata/types.ts";
 
 const BASE_CSS = await Deno.readTextFile(
   new URL("../renderer/base.css", import.meta.url),
@@ -81,12 +82,14 @@ const IMAGE_EXT_ORDER = ["svg", "png", "jpg", "jpeg", "webp"];
 export interface BuildOptions {
   imageUrlPrefix?: string; // default /books/<book>/images
   edition?: string | null; // null/undefined = the unnamed edition (metadata.json)
+  notes?: NotesConfig; // overrides metadata's note placement (the e-book wants endnotes)
 }
 
 export interface BuildResult {
   book: string;
   edition: string | null;
   bookTitle: string;
+  doc: BmlDocument; // the parsed tree the html was rendered from
   html: string; // render() output — body content only, no <html> wrapper
   baseCss: string;
   domCss: string;
@@ -148,7 +151,11 @@ export async function listBooks(booksRoot: string): Promise<string[]> {
 }
 
 export function extractBookTitle(doc: BmlDocument, fallback: string): string {
-  for (const m of doc.frontMatter) {
+  // The title page names the book; a preface set before it does not.
+  const ranked = [...doc.frontMatter].sort((a, b) =>
+    Number(b.type === "title-page") - Number(a.type === "title-page")
+  );
+  for (const m of ranked) {
     for (const c of m.children) {
       if (c.kind === "component" && c.name === "title") {
         return c.inlines.map((i) => (i.kind === "text" ? i.text : "")).join("");
@@ -158,7 +165,7 @@ export function extractBookTitle(doc: BmlDocument, fallback: string): string {
   return fallback;
 }
 
-async function resolveImages(
+export async function resolveImages(
   bookDir: string,
   urlPrefix: string,
 ): Promise<Record<string, string>> {
@@ -213,9 +220,10 @@ export async function buildBook(
     book,
     edition,
     bookTitle,
+    doc,
     html: render(doc, {
       numbering: m.numbering,
-      notes: m.notes,
+      notes: opts.notes ?? m.notes,
       toc: m.toc,
       images,
     }),

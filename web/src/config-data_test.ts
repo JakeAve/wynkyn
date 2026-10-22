@@ -2,6 +2,7 @@ import { assert, assertEquals, assertFalse } from "@std/assert";
 import type { RunningEntry } from "../../metadata/types.ts";
 import {
   bumpLength,
+  convertLength,
   formatCssLines,
   isValidFolios,
   isValidSize,
@@ -113,6 +114,14 @@ Deno.test("page-number style choices exclude 'words'", () => {
   assert(NUMBERING_STYLES.includes("words"));
   assert(!PAGE_NUMBERING_STYLES.includes("words"));
   assertEquals(PAGE_NUMBERING_STYLES.length, NUMBERING_STYLES.length - 1);
+});
+
+Deno.test("convertLength converts absolute units, keeps the number otherwise", () => {
+  assertEquals(convertLength("72pt", "in"), "1in");
+  assertEquals(convertLength("9pt", "mm"), "3.18mm");
+  assertEquals(convertLength("1in", "mm"), "25.4mm");
+  assertEquals(convertLength("1.5em", "mm"), "1.5mm");
+  assertEquals(convertLength("12pt", "em"), "12em");
 });
 
 Deno.test("parseLength keeps the unit", () => {

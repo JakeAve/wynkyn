@@ -4,7 +4,9 @@
 import type { CssProps, Metadata } from "../../metadata/types.ts";
 import {
   bumpLength,
+  convertLength,
   formatCssLines,
+  LENGTH_UNITS,
   parseCssLines,
   parseLength,
 } from "./config-data.ts";
@@ -99,12 +101,33 @@ export function stepper(o: {
     inputmode: "decimal",
     "aria-label": o.label,
     autocomplete: "off",
-    placeholder: num(o.placeholder),
   });
-  const u = h("span", { class: "u" }, unit);
+  // Plain counts keep a static label; lengths get a unit picker.
+  const u = unit === "" ? h("span", { class: "u" }) : h("select", {
+    class: "u",
+    "aria-label": `${o.label} unit`,
+    title: "Change unit",
+  });
   const show = () => {
     input.value = num(value);
-    u.textContent = unit;
+    input.placeholder = num(
+      o.placeholder && convertLength(o.placeholder, unit),
+    );
+    if (!(u instanceof HTMLSelectElement)) return void (u.textContent = unit);
+    u.replaceChildren(
+      ...[...new Set([unit, ...LENGTH_UNITS])].map((x) =>
+        new Option(x, x, false, x === unit)
+      ),
+    );
+  };
+  // Converts the value (or just the shown placeholder, when unset).
+  u.onchange = () => {
+    const to = (u as HTMLSelectElement).value;
+    if (value === undefined) {
+      unit = to;
+      return show();
+    }
+    commit(convertLength(value, to));
   };
   const commit = (raw: string | undefined) => {
     const p0 = raw === undefined ? null : parseLength(raw);
@@ -117,7 +140,13 @@ export function stepper(o: {
     show();
   };
   const bump = (dir: 1 | -1) =>
-    commit(bumpLength(value ?? "", dir, o.placeholder ?? `0${unit}`));
+    commit(
+      bumpLength(
+        value ?? "",
+        dir,
+        o.placeholder ? convertLength(o.placeholder, unit) : `0${unit}`,
+      ),
+    );
   input.onchange = () => {
     const t = input.value.trim();
     if (!t) return commit(undefined);

@@ -20,6 +20,7 @@ export interface ImposeConfig {
   page: Dims;
   duplex: Flip | "none";
   flip: Flip; // back-side layout when duplex is "none"
+  tail?: number; // trailing pages pinned to the end of the padded run (the colophon); the padding blanks go before them
 }
 
 export interface Slot {
@@ -69,9 +70,16 @@ export function impose(pageCount: number, cfg: ImposeConfig): Imposition {
   // things for a 2-up landscape job and a quartered portrait one.
   const mirrorCols = (flip === "short-edge") === isLandscape(grid);
 
+  const tail = Math.min(cfg.tail ?? 0, pageCount);
   const slot = (sig: number, local: number, folio: number): Slot => {
     const g = sig * P + local - 1; // local is 1-based within the signature
-    return { page: g < pageCount ? g : null, rotate: 0, folio };
+    // The tail keeps the book's last pages last: the blanks pad before it.
+    const page = g >= paddedCount - tail
+      ? pageCount - (paddedCount - g)
+      : g < pageCount - tail
+      ? g
+      : null;
+    return { page, rotate: 0, folio };
   };
   const blank = (folio: number): Slot => ({ page: null, rotate: 0, folio });
 

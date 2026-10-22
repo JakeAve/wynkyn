@@ -2,24 +2,24 @@
   "zones": {
     "front": [
       1,
-      6
+      10
     ],
     "body": [
-      7,
-      205
+      11,
+      209
     ],
     "back": [
-      206,
-      206
+      210,
+      210
     ]
   },
   "anchors": {
     "matter-half-title": "i",
-    "matter-title-page": "ii",
-    "matter-copyright": "iii",
-    "matter-toc": "iv",
-    "matter-dedication": "v",
-    "matter-epigraph": "vi",
+    "matter-title-page": "iii",
+    "matter-copyright": "iv",
+    "matter-toc": "v",
+    "matter-dedication": "vii",
+    "matter-epigraph": "ix",
     "one": "1",
     "fnref-eggs": "5",
     "gatsbys-mansion": "7",
@@ -34,5 +34,10 @@
     "nine": "179",
     "matter-colophon": "200"
   },
-  "blanks": []
+  "blanks": [
+    2,
+    6,
+    8,
+    10
+  ]
 }

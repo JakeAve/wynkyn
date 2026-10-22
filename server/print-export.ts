@@ -258,6 +258,7 @@ export async function exportBook(
   let page: Dims;
   let pageCount: number;
   let diagnostics = 0;
+  let tail = 0; // a closing colophon is pinned to the last page of the last signature
   let pagination: PageProblem[] = [];
   const files: string[] = [];
   if (opts.proof) {
@@ -271,6 +272,8 @@ export async function exportBook(
       edition,
     });
     diagnostics = built.diagnostics.length;
+    // ponytail: assumes a one-page colophon; count its pages off the page map if one ever runs over
+    if (built.doc.backMatter.at(-1)?.type === "colophon") tail = 1;
     const pageMapPath = `${out}/page-map.json`;
     // The unseeded page is every layout input (book HTML, CSS, font links,
     // numbering, title, Paged.js and the handlers), so its hash keys the seed.
@@ -308,7 +311,14 @@ export async function exportBook(
   }
   const { folios } = setup;
   const reverseBacks = opts.reverseBacks ?? m.page?.["reverse-backs"] ?? false;
-  const imposition = impose(pageCount, { folios, sheet, page, duplex, flip });
+  const imposition = impose(pageCount, {
+    folios,
+    sheet,
+    page,
+    duplex,
+    flip,
+    tail,
+  });
   const geom: SheetGeometry = {
     sheet: imposition.sheet, // oriented by the grid, not by `sheet` as parsed
     page,

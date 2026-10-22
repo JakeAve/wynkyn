@@ -15,6 +15,7 @@ import {
   formatSummary,
   PaginationError,
 } from "./print-export.ts";
+import { exportEpub } from "./epub-export.ts";
 import { formatProblem } from "../renderer/page-map-types.ts";
 import {
   classifyChange,
@@ -37,6 +38,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
+  ".epub": "application/epub+zip",
   ".pdf": "application/pdf",
 };
 
@@ -410,7 +412,7 @@ export async function startServer(
   const exportDir = (book: string, edition: string | null) =>
     `${booksRoot}/${book}/export${edition === null ? "" : `/${edition}`}`;
 
-  // The Print tab's export (spec §7.7): `bml export` behind an endpoint, so
+  // The Publish tab's print export (spec §7.7): `bml export` behind an endpoint, so
   // both write the same files. The body is { proof?, force?, pages? }.
   async function handleExport(
     book: string,
@@ -455,6 +457,36 @@ export async function startServer(
           { status: 409 },
         );
       }
+      return new Response((err as Error).message, { status: 500 });
+    } finally {
+      exporting.delete(key);
+    }
+  }
+
+  // The Publish tab's e-book export (spec §7.8): `bml epub` behind an
+  // endpoint. The file lands beside the print export, served by the same
+  // GET /api/books/<book>/export/<file>.
+  async function handleEpub(
+    book: string,
+    edition: string | null,
+  ): Promise<Response> {
+    if (!safeName(book) || (edition !== null && !safeName(edition))) {
+      return new Response("bad path", { status: 400 });
+    }
+    const key = metaKey(book, edition);
+    if (exporting.has(key)) {
+      return new Response("an export is already running", { status: 409 });
+    }
+    exporting.add(key);
+    try {
+      await pendingMetaSaves.get(key)?.write();
+      await chains.get(metadataPath(booksRoot, book, edition));
+      const s = await exportEpub(booksRoot, book, { edition });
+      return Response.json({
+        file: s.file.slice(s.file.lastIndexOf("/") + 1),
+        documents: s.documents,
+      });
+    } catch (err) {
       return new Response((err as Error).message, { status: 500 });
     } finally {
       exporting.delete(key);
@@ -833,6 +865,11 @@ export async function startServer(
         }
         return serveStatic(exportDir(book!, edition), file);
       }
+    }
+
+    const epubApi = path.match(/^\/api\/books\/([^/]+)\/epub$/);
+    if (epubApi && req.method === "POST") {
+      return handleEpub(epubApi[1]!, url.searchParams.get("edition"));
     }
 
     const image = path.match(/^\/books\/([^/]+)\/images\/([^/]+)$/);

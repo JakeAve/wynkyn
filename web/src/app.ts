@@ -5,8 +5,9 @@ import type { BmlDocument } from "../../parser/types.ts";
 import {
   addIsNames,
   catalogFor,
+  type EpubResult,
   type ExportRequest,
-  type ExportResult,
+  ExportResult,
 } from "./style-catalog.ts";
 import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
@@ -652,7 +653,7 @@ const styleCatalog = () => {
   return catalogFor(m);
 };
 
-// The Print tab's export, run once every style save has reached the server.
+// The Publish tab's exports, run once every style save has reached the server.
 async function exportPrint(req: ExportRequest): Promise<ExportResult> {
   while (metaSaveInFlight) await metaSaveDone;
   const q = edition === null ? "" : `?edition=${encodeURIComponent(edition)}`;
@@ -689,7 +690,29 @@ async function exportPrint(req: ExportRequest): Promise<ExportResult> {
   }
 }
 
-// Built the first time Style or Print opens; a failed load is retried next time.
+async function exportEpub(): Promise<EpubResult> {
+  while (metaSaveInFlight) await metaSaveDone;
+  const q = edition === null ? "" : `?edition=${encodeURIComponent(edition)}`;
+  const base = `/api/books/${encodeURIComponent(book)}`;
+  try {
+    const res = await fetch(`${base}/epub${q}`, { method: "POST" });
+    if (!res.ok) return { error: await res.text() };
+    const r = await res.json() as { file: string; documents: number };
+    return {
+      documents: r.documents,
+      file: {
+        name: r.file,
+        url: `${base}/export/${encodeURIComponent(r.file)}${
+          q ? `${q}&` : "?"
+        }v=${Date.now()}`,
+      },
+    };
+  } catch (err) {
+    return { error: brief(err) };
+  }
+}
+
+// Built the first time Style or Publish opens; a failed load is retried next time.
 let panelLoad: Promise<ConfigPanel | null> | null = null;
 function ensureConfigPanel(): Promise<ConfigPanel | null> {
   return panelLoad ??= (async () => {
@@ -704,6 +727,7 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
         exportPrint,
+        exportEpub,
       });
     } catch (err) {
       panelLoad = null;
@@ -713,12 +737,12 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
   })();
 }
 
-const MODES: Mode[] = ["write", "style", "print"];
+const MODES: Mode[] = ["write", "style", "publish"];
 let mode: Mode = "write";
 
 // The mode decides all three columns (spec §7.1): Write = outline | editor |
-// pages, Style = style nav | style part | pages, Print = print nav | print
-// settings | sheet view. Persisted across reloads.
+// pages, Style = style nav | style part | pages, Publish = publish nav |
+// print setup and exports | sheet view. Persisted across reloads.
 function setMode(next: Mode): void {
   mode = next;
   document.documentElement.dataset.mode = next;

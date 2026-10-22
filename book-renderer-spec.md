@@ -60,6 +60,7 @@ renderer/
 server/
   dev-server.ts        — Deno live dev server: watches manuscript.md/metadata.json, re-renders, pushes updates over a WebSocket (see §6)
   print-export.ts      — imposes the paginated book onto physical sheets and produces the print-ready file (see §7.7)
+  epub-export.ts       — the same render split into chapter files and zipped as an EPUB 3 (see §7.8)
 
 web/
   ...                  — browser app: project tree, CodeMirror editor, preview pane, configuration panels (see §7)
@@ -390,6 +391,13 @@ immediately following its sentinel. Per the structural closing rule (§3.2.3), a
 matter block is closed by the next `{matter:}`, `{part:}`, or `{chapter:}`
 sentinel, whichever comes first.
 
+Following Chicago, every matter section, every part and the first body page open
+on a recto (`break-before: right` in `renderer/base.css`, a blank verso inserted
+when needed), so odd folios fall on rectos. Two exceptions: the copyright page
+is the title page's verso, and the colophon is not forced to a recto because
+print imposition pins it to the last page of the last signature (§7.7). Chapters
+open on a new page of either hand unless a book says otherwise.
+
 #### 3.4.1 Half-Title Page
 
 The recto page preceding the full title page. Traditionally contains the title
@@ -467,6 +475,11 @@ without prior written permission of the publisher.
 Printed and bound by hand in Edinburgh
 %%  Add CIP data here if seeking library distribution
 ```
+
+The copyright page sits at the foot of its text block by default, as is
+conventional. `"justify-content"` on the `copyright` section moves it:
+`"flex-start"` (top), `"center"` (middle) or `"flex-end"` (bottom, the default).
+The style panel's Copyright part sets it as "On the page".
 
 #### 3.4.4 Dedication
 
@@ -1144,7 +1157,8 @@ books/
   "numbering": { ... },
   "running": { ... },
   "notes": { ... },
-  "toc": { ... }
+  "toc": { ... },
+  "ebook": { ... }
 }
 ```
 
@@ -1605,6 +1619,28 @@ Everything _visual_ about the contents is CSS under `elements.toc` (§4.5).
 
 ---
 
+### 4.12 Section: `ebook`
+
+What the e-book export (§7.8) carries that print has no use for. Every key is
+optional.
+
+```json
+"ebook": {
+  "identifier": "urn:isbn:9780000000000",
+  "language": "en",
+  "cover": "cover"
+}
+```
+
+- `identifier` — the package's unique identifier (`dc:identifier`). Default: a
+  `urn:uuid` derived from the book slug and edition, the same on every export,
+  so a reader's library sees a re-export as the same book. Set an ISBN urn here
+  to publish through a store.
+- `language` — BCP 47 tag for `dc:language` and the documents' `lang`. Default
+  `"en"`.
+- `cover` — an image slug in `images/`. Becomes the package's cover image and
+  the first page of the spine.
+
 ## 5. Module Contracts
 
 These are the contracts each module must satisfy, per the layout in §1. Plan 0
@@ -1674,6 +1710,9 @@ layout engine, the preview is the export by construction.
   `book.pdf` at trim size via headless Chrome, then imposes at the PDF level
   (pdf-lib) onto sheet-sized pages. Preview == export still holds: the pages are
   Paged.js's own, untouched.
+- `epub-export.ts` — **e-book export** (§7.8). The same `render()` output,
+  without Paged.js: split at the article's top-level blocks into XHTML documents
+  and zipped as EPUB 3. Reflowable, so nothing from the page map applies.
 
 **Page map and the multi-pass driver.** Paged.js only fragments; folios, TOC and
 `{ref}` numbers and running heads come from the page map (§4.7) that
@@ -1747,7 +1786,7 @@ anyway.
 
 ```
 +---------------------------------------------------------------+
-| [Contents] Book · Edition   Write|Style|Print   theme [Pages] |
+| [Contents] Book · Edition  Write|Style|Publish  theme [Pages] |
 +-----------+----------------------------+----------------------+
 |           |                            |                      |
 |   where   |   what you're changing     |      the result      |
@@ -1757,14 +1796,14 @@ anyway.
 
 Three columns under a fixed toolbar, decided by one rule: **left is where you
 are, middle is what you're changing, right is the result.** The toolbar's mode
-switch (Write ⌘1, Style ⌘2, Print ⌘3; ⌘, also opens Style) picks all three, and
-the mode persists across reloads:
+switch (Write ⌘1, Style ⌘2, Publish ⌘3; ⌘, also opens Style) picks all three,
+and the mode persists across reloads:
 
-| Mode  | Left                    | Middle                          | Right                            |
-| ----- | ----------------------- | ------------------------------- | -------------------------------- |
-| Write | outline (§7.2)          | BML editor (§7.3)               | preview (§7.6)                   |
-| Style | book settings and parts | the chosen part's styles (§7.4) | preview (§7.6)                   |
-| Print | print sections          | page setup and export (§7.5)    | the first signature as it prints |
+| Mode    | Left                    | Middle                               | Right                            |
+| ------- | ----------------------- | ------------------------------------ | -------------------------------- |
+| Write   | outline (§7.2)          | BML editor (§7.3)                    | preview (§7.6)                   |
+| Style   | book settings and parts | the chosen part's styles (§7.4)      | preview (§7.6)                   |
+| Publish | print and e-book rows   | page setup, print and e-book exports | the first signature as it prints |
 
 Each side column has a toggle at its own edge of the toolbar — Contents at the
 far left before the book title (⌘\), Pages at the far right (⌘.) — drawn as a
@@ -1968,7 +2007,9 @@ pages, but a very different book); a 5.5in × 8.5in page gives 2 × 1 (fold only
 
 1. Take the total page count from the Paged.js-paginated document (§5.4); pad
    the final signature with blank pages up to a multiple of
-   `folios-per-signature` × 4.
+   `folios-per-signature` × 4. When the book ends in `{matter: colophon}`, its
+   page is pinned to the final page of the signature (the last verso) and the
+   blanks go before it, after the body's last page.
 2. For each signature of _F_ folios (_P_ = 4_F_ local pages), assign pages to
    folios by the standard nesting mapping — folio _k_ (1 = outermost) carries,
    on its front face, local pages [_P_−2_k_+2 | 2_k_−1] (left | right of the
@@ -1997,6 +2038,42 @@ proof needs `--pages`, the book's page count). The files land in
 panel's Export wrote them; the dev server serves them at
 `/api/books/<book>/export/<file>`.
 
+### 7.8 E-book Export
+
+`bml epub <book> [--edition e] [--out dir]`, or the Publish tab's E-book
+section, writes `book.epub` beside the print files in `books/<book>/export/`
+(the dev server runs it behind `POST /api/books/<book>/epub`). An EPUB is a zip
+of XHTML documents with a package file and a navigation document, and is
+**reflowable**: the reader chooses the page size and font, so folios, running
+heads, sheets and signatures have no meaning in it, and the page map (§5.4) is
+not consulted.
+
+**What it reuses.** The same `render()` output as print, with notes forced to
+endnotes (there is no page foot to float to), the base CSS and the metadata's
+element CSS. Font links are dropped: readers block remote resources and
+substitute their own faces. Images referenced by the render are copied in.
+
+**Documents.** The article is split at its top-level blocks: each matter block,
+each chapter outside a part, and each part with its chapters becomes one XHTML
+file, with the block's endnotes kept in it. HTML5 void tags are self-closed; ids
+are mapped to files so `href="#slug"` links cross documents.
+
+**Navigation.** The TOC rows (§3.4.6) become the EPUB 3 nav document, nested
+parts → chapters → headings. When the book has a `{matter: toc}` block, that
+block's document _is_ the nav (its title kept, the printed rows replaced by the
+list) at the same place in the reading order; otherwise the nav exists for the
+reader's menu only.
+
+**Notes and refs.** Each `{footnote}` anchor is an `epub:type="noteref"` and its
+note an `epub:type="footnote"`, so readers that support it pop the note up. A
+`{ref}` has no page number to resolve to: it renders as a link whose text is the
+target's contents label (its title, else its number, else its slug). Prose
+written around a page number ("on page {ref: x}") should use edition spans
+(§3.2.9) to word the e-book differently.
+
+**Metadata.** Title from the title page, author from its `{author}`, and the
+`ebook` section (§4.12) for identifier, language and cover.
+
 ---
 
 ## 8. Non-Goals
@@ -2016,7 +2093,8 @@ Explicitly out of scope, to bound the work below:
 - Automated table-of-contents _authoring_ beyond what the renderer already
   generates from the tree (manual TOC entry per §3.4.6 remains available as a
   fallback)
-- Accessibility/EPUB or other non-print output formats
+- Output formats other than the print PDFs (§7.7) and EPUB (§7.8); EPUB
+  accessibility metadata beyond what the semantic markup gives for free
 
 ---
 
