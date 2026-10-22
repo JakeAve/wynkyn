@@ -5,7 +5,7 @@ description: Use when turning a plain-text source (Project Gutenberg download.tx
 
 # Convert a manuscript to BML
 
-Grammar: `bml-spec-v06.md` (read §2–§7 once). Verify with
+Grammar: `book-renderer-spec.md` §3 (read §3.2–§3.7 once). Verify with
 `deno task bml check <slug>` — zero diagnostics is the floor, not the goal.
 The goal is the house shape below. `books/a-christmas-carol/manuscript.md`
 is the reference example; copy its structure.
@@ -56,7 +56,7 @@ Exceptions, which carry no heading: copyright, dedication, epigraph, colophon.
 | `[1]` … footnote text at chapter end | `word{footnote: slug}` inline, `{note: slug}` block after the paragraph |
 | Poem / verse / address | one line per line, `\` at end of each but the last |
 | Paragraph wrapped at ~70 cols | keep the wrapping as-is; blank line = paragraph |
-| Lines starting `-`, digit-dot, `%%`, `{` in prose | escape with leading `\` (§2.8) |
+| Lines starting `-`, digit-dot, `%%`, `{` in prose | escape with leading `\` (§3.2.8) |
 
 Slugs: lowercase, hyphens, ≤3 words, unique across the book. Curly quotes and
 em dashes from the source stay; don't normalise to ASCII.

@@ -69,8 +69,8 @@ paper to a full print.
 | `server/`   | build pipeline, live dev server, imposition and PDF export |
 | `web/`      | the browser app — editor, style panel, paginated preview   |
 
-`book-renderer-spec.md` is the source of truth for the format; `bml-spec-v06.md`
-is the markup language reference.
+`book-renderer-spec.md` is the source of truth for the format; its §3 is the
+markup language reference.
 
 ## Tests
 

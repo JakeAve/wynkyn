@@ -1,8 +1,8 @@
 # book-editor-app
 
 Web app for editing and printing hand-bound books. A book is `books/<slug>/`
-with `manuscript.md` (BML — semantic markup, spec §3 / `bml-spec-v06.md`),
-`metadata.json` (all styling, spec §4), and `images/`. `books/` is gitignored.
+with `manuscript.md` (BML — semantic markup, spec §3), `metadata.json` (all
+styling, spec §4), and `images/`. `books/` is gitignored.
 
 `book-renderer-spec.md` is the source of truth; when code and spec disagree,
 ask. Plans 0–5 and 7 are done (parser, live server, editor, config panel,

@@ -40,7 +40,7 @@ never imports from `server/`.
 | Change | Touch, in this order |
 | --- | --- |
 | New metadata key | `metadata/types.ts` → `css-generator.ts` + its test → spec §4 → `templates/metadata.json` if it has a house default → `web/src/style-catalog.ts` if it's clickable or listed → a control in `panel-*.ts` → `metadata/upgrade.ts` only if an old key is renamed |
-| New sentinel | `bml-spec-v06.md` + spec §3 (same text) → `parser/` → `renderer/render.ts` → `base.css` → `style-catalog.ts` → `web/src/snippets.ts` for the editor's insert menu |
+| New sentinel | spec §3 → `parser/` → `renderer/render.ts` → `base.css` → `style-catalog.ts` → `web/src/snippets.ts` for the editor's insert menu |
 | New server endpoint | logic in a `server/` sibling module exported as a plain function; `dev-server.ts` routes to it; `bml.ts` gets the same function if it makes sense on the CLI |
 | New panel view | build from `panel-controls.ts` primitives into `panel-page.ts`, `panel-fonts.ts`, `panel-parts.ts` or `panel-furniture.ts`; `config-panel.ts` only routes and saves |
 | Anything a page click should reach | `style-catalog.ts` maps the rendered class to the metadata path; `preview.ts` is only the DOM adapter |
