@@ -1504,6 +1504,15 @@
       background: var(--fg);
       border-color: var(--fg);
     }
+    /* the other furniture's slot: page number in the heads picker, and back */
+    #config-overlay .pospick .slot.taken {
+      border-style: dashed;
+      background: var(--line);
+    }
+    #config-overlay .pospick .slot.taken[aria-pressed="true"] {
+      border: 1px solid var(--err);
+      background: var(--err);
+    }
     #config-overlay .pospick .slot.bc {
       bottom: 5px;
       left: 23px;

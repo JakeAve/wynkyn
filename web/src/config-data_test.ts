@@ -4,6 +4,7 @@ import {
   bumpLength,
   convertLength,
   formatCssLines,
+  headPosition,
   isValidFolios,
   isValidSize,
   makeRunningEntry,
@@ -14,6 +15,7 @@ import {
   presetFor,
   renameKey,
   runningSummary,
+  setHeadPosition,
   setRunningShared,
   splitProps,
   splitRunningEntry,
@@ -190,4 +192,25 @@ Deno.test("setRunningShared writes every entry", () => {
   assertEquals(even[0]!["color"], "red"); // other keys untouched
   setRunningShared(running, "font-size", undefined);
   assert([...odd, ...even].every((e) => !("font-size" in e)));
+});
+
+Deno.test("headPosition reads and setHeadPosition moves the first heads", () => {
+  const running = {
+    odd: [{ content: "book-title", area: "top-right" }],
+    even: [
+      { content: "chapter-title", area: "top-left" },
+      { content: "page-number", area: "bottom-center" },
+    ],
+  };
+  assertEquals(headPosition(running), "top-outside");
+  assertEquals(headPosition({ odd: running.odd }), "top-outside"); // one side
+  assertEquals(headPosition(undefined), undefined);
+  setHeadPosition(running, "bottom-outside");
+  assertEquals(running.odd[0]!.area, "bottom-right");
+  assertEquals(running.even.map((e) => e.area), [
+    "bottom-left",
+    "bottom-center",
+  ]);
+  running.odd[0]!.area = "left-middle"; // hand-placed in the advanced editor
+  assertEquals(headPosition(running), undefined);
 });
