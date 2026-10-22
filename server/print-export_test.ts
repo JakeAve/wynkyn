@@ -450,7 +450,7 @@ Deno.test({
   },
 });
 
-Deno.test("formatSummary is one line plus a waste warning when relevant", () => {
+Deno.test("formatSummary is one line plus waste and font warnings when relevant", () => {
   const imp = impose(12, {
     folios: 3,
     sheet: parseDims("legal"),
@@ -464,6 +464,7 @@ Deno.test("formatSummary is one line plus a waste warning when relevant", () => 
     files: [],
     diagnostics: 0,
     pagination: [],
+    missingFonts: ["No Such Face"],
     setup: resolvePageSetup({
       size: "3.5in 8.5in",
       sheet: "legal",
@@ -477,6 +478,10 @@ Deno.test("formatSummary is one line plus a waste warning when relevant", () => 
   assertEquals(
     text.split("\n")[1],
     "warning: 1 blank folio slot per signature (cut half is waste)",
+  );
+  assertEquals(
+    text.split("\n")[2],
+    'warning: font "No Such Face" is not a Google font and is not installed here, so the PDF uses a fallback',
   );
 });
 

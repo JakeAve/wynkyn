@@ -1,7 +1,5 @@
-// web/src/fonts-list.ts — curated Google Fonts family names for the panel's
-// datalist picker (spec §7.5 "searchable picker"; §8 scopes fonts to Google
-// Fonts). Free-text entry still works for any family not listed — the value
-// goes verbatim into the css2 URL, so anything Google serves is usable.
+// web/src/fonts-list.ts — curated Google Fonts families, listed first ("For
+// books") in the font picker above the full catalog (fonts-catalog.ts).
 // Weighted toward book work: text serifs and display faces first-class.
 export const GOOGLE_FONTS: string[] = [
   "Abril Fatface",

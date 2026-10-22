@@ -2,8 +2,8 @@
 // per alias in the `fonts` section (alias → Google Fonts family), each with a
 // typeface picker, a sample set in that font and "Used by" chips.
 import { renameKey } from "./config-data.ts";
-import { GOOGLE_FONTS } from "./fonts-list.ts";
-import { row, section, select } from "./panel-controls.ts";
+import { fontMissing, fontPicker } from "./font-picker.ts";
+import { row, section } from "./panel-controls.ts";
 import { bookParts, type PanelContext, usedBy } from "./style-catalog.ts";
 
 const SAMPLES: Record<string, string> = {
@@ -37,20 +37,30 @@ export function buildFontsTab(ctx: PanelContext): Node[] {
       : [],
   );
 
-  function picker(alias: string, sample: HTMLElement): HTMLSelectElement {
+  // A new alias has no family yet; an empty family would put a blank entry
+  // in the css2 URL, so it is only saved once a real one is chosen.
+  function picker(
+    alias: string,
+    sample: HTMLElement,
+    warn: HTMLElement,
+  ): HTMLElement {
     const fonts = meta.fonts ??= {};
-    const cur = fonts[alias] ?? "";
-    const names: string[] = [...GOOGLE_FONTS];
-    if (cur && !names.includes(cur)) names.unshift(cur); // a family we don't list
-    const opts = names.map((f) => ({ label: f, value: f }));
-    // A new alias has no family yet; an empty family would put a blank entry
-    // in the css2 URL, so it is only saved once a real one is chosen.
-    if (!cur) opts.unshift({ label: "Choose a typeface", value: "" });
-    return select(opts, cur, (v) => {
+    return fontPicker(fonts[alias] ?? "", `${alias} font`, (v) => {
       fonts[alias] = v;
-      sample.style.fontFamily = v ? `"${v}", serif` : "";
-      if (v) queueSave("fonts");
-    }, `${alias} font`);
+      sample.style.fontFamily = `"${v}", serif`;
+      checkInstalled(warn, v);
+      queueSave("fonts");
+    });
+  }
+
+  // An installed font only renders where it is installed (spec §4.4).
+  function checkInstalled(warn: HTMLElement, family: string): void {
+    warn.hidden = true;
+    fontMissing(family).then((missing) => {
+      warn.textContent =
+        `${family} is not a Google font and is not installed on this Mac, so the preview and PDF use a fallback font.`;
+      warn.hidden = !missing;
+    });
   }
 
   function block(alias: string): HTMLElement {
@@ -84,7 +94,14 @@ export function buildFontsTab(ctx: PanelContext): Node[] {
       };
       kids.push(row("Name", nameIn, { set: true }));
     }
-    kids.push(row("Typeface", picker(alias, sample), { set: true }), sample);
+    const warn = el("p", "hint warn");
+    if (fam) checkInstalled(warn, fam);
+    else warn.hidden = true;
+    kids.push(
+      row("Typeface", picker(alias, sample, warn), { set: true }),
+      warn,
+      sample,
+    );
 
     const uses = usedBy(meta, alias).filter((u) =>
       !u.route.part || !absent.has(u.route.part)

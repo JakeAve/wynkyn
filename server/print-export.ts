@@ -17,6 +17,7 @@ import {
 import { metadataPath } from "./editions.ts";
 import { type PageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
 import { loadMetadata } from "../metadata/loader.ts";
+import { missingFonts } from "./local-fonts.ts";
 import { buildBook, toHtml } from "./pipeline.ts";
 import { type RenderedPdf, renderPdf } from "./pdf.ts";
 import {
@@ -162,6 +163,7 @@ export interface ExportSummary {
   diagnostics: number;
   setup: PageSetup; // the §4.3 page setup this run actually used
   pagination: PageProblem[]; // page map problems, exported anyway under force
+  missingFonts: string[]; // neither Google nor installed: drawn in a fallback
 }
 
 /** The render settled with page-map problems and `force` was not set. */
@@ -359,6 +361,7 @@ export async function exportBook(
     diagnostics,
     setup,
     pagination,
+    missingFonts: await missingFonts(m),
   };
 }
 
@@ -375,6 +378,11 @@ export function formatSummary(book: string, s: ExportSummary): string {
       `warning: ${i.wastedFolioSlots} blank folio slot${
         i.wastedFolioSlots === 1 ? "" : "s"
       } per signature (cut half is waste)`,
+    );
+  }
+  for (const f of s.missingFonts) {
+    lines.push(
+      `warning: font "${f}" is not a Google font and is not installed here, so the PDF uses a fallback`,
     );
   }
   return lines.join("\n");

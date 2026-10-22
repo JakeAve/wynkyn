@@ -53,6 +53,8 @@ diff and re-check the no-reflow note on `layOut` in `renderer/folios.js`.
 
 - `deno task test` all tests (`*_test.ts` next to each module)
 - `deno task dev` build client + live server at http://localhost:8000
+- `deno task fonts` regenerate `metadata/fonts-catalog.ts` (every Google family,
+  for the font picker) from Google's public catalog
 - `deno task bml list` books on disk
 - `deno task bml new <slug>` scaffold `books/<slug>/` from
   `templates/metadata.json` (house style)

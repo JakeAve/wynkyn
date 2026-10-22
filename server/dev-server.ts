@@ -16,6 +16,7 @@ import {
   PaginationError,
 } from "./print-export.ts";
 import { exportEpub } from "./epub-export.ts";
+import { installedFonts } from "./local-fonts.ts";
 import { formatProblem } from "../renderer/page-map-types.ts";
 import {
   classifyChange,
@@ -772,6 +773,9 @@ export async function startServer(
 
     if (path === "/api/books" && req.method === "GET") {
       return Response.json({ books: await listBooks(booksRoot) });
+    }
+    if (path === "/api/fonts" && req.method === "GET") {
+      return Response.json({ installed: await installedFonts() });
     }
 
     const bookApi = path.match(/^\/api\/books\/([^/]+)$/);

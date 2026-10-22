@@ -1237,8 +1237,9 @@ a strip of one.
 
 ### 4.4 Section: `fonts`
 
-Named aliases pointing to Google Fonts family names. Elements reference aliases
-by key.
+Named aliases pointing to font family names: a Google Fonts family, or a font
+installed on the machine that renders the book. Elements reference aliases by
+key.
 
 ```json
 "fonts": {
@@ -1248,9 +1249,15 @@ by key.
 }
 ```
 
-- Values are exact Google Fonts family names. The renderer generates the font
-  `<link>` tags automatically (not `@import` — see §5.2 note on the split
-  between processed and unprocessed CSS).
+- Values are exact family names. For Google Fonts families the renderer
+  generates the font `<link>` tags automatically (not `@import` — see §5.2 note
+  on the split between processed and unprocessed CSS).
+- Any other name is an installed font: Chrome finds it by family name on the
+  machine doing the preview or the print export, so nothing is loaded or copied.
+  A book using one only renders right where that font is installed; the Fonts
+  tab and print export warn when a family is neither a Google family nor
+  installed (macOS only — elsewhere every non-Google family warns). EPUB export
+  embeds no fonts of either kind, so readers fall back to their own.
 - Any number of aliases can be defined. `body`, `display`, `mono` are a typical
   starting set.
 - Elements reference these by alias key (e.g. `"font-family": "display"`). The
@@ -1580,7 +1587,9 @@ Controls how `{note:}` content (§3.6.8) is placed.
 When `metadata.json` is present, the renderer:
 
 1. Loads Google Fonts via `<link>` tags for each entry in `fonts`, requesting
-   the default variant set (400, 400 italic, 700, 700 italic) for each family.
+   the default variant set (400, 400 italic, 700, 700 italic) for each family
+   (Google skips names it doesn't serve, which leaves installed fonts to Chrome;
+   §4.4).
 2. Resolves font aliases in `elements` and `is` to actual family names.
 3. Emits `@page { size; margin-inside; margin-outside; }` from `page`.
 4. Generates CSS rules for each element, mapping the nested structure to the
@@ -1937,7 +1946,9 @@ Includes:
   dev server (`POST /api/books/<book>/export`), landing any pending save first,
   then link each PDF to open in the browser's viewer for printing; pagination
   problems are listed with an "export anyway" choice
-- Font aliases (name → Google Fonts family, with a searchable picker)
+- Font aliases (name → font family, with a searchable picker over every Google
+  family and the fonts installed on this Mac, each drawn in its own face, and a
+  warning under a family that is neither; §4.4)
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)
@@ -2090,7 +2101,8 @@ Explicitly out of scope, to bound the work below:
   spine, folios nested into signatures (no horizontal _folds_; a quartered sheet
   is cut across and each half folded vertically, never folded twice as a true
   quarto, and there is no perfect binding with spine text, etc.)
-- Fonts from anywhere other than Google Fonts
+- Font files carried with a book, or fonts embedded in an EPUB (fonts are Google
+  families or installed ones, §4.4)
 - Multi-user/collaborative real-time editing
 - Structural editing via drag-and-drop in the project tree (§7.2) — tree is
   navigation-only in v1

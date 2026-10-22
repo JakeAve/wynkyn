@@ -7,7 +7,8 @@
     "bml": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys bml.ts",
     "dev": "deno task build:web && deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys server/dev-server.ts",
     "pre-commit": "deno task check && deno task test",
-    "pre-push": "deno task check && deno task test"
+    "pre-push": "deno task check && deno task test",
+    "fonts": "deno run --allow-net=fonts.google.com --allow-write=metadata metadata/update-fonts.ts && deno fmt metadata/fonts-catalog.ts"
   },
   "imports": {
     "@codemirror/autocomplete": "npm:@codemirror/autocomplete@^6.20.3",

@@ -16,6 +16,7 @@ const ICONS = {
   minus: '<path d="M4 8h8"/>',
   plus: '<path d="M4 8h8M8 4v8"/>',
   chevR: '<path d="M6.5 4 10.5 8l-4 4"/>',
+  chevD: '<path d="M4 6.5 8 10.5l4-4"/>',
   alignL: '<path d="M3 4h10M3 7h6M3 10h10M3 13h6"/>',
   alignC: '<path d="M3 4h10M5 7h6M3 10h10M5 13h6"/>',
   alignR: '<path d="M3 4h10M7 7h6M3 10h10M7 13h6"/>',
@@ -35,7 +36,7 @@ export function icon(name: keyof typeof ICONS): SVGSVGElement {
   return s;
 }
 
-function h<K extends keyof HTMLElementTagNameMap>(
+export function h<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   attrs: Record<string, string | undefined> = {},
   ...kids: Array<Node | string>
