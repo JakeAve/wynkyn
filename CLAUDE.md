@@ -137,5 +137,10 @@ click-to-style), `ink-design` (tokens and patterns for the chrome),
 - Sample manuscripts start from Project Gutenberg `download.txt` in the book
   dir; strip the Gutenberg header/footer, never leave it in `manuscript.md`.
 - Commit messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.
+- Every change starts in a worktree on its own branch, even a one-line fix:
+  `git worktree add .worktrees/<name> -b feat/<name>` (or `fix/`, `chore/`),
+  then `deno task setup` there. Never edit or commit on `main` in the main
+  checkout; `main` only moves by merging a branch, and the branch is deleted
+  with its worktree once merged.
 - `docs/` is local scratch (gitignored): specs, plans, todos. Never `git add`
   it; durable knowledge goes in the spec, a code comment or a skill reference.
