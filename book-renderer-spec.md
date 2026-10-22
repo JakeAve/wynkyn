@@ -2122,6 +2122,88 @@ written around a page number ("on page {ref: x}") should use edition spans
 **Metadata.** Title from the title page, author from its `{author}`, and the
 `ebook` section (§4.12) for identifier, language and cover.
 
+### 7.9 First Run & Import
+
+A new user has no books and does not know BML. The first run is a short sequence
+of one-question dialogs, and an imported manuscript is itself the tutorial: the
+user lands in Write mode looking at their own words wrapped in the tags,
+paginated in the house template, with the importer's notes in the footer. There
+is no settings form; the editor is the review step.
+
+**Welcome — where books live.** Shown when the app has no library. Four rows,
+each one line of explanation, in the manner of a session-type picker:
+
+1. Create a new folder on my device — Wynkyn creates a Books folder.
+2. Select an existing folder on my device — the user already has one.
+3. Keep books in this browser — works anywhere, but browsers clear site storage,
+   so download what you want to keep.
+4. Save books in the cloud — paid, coming soon, disabled.
+
+Under the rows, the privacy line: _Your books are yours. Wynkyn never reads,
+analyses, trains on, shares or sells your manuscripts, and never will. Free
+users store everything on device._ Rows 1 and 2 need the File System Access API
+(Chrome, Edge, Brave); row 3 is the fallback everywhere.
+
+**Create a new folder.** A location picker and a folder name (default `Books`),
+with the resulting path shown. Then _Create a new manuscript_.
+
+**Select an existing folder.** The native picker, then permission to edit. A
+folder holding books (`<slug>/manuscript.md`) shows **Choose a book**: title,
+chapter count, page count, last edit, and a _New manuscript…_ button. An empty
+folder goes to _Create a new manuscript_.
+
+**Create a new manuscript.** Three rows: _Import a file_ (Word, EPUB, plain
+text, Markdown, HTML), _Import from the web_ (a Project Gutenberg book, a shared
+Google Doc, a web page), _Start blank_. The book switcher's _New manuscript…_
+opens the same dialog once a library has books.
+
+**Choose a book title.** One dialog for all three. Imports show their source
+(file name and size, or the address) above the title field and prefill the title
+from the file's metadata, falling back to the file name; blank starts empty. The
+folder slug is shown live under the field and the book can be renamed later. The
+button reads _Import_ or _Create book_. Blank then opens the editor on a
+half-title page carrying the title.
+
+**No wizard.** An import always makes its best guess and opens the editor; the
+editor and preview are the review step. Structural decisions the detector could
+not settle (two heading patterns that both fire, verse or hard-wrapped prose)
+are not asked up front, when a new user cannot answer them, but offered
+afterwards: the import notes list opens with _Read it differently_ and the two
+or three alternative readings as pills. Picking one re-imports from the source
+file and replaces the manuscript, so re-import is the undo for a lossy choice
+such as reflowing verse. The section appears only when a second reading was
+plausible; most books never see it. Everything line-local is a `%% check:`
+comment, never a question.
+
+**The imported manuscript.** The importer writes BML in the house shape of the
+`convert-manuscript` skill (half-title, title page, copyright, toc, chapters
+with `{dropcap}`, colophon). A `%%` block at the top says what it did (chapters
+found and how, italic runs made `{em}`, what was dropped, illustrations copied)
+and that `{` shows every tag. Each guess gets a `%% check:` comment on the line
+above it; the footer lists them as "N import notes to check", click to jump, and
+the user deletes the comment when satisfied. BML's one inline tag means bold,
+underline and small caps become `{em}` or plain text, and the summary says so.
+
+**Pipeline (the design, not yet built).** Runtime-agnostic like `buildBook`
+(§5.4), so it runs in the page and in Deno: one reader per format emits the same
+flat block stream (heading with level, paragraph, verse lines, quote, break,
+image, note); one detector turns the stream into parts, chapters, front and back
+matter; one emitter writes the BML. Readers: text and Markdown (trim Gutenberg
+START/END markers, join hard-wrapped lines, `_x_` to `{em}`, `[Illustration:]`,
+`* * *` to `{break}`); HTML (a DOM walk: h1–h6, p, blockquote, em/i, br, img,
+hr); EPUB (fflate, the OPF spine through the HTML walker, nav/NCX titles as the
+chapter filter, images to `images/`); DOCX (fflate, `word/document.xml`
+paragraph styles and italic runs, `footnotes.xml` to `{footnote}`/`{note}`,
+`word/media` to `images/`). Chapter detection: the shallowest heading level with
+at least two headings; a deeper level with twice as many headings under at most
+twelve shallow ones makes the shallow ones parts; for text, "Chapter N" or `#`
+or standalone ALL-CAPS lines, whichever fires at least twice. Title and author
+from EPUB metadata, DOCX `core.xml` or the Gutenberg header lines. No new
+dependencies except deno-dom for the CLI's HTML parsing (Deno has no
+`DOMParser`). gutenberg.org sends no CORS headers, so web import in the browser
+waits for a proxy on the sync server; until then the CLI fetches and the browser
+takes a file. PDF is out: export to Word or text first.
+
 ---
 
 ## 8. Non-Goals
@@ -2142,6 +2224,7 @@ Explicitly out of scope, to bound the work below:
 - Automated table-of-contents _authoring_ beyond what the renderer already
   generates from the tree (manual TOC entry per §3.4.6 remains available as a
   fallback)
+- Import from PDF (§7.9: export to Word or text first)
 - Output formats other than the print PDFs (§7.7) and EPUB (§7.8); EPUB
   accessibility metadata beyond what the semantic markup gives for free
 

@@ -210,13 +210,14 @@ export async function startServer(
       return Response.json({ books: await service.list() });
     }
     if (path === "/api/books" && req.method === "POST") {
-      const { slug } = await json(req);
+      const { slug, title } = await json(req);
       if (typeof slug !== "string" || !safeName(slug)) {
         return new Response("bad book slug", { status: 400 });
       }
       const made = await service.createBook(
         slug,
         await Deno.readTextFile(TEMPLATE),
+        typeof title === "string" ? title : slug,
       );
       return made
         ? Response.json({ ok: true }, { status: 201 })
@@ -252,6 +253,35 @@ export async function startServer(
         });
         return Response.json(r, { status: "conflict" in r ? 409 : 200 });
       }
+    }
+
+    // An import done in the page: the manuscript and base64 images (§7.9).
+    if ((p = m(/^\/api\/books\/([^/]+)\/import$/)) && req.method === "POST") {
+      const body = await json(req);
+      if (
+        typeof body.manuscript !== "string" || body.images === null ||
+        typeof body.images !== "object"
+      ) {
+        return new Response(
+          "body must be { manuscript: string, images: {path: base64} }",
+          { status: 400 },
+        );
+      }
+      const images: Record<string, Uint8Array> = {};
+      for (const [path, b64] of Object.entries(body.images)) {
+        if (typeof b64 !== "string") {
+          return new Response("bad image", { status: 400 });
+        }
+        images[path] = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      }
+      const made = await service.importBook(
+        p[0]!,
+        await Deno.readTextFile(TEMPLATE),
+        { manuscript: body.manuscript, images },
+      );
+      return made
+        ? Response.json({ ok: true }, { status: 201 })
+        : new Response("book already exists", { status: 409 });
     }
 
     // The unnamed edition's metadata and a named edition's: same handlers.

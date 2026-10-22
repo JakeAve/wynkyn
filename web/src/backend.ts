@@ -17,7 +17,12 @@ export interface Backend {
   /** The folder the service runs over; only in-page (the app zips from it). */
   readonly store?: BookStore;
   listBooks(): Promise<string[]>;
-  createBook(slug: string): Promise<void>;
+  createBook(slug: string, title?: string): Promise<void>;
+  /** A book from an import run in the page (§7.9). */
+  importBook(
+    slug: string,
+    r: { manuscript: string; images: Record<string, Uint8Array> },
+  ): Promise<void>;
   editions(book: string): Promise<EditionInfo[]>;
   manuscript(book: string): Promise<{ text: string; version: string }>;
   saveManuscript(
@@ -47,6 +52,14 @@ export interface Backend {
   ): () => void;
 }
 
+function base64(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+
 const editionsUrl = (book: string) =>
   `/api/books/${encodeURIComponent(book)}/editions`;
 const metadataUrl = (book: string, edition: string | null) =>
@@ -74,7 +87,14 @@ export function httpBackend(): Backend {
     kind: "http",
     listBooks: () =>
       call<{ books: string[] }>("/api/books").then((r) => r.books),
-    createBook: (slug) => post("/api/books", { slug }),
+    createBook: (slug, title) => post("/api/books", { slug, title }),
+    importBook: (slug, r) =>
+      post(`/api/books/${encodeURIComponent(slug)}/import`, {
+        manuscript: r.manuscript,
+        images: Object.fromEntries(
+          Object.entries(r.images).map(([k, v]) => [k, base64(v)]),
+        ),
+      }),
     editions: (book) =>
       call<{ editions: EditionInfo[] }>(editionsUrl(book)).then((r) =>
         r.editions
@@ -193,8 +213,13 @@ export function localBackend(
     kind: "local",
     store,
     listBooks: () => service.list(),
-    async createBook(slug) {
-      if (!await service.createBook(slug, assets.template)) {
+    async createBook(slug, title) {
+      if (!await service.createBook(slug, assets.template, title)) {
+        throw new Error("book already exists");
+      }
+    },
+    async importBook(slug, r) {
+      if (!await service.importBook(slug, assets.template, r)) {
         throw new Error("book already exists");
       }
     },

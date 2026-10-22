@@ -3,6 +3,7 @@
 //   deno task bml render <book> [out.html] [--edition e] → standalone HTML
 //   deno task bml list                    → books, with their named editions
 //   deno task bml new <slug>              → books/<slug>/ from templates/ (house-style metadata.json)
+//   deno task bml import <file> [--slug s] [--chapters auto|N|none] [--flat] [--prose] [--force] → books/<slug>/ from a .txt/.md/.html/.epub
 //   deno task bml edition <book> new <slug> [--from <edition>] → copy an edition under a new name
 //   deno task bml export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none]
 //                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]
@@ -38,6 +39,8 @@ export function formatDiagnostics(
 if (import.meta.main) {
   const a = parseArgs(Deno.args, {
     string: [
+      "slug",
+      "chapters",
       "sheet",
       "duplex",
       "flip",
@@ -47,7 +50,7 @@ if (import.meta.main) {
       "edition",
       "from",
     ],
-    boolean: ["proof", "reverse-backs", "force"],
+    boolean: ["proof", "reverse-backs", "force", "flat", "prose"],
     unknown: (_arg, key) => {
       if (key !== undefined) {
         console.error(`unknown flag --${key}`);
@@ -109,6 +112,55 @@ if (import.meta.main) {
     console.log(
       `created ${dir}/ — drop the source text in as download.txt, then use the convert-manuscript skill`,
     );
+  } else if (cmd === "import" && book) {
+    const { importSource } = await import("./server/import/mod.ts");
+    const { slugify } = await import("./server/import/structure.ts");
+    const file = book;
+    const name = file.slice(file.lastIndexOf("/") + 1);
+    const chapters = a.chapters === undefined || a.chapters === "auto"
+      ? "auto"
+      : a.chapters === "none"
+      ? "none"
+      : parseInt(a.chapters, 10);
+    const r = importSource(name, await Deno.readFile(file), {
+      chapters,
+      parts: a.flat ? false : undefined,
+      verse: a.prose ? false : undefined,
+    });
+    const slug = a.slug ?? slugify(r.title, 4);
+    if (!safeName(slug)) {
+      console.error(`bad slug: ${slug}`);
+      Deno.exit(2);
+    }
+    const dir = `${BOOKS}/${slug}`;
+    await Deno.mkdir(`${dir}/images`, { recursive: true });
+    try {
+      await Deno.copyFile("templates/metadata.json", `${dir}/metadata.json`);
+    } catch {
+      // keep an existing metadata.json: a re-import changes the manuscript only
+    }
+    try {
+      await Deno.writeTextFile(`${dir}/manuscript.md`, r.manuscript, {
+        createNew: !a.force,
+      });
+    } catch {
+      console.error(`${dir}/manuscript.md exists; --force to replace it`);
+      Deno.exit(1);
+    }
+    for (const [path, data] of Object.entries(r.images)) {
+      await Deno.writeFile(`${dir}/${path}`, data);
+    }
+    const ext = name.slice(name.lastIndexOf("."));
+    try {
+      await Deno.copyFile(file, `${dir}/download${ext}`);
+    } catch {
+      // the source may already be there (re-import from the book folder)
+    }
+    console.log(`${dir}/manuscript.md`);
+    for (const l of r.outline.summary) console.log(`  ${l}`);
+    for (const rd of r.outline.readings) {
+      console.log(`  ${rd.current ? "\u25cf" : "\u25cb"} ${rd.label}`);
+    }
   } else if (cmd === "check" && book) {
     // check is manuscript-only (spec): no edition is chosen, so every {only}
     // span's content is parsed (§3.2.9) and a missing edition can't crash it.
@@ -213,7 +265,7 @@ if (import.meta.main) {
     }
   } else {
     console.error(
-      "usage: bml list | new <slug> | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force] | epub <book> [--edition e] [--out dir]",
+      "usage: bml list | new <slug> | import <file> [--slug s] [--chapters auto|N|none] [--flat] [--prose] [--force] | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force] | epub <book> [--edition e] [--out dir]",
     );
     Deno.exit(2);
   }
