@@ -261,29 +261,15 @@ export interface PanelContext {
   go(route: Route): void;
   preview: PreviewLink;
   sheetView: HTMLElement; // where the Publish view draws the signature
-  // The Publish tab's exports: land pending saves, then run on the server.
-  exportPrint(req: ExportRequest): Promise<ExportResult>;
-  exportEpub(): Promise<EpubResult>;
+  exportEpub(): Promise<EpubResult>; // lands pending saves first
+  toStyle(view: string, from: string): void; // Publish (section `from`) → a Style view; Back returns
   onPages(redraw: () => void): void; // called after each preview render
-}
-
-export interface ExportRequest {
-  proof: boolean;
-  force: boolean; // export despite page-map problems
-  pages?: number; // proof page count; a booklet proof needs one
 }
 
 export interface EpubResult {
   error?: string; // the export failed outright
   file?: { name: string; url: string }; // set once the .epub was written
   documents?: number; // content documents in reading order
-}
-
-export interface ExportResult {
-  error?: string; // the export failed outright
-  problems: string[]; // refused over these unless forced, or exported with them
-  summary?: string; // set once files were written
-  files: Array<{ name: string; url: string }>;
 }
 
 export interface BookPart {

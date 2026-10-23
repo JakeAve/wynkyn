@@ -2,13 +2,7 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
-import {
-  addIsNames,
-  catalogFor,
-  type EpubResult,
-  type ExportRequest,
-  ExportResult,
-} from "./style-catalog.ts";
+import { addIsNames, catalogFor, type EpubResult } from "./style-catalog.ts";
 import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
   fitPreview,
@@ -98,19 +92,28 @@ let libId: string | null = null;
 // Keep the address bar at the author's place (appHref) without history
 // entries; debounced because Safari rate-limits replaceState.
 let urlTimer = 0;
+const here = () =>
+  appHref({ book, edition, mode, view, line: cursorLine, lib: libId });
 function syncUrl(): void {
   clearTimeout(urlTimer);
   urlTimer = setTimeout(() => {
     try {
-      history.replaceState(
-        null,
-        "",
-        appHref({ book, edition, mode, view, line: cursorLine, lib: libId }),
-      );
+      history.replaceState(null, "", here());
     } catch {
       // rate-limited or blocked: the URL just lags
     }
   }, 250);
+}
+
+// Publish → a Style view as a history entry, like goToStyle from Write, so
+// Back returns to Publish where the author left it (installHistory).
+function toStyle(next: string): void {
+  clearTimeout(urlTimer);
+  history.replaceState(null, "", here()); // the entry Back returns to
+  view = next;
+  configPanel?.open(next);
+  setMode("style");
+  history.pushState(null, "", here());
 }
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -736,11 +739,6 @@ const fetchMetadata = (): Promise<
   { metadata: Metadata; version: string | null }
 > => backend.metadata(book, edition);
 
-// The server's print export needs Chrome and a folder on disk: the hosted
-// app has neither. Print (print.ts) runs in this browser instead.
-const NO_SERVER_EXPORT =
-  "Not available here: Print from this browser instead, or export with the desktop app.";
-
 let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
 const styleCatalog = () => {
   const m = metadata ?? {};
@@ -748,46 +746,7 @@ const styleCatalog = () => {
   return catalogFor(m);
 };
 
-// The Publish tab's exports, run once every style save has reached the server.
-async function exportPrint(req: ExportRequest): Promise<ExportResult> {
-  if (backend.kind === "local") {
-    return { error: NO_SERVER_EXPORT, problems: [], files: [] };
-  }
-  while (metaSaveInFlight) await metaSaveDone;
-  const q = edition === null ? "" : `?edition=${encodeURIComponent(edition)}`;
-  const base = `/api/books/${encodeURIComponent(book)}/export`;
-  try {
-    const res = await fetch(base + q, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(req),
-    });
-    if (
-      res.status === 409 && res.headers.get("content-type")?.includes("json")
-    ) {
-      const { problems } = await res.json() as { problems: string[] };
-      return { problems, files: [] };
-    }
-    if (!res.ok) return { error: await res.text(), problems: [], files: [] };
-    const r = await res.json() as {
-      summary: string;
-      files: string[];
-      problems: string[];
-    };
-    // A fresh query per export, so the viewer never shows a cached PDF.
-    const v = `${q ? `${q}&` : "?"}v=${Date.now()}`;
-    return {
-      ...r,
-      files: r.files.map((name) => ({
-        name,
-        url: `${base}/${encodeURIComponent(name)}${v}`,
-      })),
-    };
-  } catch (err) {
-    return { error: brief(err), problems: [], files: [] };
-  }
-}
-
+// The Publish tab's e-book export, run once every style save has landed.
 async function exportEpub(): Promise<EpubResult> {
   while (metaSaveInFlight) await metaSaveDone;
   try {
@@ -815,8 +774,8 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         },
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
-        exportPrint,
         exportEpub,
+        toStyle,
         view,
         onRoute: (id) => {
           view = id;
@@ -872,15 +831,15 @@ async function goToStyle(key: string): Promise<void> {
   history.pushState(null, "", appHref({ ...here, view, mode: "style" }));
 }
 
-// Back and Forward between the entries goToStyle makes: the URL's mode, and
-// in Write its line.
+// Back and Forward between the entries goToStyle and toStyle make: the URL's
+// mode, its Style/Publish view, and in Write its line.
 function installHistory(): void {
   addEventListener("popstate", () => {
-    const m = MODES.find((m) =>
-      m === new URLSearchParams(location.search)
-        .get("mode")
-    ) ?? "write";
+    const p = new URLSearchParams(location.search);
+    const m = MODES.find((m) => m === p.get("mode")) ?? "write";
+    view = p.get("view");
     setMode(m);
+    if (m !== "write" && view) configPanel?.open(view);
     const line = lineFromHash(location.hash);
     if (m === "write" && line !== null) scrollEditorToLine(editor, line);
   });

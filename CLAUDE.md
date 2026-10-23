@@ -40,8 +40,8 @@ rewrite themselves on the next save.
   (`buildBook`, pure over a store, so it runs in Deno and in the browser);
   `book-service.ts` (`BookService`: saves with version checks, metadata merges,
   editions, rebuild pushes — runtime-agnostic, over a store); `dev-server.ts`
-  (HTTP/WebSocket in front of the service over `books/`, plus the Chrome
-  exports); `export-html.ts` (`toHtml` + the vendored Paged.js, Deno only)
+  (HTTP/WebSocket in front of the service over `books/`, plus the EPUB export);
+  `export-html.ts` (`toHtml` + the vendored Paged.js, Deno only)
 - `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored);
   `web/src/backend.ts` is what the app talks to: `httpBackend` (the dev server)
   or `localBackend` (the same `BookService` run in the page over the author's
@@ -57,12 +57,15 @@ rewrite themselves on the next save.
   (Page + Publish views), `panel-fonts.ts`, `panel-parts.ts` (Book parts list
   and detail views) build the views from `panel-controls.ts` primitives;
   `style-catalog.ts` maps preview clicks and book parts to metadata keys. The
-  Publish view draws the first signature with `server/imposition.ts` and exports
-  through the dev server's `POST /api/books/<book>/export` (the same
-  `exportBook` as `bml export`) and `POST /api/books/<book>/epub` (the same
-  `exportEpub` as `bml epub`); its Print button (`print.ts`) imposes the live
-  preview's pages onto sheet-sized print layers and opens the browser's print
-  dialog, no Chrome on the server.
+  Publish view is grouped Binding / PDF / E-book: the binding setup, whose first
+  signature it draws with `server/imposition.ts` and whose Print sheets button
+  (`print.ts`) imposes the live preview's pages onto sheet-sized print layers
+  and opens the browser's print dialog; Print pages (the preview's pages at the
+  page size); and Export EPUB (`POST /api/books/<book>/epub`, the same
+  `exportEpub` as `bml epub`). No print export runs on the server; sheet PDFs
+  and proofs on disk are `bml export`'s. Paper's "Change in Style" leaves a
+  history entry (`toStyle` in `app.ts`, like Write's Go to style), so Back
+  returns to Publish.
 
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
 update the checksum in `server/vendor_test.ts`, then read the golden page-map
@@ -84,12 +87,11 @@ mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
   host would (no API: the app picks a folder and runs the service itself). Deno
   Deploy builds it with that task and serves `dist/` (second-brain
   `playbooks/deno-deploy.md`). There, Print and Export EPUB run in the browser
-  (`web/src/book-zip.ts` zips a book for download out of browser storage); the
-  Chrome print export (Proof / Export) says it isn't available; browsers without
-  the File System Access API (Firefox, Safari, Brave by default) get a notice
-  pointing at Chrome or Edge, then the same Welcome with the folder buttons
-  tagged Chromium only (a click fails with the browser's own error); a
-  browser-storage library's Create dialog has Import from a folder
+  (`web/src/book-zip.ts` zips a book for download out of browser storage);
+  browsers without the File System Access API (Firefox, Safari, Brave by
+  default) get a notice pointing at Chrome or Edge, then the same Welcome with
+  the folder buttons tagged Chromium only (a click fails with the browser's own
+  error); a browser-storage library's Create dialog has Import from a folder
 - `deno task test` all tests (`*_test.ts` next to each module, ~50 s with
   Chrome); `deno task test:fast` skips the Chrome tests (~10 s, what pre-commit
   runs). `web/src/local-browser_test.ts` drives the built `dist/` with no

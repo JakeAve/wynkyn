@@ -1,10 +1,11 @@
 // web/src/panel-page.ts — the style panel's Page and Publish tabs (spec R1).
 // Page: trim size and margins (page numbers and running heads are Page
-// furniture parts, panel-furniture.ts). Publish: the sheet,
-// signatures and the imposition they derive to (§4.3), the first signature
-// drawn as it prints into the sheet view (R7), printing from this browser and
-// the print export. Both write the `page` section; Publish reads the trim size
-// the Page tab set, and exports the e-book (§7.8).
+// furniture parts, panel-furniture.ts). Publish, by what the author is
+// making: the e-book (§7.8); a PDF of the pages at their trim size; or sheets
+// for binding — paper, signatures and the imposition they derive to (§4.3),
+// the first signature drawn as it prints into the sheet view (R7), and printing
+// from this browser. Both write the `page` section; Publish reads the trim size
+// the Page tab set and links back to it.
 import type { Duplex, Flip, PageConfig } from "../../metadata/types.ts";
 import {
   DEFAULT_SIZE,
@@ -20,6 +21,7 @@ import {
   tryParseDims,
 } from "./config-data.ts";
 import {
+  icon,
   makeView,
   row,
   section,
@@ -213,13 +215,6 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       "Print the fronts, turn the stack over on that edge and put it back in, then print the backs. Last sheet first suits printers that stack face up.",
     ),
   ];
-  const printing = printSection(ctx, page);
-  const showManual = () => {
-    for (const m of manual) m.hidden = (page.duplex ?? "short-edge") !== "none";
-    printing.update();
-  };
-  showManual();
-
   const FPS = "folios-per-signature";
   let lastFolios = typeof page[FPS] === "number" ? page[FPS] : undefined;
   const folioRow = v.mark(
@@ -241,8 +236,42 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
   );
   folioRow.hidden = page[FPS] === "booklet";
 
+  const duplex = v.mark(
+    row(
+      "Auto duplex",
+      seg<Duplex>(
+        [
+          { label: "Short edge", value: "short-edge" },
+          { label: "Long edge", value: "long-edge" },
+          { label: "By hand", value: "none" },
+        ],
+        page.duplex ?? "short-edge",
+        (d) => {
+          if (d) page.duplex = d;
+          showManual();
+          save();
+        },
+        "Duplex",
+      ),
+    ),
+    () => !!page.duplex,
+  );
+  duplex.querySelector(".lbl")!.append(
+    info(
+      "If your printer does not support duplex / two-sided printing for the sheet size, choose “By hand”.",
+    ),
+  );
+  // The printer's settings sit with the buttons they change.
+  const printing = printSection(ctx, page, [duplex, ...manual]);
+  const showManual = () => {
+    for (const m of manual) m.hidden = (page.duplex ?? "short-edge") !== "none";
+    printing.update();
+  };
+  showManual();
+
   return [
     section("Paper", "sheet", [
+      pageSizeRow(ctx, page),
       v.mark(
         row(
           "Sheet",
@@ -253,27 +282,6 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
         ),
         () => !!page.sheet,
       ),
-      v.mark(
-        row(
-          "Two-sided",
-          seg<Duplex>(
-            [
-              { label: "Short edge", value: "short-edge" },
-              { label: "Long edge", value: "long-edge" },
-              { label: "By hand", value: "none" },
-            ],
-            page.duplex ?? "short-edge",
-            (d) => {
-              if (d) page.duplex = d;
-              showManual();
-              save();
-            },
-            "Duplex",
-          ),
-        ),
-        () => !!page.duplex,
-      ),
-      ...manual,
     ]),
     section("Signatures", "folios-per-signature", [
       v.mark(
@@ -293,7 +301,7 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       readout,
     ]),
     printing.sec,
-    exportSection(ctx, page),
+    pagesSection(ctx),
     ebookSection(ctx),
   ];
 }
@@ -323,6 +331,7 @@ function liveImposition(
 function printSection(
   ctx: PanelContext,
   page: PageConfig,
+  settings: HTMLElement[],
 ): { sec: HTMLElement; update(): void } {
   const status = el("div", "export-status");
   status.setAttribute("aria-live", "polite");
@@ -377,16 +386,72 @@ function printSection(
   return {
     update,
     sec: section("Print", "print", [
+      ...settings,
       el("div", "actions", sheets, fronts, backs),
-      el(
-        "p",
-        "hint",
-        "Prints the sheets from this browser (Chrome or Edge), nothing on the server. Save as PDF gives the same file the export does.",
-      ),
       dialog,
       status,
     ]),
   };
+}
+
+// A hover/focus tip beside a row label: the native title is the tooltip.
+function info(text: string): HTMLElement {
+  const b = el("button", "info", icon("info"));
+  b.type = "button";
+  b.title = text;
+  b.setAttribute("aria-label", text);
+  return b;
+}
+
+// The page size is Style's to set; Publish shows it, with the way there. The
+// trip leaves a history entry, so Back returns here.
+function pageSizeRow(ctx: PanelContext, page: PageConfig): HTMLElement {
+  const change = el("button", "where", "Change in Style");
+  change.type = "button";
+  change.onclick = () =>
+    ctx.toStyle(
+      "page",
+      change.closest<HTMLElement>("[data-focus]")!.dataset.focus!,
+    );
+  return row(
+    "Page",
+    el(
+      "span",
+      "cfg-row",
+      (page.size ?? DEFAULT_SIZE).replace(" ", " × "),
+      change,
+    ),
+  );
+}
+
+// The book's pages in reading order, one per printed page at the page size,
+// no imposition: Save as PDF gives a file the size of the book.
+function pagesSection(ctx: PanelContext): HTMLElement {
+  const status = el("div", "export-status");
+  status.setAttribute("aria-live", "polite");
+  const btn = el("button", "tog primary", "Print pages");
+  btn.type = "button";
+  btn.onclick = () => {
+    status.replaceChildren();
+    const pages = ctx.preview.pages();
+    const size = tryParseDims(ctx.meta.page?.size ?? DEFAULT_SIZE);
+    if (!pages.length || !size) {
+      status.append(
+        el("p", "err", "Nothing to print until the preview has paginated."),
+      );
+      return;
+    }
+    const sides = pages.map((_, i) => ({
+      label: `page ${i + 1}`,
+      slots: [{ page: i, rotate: 0 as const, folio: 0 }],
+    }));
+    printSheets(pages, sides, { sheet: size, page: size, cols: 1, rows: 1 });
+  };
+  return section("PDF", "pdf", [
+    el("div", "actions", btn),
+    el("p", "hint", "Choose Save as PDF in the print dialog."),
+    status,
+  ]);
 }
 
 // One button: the EPUB, then a link to it. It reflows on the reader's screen,
@@ -591,95 +656,6 @@ function drawSignature(
       : "",
   ];
   host.append(el("p", "hint", notes.filter(Boolean).join(" ")));
-}
-
-const FILE_LABELS: Record<string, string> = {
-  "sheets.pdf": "Sheets",
-  "sheets-fronts.pdf": "Fronts",
-  "sheets-backs.pdf": "Backs",
-  "book.pdf": "Pages in reading order",
-};
-
-// Proof and export buttons, then what the export wrote, each PDF opening in
-// the browser's viewer to print from.
-function exportSection(ctx: PanelContext, page: PageConfig): HTMLElement {
-  const status = el("div", "export-status");
-  status.setAttribute("aria-live", "polite");
-  const proofBtn = el("button", "tog", "Proof");
-  const exportBtn = el("button", "tog primary", "Export");
-  proofBtn.type = exportBtn.type = "button";
-  const say = (cls: string, text: string) => el("p", cls, text);
-
-  const run = async (proof: boolean, force = false) => {
-    proofBtn.disabled = exportBtn.disabled = true;
-    status.replaceChildren(say(
-      "",
-      proof
-        ? "Building the proof…"
-        : "Rendering the book in Chrome. This can take a minute…",
-    ));
-    const pages = ctx.preview.pageCount();
-    const r = await ctx.exportPrint({
-      proof,
-      force,
-      // A booklet's proof is the whole book; other proofs show one signature.
-      pages: proof && page["folios-per-signature"] === "booklet" && pages
-        ? pages
-        : undefined,
-    });
-    proofBtn.disabled = exportBtn.disabled = false;
-    status.replaceChildren();
-    if (r.error) {
-      status.append(say("err", r.error));
-      return;
-    }
-    if (!r.summary) {
-      const again = el("button", "tog", "Export anyway");
-      again.type = "button";
-      again.onclick = () => run(proof, true);
-      status.append(
-        say("err", "Pagination problems. Fix them, or export anyway:"),
-        el("ul", "", ...r.problems.map((p) => el("li", "", p))),
-        again,
-      );
-      return;
-    }
-    status.append(...r.summary.split("\n").map((l) => say("", l)));
-    if (r.problems.length) {
-      status.append(
-        say(
-          "err",
-          `Exported with ${r.problems.length} pagination problem${
-            r.problems.length === 1 ? "" : "s"
-          }.`,
-        ),
-      );
-    }
-    const links = el("div", "files");
-    for (const f of r.files) {
-      const a = el("a", "", FILE_LABELS[f.name] ?? f.name);
-      a.href = f.url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      links.append(a);
-    }
-    status.append(
-      links,
-      say("hint", "Print at 100% (actual size), never fit to page."),
-    );
-  };
-  proofBtn.onclick = () => run(true);
-  exportBtn.onclick = () => run(false);
-
-  return section("Export", "export", [
-    el("div", "actions", proofBtn, exportBtn),
-    el(
-      "p",
-      "hint",
-      "A proof prints numbered blank pages. On a new printer, fold one signature by hand before using good paper.",
-    ),
-    status,
-  ]);
 }
 
 // Preset dropdown + custom-dimensions input (spec §7.5: named presets and

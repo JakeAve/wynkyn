@@ -25,6 +25,7 @@ const ICONS = {
   eye:
     '<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.8"/>',
   pointer: '<path d="M4 2.5 12 8l-3.6.8L10.6 13l-1.5.7-2.2-4.2L4 12z"/>',
+  info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.5v3.5M8 5.2v.1"/>',
 };
 
 export function icon(name: keyof typeof ICONS): SVGSVGElement {

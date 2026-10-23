@@ -2014,10 +2014,15 @@ Includes:
 - The first signature drawn as it prints: each sheet's front and back with the
   book pages that land on it, folds dashed, cuts solid, from the same `impose()`
   export uses
-- Print export from the panel (§7.7): Proof and Export run `bml export` on the
-  dev server (`POST /api/books/<book>/export`), landing any pending save first,
-  then link each PDF to open in the browser's viewer for printing; pagination
-  problems are listed with an "export anyway" choice
+- The Publish view grouped by what the author is making: **Binding** — Paper
+  (the page size, with a link to Style's Page view that Back returns from, and
+  the sheet), Signatures, and Print (auto duplex or by hand, the by-hand flip
+  and back order, and the Print sheets buttons, §7.7); **PDF**, the pages in
+  reading order at the page size, one per printed page (Print pages; Save as PDF
+  gives the file `book.pdf` would be); and **E-book** (Export EPUB, §7.8). All
+  printing runs in the browser; proofs and the sheet PDFs on disk are
+  `bml
+  export`'s
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a
   warning under a family that is neither; §4.4)
@@ -2130,20 +2135,19 @@ pages, but a very different book); a 5.5in × 8.5in page gives 2 × 1 (fold only
 `duplex: none`), built by embedding `book.pdf` pages onto sheet-sized PDF pages;
 `--proof` emits numbered placeholders for a one-sheet printer check (a booklet's
 proof needs `--pages`, the book's page count). The files land in
-`books/<book>/export/` (or `export/<edition>/`) whether `bml export` or the
-panel's Export wrote them; the dev server serves them at
-`/api/books/<book>/export/<file>`.
+`books/<book>/export/` (or `export/<edition>/`).
 
 **Printing from the browser** (`web/src/print.ts`): the Publish tab's Print
-button needs no Chrome on the server. It clones the live preview's Paged.js
-pages onto sheet-sized print layers laid out by the same `impose()` and
+sheets button needs no Chrome on the server. It clones the live preview's
+Paged.js pages onto sheet-sized print layers laid out by the same `impose()` and
 `sidesFor()` the exporter uses (one layer per sheet side, pages at their trim
 size, rotated slots turned 180°), overrides `@page` with the sheet size, and
 opens the browser's print dialog; `afterprint` removes the layer. A printer gets
 the sheets directly; Save as PDF gives the same file as `sheets.pdf`.
 `duplex:
 none` is two runs, Print fronts and Print backs, honouring `flip` and
-`reverse-backs`. Chrome and Edge; proofs stay with the exporter.
+`reverse-backs`. Print pages is the same layer with a 1 × 1 grid at the page
+size and no imposition. Chrome and Edge; proofs stay with the exporter.
 
 ### 7.8 E-book Export
 
