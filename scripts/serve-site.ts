@@ -8,6 +8,9 @@ const TYPES: Record<string, string> = {
   json: "application/json",
   md: "text/markdown; charset=utf-8",
   txt: "text/plain; charset=utf-8",
+  svg: "image/svg+xml",
+  png: "image/png",
+  webmanifest: "application/manifest+json",
 };
 
 export function serveSite(
