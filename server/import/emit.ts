@@ -36,7 +36,7 @@ export function emit(o: Outline, today = new Date()): Emitted {
   });
   const pg = s.gutenberg;
 
-  out.push(`%% Imported from ${s.name} on ${date}.`);
+  out.push(`%% Imported from ${s.from ?? s.name} on ${date}.`);
   for (const l of o.summary) out.push(`%% ${l}`);
   if (noImageFiles && imageCount) {
     out.push(

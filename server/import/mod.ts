@@ -37,9 +37,13 @@ export function readSource(name: string, bytes: Uint8Array): Source {
 export function importSource(
   name: string,
   bytes: Uint8Array,
-  opts: ImportOptions = {},
+  { from, ...opts }: ImportOptions & { from?: string } = {},
 ): ImportResult {
   const src = readSource(name, bytes);
+  src.from = from;
+  src.gutenberg ??= from?.match(
+    /gutenberg\.org\/(?:ebooks\/|cache\/epub\/|files\/)(\d+)/,
+  )?.[1];
   const outline = structure(src, opts);
   const { manuscript, images } = emit(outline);
   return {

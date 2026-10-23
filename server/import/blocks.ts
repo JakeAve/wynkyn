@@ -17,6 +17,7 @@ export type Block =
 
 export interface Source {
   name: string; // the file's name, for the summary comment
+  from?: string; // the web address it came from, when it came from one
   title?: string;
   author?: string;
   year?: string;

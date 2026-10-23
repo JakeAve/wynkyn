@@ -117,6 +117,17 @@ Deno.test("text reader: Gutenberg header, contents, two-line headings, verse, br
   );
 });
 
+Deno.test("importSource: the address is the summary's source and a Gutenberg address supplies the eBook number", () => {
+  const url = "https://www.gutenberg.org/cache/epub/84/pg84.txt";
+  const bare = GUTENBERG.replace(/^Release date:.*$/im, "");
+  const m = importSource("pg84.txt", strToU8(bare), { from: url }).manuscript;
+  assertStringIncludes(m, `%% Imported from ${url} on`);
+  assertStringIncludes(m, "Sourced from Project Gutenberg eBook #84");
+  // the file's own header line wins over the address
+  const kept = importSource("pg84.txt", strToU8(GUTENBERG), { from: url });
+  assertStringIncludes(kept.manuscript, "eBook #99");
+});
+
 Deno.test("structure + emit: house shape, front matter, escapes, zero diagnostics", () => {
   const r = importSource("tiny.txt", strToU8(GUTENBERG));
   const m = r.manuscript;
