@@ -2159,6 +2159,11 @@ summary {
 .ask .privacy b {
   color: var(--fg);
 }
+/* A dialog opens with its title focused (announced, nothing pre-chosen);
+   Tab moves to the first choice. */
+.ask h2:focus {
+  outline: none;
+}
 .ask-foot {
   display: flex;
   align-items: center;

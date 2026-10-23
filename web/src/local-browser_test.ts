@@ -198,9 +198,13 @@ Deno.test({
         welcome.includes("Your books are yours"),
         `the privacy line is on the Welcome: ${welcome}`,
       );
+      // A dialog opens with its title focused, no row pre-chosen.
+      const focused = () => page.evaluate(() => document.activeElement?.id);
+      assertEquals(await focused(), "library-title");
       await page.locator("#lib-browser").click();
       // An empty library goes straight to Create a new manuscript.
       await page.locator("#create[open]").waitFor();
+      assertEquals(await focused(), "create-title");
       assert(
         await page.locator("#create-cancel").isHidden(),
         "no Cancel on an empty library",

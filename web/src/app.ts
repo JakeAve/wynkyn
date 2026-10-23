@@ -1154,6 +1154,7 @@ function createManuscript(cancelable: boolean): void {
   };
   const input = $("create-file") as HTMLInputElement;
   input.value = "";
+  $("create-import").onclick = () => input.click();
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
@@ -1184,6 +1185,7 @@ function createManuscript(cancelable: boolean): void {
   folder.hidden = localStorage.getItem("library") !== "browser";
   const dir = $("create-dir") as HTMLInputElement;
   dir.value = "";
+  folder.onclick = () => dir.click();
   dir.onchange = async () => {
     if (!dir.files?.length) return;
     try {

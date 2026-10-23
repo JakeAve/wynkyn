@@ -203,7 +203,8 @@
     </dialog>
     <dialog id="browser-notice" class="ask"
       aria-labelledby="browser-notice-title">
-      <h2 id="browser-notice-title">For the best experience use Chrome, Edge or
+      <h2 id="browser-notice-title" tabindex="-1"
+        autofocus>For the best experience use Chrome, Edge or
         Brave</h2>
       <p>They open your own books folder and print exact pages. Other browsers
         keep books in the browser only, and printing may differ.</p>
@@ -213,7 +214,7 @@
       </div>
     </dialog>
     <dialog id="library" class="ask" aria-labelledby="library-title">
-      <h2 id="library-title">Welcome to Wynkyn</h2>
+      <h2 id="library-title" tabindex="-1" autofocus>Welcome to Wynkyn</h2>
       <p>It looks like you don’t have any manuscripts yet. Choose where to keep
         them to get started.</p>
       <div class="choices">
@@ -240,19 +241,15 @@
       <span id="lib-err" class="sw-err"></span>
     </dialog>
     <dialog id="create" class="ask" aria-labelledby="create-title">
-      <h2 id="create-title">Create a new manuscript</h2>
+      <h2 id="create-title" tabindex="-1" autofocus>Create a new manuscript</h2>
       <p id="create-sub">Your library is empty. How do you want to begin?</p>
       <div class="choices">
-        <label class="choice">Import a file
+        <button id="create-import" class="choice">Import a file
           <small>Word, EPUB, plain text, Markdown or HTML. From Google Docs:
-            File › Download › Microsoft Word.</small>
-          <input id="create-file" type="file" hidden
-            accept=".txt,.md,.markdown,.html,.htm,.xhtml,.epub,text/plain,text/markdown,text/html,application/epub+zip">
-        </label>
-        <label id="create-folder" class="choice" hidden>Import from a folder
-          <small>Copies the books in a Wynkyn folder into this browser.</small>
-          <input id="create-dir" type="file" webkitdirectory multiple hidden>
-        </label>
+            File › Download › Microsoft Word.</small></button>
+        <button id="create-folder" class="choice" hidden>Import from a folder
+          <small>Copies the books in a Wynkyn folder into this
+            browser.</small></button>
         <button class="choice" disabled>Import from the web
           <span class="pill">Coming soon</span>
           <small>Project Gutenberg and most sites don’t allow a page to fetch
@@ -260,6 +257,9 @@
         <button id="create-blank" class="choice">Start blank
           <small>A title page and nothing else.</small></button>
       </div>
+      <input id="create-file" type="file" hidden
+        accept=".txt,.md,.markdown,.html,.htm,.xhtml,.epub,text/plain,text/markdown,text/html,application/epub+zip">
+      <input id="create-dir" type="file" webkitdirectory multiple hidden>
       <div class="ask-foot">
         <span id="create-err" class="sw-err"></span>
         <button id="create-back" class="btn" type="button"
