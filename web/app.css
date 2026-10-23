@@ -2183,7 +2183,8 @@ summary {
   color: var(--muted);
   font-size: 12px;
 }
-.ask .field input {
+.ask .field input,
+.ask .field textarea {
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -2194,6 +2195,12 @@ summary {
 .ask .hint {
   margin: 0;
   font-size: 12px;
+}
+.ask .field textarea {
+  resize: vertical;
+}
+.ask .hint a {
+  color: var(--fg);
 }
 #title-source {
   font-size: 12.5px;
