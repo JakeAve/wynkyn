@@ -5,6 +5,7 @@ import {
   bmlToken,
   classifyLines,
   emRanges,
+  hiddenLines,
   structuralBlock,
   styleKeysAt,
 } from "./bml-language.ts";
@@ -195,4 +196,25 @@ Deno.test("structuralBlock: from the structural line at or above to before the n
   assertEquals(structuralBlock(at, lines.length, 2), [2, 4]);
   assertEquals(structuralBlock(at, lines.length, 1), [1, 1]);
   assertEquals(structuralBlock(at, lines.length, 6), [5, 6]);
+});
+
+Deno.test("hiddenLines: field lines beside prose, not landmarks or the cursor's paragraph", () => {
+  const lines = [
+    "{chapter: one}", // 0 structural: kept
+    "{title}", // 1 hidden
+    "Marley's Ghost",
+    "",
+    "{illustration: a}", // 4 alone, no prose: kept
+    "",
+    "{quote}", // 6 hidden
+    "Words.",
+    "{/quote}", // 8 hidden
+    "",
+    "{dropcap}", // 10 the cursor's paragraph: kept
+    "MARLEY was dead.",
+  ];
+  assertEquals(hiddenLines(lines, 11), [1, 6, 8]);
+  assertEquals(hiddenLines(lines, 2), [6, 8, 10]);
+  // On a blank line nothing is revealed.
+  assertEquals(hiddenLines(lines, 3), [1, 6, 8, 10]);
 });

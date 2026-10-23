@@ -9,6 +9,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import {
+  Compartment,
   EditorState,
   type Range,
   RangeSet,
@@ -17,7 +18,7 @@ import {
   type Text,
 } from "@codemirror/state";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
-import { bml, ClassMarker } from "./bml-language.ts";
+import { bml, ClassMarker, emRanges, hiddenLines } from "./bml-language.ts";
 import { toCmDiagnostics } from "./diagnostics.ts";
 import { searchPanel } from "./search-panel.ts";
 import { insertExtensions } from "./editor-insert.ts";
@@ -136,58 +137,58 @@ export function setEditionSpans(
   view.dispatch({ effects: setSpans.of({ spans, token }) });
 }
 
-// ---- the style chip: on the cursor's line, a button to the style of what
-// that line is part of (spec §7.3); app.ts resolves the key and the label ----
+// ---- hide markup (the text view bar): sentinel lines beside prose and {em} tags
+// fold away everywhere but the cursor's paragraph (hiddenLines) ----
 
-export interface StyleChip {
-  line: number;
-  label: string;
-  open(): void;
-}
+const hide = Decoration.replace({});
 
-const setChip = StateEffect.define<StyleChip | null>();
-
-class ChipWidget extends WidgetType {
-  constructor(readonly chip: StyleChip) {
-    super();
+function buildHidden(state: EditorState): DecorationSet {
+  const doc = state.doc;
+  const lines = doc.toString().split("\n");
+  const cursor = doc.lineAt(state.selection.main.head).number - 1;
+  const decos: Range<Decoration>[] = [];
+  for (const i of hiddenLines(lines, cursor)) {
+    const l = doc.line(i + 1);
+    // Fold the line into the one above, so the text line below keeps its
+    // own decorations (bold after {title}); the first line folds forward.
+    if (i > 0) decos.push(hide.range(l.from - 1, l.to));
+    else if (doc.lines > 1) decos.push(hide.range(l.from, l.to + 1));
   }
-  override eq(o: ChipWidget): boolean {
-    return o.chip.label === this.chip.label && o.chip.line === this.chip.line;
-  }
-  toDOM(): HTMLElement {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "cm-bml-style-chip";
-    // The label is drawn by CSS from the attribute, so the editor's text
-    // content stays the manuscript alone.
-    b.dataset.label = this.chip.label;
-    b.setAttribute("aria-label", `Open the style: ${this.chip.label}`);
-    b.onclick = () => this.chip.open();
-    return b;
-  }
-}
-
-const styleChip = StateField.define<DecorationSet>({
-  create: () => Decoration.none,
-  update(v, tr) {
-    for (const e of tr.effects) {
-      if (e.is(setChip)) {
-        const c = e.value;
-        if (!c || c.line > tr.state.doc.lines) return Decoration.none;
-        return Decoration.set(
-          Decoration.widget({ widget: new ChipWidget(c), side: 1 }).range(
-            tr.state.doc.line(c.line).to,
-          ),
-        );
+  const [first, last] = paragraphOf(lines, cursor);
+  let pos = 0;
+  lines.forEach((line, i) => {
+    if (i < first || i > last) {
+      for (const [a, b, c, d] of emRanges(line)) {
+        decos.push(hide.range(pos + a, pos + b), hide.range(pos + c, pos + d));
       }
     }
-    return tr.docChanged ? v.map(tr.changes) : v;
-  },
+    pos += line.length + 1;
+  });
+  return Decoration.set(decos, true);
+}
+
+// The cursor's paragraph as [first, last] line (0-based); [-1, -1] on a
+// blank line, so nothing is revealed there.
+function paragraphOf(lines: string[], i: number): [number, number] {
+  if (!lines[i]?.trim()) return [-1, -1];
+  let a = i, b = i;
+  while (a > 0 && lines[a - 1]!.trim()) a--;
+  while (b < lines.length - 1 && lines[b + 1]!.trim()) b++;
+  return [a, b];
+}
+
+// ponytail: whole-document rescan on every edit and cursor move; scan only
+// when the cursor's paragraph changes if it lags on long books.
+const hiddenMarkup = StateField.define<DecorationSet>({
+  create: buildHidden,
+  update: (v, tr) => tr.docChanged || tr.selection ? buildHidden(tr.state) : v,
   provide: (f) => EditorView.decorations.from(f),
 });
 
-export function setStyleChip(view: EditorView, chip: StyleChip | null): void {
-  view.dispatch({ effects: setChip.of(chip) });
+const markup = new Compartment();
+
+export function setHideMarkup(view: EditorView, on: boolean): void {
+  view.dispatch({ effects: markup.reconfigure(on ? hiddenMarkup : []) });
 }
 
 export function createEditor(opts: {
@@ -208,8 +209,8 @@ export function createEditor(opts: {
         searchPanel(),
         insertExtensions(),
         editionSpans,
-        styleChip,
         lintGutter(),
+        markup.of([]),
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !suppressChanges) {

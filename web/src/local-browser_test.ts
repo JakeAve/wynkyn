@@ -221,8 +221,14 @@ Deno.test({
       await page.waitForURL(/book=tiny-book/);
       await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
         .first().waitFor();
+      // The tree, not the editor's DOM: CodeMirror draws only the lines near
+      // the viewport, so how far down a chapter is depends on the text size.
+      const tree = await page.locator("#tree").innerText();
+      assert(
+        tree.includes("The Start") && tree.includes("The End"),
+        `the import landed: ${tree}`,
+      );
       const text = await page.locator("#editor .cm-content").innerText();
-      assert(text.includes("{chapter: the-start}"), "the import landed");
       assert(text.includes("%% check:"), "guesses are flagged");
       const notes = page.locator("#import-notes");
       await notes.waitFor({ state: "visible" });

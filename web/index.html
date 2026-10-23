@@ -147,6 +147,23 @@
       <div id="gutter-tree" class="gutter" role="separator"
         aria-orientation="vertical" title="Drag to resize"></div>
       <div id="editor">
+        <div id="text-view" role="toolbar" aria-label="Text view">
+          <span class="seg" role="radiogroup" aria-label="Font">
+            <button type="button" role="radio" data-font="serif">Serif</button>
+            <button type="button" role="radio" data-font="sans">Sans</button>
+            <button type="button" role="radio" data-font="mono">Mono</button>
+          </span>
+          <label class="tv-size">
+            <input id="tv-size" type="range" min="12" max="24" step="1"
+              aria-label="Text size">
+            <output for="tv-size"></output>
+          </label>
+          <label class="tv-hide"
+            title="Folds sentinel lines and {em} tags away, except in the paragraph you're in">
+            Hide markup
+            <input id="tv-hide" type="checkbox" role="switch" class="sw">
+          </label>
+        </div>
         <div id="disk-banner" role="alert" hidden>
           <div class="msg">
             <strong>Save failed because something else touched the
@@ -170,12 +187,24 @@
       <div id="sheet-view"></div>
     </div>
     <div id="footer">
-      <span id="page-indicator"></span>
-      <span id="diagnostics"></span>
-      <button id="import-notes" type="button" hidden
-        aria-expanded="false"></button>
-      <div id="import-notes-list" role="list" hidden></div>
-      <span id="page-problems"></span>
+      <!-- One cell per column of #panes: the writer's under the editor, the
+           pages' under the preview (app.css mirrors the grid). -->
+      <span id="foot-tree"></span>
+      <span id="foot-gutter-tree" class="foot-gutter"></span>
+      <div id="writer-foot" class="foot">
+        <button id="style-here" type="button" hidden
+          title="Open the style of the text at the cursor"><span
+            class="k">Go to style:</span> <span></span></button>
+        <span id="diagnostics"></span>
+        <button id="import-notes" type="button" hidden
+          aria-expanded="false"></button>
+        <div id="import-notes-list" role="list" hidden></div>
+      </div>
+      <span id="foot-gutter-pages" class="foot-gutter"></span>
+      <div id="page-foot" class="foot">
+        <span id="page-indicator"></span>
+        <span id="page-problems"></span>
+      </div>
     </div>
     <dialog id="switcher" aria-label="Books and editions">
       <div class="sw-books">
