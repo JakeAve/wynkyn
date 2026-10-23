@@ -289,6 +289,8 @@ Deno.test({
       });
       await page.goto(`http://localhost:${site.addr.port}/`);
       await page.locator("#library[open]").waitFor();
+      // With the picker there is no Chromium-only tag.
+      assertEquals(await page.locator("#lib-pick .pill").isVisible(), false);
       await page.locator("#lib-pick").click();
       await page.locator("#create[open]").waitFor();
       await page.locator("#create-blank").click();

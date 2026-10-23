@@ -2140,6 +2140,9 @@ summary {
   text-transform: uppercase;
   vertical-align: 1px;
 }
+.pill[hidden] {
+  display: none;
+}
 .choice:disabled {
   cursor: default;
   opacity: .55;
