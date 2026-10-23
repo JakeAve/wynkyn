@@ -80,7 +80,7 @@ Deno.test({
         ws.on("framereceived", ({ payload }) => {
           if (String(payload).startsWith('{"type":"update"')) updates++;
         }));
-      await page.goto(`http://localhost:${server.port}/?book=demo-book`);
+      await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
       await page.locator('#status[data-kind="saved"]').waitFor();
       const original = await disk();
       assertEquals(await buffer(page), original);

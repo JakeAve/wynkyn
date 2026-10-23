@@ -581,7 +581,7 @@ function installSwitcher(): void {
   }
   $("library-open").onclick = () => {
     localStorage.removeItem("library");
-    location.href = "/";
+    location.href = location.pathname;
   };
 
   $("edition-new").onclick = () => {

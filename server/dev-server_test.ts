@@ -29,9 +29,15 @@ Deno.test("http: shell, book list, build json, images, 404s", async () => {
   const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   try {
-    const shell = await fetch(`${base}/`);
+    const shell = await fetch(`${base}/app/`);
     assertEquals(shell.status, 200);
     assert((await shell.text()).includes('id="preview"'));
+    // The root is the site's front page; a bare directory redirects.
+    assert((await (await fetch(`${base}/`)).text()).includes('href="/app/"'));
+    const bare = await fetch(`${base}/about`, { redirect: "manual" });
+    assertEquals(bare.status, 301);
+    assertEquals(bare.headers.get("location"), `${base}/about/`);
+    await bare.body?.cancel();
 
     const books = await (await fetch(`${base}/api/books`)).json();
     assertEquals(books, { books: ["demo-book"] });

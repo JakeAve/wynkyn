@@ -10,9 +10,10 @@ import type { ExportOptions } from "./print-export.ts";
 import { installedFonts } from "./local-fonts.ts";
 import { formatProblem, PaginationError } from "../renderer/page-map-types.ts";
 import { safeName } from "./editions.ts";
+import { siteFile } from "../scripts/build-site.ts";
 
 const WEB_DIR = new URL("../web/", import.meta.url);
-const PAGED_DIR = new URL("../vendor/pagedjs/", import.meta.url);
+const ROOT = new URL("../", import.meta.url);
 const TEMPLATE = new URL("../templates/metadata.json", import.meta.url);
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -170,7 +171,8 @@ export async function startServer(
     dirUrl: URL | string,
     name: string,
   ): Promise<Response> {
-    if (!safeName(name)) return new Response("bad path", { status: 400 });
+    const ok = dirUrl === ROOT || safeName(name);
+    if (!ok) return new Response("bad path", { status: 400 });
     try {
       const data = typeof dirUrl === "string"
         ? await Deno.readFile(`${dirUrl}/${name}`)
@@ -190,26 +192,15 @@ export async function startServer(
 
     if (path === "/ws") return handleWebSocket(req, url);
 
-    if (path === "/" || path === "/index.html") {
-      return serveStatic(WEB_DIR, "index.html");
-    }
-    if (path === "/vendor/paged.js") return serveStatic(PAGED_DIR, "paged.js");
-    // What the app fetches when it runs the service itself (see scripts/build-site.ts).
-    if (path === "/renderer/base.css") {
-      return serveStatic(new URL("../renderer/", import.meta.url), "base.css");
-    }
-    if (path === "/templates/metadata.json") {
-      return serveStatic(
-        new URL("../templates/", import.meta.url),
-        "metadata.json",
-      );
+    // The hosted site's files, served from their sources (scripts/build-site.ts):
+    // the landing pages at the root, the app at /app/, the crawler files.
+    const site = siteFile(path);
+    if (site) {
+      if (site.endsWith("/")) return Response.redirect(url.origin + site, 301);
+      return serveStatic(ROOT, site);
     }
     if (path.startsWith("/web/")) {
       return serveStatic(WEB_DIR, path.slice("/web/".length));
-    }
-    // Crawler files that must sit at the root, as the static host serves them.
-    if (path === "/robots.txt" || path === "/sitemap.xml") {
-      return serveStatic(WEB_DIR, path.slice(1));
     }
 
     if (path === "/api/library" && req.method === "GET") {

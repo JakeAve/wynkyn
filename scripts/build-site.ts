@@ -8,7 +8,13 @@ export const FILES: Record<string, string> = {
   "web/llms.txt": "llms.txt",
   "book-renderer-spec.md": "spec.md",
   ".claude/skills/convert-manuscript/SKILL.md": "convert-manuscript.md",
-  "web/index.html": "index.html",
+  // The pages that can rank: plain HTML at the root. The app sits at /app/.
+  "web/site/index.html": "index.html",
+  "web/site/about.html": "about/index.html",
+  "web/site/faq.html": "faq/index.html",
+  "web/site/site.css": "web/site.css",
+  ".github/readme/front-matter.png": "web/front-matter.png",
+  "web/index.html": "app/index.html",
   // For crawlers; the icons, manifest and OG image live under web/brand/.
   "web/robots.txt": "robots.txt",
   "web/sitemap.xml": "sitemap.xml",
@@ -24,6 +30,19 @@ export const FILES: Record<string, string> = {
   "renderer/base.css": "renderer/base.css",
   "templates/metadata.json": "templates/metadata.json",
 };
+
+// The file a request path maps to, or null. "/" and "/about/" read their
+// index.html; a bare "/about" comes back as "/about/" so the caller redirects.
+export function siteFile(path: string): string | null {
+  const dest = path.endsWith("/")
+    ? `${path.slice(1)}index.html`
+    : path.slice(1);
+  if (dest in DEST) return DEST[dest]!;
+  return `${dest}/index.html` in DEST ? `${path}/` : null;
+}
+const DEST = Object.fromEntries(
+  Object.entries(FILES).map(([src, dest]) => [dest, src]),
+);
 
 if (import.meta.main) await build();
 

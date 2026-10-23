@@ -28,7 +28,7 @@ Deno.test({
       await page.addInitScript(() => {
         globalThis.requestAnimationFrame = () => 0;
       });
-      await page.goto(`http://localhost:${server.port}/?book=demo-book`);
+      await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
       const live = page.locator(
         "#preview > :not(.preview-stage) .pagedjs_page",
       );
