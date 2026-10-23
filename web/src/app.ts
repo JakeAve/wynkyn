@@ -1168,7 +1168,10 @@ function createManuscript(cancelable: boolean): void {
     if (!file) return;
     err.textContent = "Reading…";
     await importPicked(
-      { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) },
+      {
+        name: file.name,
+        bytes: file.arrayBuffer().then((b) => new Uint8Array(b)),
+      },
       `${file.name} · ${sizeLabel(file.size)}`,
       cancelable,
     );
@@ -1220,14 +1223,19 @@ function createManuscript(cancelable: boolean): void {
  *  ask for a title under `label`, write the book and open it. Errors go back
  *  to the create dialog. */
 async function importPicked(
-  src: { name: string; bytes: Uint8Array; from?: string | null },
+  src: {
+    name: string;
+    bytes: Uint8Array | Promise<Uint8Array>;
+    from?: string | null;
+  },
   label: string,
   cancelable: boolean,
 ): Promise<void> {
   const dlg = $("create") as HTMLDialogElement;
   const err = $("create-err");
   try {
-    const r = importSource(src.name, src.bytes, {
+    const bytes = await src.bytes;
+    const r = importSource(src.name, bytes, {
       from: src.from ?? undefined,
     });
     err.textContent = "";
@@ -1326,6 +1334,11 @@ function askWebSource(): Promise<(WebSource & { label: string }) | null> {
     };
     ($("web-form") as HTMLFormElement).onsubmit = async (e) => {
       e.preventDefault();
+      const addr = url.value.trim();
+      url.value = addr.includes("://") ? addr : `https://${addr}`;
+      const fetchBtn = $("web-fetch") as HTMLButtonElement;
+      if (fetchBtn.disabled) return;
+      fetchBtn.disabled = true;
       err.textContent = "Fetching…";
       try {
         finish(await fetchSource(url.value), url.value);
@@ -1339,6 +1352,8 @@ function askWebSource(): Promise<(WebSource & { label: string }) | null> {
         box.hidden = false;
         paste.value = "";
         paste.focus();
+      } finally {
+        fetchBtn.disabled = false;
       }
     };
     paste.onpaste = (e) => {
