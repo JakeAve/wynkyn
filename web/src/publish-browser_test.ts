@@ -47,7 +47,7 @@ Deno.test({
     try {
       const page = await browser.newPage();
       await page.goto(
-        `http://localhost:${server.port}/?book=demo-book&mode=publish`,
+        `http://localhost:${server.port}/app/?book=demo-book&mode=publish`,
       );
       const input = page.getByLabel("Folios per signature", { exact: true });
       const more = page.getByLabel("Increase Folios per signature");
