@@ -241,6 +241,11 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
         value: lastFolios?.toString(),
         placeholder: "4",
         label: "Folios per signature",
+        // A folded quarto or octavo nests whole: step by its folios a sheet.
+        step: () => {
+          const s = resolvePageSetup(page);
+          return s.error === null && isTrueFold(s.fold) ? s.foliosPerSheet : 1;
+        },
         onChange: (n) => {
           if (n === undefined) delete page[FPS];
           else if (isValidFolios(n)) page[FPS] = lastFolios = Number(n);

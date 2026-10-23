@@ -82,13 +82,17 @@ export function makeView(ctx: PanelContext, after = () => {}): View {
 // Length field: takes and emits CSS lengths ("9pt"). The unit is shown beside
 // the number and kept; empty means unset. `placeholder` is the inherited value.
 // onChange returning false rejects the value: the field shows the old one.
-// A bare non-zero number gets `unit` (default "pt"; "" for plain counts), and
-// a negative one is clamped to 0 unless `allowNegative`.
+// A bare non-zero number gets the field's unit — the value's or placeholder's,
+// else `unit`, else "pt" — so a field whose value or placeholder is a bare
+// number is a plain count and stays one. A negative is clamped to 0 unless
+// `allowNegative`. `step` (counts) is read at each press, and a press lands on
+// the next multiple of it.
 export function stepper(o: {
   value: string | undefined;
   placeholder?: string;
   label: string;
   unit?: string;
+  step?: () => number;
   allowNegative?: boolean;
   onChange(v: string | undefined): void | false;
 }): HTMLElement {
@@ -134,21 +138,28 @@ export function stepper(o: {
   const commit = (raw: string | undefined) => {
     const p0 = raw === undefined ? null : parseLength(raw);
     const n = p0 && !o.allowNegative ? Math.max(0, p0.n) : p0?.n;
-    const v = p0 ? `${n}${p0.unit || (n === 0 ? "" : o.unit ?? "pt")}` : raw;
+    const v = p0 ? `${n}${p0.unit || (n === 0 ? "" : unit)}` : raw;
     if (o.onChange(v) === false) return show();
     value = v;
     const p = v === undefined ? null : parseLength(v);
     if (p) unit = p.unit;
     show();
   };
-  const bump = (dir: 1 | -1) =>
-    commit(
-      bumpLength(
-        value ?? "",
-        dir,
-        o.placeholder ? convertLength(o.placeholder, unit) : `0${unit}`,
-      ),
-    );
+  const bump = (dir: 1 | -1) => {
+    const step = o.step?.();
+    if (!step) {
+      return commit(
+        bumpLength(
+          value ?? "",
+          dir,
+          o.placeholder ? convertLength(o.placeholder, unit) : `0${unit}`,
+        ),
+      );
+    }
+    const n = parseLength(value ?? o.placeholder ?? "")?.n ?? 0;
+    const k = dir > 0 ? Math.floor(n / step) + 1 : Math.ceil(n / step) - 1;
+    commit(String(k * step));
+  };
   input.onchange = () => {
     const t = input.value.trim();
     if (!t) return commit(undefined);
