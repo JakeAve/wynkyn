@@ -136,6 +136,61 @@ export function setEditionSpans(
   view.dispatch({ effects: setSpans.of({ spans, token }) });
 }
 
+// ---- the style chip: on the cursor's line, a button to the style of what
+// that line is part of (spec §7.3); app.ts resolves the key and the label ----
+
+export interface StyleChip {
+  line: number;
+  label: string;
+  open(): void;
+}
+
+const setChip = StateEffect.define<StyleChip | null>();
+
+class ChipWidget extends WidgetType {
+  constructor(readonly chip: StyleChip) {
+    super();
+  }
+  override eq(o: ChipWidget): boolean {
+    return o.chip.label === this.chip.label && o.chip.line === this.chip.line;
+  }
+  toDOM(): HTMLElement {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "cm-bml-style-chip";
+    // The label is drawn by CSS from the attribute, so the editor's text
+    // content stays the manuscript alone.
+    b.dataset.label = this.chip.label;
+    b.setAttribute("aria-label", `Open the style: ${this.chip.label}`);
+    b.title = "Open this style";
+    b.onclick = () => this.chip.open();
+    return b;
+  }
+}
+
+const styleChip = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(v, tr) {
+    for (const e of tr.effects) {
+      if (e.is(setChip)) {
+        const c = e.value;
+        if (!c || c.line > tr.state.doc.lines) return Decoration.none;
+        return Decoration.set(
+          Decoration.widget({ widget: new ChipWidget(c), side: 1 }).range(
+            tr.state.doc.line(c.line).to,
+          ),
+        );
+      }
+    }
+    return tr.docChanged ? v.map(tr.changes) : v;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+export function setStyleChip(view: EditorView, chip: StyleChip | null): void {
+  view.dispatch({ effects: setChip.of(chip) });
+}
+
 export function createEditor(opts: {
   parent: HTMLElement;
   text: string;
@@ -154,6 +209,7 @@ export function createEditor(opts: {
         searchPanel(),
         insertExtensions(),
         editionSpans,
+        styleChip,
         lintGutter(),
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {

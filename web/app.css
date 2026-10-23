@@ -721,6 +721,26 @@ summary {
 #editor .cm-line.cm-bml-off {
   opacity: var(--off);
 }
+/* the style chip (editor.ts): on the cursor's line, opens the style of
+   what that line is part of */
+#editor .cm-bml-style-chip {
+  font: 10.5px system-ui, sans-serif;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 5px;
+  margin-left: 8px;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+#editor .cm-bml-style-chip::before {
+  content: attr(data-label);
+}
+#editor .cm-bml-style-chip:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
 #editor .cm-bml-cond-tag {
   font: 10.5px system-ui, sans-serif;
   color: var(--warn);
@@ -1171,7 +1191,8 @@ summary {
 [data-style-hl] {
   background: var(--hl);
 }
-[data-style-selected] {
+[data-style-selected],
+[data-edit-hl] {
   outline: 1px solid var(--pick);
   outline-offset: 3px;
 }

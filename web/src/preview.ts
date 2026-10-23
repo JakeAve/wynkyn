@@ -276,6 +276,39 @@ export function scrollPreviewTo(
   });
 }
 
+// Follow the cursor (spec §7.3): outline the rendered block the editor's line
+// is part of — the nearest `data-line` at or above it, every fragment of it
+// when a page break splits it — and keep it in view. null clears the outline.
+export function markEdited(container: HTMLElement, line: number | null): void {
+  for (const el of container.querySelectorAll("[data-edit-hl]")) {
+    el.removeAttribute("data-edit-hl");
+  }
+  if (line === null) return;
+  let best = 0;
+  const live = [...container.querySelectorAll("[data-line]")].filter((el) =>
+    !el.closest(".preview-stage")
+  );
+  for (const el of live) {
+    const n = Number(el.getAttribute("data-line"));
+    if (n <= line && n > best) best = n;
+  }
+  if (!best) return;
+  const hits = live.filter((el) =>
+    Number(el.getAttribute("data-line")) === best
+  );
+  for (const el of hits) el.setAttribute("data-edit-hl", "");
+  // By hand, not scrollIntoView: the pages are CSS-zoomed (fitPreview), and
+  // Chrome scrolls a zoomed element to the wrong place.
+  const r = hits[0]?.getBoundingClientRect();
+  const c = container.getBoundingClientRect();
+  if (!r) return;
+  if (r.top < c.top || r.height > c.height) {
+    container.scrollTop += r.top - c.top - 24;
+  } else if (r.bottom > c.bottom) {
+    container.scrollTop += r.bottom - c.bottom + 24;
+  }
+}
+
 // The app's mode (spec §7.1): what the middle column edits.
 export type Mode = "write" | "style" | "publish";
 
