@@ -397,6 +397,7 @@ Deno.test({
           "“My Books”",
         )
       );
+      await page.keyboard.press("Escape"); // the switcher covers the toolbar
       await page.locator("#library-open").click();
       await page.locator("#library[open]").waitFor();
       assertStringIncludes(

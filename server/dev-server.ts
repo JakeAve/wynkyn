@@ -212,6 +212,9 @@ export async function startServer(
       return serveStatic(WEB_DIR, path.slice(1));
     }
 
+    if (path === "/api/library" && req.method === "GET") {
+      return Response.json({ id: await service.libraryId() });
+    }
     if (path === "/api/books" && req.method === "GET") {
       return Response.json({ books: await service.list() });
     }

@@ -37,19 +37,22 @@ const ELEMENTS: Array<[string, string, string[]]> = [
   ["Copyright", "copyright", []], // the page: position, shared type
   ["Copyright", "copyright", ["copyright-line", "rights", "isbn", "edition"]],
   ["Dedication", "dedication", []],
+  // Outside in: the heading, the row box, the per-level rows that override
+  // it, then the spans inside a row in reading order. Per-level spans are
+  // appended by TOC_NESTED.
   ["Contents", "toc", [
     "title",
-    "label",
-    "number",
-    "subtitle",
-    "leader",
-    "page",
+    "entry",
     "toc-front",
     "toc-part",
     "toc-chapter",
     "toc-heading",
     "toc-back",
-    "entry",
+    "number",
+    "label",
+    "subtitle",
+    "leader",
+    "page",
   ]],
   ["Foreword / preface / introduction", "prose-matter", ["title"]],
   ["Part", "part", ["title", "number"]],
@@ -204,10 +207,12 @@ export function catalogFor(metadata: Metadata): StyleEntry[] {
     section: "is",
     selector: `.is-${name}`,
   }));
+  const i = STATIC_CATALOG.findLastIndex((e) => e.key.startsWith("toc.")) + 1;
   return [
-    ...STATIC_CATALOG,
-    PARAGRAPH,
+    ...STATIC_CATALOG.slice(0, i),
     ...TOC_NESTED,
+    ...STATIC_CATALOG.slice(i),
+    PARAGRAPH,
     ...pageNumberEntries(metadata),
     ...runningEntries(metadata),
     ...is,
@@ -480,7 +485,7 @@ export function matchKey(
         !best || (is && !best.is) ||
         (is === best.is &&
           (depth < best.depth ||
-            (depth === best.depth && tokens.length > best.tokens)))
+            (depth === best.depth && tokens.length >= best.tokens)))
       ) {
         best = { key: entry.key, is, depth, tokens: tokens.length };
       }

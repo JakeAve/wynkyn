@@ -46,6 +46,8 @@ export interface ConfigPanelOptions {
   isNames(): string[]; // `{is}` classes the manuscript uses
   exportPrint(req: ExportRequest): Promise<ExportResult>; // after saves land
   exportEpub(): Promise<EpubResult>;
+  view?: string | null; // the nav row to open on (navId); unknown = default
+  onRoute?(id: string): void; // the nav row changed (for the URL)
 }
 
 const GROUPS: Array<[BookPart["group"], string]> = [
@@ -116,6 +118,15 @@ const PUBLISH_NAV: Array<[string, NavRow[]]> = PUBLISH.map((
   })),
 ]);
 
+// The route behind a nav row id, or null for one this book doesn't have.
+function routeById(id: string, meta: Metadata): Route | null {
+  for (const [, rows] of [...styleNav(meta), ...PUBLISH_NAV]) {
+    const row = rows.find((r) => r.id === id);
+    if (row) return row.route;
+  }
+  return null;
+}
+
 export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   let meta = structuredClone(opts.metadata);
   const dirty = new Set<keyof Metadata>();
@@ -173,9 +184,11 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   let onPages: (() => void) | null = null; // the open view's redraw, if any
 
   // Both survive refresh(); the style route also survives a trip to publish.
-  let route: Route = { tab: "parts", part: "folios" };
-  let styleRoute = route;
+  const home: Route = { tab: "parts", part: "folios" };
+  let route = (opts.view ? routeById(opts.view, meta) : null) ?? home;
+  let styleRoute = route.tab === "publish" ? home : route;
   let current = navId(route); // the nav row to mark, kept past focus's flash
+  opts.onRoute?.(current); // the healed row, so the URL drops an unknown one
 
   const crumbs = document.createElement("span");
   crumbs.className = "crumbs";
@@ -190,6 +203,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     route = next;
     if (next.tab !== "publish") styleRoute = next;
     current = navId(next);
+    opts.onRoute?.(current);
     render();
   }
 

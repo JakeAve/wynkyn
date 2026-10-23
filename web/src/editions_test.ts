@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import {
+  appHref,
   editionHref,
   editionLabel,
   firstSpanLine,
@@ -55,6 +56,24 @@ Deno.test("firstSpanLine: first span naming the edition; null = default", () => 
   assertEquals(firstSpanLine(spans, "pocket"), 4);
   assertEquals(firstSpanLine(spans, null), 9);
   assertEquals(firstSpanLine(spans, "gift"), null);
+});
+
+Deno.test("appHref: only what differs from the defaults", () => {
+  assertEquals(
+    appHref({ book: "a", edition: null, mode: "write", view: null, line: 1 }),
+    "?book=a",
+  );
+  assertEquals(
+    appHref({
+      book: "a",
+      edition: "pocket",
+      mode: "publish",
+      view: "publish:export",
+      line: 40,
+      lib: "c0ffee42",
+    }),
+    "?book=a&edition=pocket&lib=c0ffee42&mode=publish&view=publish%3Aexport#line=40",
+  );
 });
 
 Deno.test("lineFromHash: only #line=N", () => {
