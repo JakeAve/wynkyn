@@ -1992,10 +1992,10 @@ page size, margins, running headers, page numbers, verses, columns, and table of
 contents exactly as the print export (§7.7) will — the whole point of the live
 preview is that it is not an approximation.
 
-A re-render is staged out of sight and swapped in whole; until then the pages on
-screen stay up but dimmed from the moment of the edit, with a "Rendering pages…
-N" count at the pane's foot (the first load shows the count alone). The layout
-keeps going in a background tab.
+A re-render is staged over the pages on screen, which stay up but dimmed from
+the moment of the edit; each new page lands over the old one it replaces as it
+is laid out, with a "Rendering pages… N" count at the pane's foot (the first
+load shows the count alone). The layout keeps going in a background tab.
 
 ### 7.7 Page Setup & Print Imposition
 

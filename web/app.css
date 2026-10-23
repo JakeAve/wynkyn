@@ -929,31 +929,37 @@ summary {
   overflow: auto;
   padding: 16px;
   position: relative;
+  --preview-zoom: var(--preview-fit, 1); /* --preview-fit: fitPreview() */
 }
-/* A new render is staged invisibly beside the live pages and swapped in when
-   complete, so the preview never flashes empty mid-render. */
-/* --preview-zoom: 1 is essential — Paged.js paginates by measuring rects,
-   and a zoomed stage makes it fit twice as much text per page. */
-/* Progress while a render is staged: CSS counts the pages Paged.js has laid
-   out so far, so the message ticks with no script. First load (nothing live
-   yet) centres it in the empty pane; a re-render pins it to the pane's foot. */
+/* A new render is staged over the live pages and swapped in when complete,
+   so the preview never flashes empty mid-render. Paged.js paginates by
+   measuring rects, and a zoomed page fits twice as much text, so the stage's
+   page container stays 1:1 — but Paged.js only ever measures the page it is
+   filling, the stage's last. Every page before it is finished, so it takes
+   the fit zoom and lands exactly over the old page it replaces; the page
+   being filled stays 1:1 and out of sight. */
+/* Progress while a render is staged (data-rendering, set by preview.ts —
+   never :has(> .preview-stage), which Chrome re-evaluates on every node
+   Paged.js inserts): CSS counts the pages laid out so far, so the message
+   ticks with no script. First load (nothing live yet) centres it in the
+   empty pane; a re-render pins it to the pane's foot. */
 #preview {
   counter-reset: staged;
 }
 #preview .preview-stage .pagedjs_page {
   counter-increment: staged;
 }
-#preview:has(> .preview-stage)::after {
+#preview[data-rendering]::after {
   content: "Rendering pages… " counter(staged);
   color: var(--muted);
   font-size: 12px;
   display: block;
   text-align: center;
 }
-#preview:not(:has(> :not(.preview-stage)))::after {
+#preview[data-rendering="first"]::after {
   padding-top: 40vh;
 }
-#preview:has(> :not(.preview-stage)):has(> .preview-stage)::after {
+#preview[data-rendering="again"]::after {
   position: sticky;
   bottom: 0;
   margin: 8px auto -8px;
@@ -965,16 +971,26 @@ summary {
 /* The pages on screen no longer match the text: an edit is on its way
    (data-stale, set by app.ts) or the new render is staged behind them. */
 #preview[data-stale] > :not(.preview-stage),
-#preview:has(> .preview-stage) > :not(.preview-stage) {
+#preview[data-rendering] > :not(.preview-stage) {
   opacity: .5;
   filter: blur(1px);
   transition: opacity .2s;
 }
 #preview .preview-stage {
-  visibility: hidden;
   position: absolute;
   inset: 16px;
+  pointer-events: none; /* clicks reach the old pages until the swap */
   --preview-zoom: 1;
+}
+#preview .preview-stage .pagedjs_pages {
+  gap: 0 calc(8px * var(--preview-fit,
+    1)); /* as the live gap is, once zoomed */
+}
+#preview .preview-stage .pagedjs_page:not(:last-child) {
+  zoom: var(--preview-fit, 1);
+}
+#preview .preview-stage .pagedjs_page:last-child {
+  visibility: hidden;
 }
 /* Spread layout (spec §7.6): two book pages per row, page 1 recto-alone.
    --preview-zoom is set by fitPreview() so a full spread always fits the pane. */

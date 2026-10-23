@@ -128,6 +128,12 @@ async function runRender(
     // old pages stay on screen for the seconds Paged.js takes, no white flash.
     const stage = document.createElement("div");
     stage.className = "preview-stage";
+    // app.css keys the progress message and the dimming on this attribute,
+    // not on :has(> .preview-stage): Chrome re-evaluates :has() on every
+    // node Paged.js inserts, which made a re-render twenty times slower.
+    container.dataset.rendering = container.childElementCount
+      ? "again"
+      : "first";
     container.appendChild(stage);
     // `as`: keeps TS from narrowing this to undefined past the closure.
     let previewer = undefined as Previewer | undefined;
@@ -182,6 +188,7 @@ async function runRender(
     return problems;
   } finally {
     rendering = false;
+    delete container.dataset.rendering;
     if (queuedUpdate) {
       const next = queuedUpdate;
       queuedUpdate = null;
@@ -469,6 +476,7 @@ export function fitPreview(container: HTMLElement): void {
   const spread = 2 * parseFloat(getComputedStyle(page).width) + SPREAD_GAP;
   const k = Math.min(1, (container.clientWidth - PANE_PADDING) / spread);
   // Set on the container (not .pagedjs_pages, which Paged.js recreates) so the
-  // zoom survives re-renders and pages don't flash at 1:1 mid-render.
-  container.style.setProperty("--preview-zoom", k.toFixed(3));
+  // zoom survives re-renders and pages don't flash at 1:1 mid-render. app.css
+  // applies it to the live pages, and to each finished page of a staged render.
+  container.style.setProperty("--preview-fit", k.toFixed(3));
 }
