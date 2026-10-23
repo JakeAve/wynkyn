@@ -27,6 +27,8 @@ interface Previewer {
     inserted: HTMLStyleElement[];
     destroy(): void;
   };
+  // The render queue's scheduler (see renderTick below).
+  chunker: { q: { tick: (cb: () => void) => void } };
   // preview() resolves to the chunker; folios.js leaves the result on it.
   preview(
     html: string,
@@ -49,6 +51,17 @@ declare const BookPageMap: {
 };
 
 export type UpdateMessage = Extract<ServerMessage, { type: "update" }>;
+
+// Paged.js lays out one page per tick of its queue, and ticks on
+// requestAnimationFrame — which a hidden tab never fires, so a book opened
+// and then left in the background sat at "Rendering pages…" until it was
+// looked at again. A message port isn't throttled in the background; the
+// browser still paints between tasks, so pages appear as they are laid out.
+const tickPort = new MessageChannel();
+function renderTick(cb: () => void): void {
+  tickPort.port1.onmessage = cb;
+  tickPort.port2.postMessage(null);
+}
 
 let currentBlobUrl: string | null = null;
 let rendering = false;
@@ -130,6 +143,7 @@ async function runRender(
         previewer = new Paged.Previewer({
           pageMap: { seed: passSeed, numbering: update.pageNumbering },
         });
+        previewer.chunker.q.tick = renderTick;
         return (await previewer.preview(update.html, [blobUrl], stage))
           .pageMapResult;
       }, seed);

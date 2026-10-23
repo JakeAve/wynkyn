@@ -451,11 +451,13 @@ summary {
   background: var(--ok);
 }
 #status[data-kind="error"],
-#status[data-kind="offline"] {
+#status[data-kind="offline"],
+#status[data-kind="failed"] {
   color: var(--err);
 }
 #status[data-kind="error"]::before,
-#status[data-kind="offline"]::before {
+#status[data-kind="offline"]::before,
+#status[data-kind="failed"]::before {
   background: var(--err);
 }
 
@@ -932,13 +934,41 @@ summary {
    complete, so the preview never flashes empty mid-render. */
 /* --preview-zoom: 1 is essential — Paged.js paginates by measuring rects,
    and a zoomed stage makes it fit twice as much text per page. */
-/* First load: nothing live yet, only the hidden stage — say so. */
-#preview:not(:has(> :not(.preview-stage)))::before {
-  content: "Rendering pages…";
+/* Progress while a render is staged: CSS counts the pages Paged.js has laid
+   out so far, so the message ticks with no script. First load (nothing live
+   yet) centres it in the empty pane; a re-render pins it to the pane's foot. */
+#preview {
+  counter-reset: staged;
+}
+#preview .preview-stage .pagedjs_page {
+  counter-increment: staged;
+}
+#preview:has(> .preview-stage)::after {
+  content: "Rendering pages… " counter(staged);
   color: var(--muted);
+  font-size: 12px;
   display: block;
   text-align: center;
+}
+#preview:not(:has(> :not(.preview-stage)))::after {
   padding-top: 40vh;
+}
+#preview:has(> :not(.preview-stage)):has(> .preview-stage)::after {
+  position: sticky;
+  bottom: 0;
+  margin: 8px auto -8px;
+  width: max-content;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: var(--desk);
+}
+/* The pages on screen no longer match the text: an edit is on its way
+   (data-stale, set by app.ts) or the new render is staged behind them. */
+#preview[data-stale] > :not(.preview-stage),
+#preview:has(> .preview-stage) > :not(.preview-stage) {
+  opacity: .5;
+  filter: blur(1px);
+  transition: opacity .2s;
 }
 #preview .preview-stage {
   visibility: hidden;
