@@ -63,9 +63,9 @@ rewrite themselves on the next save.
   and opens the browser's print dialog; Print pages (the preview's pages at the
   page size); and Export EPUB (`POST /api/books/<book>/epub`, the same
   `exportEpub` as `bml epub`). No print export runs on the server; sheet PDFs
-  and proofs on disk are `bml export`'s. Paper's "Change in Style" is the one
-  place the app pushes a history entry (`toStyle` in `app.ts`), so Back returns
-  to Publish.
+  and proofs on disk are `bml export`'s. Paper's "Change in Style" leaves a
+  history entry (`toStyle` in `app.ts`, like Write's Go to style), so Back
+  returns to Publish.
 
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
 update the checksum in `server/vendor_test.ts`, then read the golden page-map

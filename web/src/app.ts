@@ -105,8 +105,8 @@ function syncUrl(): void {
   }, 250);
 }
 
-// Publish → a Style view as a history entry (the one place the app pushes),
-// so the browser's Back returns to Publish where the author left it.
+// Publish → a Style view as a history entry, like goToStyle from Write, so
+// Back returns to Publish where the author left it (installHistory).
 function toStyle(next: string): void {
   clearTimeout(urlTimer);
   history.replaceState(null, "", here()); // the entry Back returns to
@@ -831,15 +831,15 @@ async function goToStyle(key: string): Promise<void> {
   history.pushState(null, "", appHref({ ...here, view, mode: "style" }));
 }
 
-// Back and Forward between the entries goToStyle makes: the URL's mode, and
-// in Write its line.
+// Back and Forward between the entries goToStyle and toStyle make: the URL's
+// mode, its Style/Publish view, and in Write its line.
 function installHistory(): void {
   addEventListener("popstate", () => {
-    const m = MODES.find((m) =>
-      m === new URLSearchParams(location.search)
-        .get("mode")
-    ) ?? "write";
+    const p = new URLSearchParams(location.search);
+    const m = MODES.find((m) => m === p.get("mode")) ?? "write";
+    view = p.get("view");
     setMode(m);
+    if (m !== "write" && view) configPanel?.open(view);
     const line = lineFromHash(location.hash);
     if (m === "write" && line !== null) scrollEditorToLine(editor, line);
   });
@@ -1462,14 +1462,6 @@ async function main(): Promise<void> {
     installColumnToggle("tree-toggle", "tree-hidden"),
     installColumnToggle("pages-toggle", "pages-hidden"),
   );
-  // Back/Forward over a toStyle() entry: the mode and view in its URL.
-  addEventListener("popstate", () => {
-    const p = new URLSearchParams(location.search);
-    const v = p.get("view");
-    view = v;
-    setMode(MODES.find((m) => m === p.get("mode")) ?? "write");
-    if (v) configPanel?.open(v);
-  });
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
       .mode as Mode | undefined;
