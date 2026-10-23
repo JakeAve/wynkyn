@@ -27,6 +27,9 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webp": "image/webp",
   ".epub": "application/epub+zip",
   ".pdf": "application/pdf",
+  ".webmanifest": "application/manifest+json",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml",
 };
 const contentType = (name: string) =>
   CONTENT_TYPES[name.slice(name.lastIndexOf("."))] ??
@@ -204,6 +207,10 @@ export async function startServer(
     }
     if (path.startsWith("/web/")) {
       return serveStatic(WEB_DIR, path.slice("/web/".length));
+    }
+    // Site files the head links at the root (icons, manifest, robots).
+    if (/^\/[\w.-]+\.(svg|png|webmanifest|txt|xml)$/.test(path)) {
+      return serveStatic(WEB_DIR, path.slice(1));
     }
 
     if (path === "/api/books" && req.method === "GET") {

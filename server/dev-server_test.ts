@@ -45,6 +45,15 @@ Deno.test("http: shell, book list, build json, images, 404s", async () => {
     assertEquals(img.headers.get("content-type"), "image/svg+xml");
     await img.body?.cancel();
 
+    // The head links icons and the manifest at the root, as the static host serves them.
+    const manifest = await fetch(`${base}/manifest.webmanifest`);
+    assertEquals(manifest.status, 200);
+    assertEquals(
+      manifest.headers.get("content-type"),
+      "application/manifest+json",
+    );
+    await manifest.body?.cancel();
+
     const missing = await fetch(`${base}/api/books/no-such-book`);
     assertEquals(missing.status, 404);
     await missing.body?.cancel();
