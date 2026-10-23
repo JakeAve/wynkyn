@@ -39,7 +39,6 @@ import {
   scrollEditorToLine,
   setEditionSpans,
   setHideMarkup,
-  setStyleChip,
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
 import { SNIPPETS } from "./snippets.ts";
@@ -253,25 +252,20 @@ function refreshTree(doc: BmlDocument): void {
 }
 
 // Follow the cursor (spec §7.3): the preview outlines the block the line is
-// part of, and the line carries a chip to that block's style.
+// part of, and the footer names that block's style, a click away.
 function followCursor(line: number): void {
   if (!editor) return;
   markEdited($("preview"), mode === "write" ? line : null);
   const keys = styleKeysAt(editor.state.doc.toString().split("\n"), line);
   const cat = styleCatalog();
   const entry = keys.map((k) => cat.find((e) => e.key === k)).find((e) => e);
-  setStyleChip(
-    editor,
-    entry
-      ? {
-        line,
-        label: entry.label === "Everything"
-          ? entry.group
-          : `${entry.group} · ${entry.label}`,
-        open: () => pickStyle(entry.key),
-      }
-      : null,
-  );
+  const btn = $("style-here") as HTMLButtonElement;
+  btn.hidden = !entry;
+  if (!entry) return;
+  btn.textContent = entry.label === "Everything"
+    ? entry.group
+    : `${entry.group} · ${entry.label}`;
+  btn.onclick = () => pickStyle(entry.key);
 }
 
 // Follow the cursor: the node whose block contains the cursor line is current.

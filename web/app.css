@@ -417,6 +417,31 @@ summary {
   white-space: nowrap;
   overflow: hidden;
 }
+/* the style at the cursor (app.ts followCursor): Write only */
+#style-here {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 2px 6px;
+  margin-inline: -6px;
+  cursor: pointer;
+}
+#style-here::after {
+  content: " →";
+  opacity: 0;
+}
+#style-here:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+#style-here:hover::after {
+  opacity: 1;
+}
+:root:not([data-mode="write"]) #style-here {
+  display: none;
+}
 #diagnostics {
   color: var(--warn);
   overflow: hidden;
@@ -786,30 +811,13 @@ summary {
 #editor .cm-line.cm-bml-off {
   opacity: var(--off);
 }
-/* end-of-line tags: the style chip (editor.ts, opens the style of what the
-   cursor's line is part of) and the {only} editions tag */
-#editor .cm-bml-style-chip,
+/* the {only} editions tag at the end of a span's first line */
 #editor .cm-bml-cond-tag {
   font: 10.5px system-ui, sans-serif;
   border: 1px solid currentColor;
   border-radius: 3px;
   padding: 0 5px;
   margin-left: 8px;
-}
-#editor .cm-bml-style-chip {
-  color: var(--muted);
-  background: none;
-  border-color: var(--line);
-  cursor: pointer;
-}
-#editor .cm-bml-style-chip::before {
-  content: attr(data-label); /* not textContent: the buffer's text stays the manuscript */
-}
-#editor .cm-bml-style-chip:hover {
-  color: var(--fg);
-  background: var(--hover);
-}
-#editor .cm-bml-cond-tag {
   color: var(--warn);
 }
 /* the find/replace bar (search-panel.ts) */
