@@ -85,6 +85,22 @@ const SAVE_DEBOUNCE_MS = 600;
 const clientId = crypto.randomUUID();
 const params = new URLSearchParams(location.search);
 let view: string | null = null; // the Style/Publish nav row, as the panel reports it
+
+// A random id for this browser's library, so a link pasted by someone else
+// (their book, mode and line, meaningless here) goes to the plain home page
+// instead of landing on some book of ours in their mode. Null = storage
+// blocked, and then any link is taken as is.
+const libId = ((): string | null => {
+  try {
+    const got = localStorage.getItem("lib");
+    if (got) return got;
+    const fresh = crypto.randomUUID().slice(0, 8);
+    localStorage.setItem("lib", fresh);
+    return fresh;
+  } catch {
+    return null;
+  }
+})();
 let cursorLine = 1;
 
 // Keep the address bar at the author's place (appHref) without history
@@ -97,7 +113,7 @@ function syncUrl(): void {
       history.replaceState(
         null,
         "",
-        appHref({ book, edition, mode, view, line: cursorLine }),
+        appHref({ book, edition, mode, view, line: cursorLine, lib: libId }),
       );
     } catch {
       // rate-limited or blocked: the URL just lags
@@ -1340,6 +1356,11 @@ function renderImportNotes(text: string): void {
 }
 
 async function main(): Promise<void> {
+  const lib = params.get("lib");
+  if (lib && libId && lib !== libId) {
+    location.replace(location.pathname); // someone else's place: start at home
+    return;
+  }
   backend = await connect();
   books = await backend.listBooks();
   if (!books.length) {
