@@ -2,10 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Wynkyn: typeset and print hand-bound books</title>
+    <title>Wynkyn: write, typeset and print a book to bind by hand</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description"
-      content="Typeset and print hand-bound books, free, from your own files. Write in plain text, see the real pages as you write, print folded signatures for binding by hand, export an EPUB. Open source, no account, nothing leaves your device.">
+      content="Write, typeset and print a book to bind by hand, free, from your own files. Edit the manuscript in plain text, see the finished pages as you type, print sheets that fold into signatures for hand binding, export an EPUB. Open source, no account, nothing leaves your device.">
     <link rel="canonical" href="https://wynkyn.jakeave.deno.net/">
     <link rel="license"
       href="https://github.com/JakeAve/wynkyn/blob/main/LICENSE">
@@ -21,7 +21,7 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Wynkyn">
     <meta property="og:title"
-      content="Wynkyn: typeset and print hand-bound books">
+      content="Wynkyn: write, typeset and print a book to bind by hand">
     <meta property="og:description"
       content="Free, open-source book typesetting in the browser. Write in plain text, print folded signatures for hand binding, export an EPUB. Your files stay on your device.">
     <meta property="og:url" content="https://wynkyn.jakeave.deno.net/">
@@ -36,7 +36,7 @@
       "@type": "SoftwareApplication",
       "name": "Wynkyn",
       "url": "https://wynkyn.jakeave.deno.net/",
-      "description": "Typeset and print hand-bound books, free, from your own files. Writes folded signatures for binding by hand and a reflowable EPUB.",
+      "description": "Write, typeset and print a book to bind by hand, free, from your own files. Prints sheets that fold into signatures and exports an EPUB.",
       "applicationCategory": "DesignApplication",
       "operatingSystem": "Web",
       "browserRequirements": "Chrome, Edge or Brave for editing files on disk; any modern browser otherwise",
@@ -65,11 +65,12 @@
       </nav>
     </header>
     <main>
-      <h1>Typeset and print hand-bound books, free, from your own files.</h1>
-      <p class="lead">Write a manuscript in plain text. Wynkyn lays the book
-        out in your browser, shows the real pages as you write, prints them
-        imposed into folded signatures for binding by hand, and writes a
-        reflowable EPUB.</p>
+      <h1>Write, typeset and print a book to bind by hand. Free, from your own files.</h1>
+      <p class="lead">Write and edit the manuscript in Wynkyn, in plain text.
+        The finished pages appear beside it as you type, laid out exactly as
+        they will print. When the book is ready, Wynkyn arranges the pages on
+        each sheet so the folded sheets nest into signatures, the gatherings a
+        hand-bound book is sewn from. It also exports an EPUB for e-readers.</p>
       <p class="cta">
         <a class="btn" href="/app/">Open the editor</a>
         <small>No account. Nothing to install. Works best in Chrome or
@@ -87,12 +88,15 @@
         <li><b>No account.</b> Open the editor and start writing.</li>
         <li><b>Your files stay on your device.</b> A book is a folder of plain
           files that the app reads from your own disk.</li>
-        <li><b>Print at home.</b> Signatures come out folded and in order,
-          ready to sew. Or export an EPUB for readers.</li>
+        <li><b>Print at home.</b> Fold and nest the printed sheets and the
+          signatures read in order, ready to sew. Or export an EPUB for
+          e-readers.</li>
       </ul>
       <h2>How it works</h2>
-      <p>A book is a folder: <code>manuscript.md</code> holds the words with a
-        little semantic markup (chapters, epigraphs, poems, footnotes), and
+      <p>Wynkyn has three views: Write, where you edit the manuscript; Style,
+        where you shape how the pages look; and Publish, where you print or
+        export. A book is a folder: <code>manuscript.md</code> holds the words
+        with a few plain markers (chapters, epigraphs, poems, footnotes), and
         <code>metadata.json</code> holds every styling decision. The app keeps
         them apart, so you never put a font or a page break in your prose.</p>
       <pre>{chapter: one}
