@@ -12,40 +12,14 @@ const DIST = new URL("../../dist/", import.meta.url);
 const siteBuilt = await Deno.stat(new URL("web/app.js", DIST))
   .then(() => true, () => false);
 
-// The fixture book, written straight into the page's private storage: the
-// Welcome's browser choice is remembered, so a reload lands in the book.
-async function seedDemoBook(
-  page: import("playwright").Page,
-  url: string,
-): Promise<void> {
-  const dir = new URL("../../server/testdata/demo-book/", import.meta.url);
-  const files: [string, string][] = [];
-  for (
-    const rel of [
-      "manuscript.md",
-      "metadata.json",
-      "editions/pocket.json",
-      "images/ornament.svg",
-    ]
-  ) files.push([rel, await Deno.readTextFile(new URL(rel, dir))]);
+// A browser-storage library with the fixture book copied in from disk, the
+// way a browser without the folder picker gets its books.
+async function importDemoBook(page: import("playwright").Page): Promise<void> {
   await page.locator("#lib-browser").click();
   await page.locator("#create[open]").waitFor();
-  await page.evaluate(async (files: [string, string][]) => {
-    let book = await navigator.storage.getDirectory();
-    book = await book.getDirectoryHandle("demo-book", { create: true });
-    for (const [rel, text] of files) {
-      const parts = rel.split("/");
-      let dir = book;
-      for (const d of parts.slice(0, -1)) {
-        dir = await dir.getDirectoryHandle(d, { create: true });
-      }
-      const fh = await dir.getFileHandle(parts.at(-1)!, { create: true });
-      const w = await fh.createWritable();
-      await w.write(text);
-      await w.close();
-    }
-  }, files);
-  await page.goto(`${url}?book=demo-book`);
+  await page.locator("#create-dir").setInputFiles(
+    new URL("../../server/testdata/demo-book", import.meta.url).pathname,
+  );
 }
 
 Deno.test({
@@ -60,7 +34,7 @@ Deno.test({
       const url = `http://localhost:${site.addr.port}/`;
       await page.goto(url);
       await page.locator("#library[open]").waitFor();
-      await seedDemoBook(page, url);
+      await importDemoBook(page);
       await page.locator('#status[data-kind="saved"]').waitFor();
       await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
         .first().waitFor();
@@ -135,7 +109,7 @@ Deno.test({
 
 Deno.test({
   name: "local library: a browser without the File System Access API " +
-    "gets the notice, no Create, and Select copies the folder into the browser",
+    "gets the notice, tagged folder buttons, and Import from a folder in the browser",
   ignore: !hasChrome || !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
@@ -152,20 +126,23 @@ Deno.test({
       assertEquals(await page.locator("#library[open]").count(), 0);
       await page.locator("#browser-notice-close").click();
       await page.locator("#library[open]").waitFor();
-      // No Create; Select reads the folder and copies its books in.
-      assert(await page.locator("#lib-new").isDisabled());
+      // The folder buttons are tagged, not hidden; a click fails with the
+      // browser's own error.
+      assert(await page.locator("#lib-pick .pill").isVisible());
+      await page.locator("#lib-pick").click();
+      await page.locator("#lib-err:not(:empty)").waitFor();
       assertStringIncludes(
-        (await page.locator("#lib-pick small").textContent()) ?? "",
-        "copied",
+        (await page.locator("#lib-err").textContent()) ?? "",
+        "showDirectoryPicker",
       );
-      // An empty library's Create dialog has a Back to the Welcome.
+      // An empty library's Create dialog has a Back to the Welcome, and for
+      // browser storage an Import from a folder.
       await page.locator("#lib-browser").click();
       await page.locator("#create[open]").waitFor();
+      assert(await page.locator("#create-folder").isVisible());
       await page.locator("#create-back").click();
       await page.locator("#library[open]").waitFor();
-      await page.locator("#lib-dir").setInputFiles(
-        new URL("../../server/testdata/demo-book", import.meta.url).pathname,
-      );
+      await importDemoBook(page);
       await page.locator('#status[data-kind="saved"]').waitFor();
       await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
         .first().waitFor();

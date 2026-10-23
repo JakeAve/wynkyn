@@ -219,13 +219,14 @@
       <div class="choices">
         <button id="lib-reopen" class="choice primary" hidden></button>
         <button id="lib-new" class="choice">Create a new folder on my device
+          <span class="pill" hidden>Chromium only</span>
           <small>Wynkyn creates a Books folder where you choose. Chrome, Edge
             or Brave.</small></button>
         <button id="lib-pick" class="choice">Select an existing folder on my
           device
+          <span class="pill" hidden>Chromium only</span>
           <small>You already have a Wynkyn books folder on your
             device.</small></button>
-        <input id="lib-dir" type="file" webkitdirectory multiple hidden>
         <button id="lib-browser" class="choice">Keep books in this browser
           <small>Works in this browser, but browsers can clear site storage, so
             <b>download what you want to keep</b>.</small></button>
@@ -247,6 +248,10 @@
             File › Download › Microsoft Word.</small>
           <input id="create-file" type="file" hidden
             accept=".txt,.md,.markdown,.html,.htm,.xhtml,.epub,text/plain,text/markdown,text/html,application/epub+zip">
+        </label>
+        <label id="create-folder" class="choice" hidden>Import from a folder
+          <small>Copies the books in a Wynkyn folder into this browser.</small>
+          <input id="create-dir" type="file" webkitdirectory multiple hidden>
         </label>
         <button class="choice" disabled>Import from the web
           <span class="pill">Coming soon</span>

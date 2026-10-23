@@ -849,38 +849,17 @@ async function chooseLibrary(): Promise<BookStore> {
         } else err.textContent = "The folder wasn't allowed.";
       };
     }
-    // Without the File System Access API (Firefox, Safari) a folder can be
-    // read but not written: Select copies its books into browser storage,
-    // and there is no Create.
-    const native = "showDirectoryPicker" in globalThis;
-    ($("lib-new") as HTMLButtonElement).disabled = !native;
+    // Without the File System Access API (Firefox, Safari, Brave until its
+    // flag is on) the folder buttons stay live and are tagged: a click fails
+    // with the browser's own error, which tells the author whose limit it is.
+    const tagged = !("showDirectoryPicker" in globalThis);
+    for (const id of ["lib-new", "lib-pick"]) {
+      ($(id).querySelector(".pill") as HTMLElement).hidden = !tagged;
+    }
     $("lib-new").onclick = () =>
       createBooksFolder().then((d) => done(handleStore(d), "folder"), fail);
-    const input = $("lib-dir") as HTMLInputElement;
-    if (!native) {
-      $("lib-pick").querySelector("small")!.textContent =
-        "This browser can’t edit a folder in place, so its books are copied " +
-        "into the browser.";
-    }
     $("lib-pick").onclick = () =>
-      native
-        ? pickFolder().then((d) => done(handleStore(d), "folder"), fail)
-        : input.click();
-    input.onchange = async () => {
-      if (!input.files?.length) return;
-      try {
-        const store = handleStore(await browserFolder());
-        const books = await importBooks(store, input.files);
-        if (!books.length) {
-          err.textContent =
-            "No book found: a book is a folder with a manuscript.md.";
-          return;
-        }
-        done(store, "browser");
-      } catch (e) {
-        fail(e);
-      }
-    };
+      pickFolder().then((d) => done(handleStore(d), "folder"), fail);
     $("lib-browser").onclick = () =>
       browserFolder().then((d) => done(handleStore(d), "browser"), fail);
     dlg.showModal();
@@ -1197,6 +1176,27 @@ function createManuscript(cancelable: boolean): void {
     } catch (e) {
       err.textContent = brief(e);
       if (!dlg.open) dlg.showModal();
+    }
+  };
+  // A browser-storage library can copy books in from a Wynkyn folder on
+  // disk: the way in for a browser that can't open the folder itself.
+  const folder = $("create-folder");
+  folder.hidden = localStorage.getItem("library") !== "browser";
+  const dir = $("create-dir") as HTMLInputElement;
+  dir.value = "";
+  dir.onchange = async () => {
+    if (!dir.files?.length) return;
+    try {
+      err.textContent = "Copying…";
+      const books = await importBooks(backend.store!, dir.files);
+      if (!books.length) {
+        err.textContent =
+          "No book found: a book is a folder with a manuscript.md.";
+        return;
+      }
+      location.search = editionHref(books[0]!, null);
+    } catch (e) {
+      err.textContent = brief(e);
     }
   };
   $("create-blank").onclick = async () => {
