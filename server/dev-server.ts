@@ -1,14 +1,12 @@
 // server/dev-server.ts — the local server (spec §5.4, §6): HTTP + WebSockets
 // in front of a BookService over the books/ folder, plus the app shell and the
-// Chrome-driven exports, which only exist here (the hosted app is static and
-// prints from the browser).
+// e-book export. Print PDFs come from the browser's print dialog, or from
+// `bml export`.
 import { NotFoundError } from "./pipeline.ts";
 import { BookService, ServiceError } from "./book-service.ts";
 import { diskStore } from "./store.ts";
 import { defaultPort } from "./port.ts";
-import type { ExportOptions } from "./print-export.ts";
 import { installedFonts } from "./local-fonts.ts";
-import { formatProblem, PaginationError } from "../renderer/page-map-types.ts";
 import { safeName } from "./editions.ts";
 
 const WEB_DIR = new URL("../web/", import.meta.url);
@@ -38,7 +36,6 @@ export interface ServerOptions {
   booksRoot?: string; // default "books"
   port?: number; // 0 = OS-assigned (tests); default 8000
   saveDebounceMs?: number; // metadata saves; default 250
-  render?: ExportOptions["render"]; // test seam: print export without Chrome
 }
 
 export interface RunningServer {
@@ -75,51 +72,8 @@ export async function startServer(
   const exportDir = (book: string, edition: string | null) =>
     `${booksRoot}/${book}/export${edition === null ? "" : `/${edition}`}`;
 
-  // The Publish tab's print export (spec §7.7): `bml export` behind an
-  // endpoint, so both write the same files. The body is { proof?, force?,
-  // pages? }. Imported on use: Chrome and pdf-lib never load otherwise.
-  async function handleExport(
-    book: string,
-    edition: string | null,
-    req: Request,
-  ): Promise<Response> {
-    const body = await json(req);
-    const key = `${book}/${edition}`;
-    if (exporting.has(key)) {
-      return new Response("an export is already running", { status: 409 });
-    }
-    exporting.add(key);
-    try {
-      const { exportBook, formatSummary } = await import("./print-export.ts");
-      await service.flushMetadata(book, edition); // the export reads the file
-      const s = await exportBook(booksRoot, book, {
-        edition,
-        proof: body.proof === true,
-        force: body.force === true,
-        pages: typeof body.pages === "number" ? body.pages : undefined,
-        render: opts.render,
-      });
-      return Response.json({
-        summary: formatSummary(book, s),
-        files: s.files.map((f) => f.slice(f.lastIndexOf("/") + 1))
-          .filter((f) => f.endsWith(".pdf")),
-        problems: s.pagination.map(formatProblem),
-      });
-    } catch (err) {
-      if (err instanceof PaginationError) {
-        return Response.json(
-          { problems: err.problems.map(formatProblem) },
-          { status: 409 },
-        );
-      }
-      return new Response((err as Error).message, { status: 500 });
-    } finally {
-      exporting.delete(key);
-    }
-  }
-
   // The Publish tab's e-book export (spec §7.8): `bml epub` behind an
-  // endpoint. The file lands beside the print export, served by the same
+  // endpoint. The file lands in the book's export folder, served by
   // GET /api/books/<book>/export/<file>.
   async function handleEpub(
     book: string,
@@ -369,9 +323,6 @@ export async function startServer(
       const [book, file] = p;
       if (!safeName(book!) || (edition !== null && !safeName(edition))) {
         return new Response("bad path", { status: 400 });
-      }
-      if (!file && req.method === "POST") {
-        return handleExport(book!, edition, req);
       }
       if (file && req.method === "GET") {
         return serveStatic(exportDir(book!, edition), file);

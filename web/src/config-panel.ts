@@ -14,8 +14,6 @@ import {
   bookParts,
   catalogFor,
   type EpubResult,
-  type ExportRequest,
-  ExportResult,
   type PanelContext,
   type PreviewLink,
   type Route,
@@ -33,6 +31,7 @@ export interface ConfigPanel {
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   selectStyle(key: string): void; // style mode, where a catalog entry is styled (§7.4)
   pagesChanged(): void; // the preview repaginated
+  open(view: string): void; // the nav row `view` (navId), if this book has it
 }
 
 export interface ConfigPanelOptions {
@@ -44,8 +43,8 @@ export interface ConfigPanelOptions {
   onEdit(): void; // an edit is queued; saveSections follows after the debounce
   preview: PreviewLink;
   isNames(): string[]; // `{is}` classes the manuscript uses
-  exportPrint(req: ExportRequest): Promise<ExportResult>; // after saves land
   exportEpub(): Promise<EpubResult>;
+  toStyle(view: string): void; // leave Publish for a Style view, Back returns
   view?: string | null; // the nav row to open on (navId); unknown = default
   onRoute?(id: string): void; // the nav row changed (for the URL)
 }
@@ -59,14 +58,16 @@ const GROUPS: Array<[BookPart["group"], string]> = [
 ];
 
 // Publish nav rows: the Publish view's section focus keys (panel-page.ts).
+// Grouped by what the author is making: an e-book, a PDF of the pages, or
+// sheets to fold and bind.
 const PUBLISH: Array<[string, Array<[string, string]>]> = [
-  ["Print", [
+  ["E-book", [["ebook", "EPUB"]]],
+  ["PDF", [["pdf", "Pages"]]],
+  ["Binding", [
     ["sheet", "Paper"],
     ["folios-per-signature", "Signatures"],
     ["print", "Print"],
-    ["export", "Export"],
   ]],
-  ["E-book", [["ebook", "Export"]]],
 ];
 
 interface NavRow {
@@ -78,7 +79,7 @@ interface NavRow {
 
 // Which nav row a route belongs to.
 function navId(route: Route): string {
-  if (route.tab === "publish") return `publish:${route.focus ?? "sheet"}`;
+  if (route.tab === "publish") return `publish:${route.focus ?? "ebook"}`;
   return route.tab === "parts" ? route.part ?? "" : route.tab;
 }
 
@@ -252,13 +253,14 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       go,
       preview: opts.preview,
       sheetView: opts.sheetView,
-      exportPrint: (req) => {
-        flushSave();
-        return opts.exportPrint(req);
-      },
       exportEpub: () => {
         flushSave();
         return opts.exportEpub();
+      },
+      toStyle: (view, from) => {
+        current = `publish:${from}`; // Back lands on the section left from
+        opts.onRoute?.(current);
+        opts.toStyle(view);
       },
       onPages: (redraw) => {
         onPages = redraw;
@@ -312,6 +314,10 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       render(true);
     },
     pagesChanged: () => onPages?.(),
+    open(view) {
+      const next = routeById(view, meta);
+      if (next) go(next);
+    },
     selectStyle(key) {
       addIsNames(meta, opts.isNames());
       go(routeFor(key, meta));

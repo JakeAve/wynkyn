@@ -68,11 +68,11 @@ Deno.test("appHref: only what differs from the defaults", () => {
       book: "a",
       edition: "pocket",
       mode: "publish",
-      view: "publish:export",
+      view: "publish:print",
       line: 40,
       lib: "c0ffee42",
     }),
-    "?book=a&edition=pocket&lib=c0ffee42&mode=publish&view=publish%3Aexport#line=40",
+    "?book=a&edition=pocket&lib=c0ffee42&mode=publish&view=publish%3Aprint#line=40",
   );
 });
 
