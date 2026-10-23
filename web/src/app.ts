@@ -32,7 +32,7 @@ import {
   replaceBuffer,
   scrollEditorToLine,
   setEditionSpans,
-  setStyleChip,
+  setHideMarkup,
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
 import { SNIPPETS } from "./snippets.ts";
@@ -255,25 +255,20 @@ function refreshTree(doc: BmlDocument): void {
 }
 
 // Follow the cursor (spec §7.3): the preview outlines the block the line is
-// part of, and the line carries a chip to that block's style.
+// part of, and the footer names that block's style, a click away.
 function followCursor(line: number): void {
   if (!editor) return;
   markEdited($("preview"), mode === "write" ? line : null);
   const keys = styleKeysAt(editor.state.doc.toString().split("\n"), line);
   const cat = styleCatalog();
   const entry = keys.map((k) => cat.find((e) => e.key === k)).find((e) => e);
-  setStyleChip(
-    editor,
-    entry
-      ? {
-        line,
-        label: entry.label === "Everything"
-          ? entry.group
-          : `${entry.group} · ${entry.label}`,
-        open: () => pickStyle(entry.key),
-      }
-      : null,
-  );
+  const btn = $("style-here") as HTMLButtonElement;
+  btn.hidden = !entry;
+  if (!entry) return;
+  btn.lastElementChild!.textContent = entry.label === "Everything"
+    ? entry.group
+    : `${entry.group} · ${entry.label}`;
+  btn.onclick = () => goToStyle(entry.key);
 }
 
 // Follow the cursor: the node whose block contains the cursor line is current.
@@ -826,6 +821,30 @@ async function pickStyle(key: string): Promise<void> {
   (await ensureConfigPanel())?.selectStyle(key);
 }
 
+// The footer's Go to style: unlike a preview click, it leaves a history entry,
+// so Back returns to Write at the line the writer left (installHistory).
+async function goToStyle(key: string): Promise<void> {
+  clearTimeout(urlTimer);
+  const here = { book, edition, view, line: cursorLine, lib: libId };
+  history.replaceState(null, "", appHref({ ...here, mode: "write" }));
+  await pickStyle(key);
+  history.pushState(null, "", appHref({ ...here, view, mode: "style" }));
+}
+
+// Back and Forward between the entries goToStyle makes: the URL's mode, and
+// in Write its line.
+function installHistory(): void {
+  addEventListener("popstate", () => {
+    const m = MODES.find((m) =>
+      m === new URLSearchParams(location.search)
+        .get("mode")
+    ) ?? "write";
+    setMode(m);
+    const line = lineFromHash(location.hash);
+    if (m === "write" && line !== null) scrollEditorToLine(editor, line);
+  });
+}
+
 const fetchManuscript = (
   name: string,
 ): Promise<{ text: string; version: string }> => backend.manuscript(name);
@@ -1016,10 +1035,11 @@ async function refreshConfigFromRemote(): Promise<void> {
   }
 }
 
-// Draggable gutters: each one writes a CSS var on #panes that the grid
-// template reads, persisted so widths survive a reload.
+// Draggable gutters: each one writes a CSS var on :root that the grids of
+// #panes and #footer read, persisted so widths survive a reload.
 function installGutters(): void {
   const panes = $("panes");
+  const root = document.documentElement; // the footer reads the widths too
   for (
     const [id, cssVar, min] of [["gutter-tree", "--w-tree", 120], [
       "gutter-editor",
@@ -1028,7 +1048,7 @@ function installGutters(): void {
     ]] as const
   ) {
     const saved = localStorage.getItem(cssVar);
-    if (saved) panes.style.setProperty(cssVar, saved);
+    if (saved) root.style.setProperty(cssVar, saved);
     const gutter = $(id);
     gutter.onpointerdown = (e) => {
       e.preventDefault();
@@ -1040,7 +1060,7 @@ function installGutters(): void {
       gutter.onpointermove = (m) => {
         // Leave at least 200px for whatever pane sits to the right.
         const max = panes.getBoundingClientRect().right - left - 200;
-        panes.style.setProperty(
+        root.style.setProperty(
           cssVar,
           `${Math.min(Math.max(m.clientX - left, min), max)}px`,
         );
@@ -1048,7 +1068,7 @@ function installGutters(): void {
       gutter.onpointerup = () => {
         gutter.onpointermove = gutter.onpointerup = null;
         gutter.classList.remove("dragging");
-        localStorage.setItem(cssVar, panes.style.getPropertyValue(cssVar));
+        localStorage.setItem(cssVar, root.style.getPropertyValue(cssVar));
       };
     };
   }
@@ -1090,6 +1110,59 @@ function installThemeToggle(): void {
     document.documentElement.dataset.theme = next;
     localStorage.setItem("theme", next);
   };
+}
+
+// The text view (the bar atop the editor): the editor's font and size and Hide markup, a per-reader
+// preference kept in localStorage, not the book.
+const TEXT_FONTS: Record<string, string> = {
+  serif: "ui-serif, Georgia, serif",
+  sans: "system-ui, sans-serif",
+  mono: "var(--mono)",
+};
+function installTextView(): void {
+  let prefs = { font: "serif", size: 16, hide: false };
+  try {
+    prefs = { ...prefs, ...JSON.parse(localStorage.getItem("text-view")!) };
+  } catch {
+    // none saved, or storage blocked: the defaults
+  }
+  const ed = $("editor");
+  const size = $("tv-size") as HTMLInputElement;
+  const hide = $("tv-hide") as HTMLInputElement;
+  const fonts = [
+    ...$("text-view").querySelectorAll<HTMLElement>("[data-font]"),
+  ];
+  const apply = () => {
+    ed.style.setProperty("--ed-font", TEXT_FONTS[prefs.font] ?? null);
+    ed.style.setProperty("--ed-fs", `${prefs.size}px`);
+    for (const b of fonts) {
+      b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));
+    }
+    size.value = String(prefs.size);
+    size.nextElementSibling!.textContent = `${prefs.size}px`;
+    hide.checked = prefs.hide;
+    setHideMarkup(editor, prefs.hide);
+    try {
+      localStorage.setItem("text-view", JSON.stringify(prefs));
+    } catch {
+      // storage blocked: the view just won't survive a reload
+    }
+  };
+  for (const b of fonts) {
+    b.onclick = () => {
+      prefs.font = b.dataset.font!;
+      apply();
+    };
+  }
+  size.oninput = () => {
+    prefs.size = Number(size.value);
+    apply();
+  };
+  hide.onchange = () => {
+    prefs.hide = hide.checked;
+    apply();
+  };
+  apply();
 }
 
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
@@ -1382,6 +1455,7 @@ async function main(): Promise<void> {
     onCursorLine: highlightTreeNode,
   });
   reparse(text);
+  installTextView();
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
   installShortcuts(
@@ -1417,6 +1491,7 @@ async function main(): Promise<void> {
   if (jump !== null) scrollEditorToLine(editor, jump);
   installGutters();
   installThemeToggle();
+  installHistory();
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);

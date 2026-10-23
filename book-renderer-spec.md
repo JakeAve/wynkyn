@@ -1911,14 +1911,26 @@ CodeMirror 6 over plain BML text.
   `{subtitle}` italic. A `%%` line of only box-drawing characters draws as a
   hairline rule, and a `%%` label between two rules as small caps.
 - The selection is a green-grey tint, distinct from the quieter active line.
+- The text view (a bar along the top of the editor) is a per-reader preference,
+  not part of the book: prose in Serif (default), Sans or Mono at 12–24px
+  (default 16), with sentinels always in monospace so markup reads as markup.
+  The text holds a reading measure of about 70 characters (36em), centred in the
+  pane while Pages is hidden. **Hide markup** folds away the sentinel lines of
+  every paragraph that also has prose (`{title}`, `{dropcap}`, `{quote}` …
+  `{/quote}`) and the `{em}` tags, except in the paragraph holding the cursor;
+  structural lines stay as landmarks, and a paragraph of sentinels alone
+  (`{illustration}`, `{break}`) stays visible so it can still be reached.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
-  view, so the writer sees where they are on the page. The cursor's line also
-  carries a chip naming the style that block belongs to ("Chapter · Title",
-  "Body text · Paragraph", a custom `{is}` name); clicking it opens that style
-  in Style mode, the way a preview click does (§7.4). The style is read from the
-  enclosing matter type, part or chapter, the enclosing block, and the field
-  sentinel whose text runs on to the line.
+  view, so the writer sees where they are on the page. The footer is split by
+  column: under the editor, the writer's cell (parse warnings, import notes, and
+  "Go to style:" naming the style that block belongs to — "Chapter · Title",
+  "Body text · Paragraph", a custom `{is}` name); under the pages, the page
+  count and page problems. Go to style opens that style in Style mode, the way a
+  preview click does (§7.4), and leaves a history entry, so Back returns to
+  Write with the cursor where it was. The style is read from the enclosing
+  matter type, part or chapter, the enclosing block, and the field sentinel
+  whose text runs on to the line.
 - Find and replace is a bar pinned to the top of the editor, in the chrome's
   colors: find and replace fields, match case / whole word / regex toggles, an
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"
@@ -1954,7 +1966,7 @@ editor cursor to its manuscript line (the nearest rendered block's `data-line`).
 Page furniture (page numbers, running heads) has no source line, so a click on
 it always opens its style, switching to Style. The hover outline shows only
 where a click would style: everything in Style, only furniture in Write. From
-the editor, the chip on the cursor's line (§7.3) opens the same style the
+the editor, Go to style in the writer's footer (§7.3) opens the same style the
 preview click would for that block.
 
 The panel exposes the selector model already implicit in `elements`/`is` (§4.5,
