@@ -27,7 +27,6 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webp": "image/webp",
   ".epub": "application/epub+zip",
   ".pdf": "application/pdf",
-  ".webmanifest": "application/manifest+json",
   ".txt": "text/plain; charset=utf-8",
   ".xml": "application/xml",
 };
@@ -208,8 +207,8 @@ export async function startServer(
     if (path.startsWith("/web/")) {
       return serveStatic(WEB_DIR, path.slice("/web/".length));
     }
-    // Site files the head links at the root (icons, manifest, robots).
-    if (/^\/[\w.-]+\.(svg|png|webmanifest|txt|xml)$/.test(path)) {
+    // Crawler files that must sit at the root, as the static host serves them.
+    if (path === "/robots.txt" || path === "/sitemap.xml") {
       return serveStatic(WEB_DIR, path.slice(1));
     }
 

@@ -91,8 +91,18 @@ body {
   color: var(--fg);
   background: var(--bg);
   display: grid;
-  grid-template-rows: 46px minmax(0, 1fr) 30px;
+  /* toolbar · spec banner (0 while hidden) · panes · footer */
+  grid-template-rows: 46px auto minmax(0, 1fr) 30px;
   overflow: hidden;
+}
+#spec-banner {
+  grid-row: 2;
+}
+#panes {
+  grid-row: 3;
+}
+#footer {
+  grid-row: 4;
 }
 button,
 select,
@@ -2016,7 +2026,6 @@ summary {
   font-size: 12px;
   line-height: 1.35;
 }
-#browser-banner,
 #spec-banner {
   display: flex;
   align-items: center;
@@ -2028,11 +2037,9 @@ summary {
   font-size: 13px;
   line-height: 1.4;
 }
-#browser-banner[hidden],
 #spec-banner[hidden] {
   display: none;
 }
-#browser-banner span,
 #spec-banner span {
   flex: 1;
 }
