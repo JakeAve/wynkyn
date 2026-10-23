@@ -90,16 +90,28 @@ export const bmlLanguage = StreamLanguage.define<BmlStreamState>({
 });
 
 // Colors are CSS variables from index.html's Ink palette, so one highlight
-// style serves light and dark without a reconfigure.
+// style serves light and dark without a reconfigure. Markup is set in --mono
+// whatever font the writer picks for prose, so it reads as markup.
+const mono = "var(--mono)";
 const bmlHighlight = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.comment, color: "var(--syn-c)", fontStyle: "italic" },
-  { tag: tags.keyword, color: "var(--syn-k)", fontWeight: "600" },
-  { tag: tags.labelName, color: "var(--syn-slug)" },
-  { tag: tags.propertyName, color: "var(--syn-key)" },
-  { tag: tags.string, color: "var(--syn-t)" },
-  { tag: tags.bracket, color: "var(--syn-p)" },
-  { tag: tags.punctuation, color: "var(--syn-p)" },
-  { tag: tags.escape, color: "var(--syn-k)", fontWeight: "bold" },
+  {
+    tag: tags.keyword,
+    color: "var(--syn-k)",
+    fontWeight: "600",
+    fontFamily: mono,
+  },
+  { tag: tags.labelName, color: "var(--syn-slug)", fontFamily: mono },
+  { tag: tags.propertyName, color: "var(--syn-key)", fontFamily: mono },
+  { tag: tags.string, color: "var(--syn-t)", fontFamily: mono },
+  { tag: tags.bracket, color: "var(--syn-p)", fontFamily: mono },
+  { tag: tags.punctuation, color: "var(--syn-p)", fontFamily: mono },
+  {
+    tag: tags.escape,
+    color: "var(--syn-k)",
+    fontWeight: "bold",
+    fontFamily: mono,
+  },
 ]));
 
 // ---- sentinels by kind (UX round 1): line classes and gutter marks ----
@@ -181,6 +193,33 @@ export function emRanges(line: string): [number, number, number, number][] {
     const a = m.index;
     const b = a + m[0].length;
     out.push([a, a + 4, b - 5, b]);
+  }
+  return out;
+}
+
+// Hide markup (the writer's Aa view): which sentinel-only lines to hide
+// (0-based). Only those in a paragraph that also has prose, so a lone
+// {illustration} or {break} stays and there is always text to click; never a
+// structural line, the writer's landmarks; never in the paragraph holding
+// `cursor` (0-based), so the markup being edited is always in view.
+export function hiddenLines(lines: string[], cursor: number): number[] {
+  const out: number[] = [];
+  let start = 0;
+  for (let i = 0; i <= lines.length; i++) {
+    if (i < lines.length && lines[i]!.trim() !== "") continue;
+    // lines[start, i) is one paragraph
+    if (cursor < start || cursor >= i) {
+      const para = lines.slice(start, i).map((l) => parseSentinelLine(l));
+      const prose = para.some((t, j) =>
+        !t && !lines[start + j]!.startsWith("%%")
+      );
+      para.forEach((t, j) => {
+        if (prose && t && !(STRUCTURAL.has(t.name) && !t.closing)) {
+          out.push(start + j);
+        }
+      });
+    }
+    start = i + 1;
   }
   return out;
 }

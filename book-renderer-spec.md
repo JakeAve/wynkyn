@@ -1911,6 +1911,15 @@ CodeMirror 6 over plain BML text.
   `{subtitle}` italic. A `%%` line of only box-drawing characters draws as a
   hairline rule, and a `%%` label between two rules as small caps.
 - The selection is a green-grey tint, distinct from the quieter active line.
+- The text view (Aa in the toolbar, Write only) is a per-reader preference, not
+  part of the book: prose in Serif (default), Sans or Mono at 12–24px (default
+  16), with sentinels always in monospace so markup reads as markup. The text
+  holds a reading measure of about 70 characters (36em), centred in the pane
+  while Pages is hidden. **Hide markup** folds away the sentinel lines of every
+  paragraph that also has prose (`{title}`, `{dropcap}`, `{quote}` … `{/quote}`)
+  and the `{em}` tags, except in the paragraph holding the cursor; structural
+  lines stay as landmarks, and a paragraph of sentinels alone (`{illustration}`,
+  `{break}`) stays visible so it can still be reached.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The cursor's line also

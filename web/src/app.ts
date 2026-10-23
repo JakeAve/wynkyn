@@ -38,6 +38,7 @@ import {
   replaceBuffer,
   scrollEditorToLine,
   setEditionSpans,
+  setHideMarkup,
   setStyleChip,
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
@@ -1133,6 +1134,59 @@ function installThemeToggle(): void {
   };
 }
 
+// The text view (Aa): the editor's font and size and Hide markup, a per-reader
+// preference kept in localStorage, not the book.
+const TEXT_FONTS: Record<string, string> = {
+  serif: "ui-serif, Georgia, serif",
+  sans: "system-ui, sans-serif",
+  mono: "var(--mono)",
+};
+function installTextView(): void {
+  let prefs = { font: "serif", size: 16, hide: false };
+  try {
+    prefs = { ...prefs, ...JSON.parse(localStorage.getItem("text-view")!) };
+  } catch {
+    // none saved, or storage blocked: the defaults
+  }
+  const ed = $("editor");
+  const size = $("tv-size") as HTMLInputElement;
+  const hide = $("tv-hide") as HTMLInputElement;
+  const fonts = [
+    ...$("text-view").querySelectorAll<HTMLElement>("[data-font]"),
+  ];
+  const apply = () => {
+    ed.style.setProperty("--ed-font", TEXT_FONTS[prefs.font] ?? null);
+    ed.style.setProperty("--ed-fs", `${prefs.size}px`);
+    for (const b of fonts) {
+      b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));
+    }
+    size.value = String(prefs.size);
+    size.nextElementSibling!.textContent = `${prefs.size}px`;
+    hide.checked = prefs.hide;
+    setHideMarkup(editor, prefs.hide);
+    try {
+      localStorage.setItem("text-view", JSON.stringify(prefs));
+    } catch {
+      // storage blocked: the view just won't survive a reload
+    }
+  };
+  for (const b of fonts) {
+    b.onclick = () => {
+      prefs.font = b.dataset.font!;
+      apply();
+    };
+  }
+  size.oninput = () => {
+    prefs.size = Number(size.value);
+    apply();
+  };
+  hide.onchange = () => {
+    prefs.hide = hide.checked;
+    apply();
+  };
+  apply();
+}
+
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 // Keyboard chords. Snippet chords insert via insertSnippet; the rest are UI.
 const SNIPPET_KEYS: Record<string, string> = {
@@ -1423,6 +1477,7 @@ async function main(): Promise<void> {
     onCursorLine: highlightTreeNode,
   });
   reparse(text);
+  installTextView();
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
   installShortcuts(

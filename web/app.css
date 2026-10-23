@@ -46,6 +46,7 @@
   --radius: 6px;
   --fs: 13.5px;
   --fs-sm: 11px;
+  --mono: ui-monospace, Menlo, monospace;
   /* Pane widths — dragged by the gutters, persisted in localStorage. */
   --w-tree: 230px;
   --w-editor: clamp(380px, 36%, 600px);
@@ -577,6 +578,65 @@ summary {
   flex: 1;
   min-height: 0;
 }
+/* The text view (Aa, app.ts installTextView): the writer's font and size on
+   #editor, a reading measure, centred once Pages is hidden. .cm-content
+   grows to the measure and the scroller centres what is left over. */
+#editor .cm-scroller {
+  font-family: var(--ed-font, ui-serif, Georgia, serif);
+  font-size: var(--ed-fs, 16px);
+  line-height: 1.6;
+}
+#editor .cm-content {
+  max-width: 36em; /* ~70 characters of serif prose */
+}
+#panes.pages-hidden #editor .cm-scroller {
+  justify-content: center;
+}
+#text-view-open {
+  font-family: ui-serif, Georgia, serif;
+  font-size: 15px;
+  padding-block: 3px;
+}
+:root:not([data-mode="write"]) #text-view-open {
+  display: none;
+}
+#text-view {
+  position: fixed;
+  inset: 44px 10px auto auto;
+  margin: 0;
+  padding: 6px 14px;
+  width: 280px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 14px 36px var(--backdrop);
+}
+#text-view .tv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+}
+#text-view .tv-row + .tv-row {
+  border-top: 1px solid var(--soft);
+}
+#text-view small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+#text-view input[type="range"] {
+  flex: 1;
+  accent-color: var(--fg);
+}
+#text-view output {
+  min-width: 2.5em;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 /* Changed-on-disk banner: the buffer has unsaved edits and the file moved
    under it. Rare and it blocks saving, so it is the one loud thing in the
    chrome: an err-tinted block with a bar, and bordered buttons. */
@@ -677,8 +737,10 @@ summary {
 #editor .cm-line.cm-bml-field * {
   color: var(--muted);
   font-weight: 400;
-  font-size: 11px;
   letter-spacing: .02em;
+}
+#editor .cm-line.cm-bml-field {
+  font-size: .75em; /* follows the writer's size */
 }
 #editor .cm-line.cm-bml-rail {
   box-shadow: inset 1px 0 0 var(--syn-p);
@@ -701,6 +763,9 @@ summary {
   font-style: italic;
 }
 /* %% ──── draws as a hairline rule (its text shows while the cursor is on it) */
+#editor .cm-line.cm-bml-rule {
+  font-family: var(--mono); /* box-drawing runs are line-wide in mono only */
+}
 #editor .cm-line.cm-bml-rule:not(.cm-activeLine) {
   white-space: pre;
   contain: inline-size; /* its long dash run must not widen the editor */
@@ -1386,7 +1451,7 @@ summary {
   color: var(--fg);
   background: var(--hover);
 }
-#config-overlay .seg {
+:is(#config-overlay, #text-view) .seg {
   display: inline-flex;
   gap: 2px;
   padding: 2px;
@@ -1394,7 +1459,7 @@ summary {
   border-radius: calc(var(--radius) + 2px);
   flex-wrap: wrap;
 }
-#config-overlay .seg button {
+:is(#config-overlay, #text-view) .seg button {
   background: none;
   border: 0;
   border-radius: var(--radius);
@@ -1406,11 +1471,12 @@ summary {
   align-items: center;
   gap: 4px;
 }
-#config-overlay .seg button:hover {
+:is(#config-overlay, #text-view) .seg button:hover {
   color: var(--fg);
   background: var(--hover);
 }
 #config-overlay .seg button[aria-checked="true"],
+#text-view .seg button[aria-checked="true"],
 #config-overlay .tog[aria-pressed="true"] {
   background: var(--inv-bg);
   color: var(--inv-fg);
@@ -1432,7 +1498,7 @@ summary {
 }
 /* switch (panel-controls.ts switchInput): a hairline track, the knob in
    --muted; on, the track is the inverted pill and the knob its text colour */
-#config-overlay .sw {
+:is(#config-overlay, #text-view) .sw {
   appearance: none;
   position: relative;
   flex: none;
@@ -1445,7 +1511,7 @@ summary {
   cursor: pointer;
   transition: background .15s, border-color .15s;
 }
-#config-overlay .sw::before {
+:is(#config-overlay, #text-view) .sw::before {
   content: "";
   position: absolute;
   top: 2px;
@@ -1456,14 +1522,14 @@ summary {
   background: var(--muted);
   transition: transform .15s, background .15s;
 }
-#config-overlay .sw:hover::before {
+:is(#config-overlay, #text-view) .sw:hover::before {
   background: var(--fg);
 }
-#config-overlay .sw:checked {
+:is(#config-overlay, #text-view) .sw:checked {
   background: var(--inv-bg);
   border-color: var(--inv-bg);
 }
-#config-overlay .sw:checked::before {
+:is(#config-overlay, #text-view) .sw:checked::before {
   transform: translateX(12px);
   background: var(--inv-fg);
 }
