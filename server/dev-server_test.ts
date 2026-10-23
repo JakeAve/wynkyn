@@ -45,6 +45,15 @@ Deno.test("http: shell, book list, build json, images, 404s", async () => {
     assertEquals(img.headers.get("content-type"), "image/svg+xml");
     await img.body?.cancel();
 
+    // robots.txt sits at the root, as the static host serves it.
+    const robots = await fetch(`${base}/robots.txt`);
+    assertEquals(robots.status, 200);
+    assertEquals(
+      robots.headers.get("content-type"),
+      "text/plain; charset=utf-8",
+    );
+    await robots.body?.cancel();
+
     const missing = await fetch(`${base}/api/books/no-such-book`);
     assertEquals(missing.status, 404);
     await missing.body?.cancel();

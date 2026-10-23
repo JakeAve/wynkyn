@@ -9,6 +9,9 @@ export const FILES: Record<string, string> = {
   "book-renderer-spec.md": "spec.md",
   ".claude/skills/convert-manuscript/SKILL.md": "convert-manuscript.md",
   "web/index.html": "index.html",
+  // For crawlers; the icons, manifest and OG image live under web/brand/.
+  "web/robots.txt": "robots.txt",
+  "web/sitemap.xml": "sitemap.xml",
   "web/app.js": "web/app.js",
   "web/app.css": "web/app.css",
   "web/brand/mark.svg": "web/brand/mark.svg",

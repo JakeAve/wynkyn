@@ -11,6 +11,7 @@ const TYPES: Record<string, string> = {
   svg: "image/svg+xml",
   png: "image/png",
   webmanifest: "application/manifest+json",
+  xml: "application/xml",
 };
 
 export function serveSite(
