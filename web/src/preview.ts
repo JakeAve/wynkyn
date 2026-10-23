@@ -65,6 +65,9 @@ function renderTick(cb: () => void): void {
 
 let currentBlobUrl: string | null = null;
 let rendering = false;
+// Abandons the render under way: a newer update has made it pointless.
+let cancelCurrent: (() => void) | null = null;
+const CANCELLED = Symbol("render cancelled");
 // The hash of the render on screen or being produced for it; every accepted
 // call sets it synchronously, so a queued render can't be skipped as "same".
 let targetHash: string | null = null;
@@ -99,13 +102,15 @@ export function renderPreview(
   targetHash = hash;
   if (rendering) {
     // coalesce: only the latest pending update matters, and every caller
-    // waiting on the queue gets its result
+    // waiting on the queue gets its result. The render under way is for text
+    // that no longer exists, so it stops here rather than running to the end.
     queuedUpdate = {
       update,
       container,
       cacheKey,
       done: queuedUpdate?.done ?? Promise.withResolvers(),
     };
+    cancelCurrent?.();
     return pending = queuedUpdate.done.promise;
   }
   return pending = runRender(update, container, cacheKey, hash);
@@ -118,6 +123,17 @@ async function runRender(
   hash: string,
 ): Promise<PageProblem[]> {
   rendering = true;
+  // Cancelling rejects the race below and stops the queue ticking: Paged.js
+  // finishes the page it is on and goes quiet, its promise dropped unsettled.
+  let cancelled = false;
+  const abort = Promise.withResolvers<never>();
+  cancelCurrent = () => {
+    cancelled = true;
+    abort.reject(CANCELLED);
+  };
+  const tick = (cb: () => void) => {
+    if (!cancelled) renderTick(cb);
+  };
   try {
     setFontLinks(update.fontLinks);
     // pagedCss must go through the Previewer so Paged.js processes @page;
@@ -141,22 +157,28 @@ async function runRender(
     try {
       // Each pass renders into the stage; a pass that didn't settle leaves
       // its pages and sheets behind for the next one to clear.
-      result = await BookPageMap.settle(async (passSeed) => {
-        if (previewer) {
-          previewer.polisher.destroy();
-          stage.replaceChildren();
-        }
-        previewer = new Paged.Previewer({
-          pageMap: { seed: passSeed, numbering: update.pageNumbering },
-        });
-        previewer.chunker.q.tick = renderTick;
-        return (await previewer.preview(update.html, [blobUrl], stage))
-          .pageMapResult;
-      }, seed);
+      result = await Promise.race([
+        BookPageMap.settle(async (passSeed) => {
+          if (cancelled) throw CANCELLED; // no sheets for a pass nobody wants
+          if (previewer) {
+            previewer.polisher.destroy();
+            stage.replaceChildren();
+          }
+          previewer = new Paged.Previewer({
+            pageMap: { seed: passSeed, numbering: update.pageNumbering },
+          });
+          previewer.chunker.q.tick = tick;
+          return (await previewer.preview(update.html, [blobUrl], stage))
+            .pageMapResult;
+        }, seed),
+        abort.promise,
+      ]);
     } catch (err) {
       previewer?.polisher.destroy();
       stage.remove();
       URL.revokeObjectURL(blobUrl);
+      // Whoever waited on this render gets the outcome of the one replacing it.
+      if (err === CANCELLED && queuedUpdate) return queuedUpdate.done.promise;
       throw err;
     }
     for (const old of container.children) if (old !== stage) old.remove();
@@ -188,6 +210,7 @@ async function runRender(
     return problems;
   } finally {
     rendering = false;
+    cancelCurrent = null;
     delete container.dataset.rendering;
     if (queuedUpdate) {
       const next = queuedUpdate;
