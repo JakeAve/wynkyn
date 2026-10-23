@@ -41,6 +41,22 @@ export function firstSpanLine(
 }
 
 // The editor line a switcher jump carries across the navigation: `#line=12`.
+// The app's whole place in one URL, so a reload lands where the author was
+// and a pasted link opens there for someone else. Every part heals on load:
+// an unknown book, edition, mode, view or line falls back to a default.
+export function appHref(s: {
+  book: string;
+  edition: string | null;
+  mode: string;
+  view: string | null; // the Style/Publish nav row (config-panel.ts navId)
+  line: number; // the editor's cursor line, 1-based
+}): string {
+  let href = editionHref(s.book, s.edition);
+  if (s.mode !== "write") href += `&mode=${s.mode}`;
+  if (s.view) href += `&view=${encodeURIComponent(s.view)}`;
+  return s.line > 1 ? `${href}#line=${s.line}` : href;
+}
+
 export function lineFromHash(hash: string): number | null {
   const m = hash.match(/^#line=(\d+)$/);
   return m ? Number(m[1]) : null;

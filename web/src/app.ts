@@ -46,6 +46,7 @@ import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
 import { isNewerSpec, SPEC_VERSION } from "../../metadata/upgrade.ts";
 import {
+  appHref,
   editionHref,
   type EditionInfo,
   editionLabel,
@@ -83,6 +84,26 @@ const SAVE_DEBOUNCE_MS = 600;
 
 const clientId = crypto.randomUUID();
 const params = new URLSearchParams(location.search);
+let view: string | null = null; // the Style/Publish nav row, as the panel reports it
+let cursorLine = 1;
+
+// Keep the address bar at the author's place (appHref) without history
+// entries; debounced because Safari rate-limits replaceState.
+let urlTimer = 0;
+function syncUrl(): void {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => {
+    try {
+      history.replaceState(
+        null,
+        "",
+        appHref({ book, edition, mode, view, line: cursorLine }),
+      );
+    } catch {
+      // rate-limited or blocked: the URL just lags
+    }
+  }, 250);
+}
 const $ = (id: string) => document.getElementById(id)!;
 
 // Author-facing status in the toolbar: a glyph + a short phrase, so it clears
@@ -209,7 +230,6 @@ function showPageProblems(problems: PageProblem[]): void {
 }
 
 let treeLines: number[] = []; // start line of every tree node, ascending
-let cursorLine = 1;
 
 function refreshTree(doc: BmlDocument): void {
   const nodes = buildTree(doc);
@@ -225,6 +245,7 @@ function refreshTree(doc: BmlDocument): void {
 // Follow the cursor: the node whose block contains the cursor line is current.
 function highlightTreeNode(line: number): void {
   cursorLine = line;
+  syncUrl();
   let best = 0;
   for (const l of treeLines) if (l <= line) best = l;
   const tree = $("tree");
@@ -398,7 +419,7 @@ function renderEditions(): void {
         await backend.deleteEdition(selBook, slug);
         await deleteCachedRender(cacheId(selBook, slug));
         if (selBook === book && slug === edition) {
-          location.search = editionHref(book, null);
+          location.href = editionHref(book, null);
         } else await selectBook(selBook);
       });
     }
@@ -450,7 +471,7 @@ async function renameEdition(e: EditionInfo, value: string): Promise<void> {
       await done;
       await deleteCachedRender(cacheId(selBook, e.slug));
       if (selBook === book && e.slug === edition) {
-        location.search = editionHref(book, next);
+        location.href = editionHref(book, next);
         return;
       }
     }
@@ -580,7 +601,7 @@ function installSwitcher(): void {
     if (!slug) return;
     try {
       await backend.createEdition(selBook, slug, from.value);
-      location.search = editionHref(selBook, slug);
+      location.href = editionHref(selBook, slug);
     } catch (err) {
       formErr.textContent = brief(err);
     }
@@ -770,6 +791,11 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         isNames: () => isNames,
         exportPrint,
         exportEpub,
+        view: params.get("view"),
+        onRoute: (id) => {
+          view = id;
+          syncUrl();
+        },
       });
     } catch (err) {
       panelLoad = null;
@@ -796,6 +822,7 @@ function setMode(next: Mode): void {
   } catch {
     // storage blocked: the mode just won't survive a reload
   }
+  syncUrl();
   if (next === "write") return;
   ensureConfigPanel().then((panel) => {
     if (mode !== "write") panel?.setMode(mode); // the latest, if it changed meanwhile
@@ -1173,7 +1200,7 @@ function createManuscript(cancelable: boolean): void {
       );
       if (!got) return createManuscript(cancelable);
       await backend.importBook(got.slug, r);
-      location.search = editionHref(got.slug, null);
+      location.href = editionHref(got.slug, null);
     } catch (e) {
       err.textContent = brief(e);
       if (!dlg.open) dlg.showModal();
@@ -1196,7 +1223,7 @@ function createManuscript(cancelable: boolean): void {
           "No book found: a book is a folder with a manuscript.md.";
         return;
       }
-      location.search = editionHref(books[0]!, null);
+      location.href = editionHref(books[0]!, null);
     } catch (e) {
       err.textContent = brief(e);
     }
@@ -1207,7 +1234,7 @@ function createManuscript(cancelable: boolean): void {
       const got = await askTitle("", null, "Create book");
       if (!got) return createManuscript(cancelable);
       await backend.createBook(got.slug, got.title);
-      location.search = editionHref(got.slug, null);
+      location.href = editionHref(got.slug, null);
     } catch (e) {
       err.textContent = brief(e);
       dlg.showModal();
@@ -1373,10 +1400,13 @@ async function main(): Promise<void> {
   } catch {
     // storage blocked: start in Write
   }
-  // A switcher jump to an edition's first passage (`#line=N`) opens in Write.
+  // The URL's mode wins; a bare `#line=N` (a switcher jump) opens in Write.
   const jump = lineFromHash(location.hash);
-  if (jump !== null) history.replaceState(null, "", location.search);
-  setMode(jump !== null ? "write" : MODES.find((m) => m === saved) ?? "write");
+  const asked = MODES.find((m) => m === params.get("mode"));
+  setMode(
+    asked ?? (jump !== null ? "write" : MODES.find((m) => m === saved)) ??
+      "write",
+  );
   if (jump !== null) scrollEditorToLine(editor, jump);
   installGutters();
   installThemeToggle();
