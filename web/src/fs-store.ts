@@ -140,8 +140,6 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
 
 // ---- which folder --------------------------------------------------------
 
-export const canPickFolder = (): boolean => "showDirectoryPicker" in globalThis;
-
 /** The author's books/ folder, remembered across reloads in IndexedDB. */
 export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
   const dir = await showDirectoryPicker({ mode: "readwrite", id: "books" });

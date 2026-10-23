@@ -66,7 +66,6 @@ import {
 } from "./backend.ts";
 import {
   browserFolder,
-  canPickFolder,
   createBooksFolder,
   handleStore,
   importBooks,
@@ -539,8 +538,20 @@ function installSwitcher(): void {
       $("book-err").textContent = brief(err);
     }
   };
-  $("library-note").hidden = localStorage.getItem("library") !== "browser";
-  // Forget the choice of library and pick again on the next load.
+  // Where the library lives, and the way to a different one: forget the
+  // choice and pick again on the next load.
+  const note = $("library-note");
+  const pref = localStorage.getItem("library");
+  note.hidden = backend.kind !== "local";
+  if (pref === "browser") {
+    note.textContent = "Kept in this browser only. Browsers clear site " +
+      "storage without asking, so download a book to keep it.";
+  } else if (pref === "folder") {
+    note.textContent = "Loading…";
+    rememberedFolder().then((dir) => {
+      note.textContent = `Books in the “${dir?.name}” folder on this device.`;
+    });
+  }
   $("library-open").hidden = backend.kind !== "local";
   $("library-open").onclick = () => {
     localStorage.removeItem("library");
@@ -803,7 +814,10 @@ const fetchManuscript = (
 
 // Without a server the app needs a folder: the author's own books/ (the File
 // System Access API, Chromium), or this browser's private storage. The choice
-// is remembered; "Library…" in the switcher forgets it.
+// is remembered; "Change library…" in the switcher forgets it. The folder buttons
+// show in every browser: one without the API (Firefox, Safari, Brave until its
+// flag is on) fails the click with its own error rather than hiding the
+// options.
 async function chooseLibrary(): Promise<BookStore> {
   const remembered = await rememberedFolder();
   const pref = localStorage.getItem("library");
@@ -835,41 +849,31 @@ async function chooseLibrary(): Promise<BookStore> {
         } else err.textContent = "The folder wasn't allowed.";
       };
     }
-    $("lib-pick").hidden = !canPickFolder();
-    $("lib-new").hidden = !canPickFolder();
+    // Without the File System Access API (Firefox, Safari, Brave until its
+    // flag is on) the folder buttons stay live and are tagged: a click fails
+    // with the browser's own error, which tells the author whose limit it is.
+    const tagged = !("showDirectoryPicker" in globalThis);
+    for (const id of ["lib-new", "lib-pick"]) {
+      ($(id).querySelector(".pill") as HTMLElement).hidden = !tagged;
+    }
     $("lib-new").onclick = () =>
       createBooksFolder().then((d) => done(handleStore(d), "folder"), fail);
     $("lib-pick").onclick = () =>
       pickFolder().then((d) => done(handleStore(d), "folder"), fail);
     $("lib-browser").onclick = () =>
       browserFolder().then((d) => done(handleStore(d), "browser"), fail);
-    const input = $("lib-import") as HTMLInputElement;
-    input.onchange = async () => {
-      if (!input.files?.length) return;
-      try {
-        const store = handleStore(await browserFolder());
-        const books = await importBooks(store, input.files);
-        if (!books.length) {
-          err.textContent =
-            "No book found: a book is a folder with a manuscript.md.";
-          return;
-        }
-        done(store, "browser");
-      } catch (e) {
-        fail(e);
-      }
-    };
     dlg.showModal();
   });
 }
 
-// Without the File System Access API (Firefox, Safari) the app can't open
-// the author's folder, and Safari can't write browser storage from a page
-// either: say so once, before the Welcome, and point at the browsers that can.
+// Without the File System Access API (Firefox, Safari, Brave by default) the
+// app can't open the author's folder: say so once, before the Welcome, and
+// point at the browsers that can. The Welcome itself is the same everywhere.
 function browserNotice(): Promise<void> {
-  if (canPickFolder() || localStorage.getItem("browser-notice") === "1") {
-    return Promise.resolve();
-  }
+  if (
+    "showDirectoryPicker" in globalThis ||
+    localStorage.getItem("browser-notice") === "1"
+  ) return Promise.resolve();
   const dlg = $("browser-notice") as HTMLDialogElement;
   return new Promise((resolve) => {
     dlg.onclose = () => {
@@ -1150,6 +1154,7 @@ function createManuscript(cancelable: boolean): void {
   };
   const input = $("create-file") as HTMLInputElement;
   input.value = "";
+  $("create-import").onclick = () => input.click();
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
@@ -1172,6 +1177,28 @@ function createManuscript(cancelable: boolean): void {
     } catch (e) {
       err.textContent = brief(e);
       if (!dlg.open) dlg.showModal();
+    }
+  };
+  // A browser-storage library can copy books in from a Wynkyn folder on
+  // disk: the way in for a browser that can't open the folder itself.
+  const folder = $("create-folder");
+  folder.hidden = localStorage.getItem("library") !== "browser";
+  const dir = $("create-dir") as HTMLInputElement;
+  dir.value = "";
+  folder.onclick = () => dir.click();
+  dir.onchange = async () => {
+    if (!dir.files?.length) return;
+    try {
+      err.textContent = "Copying…";
+      const books = await importBooks(backend.store!, dir.files);
+      if (!books.length) {
+        err.textContent =
+          "No book found: a book is a folder with a manuscript.md.";
+        return;
+      }
+      location.search = editionHref(books[0]!, null);
+    } catch (e) {
+      err.textContent = brief(e);
     }
   };
   $("create-blank").onclick = async () => {

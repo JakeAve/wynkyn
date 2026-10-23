@@ -2,7 +2,7 @@
 // plain files, the book service running in the page over the browser's own
 // storage. Imports the fixture book, edits it, and finds the edit in storage
 // and again after a reload.
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { chromium } from "playwright";
 import { unzipSync } from "fflate";
 import { hasChrome } from "../../testing/chrome.ts";
@@ -11,6 +11,16 @@ import { serveSite } from "../../scripts/serve-site.ts";
 const DIST = new URL("../../dist/", import.meta.url);
 const siteBuilt = await Deno.stat(new URL("web/app.js", DIST))
   .then(() => true, () => false);
+
+// A browser-storage library with the fixture book copied in from disk, the
+// way a browser without the folder picker gets its books.
+async function importDemoBook(page: import("playwright").Page): Promise<void> {
+  await page.locator("#lib-browser").click();
+  await page.locator("#create[open]").waitFor();
+  await page.locator("#create-dir").setInputFiles(
+    new URL("../../server/testdata/demo-book", import.meta.url).pathname,
+  );
+}
 
 Deno.test({
   name: "local library: import into the browser, edit, the file changes, " +
@@ -24,9 +34,7 @@ Deno.test({
       const url = `http://localhost:${site.addr.port}/`;
       await page.goto(url);
       await page.locator("#library[open]").waitFor();
-      await page.locator("#lib-import").setInputFiles(
-        new URL("../../server/testdata/demo-book", import.meta.url).pathname,
-      );
+      await importDemoBook(page);
       await page.locator('#status[data-kind="saved"]').waitFor();
       await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
         .first().waitFor();
@@ -101,7 +109,7 @@ Deno.test({
 
 Deno.test({
   name: "local library: a browser without the File System Access API " +
-    "gets the banner and no folder button",
+    "gets the notice, tagged folder buttons, and Import from a folder in the browser",
   ignore: !hasChrome || !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
@@ -118,16 +126,29 @@ Deno.test({
       assertEquals(await page.locator("#library[open]").count(), 0);
       await page.locator("#browser-notice-close").click();
       await page.locator("#library[open]").waitFor();
-      assertEquals(await page.locator("#lib-pick").isVisible(), false);
-      // An empty library's Create dialog has a Back to the Welcome.
+      // The folder buttons are tagged, not hidden; a click fails with the
+      // browser's own error.
+      assert(await page.locator("#lib-pick .pill").isVisible());
+      await page.locator("#lib-pick").click();
+      await page.locator("#lib-err:not(:empty)").waitFor();
+      assertStringIncludes(
+        (await page.locator("#lib-err").textContent()) ?? "",
+        "showDirectoryPicker",
+      );
+      // An empty library's Create dialog has a Back to the Welcome, and for
+      // browser storage an Import from a folder.
       await page.locator("#lib-browser").click();
       await page.locator("#create[open]").waitFor();
+      assert(await page.locator("#create-folder").isVisible());
       await page.locator("#create-back").click();
       await page.locator("#library[open]").waitFor();
-      await page.locator("#lib-import").setInputFiles(
-        new URL("../../server/testdata/demo-book", import.meta.url).pathname,
-      );
+      await importDemoBook(page);
       await page.locator('#status[data-kind="saved"]').waitFor();
+      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
+        .first().waitFor();
+      assert(
+        (await page.locator("#preview").innerText()).includes("Chapter One"),
+      );
       // Dismissed once, the notice stays away.
       await page.reload();
       await page.locator('#status[data-kind="saved"]').waitFor();
@@ -177,9 +198,13 @@ Deno.test({
         welcome.includes("Your books are yours"),
         `the privacy line is on the Welcome: ${welcome}`,
       );
+      // A dialog opens with its title focused, no row pre-chosen.
+      const focused = () => page.evaluate(() => document.activeElement?.id);
+      assertEquals(await focused(), "library-title");
       await page.locator("#lib-browser").click();
       // An empty library goes straight to Create a new manuscript.
       await page.locator("#create[open]").waitFor();
+      assertEquals(await focused(), "create-title");
       assert(
         await page.locator("#create-cancel").isHidden(),
         "no Cancel on an empty library",
@@ -244,6 +269,55 @@ Deno.test({
       await browser.close();
       await site.shutdown();
       await Deno.remove(tmp, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "local library: a picked folder is named in the switcher, and " +
+    "Change library… goes back to the Welcome with it on offer",
+  ignore: !hasChrome || !siteBuilt,
+  async fn() {
+    const site = serveSite(DIST, 0);
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      // The picker can't be driven, so it hands out a private-storage folder
+      // named like the author's: same handle API, no dialog.
+      await page.addInitScript(() => {
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).showDirectoryPicker = async () => {
+          const root = await navigator.storage.getDirectory();
+          return root.getDirectoryHandle("My Books", { create: true });
+        };
+      });
+      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.locator("#library[open]").waitFor();
+      // With the picker there is no Chromium-only tag.
+      assertEquals(await page.locator("#lib-pick .pill").isVisible(), false);
+      await page.locator("#lib-pick").click();
+      await page.locator("#create[open]").waitFor();
+      await page.locator("#create-blank").click();
+      await page.locator("#title-dlg[open]").waitFor();
+      await page.locator("#title-input").fill("Tiny");
+      await page.locator("#title-input").press("Enter");
+      await page.locator('#status[data-kind="saved"]').waitFor();
+      await page.locator("#book-switcher").click();
+      await page.locator("#library-note").waitFor();
+      await page.waitForFunction(() =>
+        document.getElementById("library-note")!.textContent!.includes(
+          "“My Books”",
+        )
+      );
+      await page.locator("#library-open").click();
+      await page.locator("#library[open]").waitFor();
+      assertStringIncludes(
+        (await page.locator("#lib-reopen").textContent()) ?? "",
+        "My Books",
+      );
+    } finally {
+      await browser.close();
+      await site.shutdown();
     }
   },
 });
