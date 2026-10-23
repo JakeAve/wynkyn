@@ -135,6 +135,7 @@ function positionPicker(o: {
   takenBy: string;
   clash: () => string | undefined;
   unset?: () => [name: string, note: string]; // what to say when `at` is undefined
+  clear?: () => void; // clicking the lit slot unsets, when given
 }): { nodes: HTMLElement[]; paint: () => void } {
   const name = el("b", "");
   const note = el("span", "");
@@ -169,7 +170,8 @@ function positionPicker(o: {
           `${label}, ${side === "v" ? "left" : "right"} page`,
         );
         b.onclick = () => {
-          o.set(pos);
+          if (o.clear && pos === o.at()) o.clear();
+          else o.set(pos);
           paint();
         };
         slots.push([pos, b]);
@@ -257,37 +259,20 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
     tidy();
     ctx.queueSave("numbering");
   };
-  const whereRow = view.mark(
-    row(
-      "Where",
-      select(
-        [
-          { label: "Same as other pages", value: "" },
-          ...POSITIONS.map(([pos, , name]) => ({ label: name, value: pos })),
-        ],
-        openers()?.position ?? "",
-        (v) =>
-          editOpeners((o) => {
-            if (v) o.position = v as FolioPosition;
-            else delete o.position;
-          }),
-        "Where the page number sits on chapter and part openers",
-      ),
-      { hidden: openers()?.show === false },
-    ),
-    () => !!openers()?.position,
-  );
-  const openerHint = el("p", "hint");
-  const paintOpenerHint = () => {
-    const o = openers();
-    openerHint.textContent = o?.show === false
-      ? "Openers carry no running head and, here, no page number."
-      : o?.position
-      ? "A drop folio: the opener's number moves there, every other page keeps its place."
-      : "Openers carry no running head. Chicago keeps their number, or drops it, or sets it at the foot of the page.";
-  };
-  paintOpenerHint();
-  whereRow.addEventListener("change", paintOpenerHint);
+  // Same picker as the Position sections; no slot lit means the opener's
+  // number sits where every other page's does, and clicking the lit slot
+  // goes back to that.
+  const openerPosition = positionPicker({
+    at: () => openers()?.position,
+    set: (pos) => editOpeners((o) => o.position = pos),
+    clear: () => editOpeners((o) => delete o.position),
+    taken: () => undefined,
+    takenBy: "",
+    clash: () => undefined,
+    unset: () => ["Same as other pages", ""],
+  });
+  const openerWhere = el("div", "", ...openerPosition.nodes);
+  openerWhere.hidden = openers()?.show === false;
   const openerRows = [
     view.mark(
       row(
@@ -300,15 +285,13 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
               if (on) delete o.show;
               else o.show = false;
             });
-            whereRow.hidden = !on;
-            paintOpenerHint();
+            openerWhere.hidden = !on;
           },
         ),
       ),
       () => openers()?.show === false,
     ),
-    whereRow,
-    openerHint,
+    openerWhere,
   ];
 
   const FOLIO = ["font-size", "font-family", "font-style"];
