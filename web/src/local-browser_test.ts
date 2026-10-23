@@ -274,6 +274,94 @@ Deno.test({
 });
 
 Deno.test({
+  name: "import from the web: a fetched address, and a paste when the site " +
+    "blocks the page",
+  ignore: !hasChrome || !siteBuilt,
+  async fn() {
+    const site = serveSite(DIST, 0);
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      const address = "https://books.example/tiny.txt";
+      await page.route(address, (r) =>
+        r.fulfill({
+          body: TINY,
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "access-control-allow-origin": "*",
+          },
+        }));
+      await page.route("https://blocked.example/**", (r) => r.abort());
+      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.locator("#library[open]").waitFor();
+      await page.locator("#lib-browser").click();
+      await page.locator("#create[open]").waitFor();
+
+      // An address that allows the fetch goes straight to the title.
+      await page.locator("#create-web").click();
+      await page.locator("#web-dlg[open]").waitFor();
+      await page.locator("#web-url").fill(address);
+      await page.locator("#web-fetch").click();
+      await page.locator("#title-dlg[open]").waitFor();
+      assertEquals(
+        await page.locator("#title-input").inputValue(),
+        "Tiny Book",
+      );
+      assertStringIncludes(
+        (await page.locator("#title-source").textContent()) ?? "",
+        address,
+      );
+      await page.locator("#title-ok").click();
+      await page.waitForURL(/book=tiny-book/);
+      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
+        .first().waitFor();
+      assert(
+        (await page.locator("#editor .cm-content").innerText()).startsWith(
+          `%% Imported from ${address}`,
+        ),
+        "the manuscript remembers where it came from",
+      );
+
+      // A site that blocks the page offers a paste instead.
+      await page.locator("#book-switcher").click();
+      await page.locator("#book-new").click();
+      await page.locator("#create[open]").waitFor();
+      await page.locator("#create-web").click();
+      await page.locator("#web-dlg[open]").waitFor();
+      await page.locator("#web-url").fill("https://blocked.example/book");
+      await page.locator("#web-fetch").click();
+      await page.locator("#web-paste-box").waitFor({ state: "visible" });
+      assertEquals(
+        await page.locator("#web-open").getAttribute("href"),
+        "https://blocked.example/book",
+      );
+      await page.evaluate((text) => {
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        document.getElementById("web-paste")!.dispatchEvent(
+          new ClipboardEvent("paste", {
+            clipboardData: dt,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      }, TINY);
+      await page.locator("#title-dlg[open]").waitFor();
+      assert(
+        ((await page.locator("#title-source").textContent()) ?? "")
+          .startsWith("Pasted from"),
+      );
+      await page.locator("#title-input").fill("Tiny Book Two");
+      await page.locator("#title-ok").click();
+      await page.waitForURL(/book=tiny-book-two/);
+    } finally {
+      await browser.close();
+      await site.shutdown();
+    }
+  },
+});
+
+Deno.test({
   name: "local library: a picked folder is named in the switcher, and " +
     "Change library… goes back to the Welcome with it on offer",
   ignore: !hasChrome || !siteBuilt,
