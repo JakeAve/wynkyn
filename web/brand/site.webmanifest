@@ -2,7 +2,7 @@
   "name": "Wynkyn",
   "short_name": "Wynkyn",
   "description": "Edit and print hand-bound books.",
-  "start_url": "/",
+  "start_url": "/app/",
   "display": "standalone",
   "background_color": "#f4efe4",
   "theme_color": "#161616",

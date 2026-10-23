@@ -7,7 +7,8 @@
 > folded signatures, and writes a reflowable EPUB.
 
 If an author says "I'm on wynkyn.jakeave.deno.net, help me with my book", this
-page is where to start. The app is static: nothing is stored on this site. In
+page is where to start. The app itself is at /app/ (the root is the site's
+front page). It is static: nothing is stored on this site. In
 Chrome, Edge or Brave the app opens a folder on the author's own machine (File
 System Access API) and rereads it on change, so editing the files on disk is
 the same as editing in the app. Other browsers keep books in browser storage

@@ -6,53 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description"
       content="Typeset and print hand-bound books, free, from your own files. Write in plain text, see the real pages as you write, print folded signatures for binding by hand, export an EPUB. Open source, no account, nothing leaves your device.">
-    <link rel="canonical" href="https://wynkyn.jakeave.deno.net/">
+    <link rel="canonical" href="https://wynkyn.jakeave.deno.net/app/">
     <link rel="license"
       href="https://github.com/JakeAve/wynkyn/blob/main/LICENSE">
     <meta name="theme-color" content="#f4efe4"
       media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#161616"
       media="(prefers-color-scheme: dark)">
-    <link rel="icon" href="web/brand/mark.svg" type="image/svg+xml">
-    <link rel="icon" href="web/brand/icon-32.png" type="image/png"
+    <link rel="icon" href="/web/brand/mark.svg" type="image/svg+xml">
+    <link rel="icon" href="/web/brand/icon-32.png" type="image/png"
       sizes="32x32">
-    <link rel="apple-touch-icon" href="web/brand/apple-touch-icon.png">
-    <link rel="manifest" href="web/brand/site.webmanifest">
+    <link rel="apple-touch-icon" href="/web/brand/apple-touch-icon.png">
+    <link rel="manifest" href="/web/brand/site.webmanifest">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Wynkyn">
     <meta property="og:title"
       content="Wynkyn: typeset and print hand-bound books">
     <meta property="og:description"
       content="Free, open-source book typesetting in the browser. Write in plain text, print folded signatures for hand binding, export an EPUB. Your files stay on your device.">
-    <meta property="og:url" content="https://wynkyn.jakeave.deno.net/">
+    <meta property="og:url" content="https://wynkyn.jakeave.deno.net/app/">
     <meta property="og:image"
       content="https://wynkyn.jakeave.deno.net/web/brand/og.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "Wynkyn",
-      "url": "https://wynkyn.jakeave.deno.net/",
-      "description": "Typeset and print hand-bound books, free, from your own files. Writes folded signatures for binding by hand and a reflowable EPUB.",
-      "applicationCategory": "DesignApplication",
-      "operatingSystem": "Web",
-      "browserRequirements": "Chrome, Edge or Brave for editing files on disk; any modern browser otherwise",
-      "isAccessibleForFree": true,
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-      "license": "https://github.com/JakeAve/wynkyn/blob/main/LICENSE",
-      "codeRepository": "https://github.com/JakeAve/wynkyn",
-      "author": {
-        "@type": "Person",
-        "name": "Jake Avery",
-        "url": "https://github.com/JakeAve"
-      },
-      "screenshot": "https://wynkyn.jakeave.deno.net/web/brand/og.png",
-      "keywords": "bookbinding, typesetting, imposition, signatures, EPUB, self-publishing, Paged.js"
-    }
-    </script>
     <script>
     // Resolve theme before first paint: explicit choice wins, else system.
     document.documentElement.dataset.theme = localStorage.theme ??
@@ -64,7 +41,7 @@
       }
     } catch {}
     </script>
-    <link rel="stylesheet" href="web/app.css">
+    <link rel="stylesheet" href="/web/app.css">
   </head>
   <body>
     <div id="toolbar">
@@ -342,7 +319,7 @@
         </div>
       </form>
     </dialog>
-    <script src="vendor/paged.js"></script>
-    <script type="module" src="web/app.js"></script>
+    <script src="/vendor/paged.js"></script>
+    <script type="module" src="/web/app.js"></script>
   </body>
 </html>

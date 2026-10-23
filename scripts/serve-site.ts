@@ -19,9 +19,19 @@ export function serveSite(
   port: number,
 ): Deno.HttpServer<Deno.NetAddr> {
   return Deno.serve({ port, onListen() {} }, async (req) => {
-    const path = new URL(req.url).pathname;
-    const file = path === "/" ? "index.html" : path.slice(1);
+    const url = new URL(req.url);
+    const path = url.pathname;
+    // Directory URLs read their index.html; a bare "/about" redirects to
+    // "/about/", as static hosts do.
+    const file = path.endsWith("/")
+      ? `${path.slice(1)}index.html`
+      : path.slice(1);
     try {
+      const dir = await Deno.stat(new URL(file, dist)).then(
+        (s) => s.isDirectory,
+        () => false,
+      );
+      if (dir) return Response.redirect(url.origin + path + "/", 301);
       const body = await Deno.readFile(new URL(file, dist));
       const ext = file.slice(file.lastIndexOf(".") + 1);
       return new Response(body, {

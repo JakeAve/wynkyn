@@ -31,7 +31,7 @@ Deno.test({
     const browser = await chromium.launch({ channel: "chrome" });
     try {
       const page = await browser.newPage();
-      const url = `http://localhost:${site.addr.port}/`;
+      const url = `http://localhost:${site.addr.port}/app/`;
       await page.goto(url);
       await page.locator("#library[open]").waitFor();
       await importDemoBook(page);
@@ -120,7 +120,7 @@ Deno.test({
         // deno-lint-ignore no-explicit-any
         delete (globalThis as any).showDirectoryPicker;
       });
-      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.goto(`http://localhost:${site.addr.port}/app/`);
       // The notice comes first, on its own; the Welcome waits for it.
       await page.locator("#browser-notice[open]").waitFor();
       assertEquals(await page.locator("#library[open]").count(), 0);
@@ -191,7 +191,7 @@ Deno.test({
     await Deno.writeTextFile(file, TINY);
     try {
       const page = await browser.newPage();
-      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.goto(`http://localhost:${site.addr.port}/app/`);
       await page.locator("#library[open]").waitFor();
       const welcome = await page.locator("#library").innerText();
       assert(
@@ -298,7 +298,7 @@ Deno.test({
           },
         }));
       await page.route("https://blocked.example/**", (r) => r.abort());
-      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.goto(`http://localhost:${site.addr.port}/app/`);
       await page.locator("#library[open]").waitFor();
       await page.locator("#lib-browser").click();
       await page.locator("#create[open]").waitFor();
@@ -385,7 +385,7 @@ Deno.test({
           return root.getDirectoryHandle("My Books", { create: true });
         };
       });
-      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.goto(`http://localhost:${site.addr.port}/app/`);
       await page.locator("#library[open]").waitFor();
       // With the picker there is no Chromium-only tag.
       assertEquals(await page.locator("#lib-pick .pill").isVisible(), false);

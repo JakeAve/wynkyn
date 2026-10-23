@@ -23,7 +23,7 @@ Deno.test({
     const browser = await chromium.launch({ channel: "chrome" });
     try {
       const page = await browser.newPage();
-      await page.goto(`http://localhost:${server.port}/?book=demo-book`);
+      await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
       await page.locator('#status[data-kind="saved"]').waitFor();
       // Paginated and settled: pages on screen, no render staged behind them.
       await page.waitForFunction(() =>
