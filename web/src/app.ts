@@ -538,8 +538,20 @@ function installSwitcher(): void {
       $("book-err").textContent = brief(err);
     }
   };
-  $("library-note").hidden = localStorage.getItem("library") !== "browser";
-  // Forget the choice of library and pick again on the next load.
+  // Where the library lives, and the way to a different one: forget the
+  // choice and pick again on the next load.
+  const note = $("library-note");
+  const pref = localStorage.getItem("library");
+  note.hidden = backend.kind !== "local";
+  if (pref === "browser") {
+    note.textContent = "Kept in this browser only. Browsers clear site " +
+      "storage without asking, so download a book to keep it.";
+  } else if (pref === "folder") {
+    note.textContent = "Loading…";
+    rememberedFolder().then((dir) => {
+      note.textContent = `Books in the “${dir?.name}” folder on this device.`;
+    });
+  }
   $("library-open").hidden = backend.kind !== "local";
   $("library-open").onclick = () => {
     localStorage.removeItem("library");
@@ -804,8 +816,8 @@ const fetchManuscript = (
 // System Access API, Chromium), or this browser's private storage. The choice
 // is remembered; "Library…" in the switcher forgets it. The folder buttons
 // show in every browser: one without the API (Firefox, Safari, Brave until its
-// flag is on) fails the click with its own error, which is clearer than a
-// Welcome that hides the options.
+// flag is on) fails the click with its own error rather than hiding the
+// options.
 async function chooseLibrary(): Promise<BookStore> {
   const remembered = await rememberedFolder();
   const pref = localStorage.getItem("library");
@@ -863,6 +875,25 @@ async function chooseLibrary(): Promise<BookStore> {
   });
 }
 
+// Without the File System Access API (Firefox, Safari, Brave by default) the
+// app can't open the author's folder: say so once, before the Welcome, and
+// point at the browsers that can. The Welcome itself is the same everywhere.
+function browserNotice(): Promise<void> {
+  if (
+    "showDirectoryPicker" in globalThis ||
+    localStorage.getItem("browser-notice") === "1"
+  ) return Promise.resolve();
+  const dlg = $("browser-notice") as HTMLDialogElement;
+  return new Promise((resolve) => {
+    dlg.onclose = () => {
+      localStorage.setItem("browser-notice", "1");
+      resolve();
+    };
+    $("browser-notice-close").onclick = () => dlg.close();
+    dlg.showModal();
+  });
+}
+
 // metadata.json written by a newer Wynkyn than this one: say so, keep going.
 // Unknown keys fall through to the renderer's defaults, nothing is dropped.
 function showSpecBanner(spec: string | undefined): void {
@@ -877,6 +908,7 @@ function showSpecBanner(spec: string | undefined): void {
 async function connect(): Promise<Backend> {
   if (await hasServer()) return httpBackend();
   const assets = localAssets();
+  await browserNotice();
   return localBackend(await chooseLibrary(), await assets);
 }
 

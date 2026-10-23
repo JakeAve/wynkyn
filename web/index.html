@@ -180,11 +180,10 @@
           <button id="book-download" class="btn" hidden
             title="This book's folder as a zip">Download</button>
           <button id="library-open" class="btn" hidden
-            title="Choose a different folder or storage">Library…</button>
+            title="Keep books in a different folder, or in this browser">Change
+            library…</button>
           <span id="book-err" class="sw-err"></span>
-          <p id="library-note" class="sw-note" hidden>Kept in this browser
-            only. Browsers clear site storage without asking, so download a
-            book to keep it.</p>
+          <p id="library-note" class="sw-note" hidden></p>
         </div>
       </div>
       <div class="sw-eds">
@@ -200,6 +199,17 @@
             <span class="sw-err"></span>
           </form>
         </div>
+      </div>
+    </dialog>
+    <dialog id="browser-notice" class="ask"
+      aria-labelledby="browser-notice-title">
+      <h2 id="browser-notice-title">For the best experience use Chrome, Edge or
+        Brave</h2>
+      <p>They open your own books folder and print exact pages. Other browsers
+        keep books in the browser only, and printing may differ.</p>
+      <div class="ask-foot">
+        <button id="browser-notice-close" class="btn primary"
+          type="button">Got it</button>
       </div>
     </dialog>
     <dialog id="library" class="ask" aria-labelledby="library-title">

@@ -101,7 +101,7 @@ Deno.test({
 
 Deno.test({
   name: "local library: a browser without the File System Access API " +
-    "gets the same Welcome and the browser's own error on a folder button",
+    "gets the notice, the same Welcome, and the browser's own error on a folder button",
   ignore: !hasChrome || !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
@@ -113,8 +113,12 @@ Deno.test({
         delete (globalThis as any).showDirectoryPicker;
       });
       await page.goto(`http://localhost:${site.addr.port}/`);
+      // The notice comes first, on its own; the Welcome waits for it.
+      await page.locator("#browser-notice[open]").waitFor();
+      assertEquals(await page.locator("#library[open]").count(), 0);
+      await page.locator("#browser-notice-close").click();
       await page.locator("#library[open]").waitFor();
-      // No notice, nothing hidden: the click fails and says so.
+      // Nothing hidden: the folder button is there and the click says why not.
       assertEquals(await page.locator("#lib-pick").isVisible(), true);
       await page.locator("#lib-pick").click();
       await page.locator("#lib-err:not(:empty)").waitFor();
@@ -131,8 +135,10 @@ Deno.test({
         new URL("../../server/testdata/demo-book", import.meta.url).pathname,
       );
       await page.locator('#status[data-kind="saved"]').waitFor();
+      // Dismissed once, the notice stays away.
       await page.reload();
       await page.locator('#status[data-kind="saved"]').waitFor();
+      assertEquals(await page.locator("#browser-notice[open]").count(), 0);
     } finally {
       await browser.close();
       await site.shutdown();
@@ -245,6 +251,53 @@ Deno.test({
       await browser.close();
       await site.shutdown();
       await Deno.remove(tmp, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "local library: a picked folder is named in the switcher, and " +
+    "Change library… goes back to the Welcome with it on offer",
+  ignore: !hasChrome || !siteBuilt,
+  async fn() {
+    const site = serveSite(DIST, 0);
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      // The picker can't be driven, so it hands out a private-storage folder
+      // named like the author's: same handle API, no dialog.
+      await page.addInitScript(() => {
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).showDirectoryPicker = async () => {
+          const root = await navigator.storage.getDirectory();
+          return root.getDirectoryHandle("My Books", { create: true });
+        };
+      });
+      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.locator("#library[open]").waitFor();
+      await page.locator("#lib-pick").click();
+      await page.locator("#create[open]").waitFor();
+      await page.locator("#create-blank").click();
+      await page.locator("#title-dlg[open]").waitFor();
+      await page.locator("#title-input").fill("Tiny");
+      await page.locator("#title-input").press("Enter");
+      await page.locator('#status[data-kind="saved"]').waitFor();
+      await page.locator("#book-switcher").click();
+      await page.locator("#library-note").waitFor();
+      await page.waitForFunction(() =>
+        document.getElementById("library-note")!.textContent!.includes(
+          "“My Books”",
+        )
+      );
+      await page.locator("#library-open").click();
+      await page.locator("#library[open]").waitFor();
+      assertStringIncludes(
+        (await page.locator("#lib-reopen").textContent()) ?? "",
+        "My Books",
+      );
+    } finally {
+      await browser.close();
+      await site.shutdown();
     }
   },
 });
