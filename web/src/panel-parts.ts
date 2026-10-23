@@ -18,6 +18,7 @@ import {
   seg,
   select,
   stepper,
+  switchInput,
   toggle,
   type View,
 } from "./panel-controls.ts";
@@ -464,23 +465,18 @@ function extrasFor(
         ),
         v.mark(
           row(
-            "Label",
-            el(
-              "span",
-              "ctl",
-              lab,
-              num,
-              suf,
-              toggle(
-                "Show",
-                cur.show ?? true,
-                (on) => edit((c) => c.show = on),
-              ),
+            "Show",
+            switchInput(
+              "Show the number",
+              cur.show ?? true,
+              (on) => edit((c) => c.show = on),
             ),
           ),
-          () =>
-            cfg()?.prefix !== undefined || cfg()?.suffix !== undefined ||
-            cfg()?.show !== undefined,
+          () => cfg()?.show !== undefined,
+        ),
+        v.mark(
+          row("Label", el("span", "ctl", lab, num, suf)),
+          () => cfg()?.prefix !== undefined || cfg()?.suffix !== undefined,
         ),
       ],
       reset() {

@@ -26,7 +26,7 @@ import {
   seg,
   select,
   stepper,
-  toggle,
+  switchInput,
 } from "./panel-controls.ts";
 import type { PanelContext } from "./style-catalog.ts";
 import {
@@ -194,12 +194,16 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
     ),
     v.mark(
       row(
-        "Backs",
-        toggle("Last sheet first", page["reverse-backs"] === true, (on) => {
-          if (on) page["reverse-backs"] = true;
-          else delete page["reverse-backs"];
-          save();
-        }),
+        "Last sheet first",
+        switchInput(
+          "Last sheet first",
+          page["reverse-backs"] === true,
+          (on) => {
+            if (on) page["reverse-backs"] = true;
+            else delete page["reverse-backs"];
+            save();
+          },
+        ),
       ),
       () => page["reverse-backs"] === true,
     ),
@@ -275,7 +279,7 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       v.mark(
         row(
           "Booklet",
-          toggle("One signature", page[FPS] === "booklet", (on) => {
+          switchInput("One signature", page[FPS] === "booklet", (on) => {
             if (on) page[FPS] = "booklet";
             else if (lastFolios !== undefined) page[FPS] = lastFolios;
             else delete page[FPS];
