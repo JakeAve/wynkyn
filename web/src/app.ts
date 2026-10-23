@@ -66,7 +66,6 @@ import {
 } from "./backend.ts";
 import {
   browserFolder,
-  canPickFolder,
   createBooksFolder,
   handleStore,
   importBooks,
@@ -803,7 +802,10 @@ const fetchManuscript = (
 
 // Without a server the app needs a folder: the author's own books/ (the File
 // System Access API, Chromium), or this browser's private storage. The choice
-// is remembered; "Library…" in the switcher forgets it.
+// is remembered; "Library…" in the switcher forgets it. The folder buttons
+// show in every browser: one without the API (Firefox, Safari, Brave until its
+// flag is on) fails the click with its own error, which is clearer than a
+// Welcome that hides the options.
 async function chooseLibrary(): Promise<BookStore> {
   const remembered = await rememberedFolder();
   const pref = localStorage.getItem("library");
@@ -835,8 +837,6 @@ async function chooseLibrary(): Promise<BookStore> {
         } else err.textContent = "The folder wasn't allowed.";
       };
     }
-    $("lib-pick").hidden = !canPickFolder();
-    $("lib-new").hidden = !canPickFolder();
     $("lib-new").onclick = () =>
       createBooksFolder().then((d) => done(handleStore(d), "folder"), fail);
     $("lib-pick").onclick = () =>
@@ -863,24 +863,6 @@ async function chooseLibrary(): Promise<BookStore> {
   });
 }
 
-// Without the File System Access API (Firefox, Safari) the app can't open
-// the author's folder, and Safari can't write browser storage from a page
-// either: say so once, before the Welcome, and point at the browsers that can.
-function browserNotice(): Promise<void> {
-  if (canPickFolder() || localStorage.getItem("browser-notice") === "1") {
-    return Promise.resolve();
-  }
-  const dlg = $("browser-notice") as HTMLDialogElement;
-  return new Promise((resolve) => {
-    dlg.onclose = () => {
-      localStorage.setItem("browser-notice", "1");
-      resolve();
-    };
-    $("browser-notice-close").onclick = () => dlg.close();
-    dlg.showModal();
-  });
-}
-
 // metadata.json written by a newer Wynkyn than this one: say so, keep going.
 // Unknown keys fall through to the renderer's defaults, nothing is dropped.
 function showSpecBanner(spec: string | undefined): void {
@@ -895,7 +877,6 @@ function showSpecBanner(spec: string | undefined): void {
 async function connect(): Promise<Backend> {
   if (await hasServer()) return httpBackend();
   const assets = localAssets();
-  await browserNotice();
   return localBackend(await chooseLibrary(), await assets);
 }
 

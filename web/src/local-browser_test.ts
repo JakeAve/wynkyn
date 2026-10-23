@@ -2,7 +2,7 @@
 // plain files, the book service running in the page over the browser's own
 // storage. Imports the fixture book, edits it, and finds the edit in storage
 // and again after a reload.
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { chromium } from "playwright";
 import { unzipSync } from "fflate";
 import { hasChrome } from "../../testing/chrome.ts";
@@ -101,7 +101,7 @@ Deno.test({
 
 Deno.test({
   name: "local library: a browser without the File System Access API " +
-    "gets the banner and no folder button",
+    "gets the same Welcome and the browser's own error on a folder button",
   ignore: !hasChrome || !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
@@ -113,12 +113,15 @@ Deno.test({
         delete (globalThis as any).showDirectoryPicker;
       });
       await page.goto(`http://localhost:${site.addr.port}/`);
-      // The notice comes first, on its own; the Welcome waits for it.
-      await page.locator("#browser-notice[open]").waitFor();
-      assertEquals(await page.locator("#library[open]").count(), 0);
-      await page.locator("#browser-notice-close").click();
       await page.locator("#library[open]").waitFor();
-      assertEquals(await page.locator("#lib-pick").isVisible(), false);
+      // No notice, nothing hidden: the click fails and says so.
+      assertEquals(await page.locator("#lib-pick").isVisible(), true);
+      await page.locator("#lib-pick").click();
+      await page.locator("#lib-err:not(:empty)").waitFor();
+      assertStringIncludes(
+        (await page.locator("#lib-err").textContent()) ?? "",
+        "showDirectoryPicker",
+      );
       // An empty library's Create dialog has a Back to the Welcome.
       await page.locator("#lib-browser").click();
       await page.locator("#create[open]").waitFor();
@@ -128,10 +131,8 @@ Deno.test({
         new URL("../../server/testdata/demo-book", import.meta.url).pathname,
       );
       await page.locator('#status[data-kind="saved"]').waitFor();
-      // Dismissed once, the notice stays away.
       await page.reload();
       await page.locator('#status[data-kind="saved"]').waitFor();
-      assertEquals(await page.locator("#browser-notice[open]").count(), 0);
     } finally {
       await browser.close();
       await site.shutdown();
