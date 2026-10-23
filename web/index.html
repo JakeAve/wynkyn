@@ -282,10 +282,9 @@
         <button id="create-folder" class="choice" hidden>Import from a folder
           <small>Copies the books in a Wynkyn folder into this
             browser.</small></button>
-        <button class="choice" disabled>Import from the web
-          <span class="pill">Coming soon</span>
-          <small>Project Gutenberg and most sites don’t allow a page to fetch
-            them. Download the file and import it instead.</small></button>
+        <button id="create-web" class="choice">Import from the web
+          <small>Paste the address of a Project Gutenberg book or a web page.
+            EPUB files: use Import a file.</small></button>
         <button id="create-blank" class="choice">Start blank
           <small>A title page and nothing else.</small></button>
       </div>
@@ -299,6 +298,31 @@
         <button id="create-cancel" class="btn" type="button"
           hidden>Cancel</button>
       </div>
+    </dialog>
+    <dialog id="web-dlg" class="ask" aria-labelledby="web-title">
+      <form id="web-form" method="dialog">
+        <h2 id="web-title" tabindex="-1" autofocus>Import from the web</h2>
+        <label class="field">Address
+          <input id="web-url" type="text" inputmode="url" required spellcheck="false"
+            autocomplete="off"
+            placeholder="https://www.gutenberg.org/ebooks/84">
+        </label>
+        <div id="web-paste-box" hidden>
+          <p class="hint"><span id="web-paste-hint"></span>
+            <a id="web-open" target="_blank" rel="noopener">Open in a new tab
+              ↗</a></p>
+          <label class="field">
+            <textarea id="web-paste" rows="4" placeholder="Paste here"
+              aria-label="Paste the page here"></textarea>
+          </label>
+        </div>
+        <div class="ask-foot">
+          <span id="web-err" class="sw-err"></span>
+          <button id="web-back" class="btn" type="button">← Back</button>
+          <button id="web-fetch" class="btn primary"
+            type="submit">Fetch</button>
+        </div>
+      </form>
     </dialog>
     <dialog id="title-dlg" class="ask" aria-labelledby="title-dlg-title">
       <form id="title-form" method="dialog">

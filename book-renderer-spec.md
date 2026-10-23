@@ -2220,6 +2220,15 @@ text, Markdown, HTML), _Import from the web_ (a Project Gutenberg book, a shared
 Google Doc, a web page), _Start blank_. The book switcher's _New manuscript…_
 opens the same dialog once a library has books.
 
+**Import from the web.** One address field and _Fetch_. The page fetches the
+address itself when the site lets a web page read it (Standard Ebooks,
+Wikisource). When it doesn't (Project Gutenberg, the Internet Archive) the same
+dialog shows the paste step: open the address in a new tab (a Gutenberg link
+opens as its plain-text file), select all, copy, and paste into the box; the
+paste imports at once. The clipboard's HTML is used when it has paragraphs or
+headings, else its plain text. EPUB is file-only. The title dialog shows the
+address and the manuscript's summary comment names it.
+
 **Choose a book title.** One dialog for all three. Imports show their source
 (file name and size, or the address) above the title field and prefill the title
 from the file's metadata, falling back to the file name; blank starts empty. The
@@ -2263,9 +2272,8 @@ twelve shallow ones makes the shallow ones parts; for text, "Chapter N" or `#`
 or standalone ALL-CAPS lines, whichever fires at least twice. Title and author
 from EPUB metadata, DOCX `core.xml` or the Gutenberg header lines. No new
 dependencies except deno-dom for the CLI's HTML parsing (Deno has no
-`DOMParser`). gutenberg.org sends no CORS headers, so web import in the browser
-waits for a proxy on the sync server; until then the CLI fetches and the browser
-takes a file. PDF is out: export to Word or text first.
+`DOMParser`). Web import in the browser is fetch-or-paste in the page, so it
+needs no server. PDF is out: export to Word or text first.
 
 ---
 

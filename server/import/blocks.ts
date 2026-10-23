@@ -17,6 +17,7 @@ export type Block =
 
 export interface Source {
   name: string; // the file's name, for the summary comment
+  from?: string; // the web address it came from, when it came from one
   title?: string;
   author?: string;
   year?: string;
@@ -25,6 +26,11 @@ export interface Source {
   blocks: Block[];
   images: Record<string, Uint8Array>; // by the `src` the image blocks use
 }
+
+/** The eBook number in a gutenberg.org address or identifier, if any. */
+export const gutenbergNumber = (u: string): string | undefined =>
+  u.match(/gutenberg\.org\/(?:(?:ebooks|etext|cache\/epub|files)\/)?(\d+)/)
+    ?.[1];
 
 /** Literal braces must not read as sentinels. */
 export const esc = (t: string): string => t.replace(/\{/g, "\\{");

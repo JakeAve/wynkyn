@@ -105,7 +105,8 @@ mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
   a book from a .txt/.md/.html/.epub: `server/import/` reads it into blocks,
   finds the chapters, writes `manuscript.md` in the house shape with `%% check:`
   notes (spec §7.9). The browser app runs the same code from Create a new
-  manuscript; `--force` re-imports over an existing manuscript
+  manuscript, on a file or a web address fetched or pasted; `--force` re-imports
+  over an existing manuscript
 - `deno task bml check <book>` parse diagnostics as `file:line: msg`; exit 1 on
   any — run after every manuscript edit
 - `deno task bml render <book> [out] [--edition e]` standalone HTML (default

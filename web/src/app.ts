@@ -73,6 +73,12 @@ import {
 } from "./fs-store.ts";
 import type { BookStore } from "../../server/store.ts";
 import { importSource } from "../../server/import/mod.ts";
+import {
+  fetchSource,
+  openUrl,
+  pasteSource,
+  type WebSource,
+} from "./web-source.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 
@@ -1218,7 +1224,8 @@ function installShortcuts(
 }
 
 // ---- Create a new manuscript (spec §7.9) ------------------------------------
-// Import a file, or start blank; both ask for a title, then open the book.
+// Import a file or a web page, or start blank; all ask for a title, then open
+// the book.
 // `cancelable` is false for an empty library; there Back returns to the
 // Welcome (no server only: with one, the library is the server's folder).
 function createManuscript(cancelable: boolean): void {
@@ -1249,26 +1256,21 @@ function createManuscript(cancelable: boolean): void {
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
-    try {
-      err.textContent = "Reading…";
-      const r = importSource(
-        file.name,
-        new Uint8Array(await file.arrayBuffer()),
-      );
-      err.textContent = "";
-      dlg.close();
-      const got = await askTitle(
-        r.title,
-        `${file.name} · ${sizeLabel(file.size)}`,
-        "Import",
-      );
-      if (!got) return createManuscript(cancelable);
-      await backend.importBook(got.slug, r);
-      location.href = editionHref(got.slug, null);
-    } catch (e) {
-      err.textContent = brief(e);
-      if (!dlg.open) dlg.showModal();
-    }
+    err.textContent = "Reading…";
+    await importPicked(
+      {
+        name: file.name,
+        bytes: file.arrayBuffer().then((b) => new Uint8Array(b)),
+      },
+      `${file.name} · ${sizeLabel(file.size)}`,
+      cancelable,
+    );
+  };
+  $("create-web").onclick = async () => {
+    dlg.close();
+    const src = await askWebSource();
+    if (!src) return createManuscript(cancelable);
+    await importPicked(src, src.label, cancelable);
   };
   // A browser-storage library can copy books in from a Wynkyn folder on
   // disk: the way in for a browser that can't open the folder itself.
@@ -1305,6 +1307,31 @@ function createManuscript(cancelable: boolean): void {
     }
   };
   dlg.showModal();
+}
+
+/** The one import step for a file, a fetched page or a pasted one: read it,
+ *  ask for a title under `label`, write the book and open it. Errors go back
+ *  to the create dialog. */
+async function importPicked(
+  src: { name: string; bytes: Uint8Array | Promise<Uint8Array>; from?: string },
+  label: string,
+  cancelable: boolean,
+): Promise<void> {
+  const dlg = $("create") as HTMLDialogElement;
+  const err = $("create-err");
+  try {
+    const bytes = await src.bytes;
+    const r = importSource(src.name, bytes, { from: src.from });
+    err.textContent = "";
+    dlg.close();
+    const got = await askTitle(r.title, label, "Import");
+    if (!got) return createManuscript(cancelable);
+    await backend.importBook(got.slug, r);
+    location.href = editionHref(got.slug, null);
+  } catch (e) {
+    err.textContent = brief(e);
+    if (!dlg.open) dlg.showModal();
+  }
 }
 
 const sizeLabel = (bytes: number) =>
@@ -1355,6 +1382,72 @@ function askTitle(
     dlg.showModal();
     input.focus();
     input.select();
+  });
+}
+
+/** The web dialog: an address to fetch, or, when the site blocks that, the
+ *  page pasted from a new tab. The source plus its title-dialog line, or null
+ *  for Back. */
+function askWebSource(): Promise<(WebSource & { label: string }) | null> {
+  const dlg = $("web-dlg") as HTMLDialogElement;
+  const url = $("web-url") as HTMLInputElement;
+  const box = $("web-paste-box");
+  const open = $("web-open") as HTMLAnchorElement;
+  const paste = $("web-paste") as HTMLTextAreaElement;
+  const err = $("web-err");
+  $("web-paste-hint").textContent =
+    `That site doesn’t let a web page read it. Open it in a new tab, select all (${
+      chordLabel("Mod-A")
+    }), copy (${chordLabel("Mod-C")}), and paste it here.`;
+  box.hidden = true;
+  err.textContent = "";
+  url.oninput = () => {
+    box.hidden = true;
+  };
+  return new Promise((resolve) => {
+    const finish = (src: WebSource | null, label = "") => {
+      dlg.close();
+      resolve(
+        src && { ...src, label: `${label} · ${sizeLabel(src.bytes.length)}` },
+      );
+    };
+    $("web-back").onclick = () => finish(null);
+    dlg.oncancel = (e) => {
+      e.preventDefault();
+      finish(null);
+    };
+    ($("web-form") as HTMLFormElement).onsubmit = async (e) => {
+      e.preventDefault();
+      const addr = url.value.trim();
+      url.value = addr.includes("://") ? addr : `https://${addr}`;
+      const fetchBtn = $("web-fetch") as HTMLButtonElement;
+      fetchBtn.disabled = true; // Enter does nothing while the default button is off
+      err.textContent = "Fetching…";
+      try {
+        finish(await fetchSource(url.value), url.value);
+      } catch (e) {
+        if (!(e instanceof TypeError)) { // not CORS, offline or a bad host
+          err.textContent = brief(e);
+          return;
+        }
+        err.textContent = "";
+        open.href = openUrl(url.value);
+        box.hidden = false;
+        paste.focus();
+      } finally {
+        fetchBtn.disabled = false;
+      }
+    };
+    paste.onpaste = (e) => {
+      e.preventDefault();
+      const src = e.clipboardData && pasteSource(e.clipboardData, url.value);
+      if (!src) {
+        err.textContent = "Nothing to paste: copy the page first.";
+        return;
+      }
+      finish(src, `Pasted from ${src.from}`);
+    };
+    dlg.showModal();
   });
 }
 

@@ -1,7 +1,7 @@
 // server/import/mod.ts — one call from a file to a manuscript (spec §7.9).
 // Runtime-agnostic: bytes in, BML and image files out, so the CLI and the
 // browser app share it.
-import type { Source } from "./blocks.ts";
+import { gutenbergNumber, type Source } from "./blocks.ts";
 import { readEpub } from "./epub.ts";
 import { readHtml } from "./html.ts";
 import { readText } from "./text.ts";
@@ -37,9 +37,11 @@ export function readSource(name: string, bytes: Uint8Array): Source {
 export function importSource(
   name: string,
   bytes: Uint8Array,
-  opts: ImportOptions = {},
+  { from, ...opts }: ImportOptions & { from?: string } = {},
 ): ImportResult {
   const src = readSource(name, bytes);
+  src.from = from;
+  if (from) src.gutenberg ??= gutenbergNumber(from);
   const outline = structure(src, opts);
   const { manuscript, images } = emit(outline);
   return {

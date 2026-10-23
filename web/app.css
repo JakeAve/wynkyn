@@ -2290,17 +2290,22 @@ summary {
   color: var(--muted);
   font-size: 12px;
 }
-.ask .field input {
+.ask .field input,
+.ask .field textarea {
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg);
   font: var(--fs) system-ui, sans-serif;
+  resize: vertical;
 }
 .ask .hint {
   margin: 0;
   font-size: 12px;
+}
+.ask .hint a {
+  color: var(--fg);
 }
 #title-source {
   font-size: 12.5px;
