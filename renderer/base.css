@@ -85,6 +85,18 @@
 .bml .number {
   text-indent: 0;
 }
+/* Hyphenation is a book's choice (`body: { "hyphens": "auto" }`, spec §4.5);
+   display type never breaks, and no fragment shorter than three letters. */
+.bml {
+  hyphenate-limit-chars: 6 3 3;
+}
+.bml .title,
+.bml .subtitle,
+.bml .number,
+.bml .heading,
+.bml .subheading {
+  hyphens: manual;
+}
 /* A chapter opener must not strand at the foot of a page or column — matters
    once a book sets `chapter: { "break-before": "auto" }` and chapters run on. */
 :where(.bml .chapter) > .number,

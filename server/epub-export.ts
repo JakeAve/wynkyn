@@ -373,7 +373,7 @@ export async function epubBytes(
     css: b.baseCss + b.domCss,
     title: b.bookTitle,
     author: frontText(doc, "author"),
-    language: m.ebook?.language ?? "en",
+    language: m.ebook?.language ?? m.language ?? "en",
     identifier: m.ebook?.identifier ??
       await stableIdentifier(`${book}/${edition ?? ""}`),
     modified: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),

@@ -571,6 +571,50 @@ function extrasFor(
 
 // ---- Body text ----
 
+// The book's language (spec §4.2) picks the hyphenation rules and the EPUB's
+// dc:language. Any BCP 47 tag works; Other… takes one the list lacks.
+const LANGUAGES = [
+  { label: "English", value: "en" },
+  { label: "Spanish", value: "es" },
+  { label: "Portuguese", value: "pt" },
+  { label: "French", value: "fr" },
+  { label: "German", value: "de" },
+  { label: "Italian", value: "it" },
+  { label: "Dutch", value: "nl" },
+];
+
+function languageControl(ctx: PanelContext, v: View): HTMLElement {
+  const { meta } = ctx;
+  const cur = meta.language ?? meta.ebook?.language ?? "en";
+  const listed = LANGUAGES.some((l) => l.value === cur);
+  const code = el("input", "");
+  code.type = "text";
+  code.value = listed ? "" : cur;
+  code.placeholder = "e.g. ca";
+  code.setAttribute("aria-label", "Language code");
+  code.hidden = listed;
+  const set = (tag: string) => {
+    meta.language = tag;
+    v.changed("language");
+  };
+  code.onchange = () => {
+    const t = code.value.trim();
+    if (/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/.test(t)) set(t);
+    else code.value = meta.language ?? "";
+  };
+  const pick = select(
+    [...LANGUAGES, { label: "Other…", value: "" }],
+    listed ? cur : "",
+    (x) => {
+      code.hidden = x !== "";
+      if (x) set(x);
+      else code.focus();
+    },
+    "Language",
+  );
+  return el("span", "ctl", pick, code);
+}
+
 type Sep = "indent" | "space" | "both";
 const isZero = (x: string | undefined) => !x || parseFloat(x) === 0;
 
@@ -658,6 +702,20 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
         ),
       ),
       has(body, "text-align"),
+    ),
+    v.mark(
+      row(
+        "Hyphenation",
+        switchInput("Hyphenation", bp["hyphens"] === "auto", (on) => {
+          put(meta, body, "hyphens", on ? "auto" : "manual");
+          save();
+        }),
+      ),
+      has(body, "hyphens"),
+    ),
+    v.mark(
+      row("Language", languageControl(ctx, v)),
+      () => meta.language !== undefined,
     ),
   ], el("span", "from", "Every page"));
 
@@ -803,10 +861,14 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
     paragraphs,
     emphasis,
     footer(count, () => {
-      clear(meta, body, ["font-size", "line-height", "text-align"]);
+      clear(meta, body, ["font-size", "line-height", "text-align", "hyphens"]);
       clear(meta, para, paraControlled);
       clear(meta, em, emKeys);
       ctx.queueSave("elements");
+      if (meta.language !== undefined) {
+        delete meta.language;
+        ctx.queueSave("language");
+      }
       ctx.go({ tab: "parts", part: part.id });
     }),
   ];

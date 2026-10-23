@@ -424,7 +424,7 @@ function ebookSection(ctx: PanelContext): HTMLElement {
     el(
       "p",
       "hint",
-      "An EPUB reflows to the reader's screen: paper, signatures and page numbers do not apply. Notes go to the end of their chapter. Cover, language and identifier come from the ebook section of metadata.json.",
+      "An EPUB reflows to the reader's screen: paper, signatures and page numbers do not apply. Notes go to the end of their chapter. Its language is the one set in Body text; cover and identifier come from the ebook section of metadata.json.",
     ),
     status,
   ]);
