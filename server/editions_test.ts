@@ -92,7 +92,7 @@ Deno.test("listEditions: unnamed first with summary, then named editions sorted"
     {
       slug: null,
       name: "Standard",
-      summary: "5.5in × 8.5in · 2-up on letter · EB Garamond · 11pt",
+      summary: "5.5in × 8.5in · folio on letter · EB Garamond · 11pt",
       passages: 0,
     },
     {

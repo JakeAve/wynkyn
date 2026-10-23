@@ -19,7 +19,8 @@ stamps it on files without one; the app warns on a book newer than itself. The
 hosted site also serves `/llms.txt`, `/spec.md` and `/convert-manuscript.md` for
 agents helping an author (`scripts/build-site.ts`).
 
-Page setup lives in one `page` section: `size`, `margins`, `sheet`,
+Page setup lives in one `page` section: `size`, `margins`, `sheet`, `fold`
+(`folio`/`quarto`/`octavo`/`cut`/`leaves`; unset picks the most pages a sheet),
 `folios-per-signature` (a number or `"booklet"`), `duplex`, and for backs
 printed by hand `flip` and `reverse-backs`. The retired `print` section is
 folded into it on load (`metadata/upgrade.ts`), so older books still work and
@@ -112,7 +113,7 @@ mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
 - `deno task bml render <book> [out] [--edition e]` standalone HTML (default
   `books/<book>/render.html`, or `render.<e>.html`); open in a browser to
   paginate
-- `deno task bml export <book> [--edition e] [--proof] [--sheet S] [--folios N|booklet] [--duplex M]`
+- `deno task bml export <book> [--edition e] [--proof] [--sheet S] [--fold F] [--folios N|booklet] [--duplex M]`
   → `books/<book>/export/` (or `export/<e>/`): `book.pdf`, the sheet PDFs and
   `page-map.json` (the settled seed, keyed by a hash of the render's inputs, so
   a re-export of an unchanged book takes one pass); needs Google Chrome

@@ -5,11 +5,12 @@
 //   deno task bml new <slug>              → books/<slug>/ from templates/ (house-style metadata.json)
 //   deno task bml import <file> [--slug s] [--chapters auto|N|none] [--flat] [--prose] [--force] → books/<slug>/ from a .txt/.md/.html/.epub
 //   deno task bml edition <book> new <slug> [--from <edition>] → copy an edition under a new name
-//   deno task bml export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none]
+//   deno task bml export <book> [--edition e] [--sheet S] [--fold F] [--folios N|booklet] [--duplex short-edge|long-edge|none]
 //                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]
 //                                → exit 1 on pagination problems unless --force
 //   deno task bml epub <book> [--edition e] [--out dir] → books/<book>/export/book.epub
 import { parseArgs } from "@std/cli/parse-args";
+import type { Fold } from "./metadata/types.ts";
 import { buildBook, listBooks, NotFoundError } from "./server/pipeline.ts";
 import { toHtml } from "./server/export-html.ts";
 import {
@@ -42,6 +43,7 @@ if (import.meta.main) {
       "slug",
       "chapters",
       "sheet",
+      "fold",
       "duplex",
       "flip",
       "out",
@@ -217,6 +219,7 @@ if (import.meta.main) {
           : undefined,
         pages: a.pages !== undefined ? Number(a.pages) : undefined,
         sheet: a.sheet,
+        fold: a.fold as Fold | undefined, // validated by resolvePageSetup
         duplex: a.duplex as "short-edge" | "long-edge" | "none" | undefined,
         flip: a.flip as "short-edge" | "long-edge" | undefined,
         reverseBacks: a["reverse-backs"] || undefined, // absent: the page section's
@@ -265,7 +268,7 @@ if (import.meta.main) {
     }
   } else {
     console.error(
-      "usage: bml list | new <slug> | import <file> [--slug s] [--chapters auto|N|none] [--flat] [--prose] [--force] | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--folios N|booklet] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force] | epub <book> [--edition e] [--out dir]",
+      "usage: bml list | new <slug> | import <file> [--slug s] [--chapters auto|N|none] [--flat] [--prose] [--force] | edition <book> new <slug> [--from e] | check <book> | render <book> [out.html] [--edition e] | export <book> [--edition e] [--sheet S] [--fold folio|quarto|octavo|cut|leaves] [--folios N|booklet] [--duplex short-edge|long-edge|none] [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force] | epub <book> [--edition e] [--out dir]",
     );
     Deno.exit(2);
   }

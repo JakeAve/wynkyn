@@ -81,15 +81,84 @@ Deno.test("resolvePageSetup derives the whole imposition", () => {
     duplex: "long-edge",
   });
   assertEquals(s.error, null);
-  assertEquals([s.nUp, s.cols, s.rows], [4, 2, 2]); // quartered: cut once, fold twice
+  assertEquals([s.nUp, s.cols, s.rows], [4, 2, 2]); // quartered
+  assertEquals([s.fold, s.autoFold], ["quarto", true]); // folded twice, no cut
   assertEquals(s.landscape, false); // both sides halved, so the sheet prints portrait
   assertEquals(s.foliosPerSheet, 2);
-  assertEquals(s.cutsPerSheet, 1);
+  assertEquals(s.cutsPerSheet, 0);
   assertEquals(s.sheetsPerSignature, 2);
   assertEquals(s.pagesPerSignature, 16);
   assertEquals(s.duplex, "long-edge");
   assertEquals(s.slackAcross, 0);
   assertEquals(s.slackDown, 0);
+});
+
+Deno.test("fold: auto picks the most pages per sheet, a true fold on a tie", () => {
+  const pick = (size: string, sheet = "legal") => {
+    const s = resolvePageSetup({ size, sheet });
+    return s.error ?? `${s.fold} ${s.cols}×${s.rows}`;
+  };
+  assertEquals(pick("3.5in 4.25in"), "octavo 4×2"); // an eighth of legal
+  assertEquals(pick("4.25in 7in"), "quarto 2×2");
+  assertEquals(pick("5.25in 8in"), "folio 2×1"); // same sheet as cut 2×1
+  assertEquals(pick("3.5in 8.5in"), "cut 4×1"); // strips: no true fold gets 4
+  // Configured folds keep their own grid, and say when they do not fit.
+  const cut = resolvePageSetup({
+    size: "4.25in 7in",
+    sheet: "legal",
+    fold: "cut",
+  });
+  assertEquals([cut.fold, cut.autoFold, cut.cutsPerSheet], ["cut", false, 1]);
+  const big = resolvePageSetup({
+    size: "5in 8in",
+    sheet: "legal",
+    fold: "quarto",
+  });
+  assertEquals(
+    big.error,
+    "a 5×8in page does not fit a quarto of a 8.5×14in sheet",
+  );
+  assertEquals(
+    resolvePageSetup({ fold: "sideways" as never }).error?.startsWith(
+      "fold must be",
+    ),
+    true,
+  );
+});
+
+Deno.test("fold: true folds round signatures up to whole sheets", () => {
+  const s = resolvePageSetup({
+    size: "3.5in 4.25in",
+    sheet: "legal",
+    "folios-per-signature": 3,
+  });
+  assertEquals([s.fold, s.folios, s.sheetsPerSignature], ["octavo", 4, 1]);
+  const booklet = resolvePageSetup(
+    { size: "4.25in 7in", sheet: "legal", "folios-per-signature": "booklet" },
+    { pageCount: 20 },
+  );
+  assertEquals([booklet.folios, booklet.sheetsPerSignature], [6, 3]); // 5 → 6
+});
+
+Deno.test("fold: loose leaves tile any number across, one leaf per page pair", () => {
+  const s = resolvePageSetup(
+    { size: "4.25in 7in", sheet: "legal", fold: "leaves" },
+    { pageCount: 30 },
+  );
+  assertEquals([s.cols, s.rows, s.foliosPerSheet, s.cutsPerSheet], [
+    2,
+    2,
+    0,
+    3,
+  ]);
+  assertEquals(s.sheetsPerSignature, 4); // 15 leaves, 4 a sheet
+  // An odd count across is fine when nothing folds: 3 × 1 on legal.
+  const odd = resolvePageSetup({
+    size: "4.5in 8in",
+    sheet: "legal",
+    fold: "leaves",
+  });
+  assertEquals([odd.cols, odd.rows], [3, 1]);
 });
 
 Deno.test("resolvePageSetup still lays strips out in one landscape row", () => {
@@ -148,6 +217,8 @@ Deno.test("resolvePageSetup never throws; every bad input names itself", () => {
 Deno.test("describePageSetup stays short on a broken setup", () => {
   const ok = resolvePageSetup({ size: "3.5in 8.5in", sheet: "legal" });
   assertEquals(describePageSetup(ok), "3.5in × 8.5in · 4-up on legal");
+  const quarto = resolvePageSetup({ size: "4.25in 7in", sheet: "legal" });
+  assertEquals(describePageSetup(quarto), "4.25in × 7in · quarto on legal");
   const tooBig = resolvePageSetup({ size: "6in 9in", sheet: "letter" });
   assertEquals(
     describePageSetup(tooBig),

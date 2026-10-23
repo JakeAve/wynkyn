@@ -2,7 +2,7 @@
 // the sheet it prints on, and everything the two together imply. Pure and
 // dependency-free (no Deno APIs) so the config panel and the print exporter
 // share one source of truth for this geometry.
-import type { Duplex, PageConfig } from "./types.ts";
+import type { Duplex, Fold, PageConfig } from "./types.ts";
 
 export interface Dims {
   w: number;
@@ -110,41 +110,112 @@ export function fmtDims(d: Dims): string {
 }
 
 export interface Grid {
-  cols: number; // book pages across a sheet side; always even (2 per folio)
-  rows: number; // rows of pages down the sheet, one folio per pair per row
+  cols: number; // book pages across a sheet side; even for every fold but leaves
+  rows: number; // rows of pages down the sheet
   sheet: Dims; // the sheet in the orientation this grid lays out
 }
 
 const EPS = 1e-9; // "11/5.5" style exact fits must count
 
-function gridIn(sheet: Dims, page: Dims): Grid | null {
+function gridIn(sheet: Dims, page: Dims, even = true): Grid | null {
   const across = Math.floor(sheet.w / page.w + EPS);
-  const cols = across - (across % 2); // odd pages can't be folded into folios
+  const cols = even ? across - (across % 2) : across; // a folio takes two
   const rows = Math.floor(sheet.h / page.h + EPS);
-  if (cols < 2 || rows < 1) return null;
+  if (cols < (even ? 2 : 1) || rows < 1) return null;
   return { cols, rows, sheet };
 }
 
-/**
- * How book pages tile one side of a sheet (§7.7): `cols` across by `rows` down,
- * in whichever sheet orientation fits more of them. Null when two pages do not
- * fit either way.
- *
- * A row of pages is cut apart and each pair folded down its center, so rows > 1
- * means a horizontal cut before folding — the folds themselves stay vertical
- * and parallel to the spine, which is what §8 rules out changing.
- */
-export function gridFor(sheet: Dims, page: Dims): Grid | null {
+// The grid in whichever sheet orientation fits more pages. Ties go to the
+// single-row landscape layout: fewer cuts, and it keeps every setup that
+// predates 2-D grids laid out exactly as it was.
+function bestGrid(sheet: Dims, page: Dims, even: boolean): Grid | null {
   const long = Math.max(sheet.w, sheet.h);
   const short = Math.min(sheet.w, sheet.h);
-  const landscape = gridIn({ w: long, h: short }, page);
-  const portrait = gridIn({ w: short, h: long }, page);
+  const landscape = gridIn({ w: long, h: short }, page, even);
+  const portrait = gridIn({ w: short, h: long }, page, even);
   if (!landscape) return portrait;
   if (!portrait) return landscape;
-  // Ties go to the single-row landscape layout: fewer cuts, and it keeps every
-  // setup that predates 2-D grids laid out exactly as it was.
   const gain = portrait.cols * portrait.rows - landscape.cols * landscape.rows;
   return gain > 0 ? portrait : landscape;
+}
+
+/**
+ * How book pages tile one side of a sheet that is cut before folding (§7.7,
+ * fold "cut"): `cols` across by `rows` down, in whichever sheet orientation
+ * fits more of them. Null when two pages do not fit either way.
+ *
+ * A row of pages is cut apart and each pair folded down its center, so rows > 1
+ * means a horizontal cut before folding.
+ */
+export function gridFor(sheet: Dims, page: Dims): Grid | null {
+  return bestGrid(sheet, page, true);
+}
+
+/**
+ * The folds that make a whole sheet into one gathering (§7.7), in order. Each
+ * halves the paper: "v" takes the left half back behind the right, "h" the top
+ * half back behind the bottom. The last is always "v", the spine. `cols` ×
+ * `rows` is the grid of pages the folds divide the sheet into, laid out with
+ * the sheet's long side across when `landscape`.
+ */
+export const TRUE_FOLDS = {
+  folio: { cols: 2, rows: 1, landscape: true, folds: ["v"] },
+  quarto: { cols: 2, rows: 2, landscape: false, folds: ["h", "v"] },
+  octavo: { cols: 4, rows: 2, landscape: true, folds: ["v", "h", "v"] },
+} as const satisfies Record<
+  string,
+  {
+    cols: number;
+    rows: number;
+    landscape: boolean;
+    folds: readonly ("v" | "h")[];
+  }
+>;
+
+export type TrueFold = keyof typeof TRUE_FOLDS;
+export const isTrueFold = (f: Fold): f is TrueFold => f in TRUE_FOLDS;
+
+export const FOLD_VALUES: readonly Fold[] = [
+  "folio",
+  "quarto",
+  "octavo",
+  "cut",
+  "leaves",
+];
+
+/** The grid a fold prints `page` in on `sheet`, or null when it does not fit. */
+export function gridForFold(fold: Fold, sheet: Dims, page: Dims): Grid | null {
+  if (fold === "cut") return gridFor(sheet, page);
+  if (fold === "leaves") return bestGrid(sheet, page, false);
+  const f = TRUE_FOLDS[fold];
+  const long = Math.max(sheet.w, sheet.h);
+  const short = Math.min(sheet.w, sheet.h);
+  const oriented = f.landscape ? { w: long, h: short } : { w: short, h: long };
+  // Folding halves the paper, so each page gets an equal cell of the sheet.
+  const fits = page.w <= oriented.w / f.cols + EPS &&
+    page.h <= oriented.h / f.rows + EPS;
+  return fits ? { cols: f.cols, rows: f.rows, sheet: oriented } : null;
+}
+
+/**
+ * With no fold set: the one that puts the most pages on a sheet, a true fold
+ * winning a tie with cut-then-fold (a quartered sheet folds as a real quarto).
+ * Loose leaves are never picked; they are a binding choice, not a geometry.
+ */
+export function autoFold(
+  sheet: Dims,
+  page: Dims,
+): { fold: Fold; grid: Grid } | null {
+  let best: { fold: Fold; grid: Grid } | null = null;
+  for (const fold of ["octavo", "quarto", "folio", "cut"] as const) {
+    const grid = gridForFold(fold, sheet, page);
+    if (
+      grid && (!best || grid.cols * grid.rows > best.grid.cols * best.grid.rows)
+    ) {
+      best = { fold, grid };
+    }
+  }
+  return best;
 }
 
 /** True when `grid` lays the sheet out with its long side across. */
@@ -189,17 +260,19 @@ interface PageSetupCommon {
   // Configured values, with §4.3's defaults applied.
   size: string;
   sheet: string;
-  folios: number; // a booklet's is its page count ÷ 4, rounded up
+  folios: number; // a booklet's is its page count ÷ 4; true folds round up to whole sheets
   booklet: boolean; // every page in one signature
+  fold: Fold; // the fold in use: the configured one, or autoFold's pick
+  autoFold: boolean; // no fold configured; `fold` is the pick
   duplex: Duplex;
   unit: Unit;
   // Derived. All zero when the setup is unusable — callers show `error` instead.
   nUp: number; // book pages on one sheet side = cols × rows
   cols: number; // pages across the sheet
-  rows: number; // rows of pages down it; > 1 means a cut before folding
+  rows: number; // rows of pages down it
   landscape: boolean; // whether the sheet prints with its long side across
-  foliosPerSheet: number;
-  cutsPerSheet: number;
+  foliosPerSheet: number; // 0 for loose leaves
+  cutsPerSheet: number; // before folding; a true fold has none (it is slit after)
   sheetsPerSignature: number;
   pagesPerSignature: number;
   slackAcross: number; // inches of sheet left over across the printed width
@@ -242,8 +315,9 @@ export function resolvePageSetup(
     size?: string;
     sheet?: string;
     folios?: number | "booklet";
+    fold?: Fold;
     duplex?: Duplex;
-    pageCount?: number; // sizes a booklet; until it is known a booklet is 1 folio
+    pageCount?: number; // sizes a booklet and loose leaves; until known, one sheet's worth
   } = {},
 ): PageSetup {
   const size = overrides.size ?? page?.size ?? DEFAULT_SIZE;
@@ -251,9 +325,10 @@ export function resolvePageSetup(
   const setting = overrides.folios ?? page?.["folios-per-signature"] ??
     DEFAULT_FOLIOS;
   const booklet = setting === "booklet";
-  const folios = booklet
+  let folios = booklet
     ? Math.max(1, Math.ceil((overrides.pageCount ?? 0) / 4))
     : setting;
+  const configuredFold = overrides.fold ?? page?.fold;
   const duplex = overrides.duplex ?? page?.duplex ?? DEFAULT_DUPLEX;
   const unit = unitOf(size);
   const pageDims = tryParseDims(size);
@@ -263,6 +338,8 @@ export function resolvePageSetup(
     sheet,
     folios,
     booklet,
+    fold: configuredFold ?? "cut",
+    autoFold: configuredFold === undefined,
     duplex,
     unit,
     page: pageDims,
@@ -282,31 +359,74 @@ export function resolvePageSetup(
       `duplex must be short-edge, long-edge, or none (got "${duplex}")`,
     );
   }
-  const grid = gridFor(sheetDims, pageDims);
-  if (!grid) {
+  if (configuredFold !== undefined && !FOLD_VALUES.includes(configuredFold)) {
     return fail(
-      `a ${fmtDims(pageDims)} page does not fit two-up on a ${
-        fmtDims(sheetDims)
-      } sheet`,
+      `fold must be ${FOLD_VALUES.join(", ")} (got "${configuredFold}")`,
     );
   }
+  const picked = configuredFold === undefined
+    ? autoFold(sheetDims, pageDims)
+    : (() => {
+      const grid = gridForFold(configuredFold, sheetDims, pageDims);
+      return grid && { fold: configuredFold, grid };
+    })();
+  if (!picked) {
+    return fail(
+      configuredFold === undefined || configuredFold === "cut"
+        ? `a ${fmtDims(pageDims)} page does not fit two-up on a ${
+          fmtDims(sheetDims)
+        } sheet`
+        : configuredFold === "leaves"
+        ? `a ${fmtDims(pageDims)} page does not fit on a ${
+          fmtDims(sheetDims)
+        } sheet`
+        : `a ${fmtDims(pageDims)} page does not fit ${
+          configuredFold === "octavo" ? "an" : "a"
+        } ${configuredFold} of a ${fmtDims(sheetDims)} sheet`,
+    );
+  }
+  const { fold, grid } = picked;
   const { cols, rows } = grid;
-  // One folio per column pair per row. The cut count is the same whichever way
-  // the pieces are separated: (rows − 1) across plus rows × (cols/2 − 1) down.
-  const foliosPerSheet = rows * (cols / 2);
+  const nUp = cols * rows;
+  let foliosPerSheet = nUp / 2; // one folio per page pair
+  let sheetsPerSignature: number;
+  let pagesPerSignature: number;
+  let cutsPerSheet: number;
+  if (fold === "leaves") {
+    // No folios: every page pair is its own leaf, cut and stacked.
+    foliosPerSheet = 0;
+    const leaves = Math.ceil((overrides.pageCount || 2 * nUp) / 2);
+    sheetsPerSignature = Math.ceil(leaves / nUp);
+    pagesPerSignature = 2 * nUp * sheetsPerSignature;
+    cutsPerSheet = nUp - 1;
+  } else if (isTrueFold(fold)) {
+    // A folded sheet nests whole: round the signature up to whole sheets.
+    folios = Math.ceil(folios / foliosPerSheet) * foliosPerSheet;
+    sheetsPerSignature = folios / foliosPerSheet;
+    pagesPerSignature = folios * 4;
+    cutsPerSheet = 0;
+  } else {
+    // The cut count is the same whichever way the pieces are separated:
+    // (rows − 1) across plus rows × (cols/2 − 1) down.
+    sheetsPerSignature = Math.ceil(folios / foliosPerSheet);
+    pagesPerSignature = folios * 4;
+    cutsPerSheet = foliosPerSheet - 1;
+  }
   return {
     ...base,
+    folios,
+    fold,
     page: pageDims, // re-stated so the `error: null` branch keeps non-null dims
     sheetDims,
     error: null,
-    nUp: cols * rows,
+    nUp,
     cols,
     rows,
     landscape: isLandscape(grid),
     foliosPerSheet,
-    cutsPerSheet: foliosPerSheet - 1,
-    sheetsPerSignature: Math.ceil(folios / foliosPerSheet),
-    pagesPerSignature: folios * 4,
+    cutsPerSheet,
+    sheetsPerSignature,
+    pagesPerSignature,
     slackAcross: grid.sheet.w - cols * pageDims.w,
     slackDown: grid.sheet.h - rows * pageDims.h,
   };
@@ -320,5 +440,7 @@ export function describePageSetup(s: PageSetup): string {
   const size = s.size.replace(" ", " × ");
   if (s.page === null) return `${size} · unrecognized page size`;
   if (s.error !== null) return `${size} · will not print on ${s.sheet}`;
+  if (isTrueFold(s.fold)) return `${size} · ${s.fold} on ${s.sheet}`;
+  if (s.fold === "leaves") return `${size} · ${s.nUp}-up leaves on ${s.sheet}`;
   return `${size} · ${s.nUp}-up on ${s.sheet}`;
 }

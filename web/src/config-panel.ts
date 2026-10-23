@@ -63,6 +63,7 @@ const GROUPS: Array<[BookPart["group"], string]> = [
 const PUBLISH: Array<[string, Array<[string, string]>]> = [
   ["Binding", [
     ["sheet", "Paper"],
+    ["fold", "Folding"],
     ["folios-per-signature", "Signatures"],
     ["print", "Print"],
   ]],
