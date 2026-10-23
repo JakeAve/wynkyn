@@ -552,7 +552,6 @@ function installSwitcher(): void {
       note.textContent = `Books in the “${dir?.name}” folder on this device.`;
     });
   }
-  $("library-open").hidden = backend.kind !== "local";
   $("library-open").onclick = () => {
     localStorage.removeItem("library");
     location.href = "/";
