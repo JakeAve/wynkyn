@@ -9,8 +9,6 @@ import type { Dims, Side } from "../../server/imposition.ts";
 export interface SheetLayout {
   sheet: Dims; // inches, oriented as the grid lays it out
   page: Dims;
-  cols: number;
-  rows: number;
 }
 
 export function printSheets(
@@ -22,9 +20,6 @@ export function printSheets(
   const layer = document.createElement("div");
   layer.id = "print-sheets";
   const { w: W, h: H } = geom.sheet;
-  const { w: pw, h: ph } = geom.page;
-  const x0 = (W - geom.cols * pw) / 2; // centred, as buildSheetPdf lays it out
-  const y0 = (H - geom.rows * ph) / 2;
   for (const side of sides) {
     const sheet = document.createElement("div");
     // pagedjs_pages: Paged.js's own rules (split-element guards) key on it.
@@ -33,16 +28,16 @@ export function printSheets(
     sheet.style.setProperty("width", `${W}in`, "important");
     sheet.style.setProperty("height", `${H}in`, "important");
     sheet.setAttribute("aria-label", side.label);
-    side.slots.forEach((slot, i) => {
-      if (slot.page === null) return;
+    for (const slot of side.slots) {
+      if (slot.page === null) continue;
       const src = pages[slot.page];
       if (!src) throw new Error(`the preview has no page ${slot.page + 1}`);
       const clone = src.cloneNode(true) as HTMLElement;
-      clone.style.left = `${x0 + (i % geom.cols) * pw}in`;
-      clone.style.top = `${y0 + Math.floor(i / geom.cols) * ph}in`;
+      clone.style.left = `${slot.x}in`; // where impose() put it, as the PDFs do
+      clone.style.top = `${slot.y}in`;
       if (slot.rotate) clone.style.transform = "rotate(180deg)";
       sheet.append(clone);
-    });
+    }
     layer.append(sheet);
   }
   // Last in <head>, so it outranks the trim-size @page Paged.js wrote.

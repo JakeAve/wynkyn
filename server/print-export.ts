@@ -10,6 +10,7 @@ import {
 import {
   type Dims,
   type Flip,
+  type Fold,
   impose,
   type Imposition,
   type Side,
@@ -32,11 +33,8 @@ import {
 const PT = 72; // points per inch
 
 export interface SheetGeometry {
-  sheet: Dims;
+  sheet: Dims; // oriented as the grid lays it out
   page: Dims;
-  nUp: number; // pages per sheet side; cols × rows
-  cols: number;
-  rows: number;
 }
 
 export { type Side, sidesFor };
@@ -58,8 +56,6 @@ export async function buildSheetPdf(
   const H = geom.sheet.h * PT;
   const pw = geom.page.w * PT;
   const ph = geom.page.h * PT;
-  const x0 = (W - geom.cols * pw) / 2; // grid of pages centred on the sheet
-  const y0 = (H - geom.rows * ph) / 2;
 
   let embedded: PDFEmbeddedPage[] = [];
   if (source) {
@@ -67,10 +63,10 @@ export async function buildSheetPdf(
     embedded = await out.embedPdf(src, src.getPageIndices());
   }
 
-  const drawSlot = (page: PDFPage, slot: Slot, i: number, label: string) => {
-    // Slots arrive row-major; PDF y grows upward, so row 0 is the top one.
-    const x = x0 + (i % geom.cols) * pw;
-    const y = y0 + (geom.rows - 1 - Math.floor(i / geom.cols)) * ph;
+  const drawSlot = (page: PDFPage, slot: Slot, label: string) => {
+    // Where impose() put it; PDF y grows upward from the bottom edge.
+    const x = slot.x * PT;
+    const y = H - slot.y * PT - ph;
     // pdf-lib rotates about (x, y); a 180° turn needs the opposite corner as origin.
     const at = slot.rotate === 180
       ? { x: x + pw, y: y + ph, rotate: degrees(180) }
@@ -117,13 +113,14 @@ export async function buildSheetPdf(
 
   for (const side of sides) {
     const page = out.addPage([W, H]);
-    side.slots.forEach((slot, i) => drawSlot(page, slot, i, side.label));
+    for (const slot of side.slots) drawSlot(page, slot, side.label);
   }
   return await out.save();
 }
 
 export interface ExportOptions {
   folios?: number | "booklet";
+  fold?: Fold;
   sheet?: string;
   duplex?: Flip | "none";
   flip?: Flip; // default: the page section's, then short-edge
@@ -208,6 +205,7 @@ export async function exportBook(
   // spend a Chrome render on it.
   const overrides = {
     sheet: opts.sheet,
+    fold: opts.fold,
     folios: opts.folios,
     duplex: opts.duplex,
   };
@@ -279,15 +277,20 @@ export async function exportBook(
     }
   }
 
-  // A booklet is sized by the pages it turned out to have.
-  if (setup.booklet) {
-    const sized = resolvePageSetup(m.page, { ...overrides, pageCount });
-    if (sized.error === null) setup = sized;
-  }
+  // Settle the setup on the pages the render actually made: their size picks
+  // the fold when none is set, and their count sizes a booklet.
+  const settled = resolvePageSetup(m.page, {
+    ...overrides,
+    size: `${page.w}in ${page.h}in`,
+    pageCount,
+  });
+  if (settled.error !== null) throw new Error(settled.error);
+  setup = settled;
   const { folios } = setup;
   const reverseBacks = opts.reverseBacks ?? m.page?.["reverse-backs"] ?? false;
   const imposition = impose(pageCount, {
     folios,
+    fold: setup.fold,
     sheet,
     page,
     duplex,
@@ -297,9 +300,6 @@ export async function exportBook(
   const geom: SheetGeometry = {
     sheet: imposition.sheet, // oriented by the grid, not by `sheet` as parsed
     page,
-    nUp: imposition.nUp,
-    cols: imposition.cols,
-    rows: imposition.rows,
   };
   if (duplex === "none") {
     for (
@@ -340,11 +340,14 @@ export async function exportBook(
 
 export function formatSummary(book: string, s: ExportSummary): string {
   const i = s.imposition;
-  const { folios, sheet, duplex } = s.setup;
-  const lines = [
-    `${book}: ${s.pageCount} pages → ${i.paddedCount} padded · ${i.signatures} signature${
+  const { folios, sheet, duplex, fold } = s.setup;
+  const binding = fold === "leaves"
+    ? `loose leaves, ${i.nUp}-up`
+    : `${i.signatures} signature${
       i.signatures === 1 ? "" : "s"
-    } × ${folios} folios · ${i.nUp}-up on ${sheet} · ${i.sheets.length} sheets · duplex ${duplex}`,
+    } × ${folios} folios · ${fold === "cut" ? `cut, ${i.nUp}-up` : fold}`;
+  const lines = [
+    `${book}: ${s.pageCount} pages → ${i.paddedCount} padded · ${binding} on ${sheet} · ${i.sheets.length} sheets · duplex ${duplex}`,
   ];
   if (i.wastedFolioSlots > 0) {
     lines.push(

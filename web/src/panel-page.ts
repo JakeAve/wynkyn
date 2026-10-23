@@ -6,7 +6,7 @@
 // the first signature drawn as it prints into the sheet view (R7), and printing
 // from this browser. Both write the `page` section; Publish reads the trim size
 // the Page tab set and links back to it.
-import type { Duplex, Flip, PageConfig } from "../../metadata/types.ts";
+import type { Duplex, Flip, Fold, PageConfig } from "../../metadata/types.ts";
 import {
   DEFAULT_SIZE,
   fmtLength,
@@ -37,8 +37,21 @@ import {
   sidesFor,
   type Slot,
 } from "../../server/imposition.ts";
-import type { PageSetup } from "../../metadata/page-setup.ts";
+import {
+  FOLD_VALUES,
+  isTrueFold,
+  type PageSetup,
+  TRUE_FOLDS,
+} from "../../metadata/page-setup.ts";
 import { printSheets } from "./print.ts";
+
+const FOLD_LABELS: Record<Fold, string> = {
+  folio: "Folio",
+  quarto: "Quarto",
+  octavo: "Octavo",
+  cut: "Cut, then fold",
+  leaves: "Loose leaves",
+};
 
 const MARGINS = [
   ["top", "Top"],
@@ -168,11 +181,15 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
     const setup = resolvePageSetup(page, { pageCount: pages || undefined });
     showSetup(setup, pages, readout);
     drawSignature(ctx, setup, pages, page.flip ?? "short-edge", ctx.sheetView);
+    // Auto names what it picked; loose leaves have no signatures to set.
+    foldSel.options[0]!.text = setup.error === null
+      ? `Auto: ${FOLD_LABELS[setup.fold].toLowerCase()}`
+      : "Auto";
+    signatures.hidden = setup.error === null && setup.fold === "leaves";
   };
   const v = makeView(ctx, redraw);
   const save = () => v.changed("page");
   ctx.onPages(redraw);
-  redraw();
 
   // Printing the backs by hand: how the stack goes back in.
   const manual = [
@@ -269,6 +286,37 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
   };
   showManual();
 
+  const foldSel = select(
+    [
+      { label: "Auto", value: "" },
+      ...FOLD_VALUES.map((f) => ({ label: FOLD_LABELS[f], value: f })),
+    ],
+    page.fold ?? "",
+    (f) => {
+      if (f) page.fold = f as Fold;
+      else delete page.fold;
+      save();
+    },
+    "Fold",
+  );
+  const signatures = section("Signatures", "folios-per-signature", [
+    v.mark(
+      row(
+        "Booklet",
+        switchInput("One signature", page[FPS] === "booklet", (on) => {
+          if (on) page[FPS] = "booklet";
+          else if (lastFolios !== undefined) page[FPS] = lastFolios;
+          else delete page[FPS];
+          folioRow.hidden = on;
+          save();
+        }),
+      ),
+      () => page[FPS] === "booklet",
+    ),
+    folioRow,
+  ]);
+  redraw();
+
   return [
     section("Paper", "sheet", [
       pageSizeRow(ctx, page),
@@ -283,23 +331,11 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
         () => !!page.sheet,
       ),
     ]),
-    section("Signatures", "folios-per-signature", [
-      v.mark(
-        row(
-          "Booklet",
-          switchInput("One signature", page[FPS] === "booklet", (on) => {
-            if (on) page[FPS] = "booklet";
-            else if (lastFolios !== undefined) page[FPS] = lastFolios;
-            else delete page[FPS];
-            folioRow.hidden = on;
-            save();
-          }),
-        ),
-        () => page[FPS] === "booklet",
-      ),
-      folioRow,
+    section("Folding", "fold", [
+      v.mark(row("Fold", foldSel), () => page.fold !== undefined),
       readout,
     ]),
+    signatures,
     printing.sec,
     pagesSection(ctx),
     ebookSection(ctx),
@@ -317,6 +353,7 @@ function liveImposition(
 ): Imposition {
   return impose(pageCount || setup.pagesPerSignature, {
     folios: setup.folios,
+    fold: setup.fold,
     sheet: setup.sheetDims,
     page: setup.page,
     duplex: setup.duplex,
@@ -358,8 +395,6 @@ function printSection(
     printSheets(pages, sidesFor(imp, mode, page["reverse-backs"] === true), {
       sheet: imp.sheet,
       page: setup.page,
-      cols: imp.cols,
-      rows: imp.rows,
     });
   };
   const btn = (label: string, mode: "duplex" | "fronts" | "backs") => {
@@ -443,9 +478,9 @@ function pagesSection(ctx: PanelContext): HTMLElement {
     }
     const sides = pages.map((_, i) => ({
       label: `page ${i + 1}`,
-      slots: [{ page: i, rotate: 0 as const, folio: 0 }],
+      slots: [{ page: i, rotate: 0 as const, folio: 0, x: 0, y: 0 }],
     }));
-    printSheets(pages, sides, { sheet: size, page: size, cols: 1, rows: 1 });
+    printSheets(pages, sides, { sheet: size, page: size });
   };
   return section("PDF", "pdf", [
     el("div", "actions", btn),
@@ -508,43 +543,77 @@ function showSetup(
     line(setup.error);
     return;
   }
-  const folioWord = setup.foliosPerSheet === 1 ? "folio" : "folios";
-  const cuts = setup.cutsPerSheet === 0
-    ? "fold only, no cuts"
-    : `${setup.cutsPerSheet} cut${setup.cutsPerSheet === 1 ? "" : "s"}`;
-  // The grid only earns a mention once it has more than one row — that is
-  // where the sheet turns portrait and gets cut across before folding.
-  const grid = setup.rows === 1 ? "" : ` (${setup.cols} × ${setup.rows})`;
-  line(
-    `${setup.nUp}-up on ${setup.sheet}${grid}: ${setup.foliosPerSheet} ${folioWord} per sheet, ${cuts}`,
-  );
-  if (setup.rows > 1) {
+  const sheets = (n: number) => `${n} sheet${n === 1 ? "" : "s"}`;
+  if (isTrueFold(setup.fold)) {
+    const times = TRUE_FOLDS[setup.fold].folds.length;
     line(
-      `Sheet prints ${
-        setup.landscape ? "landscape" : "portrait"
-      }: cut across, then fold each piece down its center`,
+      `${FOLD_LABELS[setup.fold]} on ${setup.sheet}: folded ${
+        ["once", "twice", "three times"][times - 1]
+      }, ${2 * setup.nUp} pages a sheet, no cuts`,
     );
-  }
-  const sheets = `${setup.sheetsPerSignature} sheet${
-    setup.sheetsPerSignature === 1 ? "" : "s"
-  }`;
-  if (setup.booklet && !pageCount) {
-    line("Booklet: sized once the preview has paginated");
-  } else if (setup.booklet) {
+    if (times > 1) {
+      line(
+        `Slit the folds at the ${
+          times > 2 ? "head and fore edge" : "head"
+        } before sewing`,
+      );
+    }
+  } else if (setup.fold === "leaves") {
     line(
-      `Booklet: all ${pageCount} pages in one ${setup.folios}-folio signature, ${sheets}`,
+      `${setup.nUp}-up on ${setup.sheet}: ${setup.nUp} leaves a sheet, ${setup.cutsPerSheet} cut${
+        setup.cutsPerSheet === 1 ? "" : "s"
+      }, no folds`,
+    );
+    line(
+      pageCount
+        ? `${sheets(setup.sheetsPerSignature)} for ${pageCount} pages`
+        : "Sheets counted once the preview has paginated",
     );
   } else {
+    const folioWord = setup.foliosPerSheet === 1 ? "folio" : "folios";
+    const cuts = setup.cutsPerSheet === 0
+      ? "fold only, no cuts"
+      : `${setup.cutsPerSheet} cut${setup.cutsPerSheet === 1 ? "" : "s"}`;
+    // The grid only earns a mention once it has more than one row — that is
+    // where the sheet turns portrait and gets cut across before folding.
+    const grid = setup.rows === 1 ? "" : ` (${setup.cols} × ${setup.rows})`;
     line(
-      `${sheets} per ${setup.folios}-folio signature = ${setup.pagesPerSignature} book pages`,
+      `${setup.nUp}-up on ${setup.sheet}${grid}: ${setup.foliosPerSheet} ${folioWord} per sheet, ${cuts}`,
     );
+    if (setup.rows > 1) {
+      line(
+        `Sheet prints ${
+          setup.landscape ? "landscape" : "portrait"
+        }: cut across, then fold each piece down its center`,
+      );
+    }
+  }
+  if (setup.fold !== "leaves") {
+    const nested = isTrueFold(setup.fold) && setup.sheetsPerSignature > 1
+      ? " nested"
+      : "";
+    if (setup.booklet && !pageCount) {
+      line("Booklet: sized once the preview has paginated");
+    } else if (setup.booklet) {
+      line(
+        `Booklet: all ${pageCount} pages in one ${setup.folios}-folio signature, ${
+          sheets(setup.sheetsPerSignature)
+        }${nested}`,
+      );
+    } else {
+      line(
+        `${
+          sheets(setup.sheetsPerSignature)
+        }${nested} per ${setup.folios}-folio signature = ${setup.pagesPerSignature} book pages`,
+      );
+    }
   }
   const EPS = 5e-4;
   if (setup.slackAcross > EPS || setup.slackDown > EPS) {
     line(
       `Leftover paper: ${fmtLength(setup.slackAcross, setup.unit)} across, ${
         fmtLength(setup.slackDown, setup.unit)
-      } down, trimmed off after folding`,
+      } down, trimmed off${setup.fold === "leaves" ? "" : " after folding"}`,
     );
   } else {
     line("The page tiles the sheet exactly, nothing to trim off");
@@ -581,8 +650,28 @@ function drawSignature(
   const first = imp.sheets.filter((sh) => sh.signature === 0);
   const { w: W, h: H } = imp.sheet;
   const { w: pw, h: ph } = setup.page;
-  const x0 = (W - imp.cols * pw) / 2; // centred, as buildSheetPdf lays it out
-  const y0 = (H - imp.rows * ph) / 2;
+  const { origin: o, cell } = imp;
+  const folded = isTrueFold(imp.fold);
+  // Grid lines: a folded sheet folds at every cell edge; loose leaves cut at
+  // every one; a cut sheet folds each column pair and cuts the rest.
+  const lines: Array<
+    { cls: string; x1: number; y1: number; x2: number; y2: number }
+  > = [];
+  for (let c = 1; c < imp.cols; c++) {
+    const x = o.x + c * cell.w;
+    const cls = folded || (imp.fold === "cut" && c % 2) ? "fold" : "cut";
+    lines.push({ cls, x1: x, x2: x, y1: o.y, y2: o.y + imp.rows * cell.h });
+  }
+  for (let r = 1; r < imp.rows; r++) {
+    const y = o.y + r * cell.h;
+    lines.push({
+      cls: folded ? "fold" : "cut",
+      x1: o.x,
+      x2: o.x + imp.cols * cell.w,
+      y1: y,
+      y2: y,
+    });
+  }
   const side = (slots: Slot[], label: string) => {
     const s = svg("svg", {
       viewBox: `0 0 ${W} ${H}`,
@@ -591,47 +680,26 @@ function drawSignature(
         slots.map((t) => t.page === null ? "blank" : t.page + 1).join(", ")
       }`,
     }, svg("rect", { class: "paper", width: W, height: H }));
-    slots.forEach((slot, i) => {
-      const x = x0 + (i % imp.cols) * pw;
-      const y = y0 + Math.floor(i / imp.cols) * ph;
+    for (const slot of slots) {
       s.append(svg("rect", {
         class: slot.page === null ? "slot blank" : "slot",
-        x,
-        y,
+        x: slot.x,
+        y: slot.y,
         width: pw,
         height: ph,
       }));
-      if (slot.page === null) return;
-      const cx = x + pw / 2;
-      const cy = y + ph / 2;
+      if (slot.page === null) continue;
+      const cx = slot.x + pw / 2;
+      const cy = slot.y + ph / 2;
       s.append(svg("text", {
         x: cx,
         y: cy,
         "font-size": Math.min(pw, ph) * 0.4,
         transform: slot.rotate ? `rotate(180 ${cx} ${cy})` : "",
       }, String(slot.page + 1)));
-    });
-    for (let r = 0; r < imp.rows; r++) {
-      const y = y0 + r * ph;
-      for (let c = 1; c < imp.cols; c++) {
-        const x = x0 + c * pw;
-        s.append(svg("line", {
-          class: c % 2 ? "fold" : "cut",
-          x1: x,
-          x2: x,
-          y1: y,
-          y2: y + ph,
-        }));
-      }
-      if (r > 0) {
-        s.append(svg("line", {
-          class: "cut",
-          x1: x0,
-          x2: x0 + imp.cols * pw,
-          y1: y,
-          y2: y,
-        }));
-      }
+    }
+    for (const { cls, ...at } of lines) {
+      s.append(svg("line", { class: cls, ...at }));
     }
     return el("figure", "", s, el("figcaption", "", label));
   };
@@ -646,13 +714,28 @@ function drawSignature(
     )
   );
   const more = first.length - SHOWN_SHEETS;
+  const how = folded
+    ? `Fold ${
+      TRUE_FOLDS[imp.fold as keyof typeof TRUE_FOLDS].folds.map((f) =>
+        f === "v"
+          ? "the left half back behind the right"
+          : "the top half back behind the bottom"
+      ).join(", then ")
+    }, printed front facing you.${
+      imp.sheetsPerSignature > 1
+        ? " Nest each signature's folded sheets in order, sheet 1 outermost."
+        : ""
+    }`
+    : imp.fold === "leaves"
+    ? "Solid lines cut. Cut the stack and pile the pieces in reading order, top row first."
+    : setup.cutsPerSheet
+    ? "Dashed lines fold, solid lines cut."
+    : "Dashed lines fold.";
   const notes = [
     more > 0 ? `And ${more} more sheet${more === 1 ? "" : "s"}.` : "",
-    setup.cutsPerSheet
-      ? "Dashed lines fold, solid lines cut."
-      : "Dashed lines fold.",
-    first.some((sh) => sh.back.some((t) => t.rotate))
-      ? "Upside-down numbers print upside down, which is how the back lines up."
+    how,
+    first.some((sh) => [...sh.front, ...sh.back].some((t) => t.rotate))
+      ? "Upside-down numbers print upside down, which is how the sheet lines up."
       : "",
   ];
   host.append(el("p", "hint", notes.filter(Boolean).join(" ")));

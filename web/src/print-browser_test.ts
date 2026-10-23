@@ -49,6 +49,7 @@ Deno.test({
       if (setup.error !== null) throw new Error(setup.error);
       const imp = impose(n, {
         folios: setup.folios,
+        fold: setup.fold,
         sheet: setup.sheetDims,
         page: setup.page,
         duplex: setup.duplex,
