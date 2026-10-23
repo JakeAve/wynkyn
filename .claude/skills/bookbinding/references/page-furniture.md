@@ -7,7 +7,12 @@ dropped, following Chicago:
 
 - **Folio:** hidden on display pages (`pagedjs_display_page`: half title,
   title page, copyright, dedication, epigraph…) and on blank pages. Openers keep
-  theirs.
+  theirs unless `numbering.pages.openers` (the one override, added 2026-10-22
+  for the Gatsby deco edition) drops it (`show: false`) or moves it
+  (`position`): the page map then blanks `--folio` on the opener and writes the
+  number to `--folio-opener`, which the generator reads at the override's
+  boxes. `pageNumberingConfig` normalises a position equal to the book's to no
+  override so both sides agree.
 - **Running head:** body zone only, and never on a display, blank or opener
   page. On a body page a running head that shares a margin box with a top folio
   wins (it is emitted after the folio); the panel's hint says so
@@ -15,14 +20,14 @@ dropped, following Chicago:
 - **Numbering:** front matter roman, body arabic from 1, back matter continues
   the body count. `refText` carries the number even where `folioText` is empty.
 
-The Page furniture parts in the style panel show these as a read-only "Where
-they're dropped" list. Decision: keep them read-only until a real book needs
-an override. When one does, the likely shape is a per-part override (e.g.
-Chapter opener → "Running head: show"), read by `folios.js` when it computes
-`head` and `folioText`. The page map is the single source for folios, TOC
-numbers and running heads, so an override there changes all three
-consistently. Golden page maps (`testdata/*/page-map.json`) will move;
-regenerate with `UPDATE_GOLDEN=1 deno task test` and read the diff.
+The Page furniture parts in the style panel show the rest as a read-only
+"Where they're dropped" list. Decision: keep them read-only until a real book
+needs another override; the opener folio shows the shape (a key under
+`numbering.pages`, read by `folios.js` when it computes `folioText`, and by
+the generator for the boxes). The page map is the single source for folios,
+TOC numbers and running heads, so an override there changes all three
+consistently. Golden page maps (`testdata/*/page-map.json`) hold the digest
+(zones, anchors, blanks), so a furniture override alone does not move them.
 
 ## Anchoring to the text block
 

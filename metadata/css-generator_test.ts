@@ -155,6 +155,7 @@ Deno.test("pageNumberingConfig: per-zone style and show, defaulting to arabic/sh
     front: { style: "arabic", show: true },
     body: { style: "arabic", show: true },
     back: { style: "arabic", show: true },
+    openers: { show: true, position: null },
   });
   assertEquals(
     pageNumberingConfig({
@@ -170,6 +171,7 @@ Deno.test("pageNumberingConfig: per-zone style and show, defaulting to arabic/sh
       front: { style: "roman-lower", show: true },
       body: { style: "arabic", show: false },
       back: { style: "none", show: true },
+      openers: { show: true, position: null },
     },
   );
 });
@@ -213,6 +215,40 @@ Deno.test("running content vocabulary: page-number, none, literal (§4.8)", () =
   // Literals go through --running-off so the page map can blank them on
   // openers and blank pages; page-number is a folio and keeps showing.
   assertStringIncludes(css, 'content: var(--running-off, "· 1943 ·");');
+});
+
+Deno.test("opener folios: a drop folio gets its own box, the same box gets none (§4.7)", () => {
+  const dropped = generatePagedCSS({
+    numbering: {
+      pages: {
+        position: "top-outside",
+        openers: { position: "bottom-center" },
+        "back-matter": { show: false },
+      },
+    },
+  });
+  assertStringIncludes(
+    dropped,
+    "@page body {\n  @bottom-center {\n    content: var(--folio-opener);",
+  );
+  assertStringIncludes(dropped, "@page front:right {\n  @top-right {");
+  assert(!dropped.includes("@page back {")); // a hidden zone hides its openers
+  // Display pages blank the drop box too.
+  assertStringIncludes(dropped, "@page display {\n  @top-right {");
+  assertStringIncludes(dropped, "  @bottom-center {\n    content: none;");
+
+  // The opener position equal to the main one is no override at all.
+  const same = pageNumberingConfig({
+    numbering: {
+      pages: { openers: { position: "bottom-center", show: false } },
+    },
+  });
+  assertEquals(same.openers, { show: false, position: null });
+  assert(
+    !generatePagedCSS({
+      numbering: { pages: { openers: { position: "bottom-center" } } },
+    }).includes("--folio-opener"),
+  );
 });
 
 Deno.test("TOC and ref numbers are written by the page map, not CSS (§4.11)", () => {

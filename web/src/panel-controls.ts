@@ -235,6 +235,24 @@ export function toggle(
   return b;
 }
 
+// A switch: a checkbox drawn as a track and knob (app.css `.sw`). Its row
+// label names it, so the input itself carries only the aria-label.
+export function switchInput(
+  label: string,
+  on: boolean,
+  onChange: (on: boolean) => void,
+): HTMLInputElement {
+  const input = h("input", {
+    type: "checkbox",
+    role: "switch",
+    class: "sw",
+    "aria-label": label,
+  });
+  input.checked = on;
+  input.onchange = () => onChange(input.checked);
+  return input;
+}
+
 export function select(
   options: Array<{ label: string; value: string }>,
   value: string,

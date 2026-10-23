@@ -1,7 +1,8 @@
 // web/src/panel-furniture.ts — the Page furniture parts of the Book parts tab
 // (UX round 1): page numbers and running heads. Each has where it sits, its
-// gap from the text block (§4.7, §4.8), type, CSS, and the read-only Chicago
-// rules for the pages that drop it (renderer/folios.js).
+// gap from the text block (§4.7, §4.8), type, CSS, and the Chicago rules for
+// the pages that drop it (renderer/folios.js) — read-only except the opener
+// folio, which a book may drop or move (`numbering.pages.openers`).
 import type {
   CssProps,
   FolioPosition,
@@ -41,6 +42,7 @@ import {
   seg,
   select,
   stepper,
+  switchInput,
   toggle,
   type View,
 } from "./panel-controls.ts";
@@ -67,8 +69,8 @@ export function buildFurniture(
   return part === "folios" ? pageNumbers(ctx, v) : runningHeads(ctx, v);
 }
 
-// What the page map drops where (renderer/folios.js, Chicago). Read-only:
-// docs/todos/folio-drop-rules.md.
+// What the page map drops where (renderer/folios.js, Chicago). Read-only;
+// the one override, the opener folio, has its own section above.
 function dropped(rules: Array<[string, string]>): HTMLElement {
   return section("Where they're dropped", "dropped", [
     el(
@@ -242,6 +244,73 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
     },
   });
 
+  // Chapter and part openers (§4.7): the folio can be dropped (the switch) or
+  // moved, Chicago's drop folio. Both default to "as every other page".
+  const openers = () => live()?.openers;
+  const editOpeners = (
+    f: (o: NonNullable<NonNullable<typeof numbering.pages>["openers"]>) => void,
+  ) => {
+    const p = numbering.pages ??= {};
+    const o = p.openers ??= {};
+    f(o);
+    if (!Object.keys(o).length) delete p.openers;
+    tidy();
+    ctx.queueSave("numbering");
+  };
+  const whereRow = view.mark(
+    row(
+      "Where",
+      select(
+        [
+          { label: "Same as other pages", value: "" },
+          ...POSITIONS.map(([pos, , name]) => ({ label: name, value: pos })),
+        ],
+        openers()?.position ?? "",
+        (v) =>
+          editOpeners((o) => {
+            if (v) o.position = v as FolioPosition;
+            else delete o.position;
+          }),
+        "Where the page number sits on chapter and part openers",
+      ),
+      { hidden: openers()?.show === false },
+    ),
+    () => !!openers()?.position,
+  );
+  const openerHint = el("p", "hint");
+  const paintOpenerHint = () => {
+    const o = openers();
+    openerHint.textContent = o?.show === false
+      ? "Openers carry no running head and, here, no page number."
+      : o?.position
+      ? "A drop folio: the opener's number moves there, every other page keeps its place."
+      : "Openers carry no running head. Chicago keeps their number, or drops it, or sets it at the foot of the page.";
+  };
+  paintOpenerHint();
+  whereRow.addEventListener("change", paintOpenerHint);
+  const openerRows = [
+    view.mark(
+      row(
+        "Page number",
+        switchInput(
+          "Page number on chapter and part openers",
+          openers()?.show !== false,
+          (on) => {
+            editOpeners((o) => {
+              if (on) delete o.show;
+              else o.show = false;
+            });
+            whereRow.hidden = !on;
+            paintOpenerHint();
+          },
+        ),
+      ),
+      () => openers()?.show === false,
+    ),
+    whereRow,
+    openerHint,
+  ];
+
   const FOLIO = ["font-size", "font-family", "font-style"];
   const zones = ZONES.map(([zone, label]) => {
     const cfg = pages[zone] ?? {};
@@ -294,6 +363,7 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
       ),
     ]),
     section("Numerals", "numerals", zones),
+    section("Chapter and part openers", "openers", openerRows),
     section("Type", "type", [
       view.mark(
         row(
@@ -358,7 +428,6 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
         "Half title, title page, copyright and other display pages",
         "No number",
       ],
-      ["Chapter and part openers", "Keep their number"],
       ["Back matter", "Continues the body count"],
     ]),
   ];
