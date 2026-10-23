@@ -409,13 +409,22 @@ summary {
 #footer {
   color: var(--muted);
   border-top: 1px solid var(--line);
+  display: grid;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+#footer .foot {
   display: flex;
   align-items: center;
   gap: 18px;
   padding: 0 14px;
-  font-size: 12px;
-  white-space: nowrap;
+  min-width: 0;
   overflow: hidden;
+}
+.foot-gutter {
+  background: linear-gradient(var(--line), var(--line)) 50% 0 / 1px 100%
+    no-repeat;
 }
 /* the style at the cursor (app.ts followCursor): Write only */
 #style-here {
@@ -428,16 +437,12 @@ summary {
   margin-inline: -6px;
   cursor: pointer;
 }
-#style-here::after {
-  content: " →";
-  opacity: 0;
+#style-here span:last-child {
+  color: var(--fg);
 }
 #style-here:hover {
   color: var(--fg);
   background: var(--hover);
-}
-#style-here:hover::after {
-  opacity: 1;
 }
 :root:not([data-mode="write"]) #style-here {
   display: none;
@@ -504,8 +509,12 @@ summary {
 #panes {
   position: relative;
   display: grid;
-  grid-template-columns: var(--w-tree) 5px var(--w-editor) 5px minmax(0, 1fr);
   min-height: 0;
+}
+/* The footer mirrors these columns (below), so each column has its cell. */
+#panes,
+#footer {
+  grid-template-columns: var(--w-tree) 5px var(--w-editor) 5px minmax(0, 1fr);
 }
 .gutter {
   cursor: col-resize;
@@ -521,20 +530,25 @@ summary {
    changing, right is the result. The mode shows one element per column;
    display:none takes the others out of grid flow. The side toggles drop
    a column and its gutter. */
-#panes.tree-hidden {
+#panes.tree-hidden,
+#panes.tree-hidden ~ #footer {
   grid-template-columns: var(--w-editor) 5px minmax(0, 1fr);
 }
-#panes.pages-hidden {
+#panes.pages-hidden,
+#panes.pages-hidden ~ #footer {
   grid-template-columns: var(--w-tree) 5px minmax(0, 1fr);
 }
-#panes.tree-hidden.pages-hidden {
+#panes.tree-hidden.pages-hidden,
+#panes.tree-hidden.pages-hidden ~ #footer {
   grid-template-columns: minmax(0, 1fr);
 }
 :root[data-mode="write"] :is(#style-nav, #config-overlay, #sheet-view),
 :root[data-mode="style"] :is(#tree, #editor, #sheet-view),
 :root[data-mode="publish"] :is(#tree, #editor),
 #panes.tree-hidden :is(#tree, #style-nav, #gutter-tree),
-#panes.pages-hidden :is(#sheet-view, #gutter-editor) {
+#panes.pages-hidden :is(#sheet-view, #gutter-editor),
+#panes.tree-hidden ~ #footer :is(#foot-tree, #foot-gutter-tree),
+#panes.pages-hidden ~ #footer :is(#page-foot, #foot-gutter-pages) {
   display: none;
 }
 /* Hidden pages still lay out: Paged.js paginates by measuring, so the

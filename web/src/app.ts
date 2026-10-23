@@ -262,10 +262,10 @@ function followCursor(line: number): void {
   const btn = $("style-here") as HTMLButtonElement;
   btn.hidden = !entry;
   if (!entry) return;
-  btn.textContent = entry.label === "Everything"
+  btn.lastElementChild!.textContent = entry.label === "Everything"
     ? entry.group
     : `${entry.group} · ${entry.label}`;
-  btn.onclick = () => pickStyle(entry.key);
+  btn.onclick = () => goToStyle(entry.key);
 }
 
 // Follow the cursor: the node whose block contains the cursor line is current.
@@ -862,6 +862,30 @@ async function pickStyle(key: string): Promise<void> {
   (await ensureConfigPanel())?.selectStyle(key);
 }
 
+// The footer's Go to style: unlike a preview click, it leaves a history entry,
+// so Back returns to Write at the line the writer left (installHistory).
+async function goToStyle(key: string): Promise<void> {
+  clearTimeout(urlTimer);
+  const here = { book, edition, view, line: cursorLine, lib: libId };
+  history.replaceState(null, "", appHref({ ...here, mode: "write" }));
+  await pickStyle(key);
+  history.pushState(null, "", appHref({ ...here, view, mode: "style" }));
+}
+
+// Back and Forward between the entries goToStyle makes: the URL's mode, and
+// in Write its line.
+function installHistory(): void {
+  addEventListener("popstate", () => {
+    const m = MODES.find((m) =>
+      m === new URLSearchParams(location.search)
+        .get("mode")
+    ) ?? "write";
+    setMode(m);
+    const line = lineFromHash(location.hash);
+    if (m === "write" && line !== null) scrollEditorToLine(editor, line);
+  });
+}
+
 const fetchManuscript = (
   name: string,
 ): Promise<{ text: string; version: string }> => backend.manuscript(name);
@@ -1052,10 +1076,11 @@ async function refreshConfigFromRemote(): Promise<void> {
   }
 }
 
-// Draggable gutters: each one writes a CSS var on #panes that the grid
-// template reads, persisted so widths survive a reload.
+// Draggable gutters: each one writes a CSS var on :root that the grids of
+// #panes and #footer read, persisted so widths survive a reload.
 function installGutters(): void {
   const panes = $("panes");
+  const root = document.documentElement; // the footer reads the widths too
   for (
     const [id, cssVar, min] of [["gutter-tree", "--w-tree", 120], [
       "gutter-editor",
@@ -1064,7 +1089,7 @@ function installGutters(): void {
     ]] as const
   ) {
     const saved = localStorage.getItem(cssVar);
-    if (saved) panes.style.setProperty(cssVar, saved);
+    if (saved) root.style.setProperty(cssVar, saved);
     const gutter = $(id);
     gutter.onpointerdown = (e) => {
       e.preventDefault();
@@ -1076,7 +1101,7 @@ function installGutters(): void {
       gutter.onpointermove = (m) => {
         // Leave at least 200px for whatever pane sits to the right.
         const max = panes.getBoundingClientRect().right - left - 200;
-        panes.style.setProperty(
+        root.style.setProperty(
           cssVar,
           `${Math.min(Math.max(m.clientX - left, min), max)}px`,
         );
@@ -1084,7 +1109,7 @@ function installGutters(): void {
       gutter.onpointerup = () => {
         gutter.onpointermove = gutter.onpointerup = null;
         gutter.classList.remove("dragging");
-        localStorage.setItem(cssVar, panes.style.getPropertyValue(cssVar));
+        localStorage.setItem(cssVar, root.style.getPropertyValue(cssVar));
       };
     };
   }
@@ -1499,6 +1524,7 @@ async function main(): Promise<void> {
   if (jump !== null) scrollEditorToLine(editor, jump);
   installGutters();
   installThemeToggle();
+  installHistory();
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);

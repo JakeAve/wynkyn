@@ -191,14 +191,24 @@
       <div id="sheet-view"></div>
     </div>
     <div id="footer">
-      <span id="page-indicator"></span>
-      <button id="style-here" type="button" hidden
-        title="Open the style of the text at the cursor"></button>
-      <span id="diagnostics"></span>
-      <button id="import-notes" type="button" hidden
-        aria-expanded="false"></button>
-      <div id="import-notes-list" role="list" hidden></div>
-      <span id="page-problems"></span>
+      <!-- One cell per column of #panes: the writer's under the editor, the
+           pages' under the preview (app.css mirrors the grid). -->
+      <span id="foot-tree"></span>
+      <span id="foot-gutter-tree" class="foot-gutter"></span>
+      <div id="writer-foot" class="foot">
+        <button id="style-here" type="button" hidden
+          title="Open the style of the text at the cursor"><span
+            class="k">Go to style:</span> <span></span></button>
+        <span id="diagnostics"></span>
+        <button id="import-notes" type="button" hidden
+          aria-expanded="false"></button>
+        <div id="import-notes-list" role="list" hidden></div>
+      </div>
+      <span id="foot-gutter-pages" class="foot-gutter"></span>
+      <div id="page-foot" class="foot">
+        <span id="page-indicator"></span>
+        <span id="page-problems"></span>
+      </div>
     </div>
     <dialog id="switcher" aria-label="Books and editions">
       <div class="sw-books">

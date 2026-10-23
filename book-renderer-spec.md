@@ -1922,12 +1922,15 @@ CodeMirror 6 over plain BML text.
   `{break}`) stays visible so it can still be reached.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
-  view, so the writer sees where they are on the page. The footer names the
-  style that block belongs to ("Chapter · Title", "Body text · Paragraph", a
-  custom `{is}` name); clicking it opens that style in Style mode, the way a
-  preview click does (§7.4). The style is read from the enclosing matter type,
-  part or chapter, the enclosing block, and the field sentinel whose text runs
-  on to the line.
+  view, so the writer sees where they are on the page. The footer is split by
+  column: under the editor, the writer's cell (parse warnings, import notes, and
+  "Go to style:" naming the style that block belongs to — "Chapter · Title",
+  "Body text · Paragraph", a custom `{is}` name); under the pages, the page
+  count and page problems. Go to style opens that style in Style mode, the way a
+  preview click does (§7.4), and leaves a history entry, so Back returns to
+  Write with the cursor where it was. The style is read from the enclosing
+  matter type, part or chapter, the enclosing block, and the field sentinel
+  whose text runs on to the line.
 - Find and replace is a bar pinned to the top of the editor, in the chrome's
   colors: find and replace fields, match case / whole word / regex toggles, an
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"
@@ -1963,7 +1966,7 @@ editor cursor to its manuscript line (the nearest rendered block's `data-line`).
 Page furniture (page numbers, running heads) has no source line, so a click on
 it always opens its style, switching to Style. The hover outline shows only
 where a click would style: everything in Style, only furniture in Write. From
-the editor, the style named in the footer (§7.3) opens the same style the
+the editor, Go to style in the writer's footer (§7.3) opens the same style the
 preview click would for that block.
 
 The panel exposes the selector model already implicit in `elements`/`is` (§4.5,
