@@ -1,14 +1,15 @@
 // web/src/web-source.ts — a web page as an import source: fetched by address,
 // or pasted from the clipboard, into the `{ name, bytes, from }` import takes.
+import { gutenbergNumber } from "../../server/import/blocks.ts";
 
 export interface WebSource {
   name: string;
   bytes: Uint8Array;
-  from: string | null;
+  from: string;
 }
 
 export async function fetchSource(url: string): Promise<WebSource> {
-  const res = await fetch(url); // a TypeError here means blocked: see isBlocked
+  const res = await fetch(url); // a TypeError here means blocked (CORS, offline)
   if (!res.ok) {
     await res.body?.cancel();
     throw new Error(`${url}: ${res.status} ${res.statusText}`);
@@ -20,16 +21,13 @@ export async function fetchSource(url: string): Promise<WebSource> {
   };
 }
 
-/** CORS, offline and a bad host all reach `fetch`'s caller as a TypeError. */
-export const isBlocked = (e: unknown): boolean => e instanceof TypeError;
-
 /** The clipboard's HTML when it has paragraphs or headings; else its text
  *  (Chrome copies a plain-text page as one `<pre>`, which would read as verse). */
 export function pasteSource(
   data: { getData(type: string): string },
-  from: string | null,
+  from: string,
 ): WebSource | null {
-  const host = from && URL.canParse(from) ? new URL(from).host : "pasted";
+  const host = URL.canParse(from) ? new URL(from).host : "pasted";
   const html = data.getData("text/html");
   const [name, text] = /<(p|h[1-6])[\s>]/i.test(html)
     ? [`${host}.html`, `<!doctype html>\n${html}`]
@@ -41,10 +39,7 @@ export function pasteSource(
 /** A Gutenberg book page or download → its plain-text file, whose select-all
  *  copy keeps the header lines; any other address as is. */
 export function openUrl(url: string): string {
-  if (!URL.canParse(url)) return url;
-  const { hostname, pathname } = new URL(url);
-  if (!/^(www\.)?gutenberg\.org$/i.test(hostname)) return url;
-  const n = pathname.match(/^\/(?:ebooks|cache\/epub)\/(\d+)/)?.[1];
+  const n = gutenbergNumber(url);
   return n ? `https://www.gutenberg.org/cache/epub/${n}/pg${n}.txt` : url;
 }
 

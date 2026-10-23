@@ -27,6 +27,11 @@ export interface Source {
   images: Record<string, Uint8Array>; // by the `src` the image blocks use
 }
 
+/** The eBook number in a gutenberg.org address or identifier, if any. */
+export const gutenbergNumber = (u: string): string | undefined =>
+  u.match(/gutenberg\.org\/(?:(?:ebooks|etext|cache\/epub|files)\/)?(\d+)/)
+    ?.[1];
+
 /** Literal braces must not read as sentinels. */
 export const esc = (t: string): string => t.replace(/\{/g, "\\{");
 

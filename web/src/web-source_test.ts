@@ -22,14 +22,14 @@ Deno.test("pasteSource: a <pre>-only fragment falls back to the text", () => {
       "text/html": "<pre>Line one\nLine two</pre>",
       "text/plain": "Line one\nLine two",
     }),
-    null,
+    "not an address",
   );
   assertEquals(s?.name, "pasted.txt");
   assertEquals(text(s!.bytes), "Line one\nLine two");
 });
 
 Deno.test("pasteSource: null when both flavours are empty", () => {
-  assertEquals(pasteSource(clip({}), null), null);
+  assertEquals(pasteSource(clip({}), "https://x.test/"), null);
 });
 
 Deno.test("openUrl: Gutenberg pages map to the plain-text file", () => {

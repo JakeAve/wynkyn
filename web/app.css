@@ -2191,13 +2191,11 @@ summary {
   background: var(--bg);
   color: var(--fg);
   font: var(--fs) system-ui, sans-serif;
+  resize: vertical;
 }
 .ask .hint {
   margin: 0;
   font-size: 12px;
-}
-.ask .field textarea {
-  resize: vertical;
 }
 .ask .hint a {
   color: var(--fg);

@@ -77,7 +77,6 @@ import type { BookStore } from "../../server/store.ts";
 import { importSource } from "../../server/import/mod.ts";
 import {
   fetchSource,
-  isBlocked,
   openUrl,
   pasteSource,
   type WebSource,
@@ -1223,11 +1222,7 @@ function createManuscript(cancelable: boolean): void {
  *  ask for a title under `label`, write the book and open it. Errors go back
  *  to the create dialog. */
 async function importPicked(
-  src: {
-    name: string;
-    bytes: Uint8Array | Promise<Uint8Array>;
-    from?: string | null;
-  },
+  src: { name: string; bytes: Uint8Array | Promise<Uint8Array>; from?: string },
   label: string,
   cancelable: boolean,
 ): Promise<void> {
@@ -1235,9 +1230,7 @@ async function importPicked(
   const err = $("create-err");
   try {
     const bytes = await src.bytes;
-    const r = importSource(src.name, bytes, {
-      from: src.from ?? undefined,
-    });
+    const r = importSource(src.name, bytes, { from: src.from });
     err.textContent = "";
     dlg.close();
     const got = await askTitle(r.title, label, "Import");
@@ -1337,20 +1330,18 @@ function askWebSource(): Promise<(WebSource & { label: string }) | null> {
       const addr = url.value.trim();
       url.value = addr.includes("://") ? addr : `https://${addr}`;
       const fetchBtn = $("web-fetch") as HTMLButtonElement;
-      if (fetchBtn.disabled) return;
-      fetchBtn.disabled = true;
+      fetchBtn.disabled = true; // Enter does nothing while the default button is off
       err.textContent = "Fetching…";
       try {
         finish(await fetchSource(url.value), url.value);
       } catch (e) {
-        if (!isBlocked(e)) {
+        if (!(e instanceof TypeError)) { // not CORS, offline or a bad host
           err.textContent = brief(e);
           return;
         }
         err.textContent = "";
         open.href = openUrl(url.value);
         box.hidden = false;
-        paste.value = "";
         paste.focus();
       } finally {
         fetchBtn.disabled = false;
@@ -1363,7 +1354,7 @@ function askWebSource(): Promise<(WebSource & { label: string }) | null> {
         err.textContent = "Nothing to paste: copy the page first.";
         return;
       }
-      finish(src, src.from ? `Pasted from ${src.from}` : "Pasted text");
+      finish(src, `Pasted from ${src.from}`);
     };
     dlg.showModal();
   });
