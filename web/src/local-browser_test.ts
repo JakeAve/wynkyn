@@ -28,7 +28,8 @@ Deno.test({
         new URL("../../server/testdata/demo-book", import.meta.url).pathname,
       );
       await page.locator('#status[data-kind="saved"]').waitFor();
-      await page.locator("#preview .pagedjs_page").first().waitFor();
+      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
+        .first().waitFor();
       assert(
         (await page.locator("#preview").innerText()).includes("Chapter One"),
       );
@@ -193,7 +194,8 @@ Deno.test({
       await page.locator("#title-ok").click();
 
       await page.waitForURL(/book=tiny-book/);
-      await page.locator("#preview .pagedjs_page").first().waitFor();
+      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
+        .first().waitFor();
       const text = await page.locator("#editor .cm-content").innerText();
       assert(text.includes("{chapter: the-start}"), "the import landed");
       assert(text.includes("%% check:"), "guesses are flagged");
@@ -229,7 +231,8 @@ Deno.test({
       await page.locator("#title-input").fill("Second Book");
       await page.locator("#title-ok").click();
       await page.waitForURL(/book=second-book/);
-      await page.locator("#preview .pagedjs_page").first().waitFor();
+      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
+        .first().waitFor();
       assert(
         (await page.locator("#editor .cm-content").innerText()).includes(
           "Second Book",

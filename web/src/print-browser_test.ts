@@ -29,7 +29,9 @@ Deno.test({
         document.querySelector("#preview .pagedjs_page") &&
         !document.querySelector("#preview .preview-stage")
       );
-      const n = await page.locator("#preview .pagedjs_page").count();
+      const n = await page.locator(
+        "#preview > :not(.preview-stage) .pagedjs_page",
+      ).count();
       // The dialog never opens headless; the layer stays for page.pdf().
       await page.evaluate(() => {
         globalThis.print = () =>

@@ -88,13 +88,20 @@ const $ = (id: string) => document.getElementById(id)!;
 
 // Author-facing status in the toolbar: a glyph + a short phrase, so it clears
 // the mode switch; the detail goes in the tooltip. "Saved" says how long ago.
-type StatusKind = "connecting" | "saved" | "saving" | "error" | "offline";
+type StatusKind =
+  | "connecting"
+  | "saved"
+  | "saving"
+  | "error"
+  | "offline"
+  | "failed";
 const STATUS_TEXT: Record<StatusKind, string> = {
   connecting: "Connecting…",
   saved: "Saved",
   saving: "Saving…",
   error: "Not saved",
   offline: "Disconnected",
+  failed: "Couldn't load", // the app never got going; the title says why
 };
 let lastSaved: Date | null = null; // when a manuscript or metadata save last landed
 const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
@@ -155,6 +162,7 @@ let queuedMetaSections: Partial<Metadata> | null = null;
 function onDocChanged(text: string): void {
   dirty = true;
   setStatus("saving");
+  $("preview").dataset.stale = ""; // dimmed until the render catches up
   clearTimeout(parseTimer);
   parseTimer = setTimeout(() => reparse(text), PARSE_DEBOUNCE_MS);
   clearTimeout(saveTimer);
@@ -743,7 +751,10 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         sheetView: $("sheet-view"),
         metadata,
         saveSections: saveMetadataSections,
-        onEdit: () => setStatus("saving"),
+        onEdit: () => {
+          setStatus("saving");
+          $("preview").dataset.stale = "";
+        },
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
         exportPrint,
@@ -1389,6 +1400,7 @@ async function main(): Promise<void> {
       !diskOffer
     ) setStatus("saved");
     renderPreview(msg, previewEl, key).then((problems) => {
+      delete previewEl.dataset.stale;
       showPageProblems(problems);
       refreshPageIndicator();
       configPanel?.pagesChanged();
@@ -1404,4 +1416,5 @@ async function main(): Promise<void> {
   backend.subscribe(book, edition, clientId, onMessage, onClose);
 }
 
-main();
+// A boot that throws must say so, not sit on "Connecting…" for good.
+main().catch((err) => setStatus("failed", String(err)));
