@@ -618,15 +618,20 @@ summary {
   min-height: 0;
 }
 /* The text view (#text-view, app.ts installTextView): the writer's font and size on
-   #editor, a reading measure, centred once Pages is hidden. .cm-content
-   grows to the measure and the scroller centres what is left over. */
+   #editor, a reading measure, centred once Pages is hidden. Size goes on
+   .cm-content only, so line numbers stay put, and the measure is in rem, so
+   bigger text wraps sooner instead of widening the column. */
 #editor .cm-scroller {
   font-family: var(--ed-font, ui-serif, Georgia, serif);
-  font-size: var(--ed-fs, 16px);
   line-height: 1.6;
 }
+/* numbers sit on the text's line */
+#editor .cm-gutters {
+  line-height: calc(var(--ed-fs, 16px) * 1.6);
+}
 #editor .cm-content {
-  max-width: 36em; /* ~70 characters of serif prose */
+  font-size: var(--ed-fs, 16px);
+  max-width: 36rem; /* ~70 characters of 16px serif prose */
 }
 #panes.pages-hidden #editor .cm-scroller {
   justify-content: center;
@@ -656,6 +661,22 @@ summary {
 #text-view output {
   min-width: 2.6em;
   font-variant-numeric: tabular-nums;
+}
+#text-view .tv-step {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+#text-view .tv-step:hover {
+  background: var(--hover);
+  color: var(--fg);
 }
 #text-view .tv-hide {
   margin-left: auto;

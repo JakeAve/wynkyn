@@ -131,8 +131,12 @@
             <button type="button" role="radio" data-font="mono">Mono</button>
           </span>
           <label class="tv-size">
+            <button type="button" class="tv-step" data-step="-1"
+              aria-label="Smaller text">−</button>
             <input id="tv-size" type="range" min="12" max="24" step="1"
               aria-label="Text size">
+            <button type="button" class="tv-step" data-step="1"
+              aria-label="Larger text">+</button>
             <output for="tv-size"></output>
           </label>
           <label class="tv-hide"

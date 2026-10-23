@@ -57,7 +57,7 @@ Exceptions, which carry no heading: copyright, dedication, epigraph, colophon.
 | `[Illustration: Caption]` | `{illustration: caption-slug \| placement: full-page}` + caption line; file goes in `images/<slug>.<ext>` |
 | `[1]` … footnote text at chapter end | `word{footnote: slug}` inline, `{note: slug}` block after the paragraph |
 | Poem / verse / address | one line per line, `\` at end of each but the last |
-| Paragraph wrapped at ~70 cols | keep the wrapping as-is; blank line = paragraph |
+| Paragraph wrapped at ~70 cols | join it onto one line (the editor soft-wraps); blank line = paragraph |
 | Lines starting `-`, digit-dot, `%%`, `{` in prose | escape with leading `\` (§3.2.8) |
 
 Slugs: lowercase, hyphens, ≤3 words, unique across the book. Curly quotes and
