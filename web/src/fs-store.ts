@@ -183,24 +183,6 @@ export async function reopenFolder(
 export const browserFolder = (): Promise<FileSystemDirectoryHandle> =>
   navigator.storage.getDirectory();
 
-function idb<T>(
-  mode: IDBTransactionMode,
-  op: (s: IDBObjectStore) => IDBRequest<T>,
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const open = indexedDB.open("wynkyn", 1);
-    open.onupgradeneeded = () => open.result.createObjectStore("handles");
-    open.onerror = () => reject(open.error);
-    open.onsuccess = () => {
-      const tx = open.result.transaction("handles", mode);
-      const req = op(tx.objectStore("handles"));
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-      tx.oncomplete = () => open.result.close();
-    };
-  });
-}
-
 // Files picked with <input type="file" webkitdirectory>: every book is a
 // directory with a manuscript.md; its metadata, editions and images come
 // along, anything else is left behind. Returns the books written.
@@ -232,4 +214,22 @@ export async function importBooks(
     written.add(book);
   }
   return [...written].sort();
+}
+
+function idb<T>(
+  mode: IDBTransactionMode,
+  op: (s: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open("wynkyn", 1);
+    open.onupgradeneeded = () => open.result.createObjectStore("handles");
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const tx = open.result.transaction("handles", mode);
+      const req = op(tx.objectStore("handles"));
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => open.result.close();
+    };
+  });
 }

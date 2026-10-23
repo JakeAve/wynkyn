@@ -814,7 +814,7 @@ const fetchManuscript = (
 
 // Without a server the app needs a folder: the author's own books/ (the File
 // System Access API, Chromium), or this browser's private storage. The choice
-// is remembered; "Library…" in the switcher forgets it. The folder buttons
+// is remembered; "Change library…" in the switcher forgets it. The folder buttons
 // show in every browser: one without the API (Firefox, Safari, Brave until its
 // flag is on) fails the click with its own error rather than hiding the
 // options.
