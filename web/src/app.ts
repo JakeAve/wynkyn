@@ -1141,6 +1141,7 @@ function installTextView(): void {
   const apply = () => {
     ed.style.setProperty("--ed-font", TEXT_FONTS[prefs.font] ?? null);
     ed.style.setProperty("--ed-fs", `${prefs.size}px`);
+    editor.requestMeasure(); // a CSS-only size change: re-align line numbers
     for (const b of fonts) {
       b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));
     }
@@ -1164,6 +1165,14 @@ function installTextView(): void {
     prefs.size = Number(size.value);
     apply();
   };
+  for (const b of $("text-view").querySelectorAll<HTMLElement>("[data-step]")) {
+    b.onclick = (e) => {
+      e.preventDefault(); // inside the label: don't also focus the slider
+      size.stepUp(Number(b.dataset.step)); // clamps to the slider's min/max
+      prefs.size = Number(size.value);
+      apply();
+    };
+  }
   hide.onchange = () => {
     prefs.hide = hide.checked;
     apply();
