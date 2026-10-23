@@ -1696,8 +1696,8 @@ optional.
   `urn:uuid` derived from the book slug and edition, the same on every export,
   so a reader's library sees a re-export as the same book. Set an ISBN urn here
   to publish through a store.
-- `language` — BCP 47 tag for `dc:language` and the documents' `lang`. Falls
-  back to the top-level `language` (§4.2), then `"en"`.
+- `language` — the older spelling of the top-level `language` (§4.2), read only
+  when that is unset.
 - `cover` — an image slug in `images/`. Becomes the package's cover image and
   the first page of the spine.
 

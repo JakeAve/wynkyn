@@ -865,10 +865,8 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
       clear(meta, para, paraControlled);
       clear(meta, em, emKeys);
       ctx.queueSave("elements");
-      if (meta.language !== undefined) {
-        delete meta.language;
-        ctx.queueSave("language");
-      }
+      delete meta.language;
+      ctx.queueSave("language");
       ctx.go({ tab: "parts", part: part.id });
     }),
   ];
