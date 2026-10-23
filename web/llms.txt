@@ -48,6 +48,10 @@ A new book starts from the house style: /templates/metadata.json
   "add an epigraph" is a BML edit.
 - Every section with a heading needs its `{title}` sentinel; a bare first line
   leaves the contents page and running heads empty.
+- Keep each paragraph on one line and let the editor wrap it; a blank line
+  separates paragraphs. Join hard-wrapped source text rather than keeping its
+  line breaks. Verse keeps one line per line, with `\` at the end of each but
+  the last.
 - After editing `manuscript.md`, the editor's lint gutter in the app shows
   parse diagnostics; aim for zero.
 - Source: https://github.com/JakeAve/wynkyn (Deno; `deno task bml check <book>`
