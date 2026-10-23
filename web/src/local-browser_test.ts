@@ -298,7 +298,7 @@ Deno.test({
           },
         }));
       await page.route("https://blocked.example/**", (r) => r.abort());
-      await page.goto(`http://localhost:${site.addr.port}/`);
+      await page.goto(`http://localhost:${site.addr.port}/app/`);
       await page.locator("#library[open]").waitFor();
       await page.locator("#lib-browser").click();
       await page.locator("#create[open]").waitFor();
