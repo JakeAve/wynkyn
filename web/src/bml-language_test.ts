@@ -5,7 +5,9 @@ import {
   bmlToken,
   classifyLines,
   emRanges,
+  hiddenLines,
   structuralBlock,
+  styleKeysAt,
 } from "./bml-language.ts";
 
 // Run the tokenizer over one line, collecting [style, consumedText] pairs.
@@ -101,8 +103,60 @@ Deno.test("classifyLines: structural, fields, and the line after a title", () =>
       "",
       "Prose.",
     ]),
-    [["struct"], ["field"], ["strong"], ["field"], ["italic"], [], [], []],
+    [
+      ["struct"],
+      ["field"],
+      ["strong"],
+      ["field"],
+      ["italic"],
+      ["field"],
+      [],
+      [],
+    ],
   );
+});
+
+Deno.test("styleKeysAt: struct, field text, block prose, bare prose", () => {
+  const lines = [
+    "{matter: title-page}",
+    "{title}",
+    "The Book",
+    "{author}",
+    "A. Writer",
+    "",
+    "{chapter: one}",
+    "{title}",
+    "One",
+    "",
+    "Prose.",
+    "{epigraph}",
+    "Words.",
+    "{attribution}",
+    "— Someone",
+    "{/epigraph}",
+    "{is: letter}",
+    "Dear",
+    "{/is: letter}",
+    "{heading}",
+    "A head",
+    "{illustration: fig}",
+    "Caption",
+    "{break}",
+  ];
+  const at = (n: number) => styleKeysAt(lines, n);
+  assertEquals(at(1), ["title-page"]);
+  assertEquals(at(3), ["title-page.title", "title-page"]);
+  assertEquals(at(5), ["title-page.author", "title-page"]);
+  assertEquals(at(6), ["title-page"]); // blank prose on a matter page
+  assertEquals(at(7), ["chapter"]);
+  assertEquals(at(9), ["chapter.title", "chapter"]);
+  assertEquals(at(11), ["paragraph"]);
+  assertEquals(at(13), ["epigraph.text", "epigraph"]);
+  assertEquals(at(15), ["epigraph.attribution", "epigraph"]);
+  assertEquals(at(18), ["is.letter"]);
+  assertEquals(at(21), ["heading"]);
+  assertEquals(at(23), ["illustration.caption", "illustration"]);
+  assertEquals(at(24), ["break"]);
 });
 
 Deno.test("classifyLines: block rails run tag to tag, or to EOF unclosed", () => {
@@ -142,4 +196,25 @@ Deno.test("structuralBlock: from the structural line at or above to before the n
   assertEquals(structuralBlock(at, lines.length, 2), [2, 4]);
   assertEquals(structuralBlock(at, lines.length, 1), [1, 1]);
   assertEquals(structuralBlock(at, lines.length, 6), [5, 6]);
+});
+
+Deno.test("hiddenLines: field lines beside prose, not landmarks or the cursor's paragraph", () => {
+  const lines = [
+    "{chapter: one}", // 0 structural: kept
+    "{title}", // 1 hidden
+    "Marley's Ghost",
+    "",
+    "{illustration: a}", // 4 alone, no prose: kept
+    "",
+    "{quote}", // 6 hidden
+    "Words.",
+    "{/quote}", // 8 hidden
+    "",
+    "{dropcap}", // 10 the cursor's paragraph: kept
+    "MARLEY was dead.",
+  ];
+  assertEquals(hiddenLines(lines, 11), [1, 6, 8]);
+  assertEquals(hiddenLines(lines, 2), [6, 8, 10]);
+  // On a blank line nothing is revealed.
+  assertEquals(hiddenLines(lines, 3), [1, 6, 8, 10]);
 });

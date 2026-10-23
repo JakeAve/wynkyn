@@ -46,6 +46,7 @@
   --radius: 6px;
   --fs: 13.5px;
   --fs-sm: 11px;
+  --mono: ui-monospace, Menlo, monospace;
   /* Pane widths — dragged by the gutters, persisted in localStorage. */
   --w-tree: 230px;
   --w-editor: clamp(380px, 36%, 600px);
@@ -408,13 +409,43 @@ summary {
 #footer {
   color: var(--muted);
   border-top: 1px solid var(--line);
+  display: grid;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+#footer .foot {
   display: flex;
   align-items: center;
   gap: 18px;
   padding: 0 14px;
-  font-size: 12px;
-  white-space: nowrap;
+  min-width: 0;
   overflow: hidden;
+}
+.foot-gutter {
+  background: linear-gradient(var(--line), var(--line)) 50% 0 / 1px 100%
+    no-repeat;
+}
+/* the style at the cursor (app.ts followCursor): Write only */
+#style-here {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 2px 6px;
+  margin-inline: -6px;
+  cursor: pointer;
+}
+#style-here span:last-child {
+  color: var(--fg);
+}
+#style-here:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+:root:not([data-mode="write"]) #style-here {
+  display: none;
 }
 #diagnostics {
   color: var(--warn);
@@ -478,8 +509,12 @@ summary {
 #panes {
   position: relative;
   display: grid;
-  grid-template-columns: var(--w-tree) 5px var(--w-editor) 5px minmax(0, 1fr);
   min-height: 0;
+}
+/* The footer mirrors these columns (below), so each column has its cell. */
+#panes,
+#footer {
+  grid-template-columns: var(--w-tree) 5px var(--w-editor) 5px minmax(0, 1fr);
 }
 .gutter {
   cursor: col-resize;
@@ -495,20 +530,25 @@ summary {
    changing, right is the result. The mode shows one element per column;
    display:none takes the others out of grid flow. The side toggles drop
    a column and its gutter. */
-#panes.tree-hidden {
+#panes.tree-hidden,
+#panes.tree-hidden ~ #footer {
   grid-template-columns: var(--w-editor) 5px minmax(0, 1fr);
 }
-#panes.pages-hidden {
+#panes.pages-hidden,
+#panes.pages-hidden ~ #footer {
   grid-template-columns: var(--w-tree) 5px minmax(0, 1fr);
 }
-#panes.tree-hidden.pages-hidden {
+#panes.tree-hidden.pages-hidden,
+#panes.tree-hidden.pages-hidden ~ #footer {
   grid-template-columns: minmax(0, 1fr);
 }
 :root[data-mode="write"] :is(#style-nav, #config-overlay, #sheet-view),
 :root[data-mode="style"] :is(#tree, #editor, #sheet-view),
 :root[data-mode="publish"] :is(#tree, #editor),
 #panes.tree-hidden :is(#tree, #style-nav, #gutter-tree),
-#panes.pages-hidden :is(#sheet-view, #gutter-editor) {
+#panes.pages-hidden :is(#sheet-view, #gutter-editor),
+#panes.tree-hidden ~ #footer :is(#foot-tree, #foot-gutter-tree),
+#panes.pages-hidden ~ #footer :is(#page-foot, #foot-gutter-pages) {
   display: none;
 }
 /* Hidden pages still lay out: Paged.js paginates by measuring, so the
@@ -576,6 +616,49 @@ summary {
 #editor .cm-editor {
   flex: 1;
   min-height: 0;
+}
+/* The text view (#text-view, app.ts installTextView): the writer's font and size on
+   #editor, a reading measure, centred once Pages is hidden. .cm-content
+   grows to the measure and the scroller centres what is left over. */
+#editor .cm-scroller {
+  font-family: var(--ed-font, ui-serif, Georgia, serif);
+  font-size: var(--ed-fs, 16px);
+  line-height: 1.6;
+}
+#editor .cm-content {
+  max-width: 36em; /* ~70 characters of serif prose */
+}
+#panes.pages-hidden #editor .cm-scroller {
+  justify-content: center;
+}
+/* the text view bar along the top of the editor */
+#text-view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+#text-view label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+#text-view input[type="range"] {
+  width: 90px;
+  margin: 0;
+  accent-color: var(--fg);
+}
+#text-view output {
+  min-width: 2.6em;
+  font-variant-numeric: tabular-nums;
+}
+#text-view .tv-hide {
+  margin-left: auto;
 }
 /* Changed-on-disk banner: the buffer has unsaved edits and the file moved
    under it. Rare and it blocks saving, so it is the one loud thing in the
@@ -677,8 +760,10 @@ summary {
 #editor .cm-line.cm-bml-field * {
   color: var(--muted);
   font-weight: 400;
-  font-size: 11px;
   letter-spacing: .02em;
+}
+#editor .cm-line.cm-bml-field {
+  font-size: .75em; /* follows the writer's size */
 }
 #editor .cm-line.cm-bml-rail {
   box-shadow: inset 1px 0 0 var(--syn-p);
@@ -701,6 +786,9 @@ summary {
   font-style: italic;
 }
 /* %% ──── draws as a hairline rule (its text shows while the cursor is on it) */
+#editor .cm-line.cm-bml-rule {
+  font-family: var(--mono); /* box-drawing runs are line-wide in mono only */
+}
 #editor .cm-line.cm-bml-rule:not(.cm-activeLine) {
   white-space: pre;
   contain: inline-size; /* its long dash run must not widen the editor */
@@ -721,13 +809,14 @@ summary {
 #editor .cm-line.cm-bml-off {
   opacity: var(--off);
 }
+/* the {only} editions tag at the end of a span's first line */
 #editor .cm-bml-cond-tag {
   font: 10.5px system-ui, sans-serif;
-  color: var(--warn);
   border: 1px solid currentColor;
   border-radius: 3px;
   padding: 0 5px;
   margin-left: 8px;
+  color: var(--warn);
 }
 /* the find/replace bar (search-panel.ts) */
 .cm-bml-find {
@@ -1171,7 +1260,8 @@ summary {
 [data-style-hl] {
   background: var(--hl);
 }
-[data-style-selected] {
+[data-style-selected],
+[data-edit-hl] {
   outline: 1px solid var(--pick);
   outline-offset: 3px;
 }
@@ -1222,6 +1312,9 @@ summary {
   border-radius: 4px;
   transition: background-color .8s cubic-bezier(.16,1,.3,1);
 }
+#config-overlay .sec[hidden] {
+  display: none;
+}
 #config-overlay .sec:last-child {
   border-bottom: 0;
 }
@@ -1258,6 +1351,22 @@ summary {
 #config-overlay .where:hover {
   color: var(--fg);
   background: var(--hover);
+}
+#config-overlay .info {
+  background: none;
+  border: 0;
+  padding: 0 0 0 4px;
+  color: var(--muted);
+  cursor: help;
+  vertical-align: -2px;
+}
+#config-overlay .info:hover,
+#config-overlay .info:focus-visible {
+  color: var(--fg);
+}
+#config-overlay .info svg.i {
+  width: 13px;
+  height: 13px;
 }
 #config-overlay .where svg.i {
   width: 13px;
@@ -1367,7 +1476,7 @@ summary {
   color: var(--fg);
   background: var(--hover);
 }
-#config-overlay .seg {
+:is(#config-overlay, #text-view) .seg {
   display: inline-flex;
   gap: 2px;
   padding: 2px;
@@ -1375,7 +1484,7 @@ summary {
   border-radius: calc(var(--radius) + 2px);
   flex-wrap: wrap;
 }
-#config-overlay .seg button {
+:is(#config-overlay, #text-view) .seg button {
   background: none;
   border: 0;
   border-radius: var(--radius);
@@ -1387,11 +1496,12 @@ summary {
   align-items: center;
   gap: 4px;
 }
-#config-overlay .seg button:hover {
+:is(#config-overlay, #text-view) .seg button:hover {
   color: var(--fg);
   background: var(--hover);
 }
 #config-overlay .seg button[aria-checked="true"],
+#text-view .seg button[aria-checked="true"],
 #config-overlay .tog[aria-pressed="true"] {
   background: var(--inv-bg);
   color: var(--inv-fg);
@@ -1413,7 +1523,7 @@ summary {
 }
 /* switch (panel-controls.ts switchInput): a hairline track, the knob in
    --muted; on, the track is the inverted pill and the knob its text colour */
-#config-overlay .sw {
+:is(#config-overlay, #text-view) .sw {
   appearance: none;
   position: relative;
   flex: none;
@@ -1426,7 +1536,7 @@ summary {
   cursor: pointer;
   transition: background .15s, border-color .15s;
 }
-#config-overlay .sw::before {
+:is(#config-overlay, #text-view) .sw::before {
   content: "";
   position: absolute;
   top: 2px;
@@ -1437,14 +1547,14 @@ summary {
   background: var(--muted);
   transition: transform .15s, background .15s;
 }
-#config-overlay .sw:hover::before {
+:is(#config-overlay, #text-view) .sw:hover::before {
   background: var(--fg);
 }
-#config-overlay .sw:checked {
+:is(#config-overlay, #text-view) .sw:checked {
   background: var(--inv-bg);
   border-color: var(--inv-bg);
 }
-#config-overlay .sw:checked::before {
+:is(#config-overlay, #text-view) .sw:checked::before {
   transform: translateX(12px);
   background: var(--inv-fg);
 }
@@ -2183,17 +2293,22 @@ summary {
   color: var(--muted);
   font-size: 12px;
 }
-.ask .field input {
+.ask .field input,
+.ask .field textarea {
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg);
   font: var(--fs) system-ui, sans-serif;
+  resize: vertical;
 }
 .ask .hint {
   margin: 0;
   font-size: 12px;
+}
+.ask .hint a {
+  color: var(--fg);
 }
 #title-source {
   font-size: 12.5px;

@@ -1,7 +1,7 @@
-// web/src/print-browser_test.ts — the Publish tab's Print button in the real
-// app: the print layer imposes the preview's pages onto sheet-sized print
-// pages, so printing to PDF gives one sheet side per page at the sheet size,
-// the layout sheets.pdf has.
+// web/src/print-browser_test.ts — the Publish tab's print buttons in the real
+// app: Print sheets imposes the preview's pages onto sheet-sized print pages,
+// so printing to PDF gives one sheet side per page at the sheet size, the
+// layout sheets.pdf has; Print pages gives the pages as they are, book.pdf's.
 import { assertAlmostEquals, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
 import { PDFDocument } from "pdf-lib";
@@ -14,7 +14,8 @@ const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
 
 Deno.test({
-  name: "browser print: one sheet side per printed page, at the sheet size",
+  name:
+    "browser print: sheet sides at the sheet size, then pages at the page size",
   ignore: !hasChrome || !appBuilt,
   async fn() {
     const root = new URL("../../server/testdata", import.meta.url).pathname;
@@ -48,6 +49,7 @@ Deno.test({
       if (setup.error !== null) throw new Error(setup.error);
       const imp = impose(n, {
         folios: setup.folios,
+        fold: setup.fold,
         sheet: setup.sheetDims,
         page: setup.page,
         duplex: setup.duplex,
@@ -65,6 +67,20 @@ Deno.test({
       const { width, height } = pdf.getPage(0).getSize();
       assertAlmostEquals(width / 72, imp.sheet.w, 0.01);
       assertAlmostEquals(height / 72, imp.sheet.h, 0.01);
+
+      // Print pages: every page in reading order at the page size.
+      await page.evaluate(() =>
+        document.documentElement.removeAttribute("data-printed")
+      );
+      await page.getByRole("button", { name: "Print pages" }).click();
+      await page.locator("html[data-printed]").waitFor();
+      const pages = await PDFDocument.load(
+        await page.pdf({ preferCSSPageSize: true, printBackground: true }),
+      );
+      assertEquals(pages.getPageCount(), n);
+      const at = pages.getPage(0).getSize();
+      assertAlmostEquals(at.width / 72, setup.page.w, 0.01);
+      assertAlmostEquals(at.height / 72, setup.page.h, 0.01);
     } finally {
       await browser.close();
       await server.stop();

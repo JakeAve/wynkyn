@@ -91,12 +91,12 @@ number of folios per signature. The "sheet" and "page" are not necessarily 1:1 �
 how many book pages fit on each sheet side is derived from the sheet and
 book-page dimensions (§7.7). A 4.25in × 7in book page quarters US Legal and
 prints 4-up (8 book pages per duplex sheet); a 5.5in × 8.5in page on the same
-sheet prints 2-up (4 book pages per sheet). All folds are vertical, parallel to
-the spine: a 2-up sheet is folded once at its center, while a 4-up sheet is
-first cut — across or down, whichever the grid calls for — and each piece is
-then folded. Every folded piece is a **folio** — 2 leaves, 4 book pages — and
-folios nest inside one another to form signatures. This is the only binding
-style in scope for v1 (see §8, Non-Goals).
+sheet prints 2-up (4 book pages per sheet). The sheet is then folded whole —
+once (folio), twice (quarto) or three times (octavo) — or cut into pieces that
+are each folded once, or cut into loose leaves (§7.7 `fold`). Every folded piece
+is made of **folios** — 2 leaves, 4 book pages — and folios nest inside one
+another to form signatures. These are the binding styles in scope (see §8,
+Non-Goals).
 
 ---
 
@@ -1152,6 +1152,7 @@ books/
 {
   "spec": "0.6",
   "name": "Standard",
+  "language": "en",
   "page": { ... },
   "fonts": { ... },
   "elements": { ... },
@@ -1170,6 +1171,11 @@ on files that lack one (they predate the key). The app compares it to its own
 `SPEC_VERSION` (`metadata/upgrade.ts`) and warns on a book newer than itself;
 unknown keys are kept, never dropped. Bumping `spec` after an on-load upgrade is
 not done yet; see the todo in `docs/`.
+
+`language` is the book's BCP 47 tag, default `"en"`: the renderer stamps it on
+the article as `lang`, which is what `hyphens: auto` (§4.5) and the EPUB's
+`dc:language` (§4.12) read. A Spanish book that leaves it unset hyphenates by
+English rules.
 
 ### 4.3 Section: `page`
 
@@ -1202,11 +1208,16 @@ in one section.
   signature is trimmed by hand after binding; compensate for that here rather
   than by shrinking `size`.
 - `sheet` — the physical paper the printer loads. Same value space as `size`.
+- `fold` — how a printed sheet becomes leaves (§7.7): `folio` (folded once),
+  `quarto` (twice), `octavo` (three times), `cut` (cut into pieces, each folded
+  once) or `leaves` (cut, never folded). Unset: whichever puts the most pages on
+  a sheet, a true fold winning a tie.
 - `folios-per-signature` — signature thickness in folios (one folio = one folded
   piece = 4 book pages, §7.7). Signature page count = `folios-per-signature`
   × 4. `"booklet"` puts every page in one signature: its folios are the page
   count ÷ 4, rounded up, sized from the preview in the panel and from the
-  rendered `book.pdf` at export.
+  rendered `book.pdf` at export. A true fold rounds it up to whole folded sheets
+  (quarto: even; octavo: a multiple of 4); loose leaves ignore it.
 - `duplex` — `short-edge` (book-style turn, default), `long-edge`
   (calendar-style turn), or `none` (separate fronts/backs files, the backs
   printed by hand).
@@ -1216,7 +1227,7 @@ in one section.
 - `reverse-backs` — with `duplex: none`, `true` writes the backs file last sheet
   first, for printers that stack face up. Default `false`.
 
-CLI flags (`bml export --sheet/--folios/--duplex/--flip/--reverse-backs`)
+CLI flags (`bml export --sheet/--fold/--folios/--duplex/--flip/--reverse-backs`)
 override any of these per run.
 
 Everything else about the setup is **derived**, never stored: the grid of pages
@@ -1289,10 +1300,15 @@ default is `1.5em`) and `margin-top` in `lh` units for space between paragraphs
 (`"0.5lh"`). The paragraph that opens a block (`.lead`: first in its container,
 or after a title, heading or break) and the drop-cap paragraph stay flush and
 tight whatever `paragraph` says; one after a quote, poem, list or other block
-keeps its indent. Pullquote text and attributions are flush. Display matter
-(half-title, title-page, copyright, dedication, epigraph, colophon) sets lines,
-not prose: its paragraphs take `text-indent` from the section, none by default,
-so `"dedication": { "text-indent": "1.5em" }` indents a dedication.
+keeps its indent. Pullquote text and attributions are flush. `body` is the whole
+text block (`.bml`); `"hyphens": "auto"` there turns on the browser's dictionary
+hyphenation for the book's `language` (the template ships with it on, since
+justified text without it sets rivers). Titles, numbers and headings never
+hyphenate whatever `body` says, and the base stylesheet allows no fragment under
+three letters (`hyphenate-limit-chars: 6 3 3`). Display matter (half-title,
+title-page, copyright, dedication, epigraph, colophon) sets lines, not prose:
+its paragraphs take `text-indent` from the section, none by default, so
+`"dedication": { "text-indent": "1.5em" }` indents a dedication.
 
 ```json
 "elements": {
@@ -1685,8 +1701,8 @@ optional.
   `urn:uuid` derived from the book slug and edition, the same on every export,
   so a reader's library sees a re-export as the same book. Set an ISBN urn here
   to publish through a store.
-- `language` — BCP 47 tag for `dc:language` and the documents' `lang`. Default
-  `"en"`.
+- `language` — the older spelling of the top-level `language` (§4.2), read only
+  when that is unset.
 - `cover` — an image slug in `images/`. Becomes the package's cover image and
   the first page of the spine.
 
@@ -1890,15 +1906,36 @@ CodeMirror 6 over plain BML text.
   not as blocking dialogs — BML tolerates an unclosed block by falling back to
   implicit-close (§3.2.3), so most "errors" are really just "here's where it
   fell back."
-- Sentinels are styled by kind: structural lines (`matter`, `part`, `chapter`)
-  get a faint band, a hairline above and a gutter mark; field sentinels
-  (`{title}`, `{author}`) are small and muted; a block's opening and closing
-  tags are joined by a 1px rail, so an unclosed block shows at a glance; `{em}`
-  tags dim while their text is italic. The line after `{title}`, `{heading}` or
-  `{subheading}` is bold, after `{subtitle}` italic. A `%%` line of only
-  box-drawing characters draws as a hairline rule, and a `%%` label between two
-  rules as small caps.
+- Sentinels are styled by closing form (§3.2.3), one rule: nesting-close lines
+  (`matter`, `part`, `chapter`) get a faint band, a hairline above and a gutter
+  mark; explicit-close pairs (`quote`, `poem`, `is`, …) are joined by a 1px rail
+  from opening to closing tag, so an unclosed block shows at a glance; every
+  other sentinel line (`{title}`, `{author}`, `{heading}`, `{break}`,
+  `{illustration}`) is small and muted; `{em}` tags dim while their text is
+  italic. The line after `{title}`, `{heading}` or `{subheading}` is bold, after
+  `{subtitle}` italic. A `%%` line of only box-drawing characters draws as a
+  hairline rule, and a `%%` label between two rules as small caps.
 - The selection is a green-grey tint, distinct from the quieter active line.
+- The text view (a bar along the top of the editor) is a per-reader preference,
+  not part of the book: prose in Serif (default), Sans or Mono at 12–24px
+  (default 16), with sentinels always in monospace so markup reads as markup.
+  The text holds a reading measure of about 70 characters (36em), centred in the
+  pane while Pages is hidden. **Hide markup** folds away the sentinel lines of
+  every paragraph that also has prose (`{title}`, `{dropcap}`, `{quote}` …
+  `{/quote}`) and the `{em}` tags, except in the paragraph holding the cursor;
+  structural lines stay as landmarks, and a paragraph of sentinels alone
+  (`{illustration}`, `{break}`) stays visible so it can still be reached.
+- The preview follows the cursor: the rendered block the cursor's line is part
+  of (the nearest `data-line` at or above it) is outlined and scrolled into
+  view, so the writer sees where they are on the page. The footer is split by
+  column: under the editor, the writer's cell (parse warnings, import notes, and
+  "Go to style:" naming the style that block belongs to — "Chapter · Title",
+  "Body text · Paragraph", a custom `{is}` name); under the pages, the page
+  count and page problems. Go to style opens that style in Style mode, the way a
+  preview click does (§7.4), and leaves a history entry, so Back returns to
+  Write with the cursor where it was. The style is read from the enclosing
+  matter type, part or chapter, the enclosing block, and the field sentinel
+  whose text runs on to the line.
 - Find and replace is a bar pinned to the top of the editor, in the chrome's
   colors: find and replace fields, match case / whole word / regex toggles, an
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"
@@ -1933,7 +1970,9 @@ preview opens its style in the middle column; in Write the same click moves the
 editor cursor to its manuscript line (the nearest rendered block's `data-line`).
 Page furniture (page numbers, running heads) has no source line, so a click on
 it always opens its style, switching to Style. The hover outline shows only
-where a click would style: everything in Style, only furniture in Write.
+where a click would style: everything in Style, only furniture in Write. From
+the editor, Go to style in the writer's footer (§7.3) opens the same style the
+preview click would for that block.
 
 The panel exposes the selector model already implicit in `elements`/`is` (§4.5,
 §4.6):
@@ -1980,10 +2019,16 @@ Includes:
 - The first signature drawn as it prints: each sheet's front and back with the
   book pages that land on it, folds dashed, cuts solid, from the same `impose()`
   export uses
-- Print export from the panel (§7.7): Proof and Export run `bml export` on the
-  dev server (`POST /api/books/<book>/export`), landing any pending save first,
-  then link each PDF to open in the browser's viewer for printing; pagination
-  problems are listed with an "export anyway" choice
+- The Publish view grouped by what the author is making: **Binding** — Paper
+  (the page size, with a link to Style's Page view that Back returns from, and
+  the sheet), Folding (the fold, Auto naming its pick, and what the setup
+  derives to), Signatures (hidden for loose leaves), and Print (auto duplex or
+  by hand, the by-hand flip and back order, and the Print sheets buttons, §7.7);
+  **PDF**, the pages in reading order at the page size, one per printed page
+  (Print pages; Save as PDF gives the file `book.pdf` would be); and **E-book**
+  (Export EPUB, §7.8). All printing runs in the browser; proofs and the sheet
+  PDFs on disk are `bml
+  export`'s
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a
   warning under a family that is neither; §4.4)
@@ -2025,70 +2070,108 @@ manuscript is laid out at, e.g. 5.5in × 8.5in) get imposed onto physical
 "sheets" (what the printer/binder actually prints on, e.g. US Legal) for
 hand-binding.
 
-**Configuration** (from `metadata.json`'s `page` section, §4.3): `sheet` and
-`folios-per-signature`, resolved together with `size` by
+**Configuration** (from `metadata.json`'s `page` section, §4.3): `sheet`, `fold`
+and `folios-per-signature`, resolved together with `size` by
 `metadata/page-setup.ts`.
 
-**Binding model (fixed, not configurable in v1, §8).** All folds are vertical,
-parallel to the spine. A **folio** is one folded piece of paper: 2 leaves, 4
-book pages. Folios nest inside one another to form a **signature** of
-`folios-per-signature` folios (= `folios-per-signature` × 4 book pages); the
-book is a sequence of signatures.
+**Binding model.** A **folio** is one folded piece of paper: 2 leaves, 4 book
+pages, folded down the spine. Folios nest inside one another to form a
+**signature** of `folios-per-signature` folios (= `folios-per-signature` × 4
+book pages); the book is a sequence of signatures. `fold` says how a printed
+sheet becomes folios:
 
-**Layout derivation.** Book pages tile one side of a sheet in a grid of `cols` ×
-`rows`, derived and never configured: `cols` is the largest **even** number of
-page-widths that fit across the sheet, `rows` the number of page-heights that
-fit down it, evaluated in **both sheet orientations** with the one yielding more
-pages winning. A tie goes to the single-row landscape layout, which needs fewer
-cuts. _n_ (the "n-up" count, pages per sheet side) is `cols × rows`.
+| `fold`   | The sheet                                   | Grid             | Pages a sheet |
+| -------- | ------------------------------------------- | ---------------- | ------------- |
+| `folio`  | folded once, down the spine                 | 2 × 1, landscape | 4             |
+| `quarto` | folded twice: head, then spine              | 2 × 2, portrait  | 8             |
+| `octavo` | folded three times: spine-wise, head, spine | 4 × 2, landscape | 16            |
+| `cut`    | cut into pieces, each folded once           | derived, below   | 4 × pieces    |
+| `leaves` | cut into single leaves, no fold             | derived, below   | 2 × pieces    |
 
-Each pair of columns is one folio, so a sheet carries `rows × cols/2` folios,
-separated by `rows − 1` cuts across and `cols/2 − 1` cuts down each row —
-`rows × cols/2 − 1` cuts in all. Cutting is what a grid adds; **the folds
-themselves stay vertical and parallel to the spine**, which is what §8 rules out
-changing.
+**True folds** (`folio`, `quarto`, `octavo`) halve the whole sheet each time, so
+each page gets an equal cell of the sheet (`sheet ÷ grid`) and a page must fit
+its cell. Each fold takes one half **back** behind the other, with the printed
+front facing the folder: "v" folds take the left half behind the right, "h"
+folds the top half behind the bottom; folio is v, quarto h v, octavo v h v. The
+last fold is the spine. Folds that end up at the head or fore edge (quarto's
+head; octavo's head and fore edge) join leaves that must be slit before sewing,
+and are trimmed away. A folded sheet carries `cols × rows / 2` folios that nest
+as one, so a true fold rounds `folios-per-signature` up to whole sheets, and
+several folded sheets nest one inside the next. A quarto's head-to-head rows
+mean its top row prints upside down; so does an octavo's.
 
-- 2 × 1 — the sheet is folded once at its center; one sheet = one folio.
+**Cut then fold** (`cut`) tiles the sheet in a grid of `cols` × `rows`: `cols`
+is the largest **even** number of page-widths that fit across the sheet, `rows`
+the number of page-heights that fit down it, evaluated in **both sheet
+orientations** with the one yielding more pages winning. A tie goes to the
+single-row landscape layout, which needs fewer cuts. Each pair of columns is one
+folio, so a sheet carries `rows × cols/2` folios, separated by `rows − 1` cuts
+across and `cols/2 − 1` cuts down each row — `rows × cols/2 − 1` cuts in all —
+each piece then folded once down its center.
+
+- 2 × 1 — no cut: the same sheet as `folio`.
 - 4 × 1 — the sheet is cut at its vertical center and each half folded; one
   sheet = two folios. The page is a narrow strip of the sheet.
 - 2 × 2 (**quartering**) — the sheet is cut at its horizontal center and each
   half folded. Both sheet dimensions are halved, so the page keeps the sheet's
   proportions: US Legal 8.5in × 14in quarters to 4.25in × 7in, and the sheet
-  prints portrait rather than landscape.
-- 2 × 1, 4 × 1 and 2 × 2 are the expected v1 cases; the math generalizes but
-  larger grids are untested.
-- If no orientation fits two book pages, export fails with a clear configuration
-  error.
+  prints portrait rather than landscape. `quarto` gets the same page from the
+  same sheet without the cut.
 
-Example: a 4.25in × 7in book page on US Legal quarters it (2 × 2, 8 pages per
-duplex sheet); a 3.5in × 8.5in page on the same sheet gives 4 × 1 strips (also 8
-pages, but a very different book); a 5.5in × 8.5in page gives 2 × 1 (fold only,
-4 pages per sheet).
+**Loose leaves** (`leaves`) tile the sheet like `cut` but any number across, odd
+included: nothing folds, every piece is one leaf (its front the recto, its back
+the verso), for stab, Japanese or glued bindings. There are no signatures.
+Sheets are imposed **cut and stack**: slot _s_ of sheet _t_ carries leaf _s_ ·
+_N_ + _t_ (_N_ sheets), so cutting the printed stack along the grid and piling
+the pieces in slot order — top row first, left to right — gives the leaves in
+reading order.
+
+**With no `fold` set** the setup takes the option that puts the most pages on a
+sheet side, a true fold winning a tie with `cut` (so a quartered sheet folds as
+a real quarto, and a half sheet is a folio either way). `leaves` is never
+picked. If nothing fits two book pages, export fails with a clear configuration
+error, as does a `fold` whose cell the page does not fit.
+
+Example, on US Legal: a 3.5in × 4.25in page is an octavo (16 pages a sheet); a
+4.25in × 7in page a quarto (8); a 3.5in × 8.5in page gives `cut` 4 × 1 strips
+(also 8 pages, but a very different book); a 5.5in × 8.5in page a folio (4).
 
 **Imposition algorithm (`server/imposition.ts`, Plan 5):**
 
 1. Take the total page count from the Paged.js-paginated document (§5.4); pad
    the final signature with blank pages up to a multiple of
-   `folios-per-signature` × 4. When the book ends in `{matter: colophon}`, its
-   page is pinned to the final page of the signature (the last verso) and the
-   blanks go before it, after the body's last page.
+   `folios-per-signature` × 4 (loose leaves: to whole sheets). When the book
+   ends in `{matter: colophon}`, its page is pinned to the final page of the
+   signature (the last verso) and the blanks go before it, after the body's last
+   page.
 2. For each signature of _F_ folios (_P_ = 4_F_ local pages), assign pages to
    folios by the standard nesting mapping — folio _k_ (1 = outermost) carries,
    on its front face, local pages [_P_−2_k_+2 | 2_k_−1] (left | right of the
    fold) and, on its back face, [2_k_ | _P_−2_k_+1] — so that folding and
    nesting reconstructs reading order. (Check, _P_ = 16: folio 1 is [16 | 1]
    front, [2 | 15] back.)
-3. Pack folios onto physical sheets row-major, `cols/2` folios per row.
-   Back-side layout follows `page.duplex`, whose effect depends on the sheet
-   orientation the grid chose: turning the sheet about a left/right edge mirrors
-   the folio **column** order (each `[2k | P−2k+1]` pair intact), turning it
-   about a top/bottom edge mirrors the **rows** — which is that same layout
-   rotated 180° as a whole. Those left/right edges are the short ones on a
-   landscape sheet and the long ones on a portrait sheet, so `short-edge`
-   mirrors columns on a 2-up landscape job and rows on a quartered portrait one.
-   The exporter maps this; `duplex` always names the setting to pick on the
-   printer.
-4. Emit the final print file via `print-export.ts` (§5.4, §6) — one output page
+3. Pack folios onto physical sheets. `cut`: row-major, `cols/2` folios per row.
+   True folds: by simulating the folds on one sheet and reading the folded stack
+   as leaves (layer _i_ carries local pages 2_i_+1 facing and 2_i_+2 away),
+   which gives the standard formes — quarto front [5↓ 4↓ | 8 1], back [3↓ 6↓ | 2
+   7]; octavo front [5↓ 12↓ 9↓ 8↓ | 4 13 16 1], back [7↓ 10↓ 11↓ 6↓ | 2 15 14 3]
+   (↓ upside down, top row first). Nested folded sheets take the signature's
+   leaves from the outside in: the outermost sheet carries its first and last
+   `cols × rows` leaves. Back-side layout follows `page.duplex`, whose effect
+   depends on the sheet orientation the grid chose: turning the sheet about a
+   left/right edge mirrors the folio **column** order (each `[2k | P−2k+1]` pair
+   intact), turning it about a top/bottom edge mirrors the **rows** — which is
+   that same layout rotated 180° as a whole. Those left/right edges are the
+   short ones on a landscape sheet and the long ones on a portrait sheet, so
+   `short-edge` mirrors columns on a 2-up landscape job and rows on a quartered
+   portrait one. The exporter maps this; `duplex` always names the setting to
+   pick on the printer.
+4. Place each page. `cut` and `leaves` pack the pages edge to edge, the grid
+   centred on the sheet. A true fold puts each page against the spine edge of
+   its cell (a recto's left, a verso's right, swapped when it prints upside
+   down), centred head to tail, so every leaf registers on the spine fold and
+   the slack is trimmed from the fore edge, head and tail.
+5. Emit the final print file via `print-export.ts` (§5.4, §6) — one output page
    per sheet side, at the sheet's physical dimensions, with the
    already-paginated book pages positioned at their exact trim size.
 
@@ -2096,20 +2179,19 @@ pages, but a very different book); a 5.5in × 8.5in page gives 2 × 1 (fold only
 `duplex: none`), built by embedding `book.pdf` pages onto sheet-sized PDF pages;
 `--proof` emits numbered placeholders for a one-sheet printer check (a booklet's
 proof needs `--pages`, the book's page count). The files land in
-`books/<book>/export/` (or `export/<edition>/`) whether `bml export` or the
-panel's Export wrote them; the dev server serves them at
-`/api/books/<book>/export/<file>`.
+`books/<book>/export/` (or `export/<edition>/`).
 
 **Printing from the browser** (`web/src/print.ts`): the Publish tab's Print
-button needs no Chrome on the server. It clones the live preview's Paged.js
-pages onto sheet-sized print layers laid out by the same `impose()` and
+sheets button needs no Chrome on the server. It clones the live preview's
+Paged.js pages onto sheet-sized print layers laid out by the same `impose()` and
 `sidesFor()` the exporter uses (one layer per sheet side, pages at their trim
 size, rotated slots turned 180°), overrides `@page` with the sheet size, and
 opens the browser's print dialog; `afterprint` removes the layer. A printer gets
 the sheets directly; Save as PDF gives the same file as `sheets.pdf`.
 `duplex:
 none` is two runs, Print fronts and Print backs, honouring `flip` and
-`reverse-backs`. Chrome and Edge; proofs stay with the exporter.
+`reverse-backs`. Print pages is the same layer with a 1 × 1 grid at the page
+size and no imposition. Chrome and Edge; proofs stay with the exporter.
 
 ### 7.8 E-book Export
 
@@ -2182,6 +2264,15 @@ text, Markdown, HTML), _Import from the web_ (a Project Gutenberg book, a shared
 Google Doc, a web page), _Start blank_. The book switcher's _New manuscript…_
 opens the same dialog once a library has books.
 
+**Import from the web.** One address field and _Fetch_. The page fetches the
+address itself when the site lets a web page read it (Standard Ebooks,
+Wikisource). When it doesn't (Project Gutenberg, the Internet Archive) the same
+dialog shows the paste step: open the address in a new tab (a Gutenberg link
+opens as its plain-text file), select all, copy, and paste into the box; the
+paste imports at once. The clipboard's HTML is used when it has paragraphs or
+headings, else its plain text. EPUB is file-only. The title dialog shows the
+address and the manuscript's summary comment names it.
+
 **Choose a book title.** One dialog for all three. Imports show their source
 (file name and size, or the address) above the title field and prefill the title
 from the file's metadata, falling back to the file name; blank starts empty. The
@@ -2225,9 +2316,8 @@ twelve shallow ones makes the shallow ones parts; for text, "Chapter N" or `#`
 or standalone ALL-CAPS lines, whichever fires at least twice. Title and author
 from EPUB metadata, DOCX `core.xml` or the Gutenberg header lines. No new
 dependencies except deno-dom for the CLI's HTML parsing (Deno has no
-`DOMParser`). gutenberg.org sends no CORS headers, so web import in the browser
-waits for a proxy on the sync server; until then the CLI fetches and the browser
-takes a file. PDF is out: export to Word or text first.
+`DOMParser`). Web import in the browser is fetch-or-paste in the page, so it
+needs no server. PDF is out: export to Word or text first.
 
 ---
 
@@ -2235,10 +2325,10 @@ takes a file. PDF is out: export to Word or text first.
 
 Explicitly out of scope, to bound the work below:
 
-- Binding styles other than the §7.7 model — vertical folds parallel to the
-  spine, folios nested into signatures (no horizontal _folds_; a quartered sheet
-  is cut across and each half folded vertically, never folded twice as a true
-  quarto, and there is no perfect binding with spine text, etc.)
+- Binding styles other than the §7.7 model — folio, quarto, octavo, cut then
+  fold, or loose leaves (no sextodecimo or other folds past three, no
+  work-and-turn or work-and-tumble layouts, no perfect binding with spine text,
+  etc.)
 - Font files carried with a book, or fonts embedded in an EPUB (fonts are Google
   families or installed ones, §4.4)
 - Multi-user/collaborative real-time editing

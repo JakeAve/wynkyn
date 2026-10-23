@@ -7,8 +7,8 @@ description: Use whenever work touches how a book becomes paper — page size ag
 
 The user folds and sews the books by hand. The app's job is to put the right
 book page on the right spot of a printer sheet so that folding and nesting
-reconstructs reading order. Everything below is fixed in v1 (spec §8); the
-geometry is derived, never configured.
+reconstructs reading order. The fold is a choice (`page.fold`); the
+geometry it implies is derived, never configured.
 
 ## Vocabulary
 
@@ -27,16 +27,25 @@ geometry is derived, never configured.
 
 ## The binding model
 
-- All folds are vertical, parallel to the spine. A grid only adds *cuts*: a
-  2 × 1 sheet folds once; 4 × 1 is cut down the middle then each half folded;
-  2 × 2 is cut across then each half folded. There is no true quarto fold.
-- `cols` is the largest even number of page widths across the sheet, `rows` the
-  page heights down it, tried in both sheet orientations; more pages wins, a tie
-  goes to the single-row landscape (fewer cuts). No fit two-up → an error the
-  panel shows inline and `bml export` refuses.
+- `page.fold` (spec §7.7): **folio** folds the sheet once (2 × 1), **quarto**
+  twice (2 × 2, top row upside down, head slit), **octavo** three times (4 × 2,
+  head and fore edge slit); **cut** cuts the sheet into pieces each folded once;
+  **leaves** cuts it into single leaves, never folded, imposed cut-and-stack.
+  Unset = whichever puts the most pages on a sheet, a true fold winning a tie
+  (so a quartered sheet is a real quarto). `server/imposition.ts`'s
+  `foldedSheet()` simulates the folds; its test pins the standard formes.
+- True folds give each page an equal cell of the sheet and put it against the
+  spine edge of that cell; cut and leaves pack pages edge to edge, centred.
+- For `cut`, `cols` is the largest even number of page widths across the sheet,
+  `rows` the page heights down it, tried in both sheet orientations; more pages
+  wins, a tie goes to the single-row landscape (fewer cuts). Nothing fits →
+  an error the panel shows inline and `bml export` refuses.
 - Nesting: in a signature of _P_ = 4·folios pages, folio _k_ (1 = outermost)
   carries [_P_−2_k_+2 | 2_k_−1] on its front face and [2_k_ | _P_−2_k_+1] on
   its back. Check with _P_ = 16: folio 1 is [16 | 1] front, [2 | 15] back.
+- A true fold's folded sheet holds `cols × rows / 2` folios, so it rounds
+  `folios-per-signature` up to whole sheets; nested sheets take the leaves from
+  the outside in.
 - The last signature is padded with blanks to a multiple of 4·folios. When the
   book ends in `{matter: colophon}`, the colophon is pinned to the signature's
   final verso and the blanks go before it.
@@ -68,8 +77,8 @@ has the detail.
 
 A new printer, sheet or duplex setting gets `bml export <book> --proof` first:
 one signature of numbered placeholders, printed, folded and nested by hand,
-read in order. The one combination not yet proven on paper is `short-edge` on a
-quartered portrait sheet, where rows mirror instead of columns. Then the real
+read in order. Not yet proven on paper: `short-edge` on a quartered portrait
+sheet (rows mirror instead of columns), and quarto, octavo and loose leaves. Then the real
 export; the fore edge is trimmed after sewing, so compensate in `outside`
 margin, not in `size`.
 

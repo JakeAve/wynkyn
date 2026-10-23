@@ -2,19 +2,14 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
-import {
-  addIsNames,
-  catalogFor,
-  type EpubResult,
-  type ExportRequest,
-  ExportResult,
-} from "./style-catalog.ts";
+import { addIsNames, catalogFor, type EpubResult } from "./style-catalog.ts";
 import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
   fitPreview,
   installPageIndicator,
   installPreviewClicks,
   installStyleHover,
+  markEdited,
   type Mode,
   previewLink,
   renderPreview,
@@ -37,7 +32,9 @@ import {
   replaceBuffer,
   scrollEditorToLine,
   setEditionSpans,
+  setHideMarkup,
 } from "./editor.ts";
+import { styleKeysAt } from "./bml-language.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
 import { buildTree } from "./tree-data.ts";
@@ -76,6 +73,12 @@ import {
 } from "./fs-store.ts";
 import type { BookStore } from "../../server/store.ts";
 import { importSource } from "../../server/import/mod.ts";
+import {
+  fetchSource,
+  openUrl,
+  pasteSource,
+  type WebSource,
+} from "./web-source.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 
@@ -95,19 +98,28 @@ let libId: string | null = null;
 // Keep the address bar at the author's place (appHref) without history
 // entries; debounced because Safari rate-limits replaceState.
 let urlTimer = 0;
+const here = () =>
+  appHref({ book, edition, mode, view, line: cursorLine, lib: libId });
 function syncUrl(): void {
   clearTimeout(urlTimer);
   urlTimer = setTimeout(() => {
     try {
-      history.replaceState(
-        null,
-        "",
-        appHref({ book, edition, mode, view, line: cursorLine, lib: libId }),
-      );
+      history.replaceState(null, "", here());
     } catch {
       // rate-limited or blocked: the URL just lags
     }
   }, 250);
+}
+
+// Publish → a Style view as a history entry, like goToStyle from Write, so
+// Back returns to Publish where the author left it (installHistory).
+function toStyle(next: string): void {
+  clearTimeout(urlTimer);
+  history.replaceState(null, "", here()); // the entry Back returns to
+  view = next;
+  configPanel?.open(next);
+  setMode("style");
+  history.pushState(null, "", here());
 }
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -248,10 +260,28 @@ function refreshTree(doc: BmlDocument): void {
   highlightTreeNode(cursorLine);
 }
 
+// Follow the cursor (spec §7.3): the preview outlines the block the line is
+// part of, and the footer names that block's style, a click away.
+function followCursor(line: number): void {
+  if (!editor) return;
+  markEdited($("preview"), mode === "write" ? line : null);
+  const keys = styleKeysAt(editor.state.doc.toString().split("\n"), line);
+  const cat = styleCatalog();
+  const entry = keys.map((k) => cat.find((e) => e.key === k)).find((e) => e);
+  const btn = $("style-here") as HTMLButtonElement;
+  btn.hidden = !entry;
+  if (!entry) return;
+  btn.lastElementChild!.textContent = entry.label === "Everything"
+    ? entry.group
+    : `${entry.group} · ${entry.label}`;
+  btn.onclick = () => goToStyle(entry.key);
+}
+
 // Follow the cursor: the node whose block contains the cursor line is current.
 function highlightTreeNode(line: number): void {
   cursorLine = line;
   syncUrl();
+  followCursor(line);
   let best = 0;
   for (const l of treeLines) if (l <= line) best = l;
   const tree = $("tree");
@@ -715,11 +745,6 @@ const fetchMetadata = (): Promise<
   { metadata: Metadata; version: string | null }
 > => backend.metadata(book, edition);
 
-// The server's print export needs Chrome and a folder on disk: the hosted
-// app has neither. Print (print.ts) runs in this browser instead.
-const NO_SERVER_EXPORT =
-  "Not available here: Print from this browser instead, or export with the desktop app.";
-
 let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
 const styleCatalog = () => {
   const m = metadata ?? {};
@@ -727,46 +752,7 @@ const styleCatalog = () => {
   return catalogFor(m);
 };
 
-// The Publish tab's exports, run once every style save has reached the server.
-async function exportPrint(req: ExportRequest): Promise<ExportResult> {
-  if (backend.kind === "local") {
-    return { error: NO_SERVER_EXPORT, problems: [], files: [] };
-  }
-  while (metaSaveInFlight) await metaSaveDone;
-  const q = edition === null ? "" : `?edition=${encodeURIComponent(edition)}`;
-  const base = `/api/books/${encodeURIComponent(book)}/export`;
-  try {
-    const res = await fetch(base + q, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(req),
-    });
-    if (
-      res.status === 409 && res.headers.get("content-type")?.includes("json")
-    ) {
-      const { problems } = await res.json() as { problems: string[] };
-      return { problems, files: [] };
-    }
-    if (!res.ok) return { error: await res.text(), problems: [], files: [] };
-    const r = await res.json() as {
-      summary: string;
-      files: string[];
-      problems: string[];
-    };
-    // A fresh query per export, so the viewer never shows a cached PDF.
-    const v = `${q ? `${q}&` : "?"}v=${Date.now()}`;
-    return {
-      ...r,
-      files: r.files.map((name) => ({
-        name,
-        url: `${base}/${encodeURIComponent(name)}${v}`,
-      })),
-    };
-  } catch (err) {
-    return { error: brief(err), problems: [], files: [] };
-  }
-}
-
+// The Publish tab's e-book export, run once every style save has landed.
 async function exportEpub(): Promise<EpubResult> {
   while (metaSaveInFlight) await metaSaveDone;
   try {
@@ -794,8 +780,8 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         },
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
-        exportPrint,
         exportEpub,
+        toStyle,
         view,
         onRoute: (id) => {
           view = id;
@@ -828,6 +814,7 @@ function setMode(next: Mode): void {
     // storage blocked: the mode just won't survive a reload
   }
   syncUrl();
+  followCursor(cursorLine);
   if (next === "write") return;
   ensureConfigPanel().then((panel) => {
     if (mode !== "write") panel?.setMode(mode); // the latest, if it changed meanwhile
@@ -838,6 +825,30 @@ function setMode(next: Mode): void {
 async function pickStyle(key: string): Promise<void> {
   setMode("style");
   (await ensureConfigPanel())?.selectStyle(key);
+}
+
+// The footer's Go to style: unlike a preview click, it leaves a history entry,
+// so Back returns to Write at the line the writer left (installHistory).
+async function goToStyle(key: string): Promise<void> {
+  clearTimeout(urlTimer);
+  const here = { book, edition, view, line: cursorLine, lib: libId };
+  history.replaceState(null, "", appHref({ ...here, mode: "write" }));
+  await pickStyle(key);
+  history.pushState(null, "", appHref({ ...here, view, mode: "style" }));
+}
+
+// Back and Forward between the entries goToStyle and toStyle make: the URL's
+// mode, its Style/Publish view, and in Write its line.
+function installHistory(): void {
+  addEventListener("popstate", () => {
+    const p = new URLSearchParams(location.search);
+    const m = MODES.find((m) => m === p.get("mode")) ?? "write";
+    view = p.get("view");
+    setMode(m);
+    if (m !== "write" && view) configPanel?.open(view);
+    const line = lineFromHash(location.hash);
+    if (m === "write" && line !== null) scrollEditorToLine(editor, line);
+  });
 }
 
 const fetchManuscript = (
@@ -1030,10 +1041,11 @@ async function refreshConfigFromRemote(): Promise<void> {
   }
 }
 
-// Draggable gutters: each one writes a CSS var on #panes that the grid
-// template reads, persisted so widths survive a reload.
+// Draggable gutters: each one writes a CSS var on :root that the grids of
+// #panes and #footer read, persisted so widths survive a reload.
 function installGutters(): void {
   const panes = $("panes");
+  const root = document.documentElement; // the footer reads the widths too
   for (
     const [id, cssVar, min] of [["gutter-tree", "--w-tree", 120], [
       "gutter-editor",
@@ -1042,7 +1054,7 @@ function installGutters(): void {
     ]] as const
   ) {
     const saved = localStorage.getItem(cssVar);
-    if (saved) panes.style.setProperty(cssVar, saved);
+    if (saved) root.style.setProperty(cssVar, saved);
     const gutter = $(id);
     gutter.onpointerdown = (e) => {
       e.preventDefault();
@@ -1054,7 +1066,7 @@ function installGutters(): void {
       gutter.onpointermove = (m) => {
         // Leave at least 200px for whatever pane sits to the right.
         const max = panes.getBoundingClientRect().right - left - 200;
-        panes.style.setProperty(
+        root.style.setProperty(
           cssVar,
           `${Math.min(Math.max(m.clientX - left, min), max)}px`,
         );
@@ -1062,7 +1074,7 @@ function installGutters(): void {
       gutter.onpointerup = () => {
         gutter.onpointermove = gutter.onpointerup = null;
         gutter.classList.remove("dragging");
-        localStorage.setItem(cssVar, panes.style.getPropertyValue(cssVar));
+        localStorage.setItem(cssVar, root.style.getPropertyValue(cssVar));
       };
     };
   }
@@ -1104,6 +1116,59 @@ function installThemeToggle(): void {
     document.documentElement.dataset.theme = next;
     localStorage.setItem("theme", next);
   };
+}
+
+// The text view (the bar atop the editor): the editor's font and size and Hide markup, a per-reader
+// preference kept in localStorage, not the book.
+const TEXT_FONTS: Record<string, string> = {
+  serif: "ui-serif, Georgia, serif",
+  sans: "system-ui, sans-serif",
+  mono: "var(--mono)",
+};
+function installTextView(): void {
+  let prefs = { font: "serif", size: 16, hide: false };
+  try {
+    prefs = { ...prefs, ...JSON.parse(localStorage.getItem("text-view")!) };
+  } catch {
+    // none saved, or storage blocked: the defaults
+  }
+  const ed = $("editor");
+  const size = $("tv-size") as HTMLInputElement;
+  const hide = $("tv-hide") as HTMLInputElement;
+  const fonts = [
+    ...$("text-view").querySelectorAll<HTMLElement>("[data-font]"),
+  ];
+  const apply = () => {
+    ed.style.setProperty("--ed-font", TEXT_FONTS[prefs.font] ?? null);
+    ed.style.setProperty("--ed-fs", `${prefs.size}px`);
+    for (const b of fonts) {
+      b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));
+    }
+    size.value = String(prefs.size);
+    size.nextElementSibling!.textContent = `${prefs.size}px`;
+    hide.checked = prefs.hide;
+    setHideMarkup(editor, prefs.hide);
+    try {
+      localStorage.setItem("text-view", JSON.stringify(prefs));
+    } catch {
+      // storage blocked: the view just won't survive a reload
+    }
+  };
+  for (const b of fonts) {
+    b.onclick = () => {
+      prefs.font = b.dataset.font!;
+      apply();
+    };
+  }
+  size.oninput = () => {
+    prefs.size = Number(size.value);
+    apply();
+  };
+  hide.onchange = () => {
+    prefs.hide = hide.checked;
+    apply();
+  };
+  apply();
 }
 
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
@@ -1159,7 +1224,8 @@ function installShortcuts(
 }
 
 // ---- Create a new manuscript (spec §7.9) ------------------------------------
-// Import a file, or start blank; both ask for a title, then open the book.
+// Import a file or a web page, or start blank; all ask for a title, then open
+// the book.
 // `cancelable` is false for an empty library; there Back returns to the
 // Welcome (no server only: with one, the library is the server's folder).
 function createManuscript(cancelable: boolean): void {
@@ -1190,26 +1256,21 @@ function createManuscript(cancelable: boolean): void {
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
-    try {
-      err.textContent = "Reading…";
-      const r = importSource(
-        file.name,
-        new Uint8Array(await file.arrayBuffer()),
-      );
-      err.textContent = "";
-      dlg.close();
-      const got = await askTitle(
-        r.title,
-        `${file.name} · ${sizeLabel(file.size)}`,
-        "Import",
-      );
-      if (!got) return createManuscript(cancelable);
-      await backend.importBook(got.slug, r);
-      location.href = editionHref(got.slug, null);
-    } catch (e) {
-      err.textContent = brief(e);
-      if (!dlg.open) dlg.showModal();
-    }
+    err.textContent = "Reading…";
+    await importPicked(
+      {
+        name: file.name,
+        bytes: file.arrayBuffer().then((b) => new Uint8Array(b)),
+      },
+      `${file.name} · ${sizeLabel(file.size)}`,
+      cancelable,
+    );
+  };
+  $("create-web").onclick = async () => {
+    dlg.close();
+    const src = await askWebSource();
+    if (!src) return createManuscript(cancelable);
+    await importPicked(src, src.label, cancelable);
   };
   // A browser-storage library can copy books in from a Wynkyn folder on
   // disk: the way in for a browser that can't open the folder itself.
@@ -1246,6 +1307,31 @@ function createManuscript(cancelable: boolean): void {
     }
   };
   dlg.showModal();
+}
+
+/** The one import step for a file, a fetched page or a pasted one: read it,
+ *  ask for a title under `label`, write the book and open it. Errors go back
+ *  to the create dialog. */
+async function importPicked(
+  src: { name: string; bytes: Uint8Array | Promise<Uint8Array>; from?: string },
+  label: string,
+  cancelable: boolean,
+): Promise<void> {
+  const dlg = $("create") as HTMLDialogElement;
+  const err = $("create-err");
+  try {
+    const bytes = await src.bytes;
+    const r = importSource(src.name, bytes, { from: src.from });
+    err.textContent = "";
+    dlg.close();
+    const got = await askTitle(r.title, label, "Import");
+    if (!got) return createManuscript(cancelable);
+    await backend.importBook(got.slug, r);
+    location.href = editionHref(got.slug, null);
+  } catch (e) {
+    err.textContent = brief(e);
+    if (!dlg.open) dlg.showModal();
+  }
 }
 
 const sizeLabel = (bytes: number) =>
@@ -1296,6 +1382,72 @@ function askTitle(
     dlg.showModal();
     input.focus();
     input.select();
+  });
+}
+
+/** The web dialog: an address to fetch, or, when the site blocks that, the
+ *  page pasted from a new tab. The source plus its title-dialog line, or null
+ *  for Back. */
+function askWebSource(): Promise<(WebSource & { label: string }) | null> {
+  const dlg = $("web-dlg") as HTMLDialogElement;
+  const url = $("web-url") as HTMLInputElement;
+  const box = $("web-paste-box");
+  const open = $("web-open") as HTMLAnchorElement;
+  const paste = $("web-paste") as HTMLTextAreaElement;
+  const err = $("web-err");
+  $("web-paste-hint").textContent =
+    `That site doesn’t let a web page read it. Open it in a new tab, select all (${
+      chordLabel("Mod-A")
+    }), copy (${chordLabel("Mod-C")}), and paste it here.`;
+  box.hidden = true;
+  err.textContent = "";
+  url.oninput = () => {
+    box.hidden = true;
+  };
+  return new Promise((resolve) => {
+    const finish = (src: WebSource | null, label = "") => {
+      dlg.close();
+      resolve(
+        src && { ...src, label: `${label} · ${sizeLabel(src.bytes.length)}` },
+      );
+    };
+    $("web-back").onclick = () => finish(null);
+    dlg.oncancel = (e) => {
+      e.preventDefault();
+      finish(null);
+    };
+    ($("web-form") as HTMLFormElement).onsubmit = async (e) => {
+      e.preventDefault();
+      const addr = url.value.trim();
+      url.value = addr.includes("://") ? addr : `https://${addr}`;
+      const fetchBtn = $("web-fetch") as HTMLButtonElement;
+      fetchBtn.disabled = true; // Enter does nothing while the default button is off
+      err.textContent = "Fetching…";
+      try {
+        finish(await fetchSource(url.value), url.value);
+      } catch (e) {
+        if (!(e instanceof TypeError)) { // not CORS, offline or a bad host
+          err.textContent = brief(e);
+          return;
+        }
+        err.textContent = "";
+        open.href = openUrl(url.value);
+        box.hidden = false;
+        paste.focus();
+      } finally {
+        fetchBtn.disabled = false;
+      }
+    };
+    paste.onpaste = (e) => {
+      e.preventDefault();
+      const src = e.clipboardData && pasteSource(e.clipboardData, url.value);
+      if (!src) {
+        err.textContent = "Nothing to paste: copy the page first.";
+        return;
+      }
+      finish(src, `Pasted from ${src.from}`);
+    };
+    dlg.showModal();
   });
 }
 
@@ -1396,6 +1548,7 @@ async function main(): Promise<void> {
     onCursorLine: highlightTreeNode,
   });
   reparse(text);
+  installTextView();
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
   installShortcuts(
@@ -1423,6 +1576,7 @@ async function main(): Promise<void> {
   if (jump !== null) scrollEditorToLine(editor, jump);
   installGutters();
   installThemeToggle();
+  installHistory();
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);
@@ -1443,6 +1597,7 @@ async function main(): Promise<void> {
   if (cached) {
     restoreCachedRender(cached, previewEl);
     refreshPageIndicator();
+    followCursor(cursorLine);
   }
   const onClose = () => {
     // `deno task dev` restarts the server when app code changes; follow it
@@ -1474,6 +1629,7 @@ async function main(): Promise<void> {
       showPageProblems(problems);
       refreshPageIndicator();
       configPanel?.pagesChanged();
+      followCursor(cursorLine);
     }, (err) => {
       // The old pages stay up; their problems no longer describe this book.
       setStatus("error", `preview: ${brief(err)}`);

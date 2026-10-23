@@ -16,17 +16,22 @@ export interface PageMargins {
 
 export type Duplex = "short-edge" | "long-edge" | "none";
 export type Flip = Exclude<Duplex, "none">;
+// How a printed sheet becomes leaves (§4.3, §7.7): folded whole into one
+// gathering (folio once, quarto twice, octavo three times), cut into pieces
+// that are each folded once, or cut into single leaves with no fold.
+export type Fold = "folio" | "quarto" | "octavo" | "cut" | "leaves";
 
 // The physical setup of the edition (§4.3): the book page, the sheet it is
 // printed on, and how those sheets are folded into signatures. `size`/`margins`
-// drive the preview; `sheet`/`folios-per-signature`/`duplex` (and, printing
-// the backs by hand, `flip`/`reverse-backs`) drive imposition.
+// drive the preview; `sheet`/`fold`/`folios-per-signature`/`duplex` (and,
+// printing the backs by hand, `flip`/`reverse-backs`) drive imposition.
 // Everything else about the setup (pages across a sheet, sheets per signature,
 // slack to trim off) is derived — see metadata/page-setup.ts.
 export interface PageConfig {
   size?: string; // any CSS @page size value (§4.3)
   margins?: PageMargins;
   sheet?: string; // physical paper the printer loads; same value space as `size`
+  fold?: Fold; // unset: the fold that puts the most pages on a sheet
   "folios-per-signature"?: number | "booklet"; // booklet: every page in one signature
   duplex?: Duplex;
   flip?: Flip; // which edge the stack turns over on for its backs, duplex "none"
@@ -115,6 +120,7 @@ export interface TocConfig {
 export interface Metadata {
   spec?: string; // the spec version this file complies with (§4.2); missing = pre-versioned
   name?: string; // the default edition's display name (§4.1); named editions use their slug
+  language?: string; // BCP 47 (§4.2), default "en"; `ebook.language` is the older spelling
   page?: PageConfig;
   fonts?: Record<string, string>;
   elements?: Record<string, ElementStyle>;
@@ -130,6 +136,6 @@ export interface Metadata {
 /** The e-book export (spec §4.12): what an EPUB carries that print does not. */
 export interface EbookConfig {
   identifier?: string; // e.g. "urn:isbn:9780000000000"; default: a stable urn:uuid from the book slug
-  language?: string; // BCP 47, default "en"
+  language?: string; // BCP 47; falls back to the top-level `language`
   cover?: string; // image slug in images/
 }

@@ -3,7 +3,7 @@
 // NCX) for the book's own contents, then every spine item through the HTML
 // reader. Images are collected by the `src` the blocks reference.
 import { strFromU8, unzipSync } from "fflate";
-import type { Source } from "./blocks.ts";
+import { gutenbergNumber, type Source } from "./blocks.ts";
 import { readHtml } from "./html.ts";
 import { textOf, tokenize } from "./xml.ts";
 
@@ -61,8 +61,7 @@ export function readEpub(name: string, bytes: Uint8Array): Source {
   const date = textOf(opf, "dc:date");
   src.year = date?.match(/\b(1[5-9]\d\d|20\d\d)\b/)?.[1];
   const ident = textOf(opf, "dc:identifier") ?? "";
-  src.gutenberg = ident.match(/gutenberg\.org\/(?:ebooks\/|etext\/)?(\d+)/)
-    ?.[1];
+  src.gutenberg = gutenbergNumber(ident);
   if (src.gutenberg) src.year = undefined; // dc:date is the release date there
 
   const manifest = new Map<

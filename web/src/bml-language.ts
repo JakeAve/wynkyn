@@ -90,43 +90,33 @@ export const bmlLanguage = StreamLanguage.define<BmlStreamState>({
 });
 
 // Colors are CSS variables from index.html's Ink palette, so one highlight
-// style serves light and dark without a reconfigure.
+// style serves light and dark without a reconfigure. Markup is set in --mono
+// whatever font the writer picks for prose, so it reads as markup.
+const mono = "var(--mono)";
 const bmlHighlight = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.comment, color: "var(--syn-c)", fontStyle: "italic" },
-  { tag: tags.keyword, color: "var(--syn-k)", fontWeight: "600" },
-  { tag: tags.labelName, color: "var(--syn-slug)" },
-  { tag: tags.propertyName, color: "var(--syn-key)" },
-  { tag: tags.string, color: "var(--syn-t)" },
-  { tag: tags.bracket, color: "var(--syn-p)" },
-  { tag: tags.punctuation, color: "var(--syn-p)" },
-  { tag: tags.escape, color: "var(--syn-k)", fontWeight: "bold" },
+  {
+    tag: tags.keyword,
+    color: "var(--syn-k)",
+    fontWeight: "600",
+    fontFamily: mono,
+  },
+  { tag: tags.labelName, color: "var(--syn-slug)", fontFamily: mono },
+  { tag: tags.propertyName, color: "var(--syn-key)", fontFamily: mono },
+  { tag: tags.string, color: "var(--syn-t)", fontFamily: mono },
+  { tag: tags.bracket, color: "var(--syn-p)", fontFamily: mono },
+  { tag: tags.punctuation, color: "var(--syn-p)", fontFamily: mono },
+  {
+    tag: tags.escape,
+    color: "var(--syn-k)",
+    fontWeight: "bold",
+    fontFamily: mono,
+  },
 ]));
 
 // ---- sentinels by kind (UX round 1): line classes and gutter marks ----
 
 const STRUCTURAL = new Set(["matter", "part", "chapter"]);
-const FIELDS = new Set([
-  "title",
-  "subtitle",
-  "author",
-  "editor",
-  "translator",
-  "publisher",
-  "publisher-location",
-  "year",
-  "edition",
-  "series",
-  "series-number",
-  "copyright-line",
-  "rights",
-  "isbn",
-  "printer",
-  "typeface",
-  "paper",
-  "binding",
-  "dropcap",
-  "attribution",
-]);
 const BLOCKS = new Set([
   "quote",
   "epigraph",
@@ -146,9 +136,12 @@ const NEXT_KIND: Record<string, LineKind> = {
 // A `%%` line made only of box-drawing characters (U+2500–U+257F).
 const RULE_RE = /^%%\s*[─-╿]+\s*$/;
 
+// One rule, by closing form (§3.2.3): a nesting-close sentinel is a struct,
+// an explicit-close pair is a rail, and every other sentinel line — fields,
+// markers, point sentinels — is a field.
 export type LineKind =
   | "struct" // {matter} / {part} / {chapter}
-  | "field" // {title}, {author}, … — small and muted
+  | "field" // {title}, {author}, {heading}, {break}, … — small and muted
   | "rail" // inside a block pair, tags inclusive
   | "strong" // the line after {title} / {heading} / {subheading}
   | "italic" // the line after {subtitle}
@@ -177,7 +170,7 @@ export function classifyLines(lines: string[]): LineKind[][] {
     }
     if (t) {
       if (!t.closing && STRUCTURAL.has(t.name)) kinds.push("struct");
-      if (FIELDS.has(t.name)) kinds.push("field");
+      else if (!BLOCKS.has(t.name)) kinds.push("field");
       next = t.closing ? null : NEXT_KIND[t.name] ?? null;
       if (BLOCKS.has(t.name)) {
         if (!t.closing) open.push(t.name);
@@ -204,6 +197,33 @@ export function emRanges(line: string): [number, number, number, number][] {
   return out;
 }
 
+// Hide markup (the editor's text view bar): which sentinel-only lines to hide
+// (0-based). Only those in a paragraph that also has prose, so a lone
+// {illustration} or {break} stays and there is always text to click; never a
+// structural line, the writer's landmarks; never in the paragraph holding
+// `cursor` (0-based), so the markup being edited is always in view.
+export function hiddenLines(lines: string[], cursor: number): number[] {
+  const out: number[] = [];
+  let start = 0;
+  for (let i = 0; i <= lines.length; i++) {
+    if (i < lines.length && lines[i]!.trim() !== "") continue;
+    // lines[start, i) is one paragraph
+    if (cursor < start || cursor >= i) {
+      const para = lines.slice(start, i).map((l) => parseSentinelLine(l));
+      const prose = para.some((t, j) =>
+        !t && !lines[start + j]!.startsWith("%%")
+      );
+      para.forEach((t, j) => {
+        if (prose && t && !(STRUCTURAL.has(t.name) && !t.closing)) {
+          out.push(start + j);
+        }
+      });
+    }
+    start = i + 1;
+  }
+  return out;
+}
+
 // The structural block holding `line` (1-based): from the nearest
 // {matter}/{part}/{chapter} at or above it to the line before the next.
 export function structuralBlock(
@@ -216,6 +236,76 @@ export function structuralBlock(
   let to = line + 1;
   while (to <= lines && !isStructural(lineText(to))) to++;
   return [from, to - 1];
+}
+
+// Matter types that have a catalog type of their own; the rest are prose.
+const MATTER_TYPE: Record<string, string> = {
+  foreword: "prose-matter",
+  preface: "prose-matter",
+  introduction: "prose-matter",
+};
+// Field sentinels whose text is styled by the enclosing matter page.
+const PAGE_FIELDS = new Set([
+  "title",
+  "subtitle",
+  "author",
+  "edition",
+  "epigraph",
+  "imprint",
+  "copyright-line",
+  "rights",
+  "isbn",
+]);
+
+// The style-catalog keys for what `line` (1-based) is part of, most specific
+// first: "chapter.title" then "chapter"; "epigraph.attribution" then
+// "epigraph"; a bare paragraph is "paragraph". The caller keeps the first key
+// its catalog has. Empty when the line belongs to nothing stylable.
+// ponytail: rescans from the top on every cursor move; cache per doc if it lags.
+export function styleKeysAt(lines: string[], line: number): string[] {
+  let struct = ""; // the catalog type of the enclosing matter/part/chapter
+  const open: string[] = []; // enclosing blocks, keys, innermost last
+  let field: string[] = []; // keys of the field whose text runs on
+  for (let i = 0; i < Math.min(line, lines.length); i++) {
+    const text = lines[i]!;
+    const t = parseSentinelLine(text);
+    if (!t) {
+      if (text.trim() === "") field = [];
+      continue;
+    }
+    field = [];
+    const key = t.name === "is" ? `is.${t.slug ?? ""}` : t.name;
+    if (t.closing) {
+      if (open.includes(key)) open.length = open.lastIndexOf(key);
+      continue;
+    }
+    if (STRUCTURAL.has(t.name)) {
+      struct = t.name === "matter"
+        ? (MATTER_TYPE[t.slug ?? ""] ?? t.slug ?? "")
+        : t.name;
+      open.length = 0;
+      field = [struct];
+    } else if (BLOCKS.has(t.name)) {
+      open.push(key);
+    } else if (t.name === "attribution") {
+      const b = open.at(-1) ?? "epigraph";
+      field = [`${b}.attribution`, b];
+    } else if (t.name === "illustration") {
+      field = ["illustration.caption", "illustration"];
+    } else if (t.name === "note") field = ["footnote"];
+    else if (PAGE_FIELDS.has(t.name)) field = [`${struct}.${t.name}`, struct];
+    else field = [t.name]; // heading, subheading, break, dropcap, …
+  }
+  if (field.length) return field;
+  const block = open.at(-1);
+  if (block === "epigraph") return ["epigraph.text", "epigraph"];
+  if (block) return [block];
+  // Prose: a paragraph in the text, or the page itself in matter that has no
+  // paragraph style of its own (dedication, colophon).
+  if (["chapter", "part", "prose-matter", "appendix", ""].includes(struct)) {
+    return ["paragraph"];
+  }
+  return [struct];
 }
 
 const lineDeco = (kind: LineKind) =>

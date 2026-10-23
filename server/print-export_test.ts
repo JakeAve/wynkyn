@@ -25,9 +25,6 @@ const imp = impose(8, {
 const geom = {
   sheet: imp.sheet,
   page,
-  nUp: imp.nUp,
-  cols: imp.cols,
-  rows: imp.rows,
 };
 
 Deno.test("sidesFor: duplex interleaves front/back per sheet; fronts/backs split; backs can reverse", () => {
@@ -499,7 +496,7 @@ Deno.test("formatSummary is one line plus waste and font warnings when relevant"
   });
   assertEquals(
     text.split("\n")[0],
-    "demo: 12 pages → 12 padded · 1 signature × 3 folios · 4-up on legal · 2 sheets · duplex short-edge",
+    "demo: 12 pages → 12 padded · 1 signature × 3 folios · cut, 4-up on legal · 2 sheets · duplex short-edge",
   );
   assertEquals(
     text.split("\n")[1],
@@ -520,7 +517,7 @@ Deno.test("exportBook --edition: uses that edition's page size and writes under 
     await Deno.copyFile(new URL(f, src), `${root}/demo-book/${f}`);
   }
   try {
-    // pocket is 3.5×5in → 4-up on legal (8.5×14): 2 folios = 1 sheet = 2 sides.
+    // pocket is 3.5×5in → a quarto of legal (8.5×14): 2 folios = 1 sheet = 2 sides.
     const s = await exportBook(root, "demo-book", {
       proof: true,
       folios: 2,
@@ -561,9 +558,6 @@ Deno.test("buildSheetPdf: a quartered setup prints a portrait sheet, 2 × 2", as
   const bytes = await buildSheetPdf(sidesFor(q, "duplex", false), {
     sheet: q.sheet,
     page: qpage,
-    nUp: q.nUp,
-    cols: q.cols,
-    rows: q.rows,
   }, null);
   const doc = await PDFDocument.load(bytes);
   // Portrait, at the sheet's real dimensions — not the landscape 2-up shape.
