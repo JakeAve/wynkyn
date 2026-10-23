@@ -35,6 +35,7 @@ import {
   setHideMarkup,
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
+import { parseWordList, setSpeller } from "./spelling.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
 import { buildTree } from "./tree-data.ts";
@@ -1118,7 +1119,45 @@ function installThemeToggle(): void {
   };
 }
 
-// The text view (the bar atop the editor): the editor's font and size and Hide markup, a per-reader
+// Spell check (spec §7.3): the English word list, fetched once, and the
+// book's dictionary.json, which Add to dictionary grows. A book whose
+// `language` isn't English gets none.
+let english: Promise<Set<string>> | undefined;
+async function spellCheck(on: boolean): Promise<void> {
+  const toggle = $("tv-spell") as HTMLInputElement;
+  try {
+    const lang = (await fetchMetadata()).metadata.language ?? "en";
+    if (!/^en\b/i.test(lang)) {
+      toggle.disabled = true;
+      toggle.parentElement!.title = "Spell check is English only for now";
+      return;
+    }
+    if (!on) return setSpeller(editor, null);
+    english ??= fetch("/vendor/words-en.txt").then((r) =>
+      r.ok ? r.text() : Promise.reject(new Error(`word list: ${r.status}`))
+    ).then(parseWordList);
+    const [list, words] = await Promise.all([
+      english,
+      backend.dictionary(book),
+    ]);
+    const speller = (mine: Set<string>) => ({
+      has: (w: string) => list.has(w) || mine.has(w),
+      async add(w: string) {
+        try {
+          setSpeller(editor, speller(new Set(await backend.addWord(book, w))));
+        } catch (err) {
+          setStatus("error", `dictionary: ${brief(err)}`);
+        }
+      },
+    });
+    if (toggle.checked) setSpeller(editor, speller(new Set(words)));
+  } catch (err) {
+    english = undefined; // try the fetch again next time
+    setStatus("error", `spell check: ${brief(err)}`);
+  }
+}
+
+// The text view (the bar atop the editor): the editor's font and size, Hide markup and Spelling, a per-reader
 // preference kept in localStorage, not the book.
 const TEXT_FONTS: Record<string, string> = {
   serif: "ui-serif, Georgia, serif",
@@ -1126,7 +1165,7 @@ const TEXT_FONTS: Record<string, string> = {
   mono: "var(--mono)",
 };
 function installTextView(): void {
-  let prefs = { font: "serif", size: 16, hide: false };
+  let prefs = { font: "serif", size: 16, hide: false, spell: true };
   try {
     prefs = { ...prefs, ...JSON.parse(localStorage.getItem("text-view")!) };
   } catch {
@@ -1135,6 +1174,7 @@ function installTextView(): void {
   const ed = $("editor");
   const size = $("tv-size") as HTMLInputElement;
   const hide = $("tv-hide") as HTMLInputElement;
+  const spell = $("tv-spell") as HTMLInputElement;
   const fonts = [
     ...$("text-view").querySelectorAll<HTMLElement>("[data-font]"),
   ];
@@ -1148,6 +1188,7 @@ function installTextView(): void {
     size.value = String(prefs.size);
     size.nextElementSibling!.textContent = `${prefs.size}px`;
     hide.checked = prefs.hide;
+    spell.checked = prefs.spell;
     setHideMarkup(editor, prefs.hide);
     try {
       localStorage.setItem("text-view", JSON.stringify(prefs));
@@ -1177,7 +1218,14 @@ function installTextView(): void {
     prefs.hide = hide.checked;
     apply();
   };
+  spell.checked = prefs.spell;
+  spell.onchange = () => {
+    prefs.spell = spell.checked;
+    apply();
+    spellCheck(prefs.spell);
+  };
   apply();
+  spellCheck(prefs.spell);
 }
 
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";

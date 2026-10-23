@@ -27,6 +27,7 @@ export const FILES: Record<string, string> = {
   "web/brand/site.webmanifest": "web/brand/site.webmanifest",
   "web/brand/og.png": "web/brand/og.png",
   "vendor/pagedjs/paged.js": "vendor/paged.js",
+  "vendor/scowl/en.txt": "vendor/words-en.txt",
   "renderer/base.css": "renderer/base.css",
   "templates/metadata.json": "templates/metadata.json",
 };
