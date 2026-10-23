@@ -137,7 +137,7 @@ export function setEditionSpans(
   view.dispatch({ effects: setSpans.of({ spans, token }) });
 }
 
-// ---- hide markup (the Aa view): sentinel lines beside prose and {em} tags
+// ---- hide markup (the text view bar): sentinel lines beside prose and {em} tags
 // fold away everywhere but the cursor's paragraph (hiddenLines) ----
 
 const hide = Decoration.replace({});

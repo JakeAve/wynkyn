@@ -617,7 +617,7 @@ summary {
   flex: 1;
   min-height: 0;
 }
-/* The text view (Aa, app.ts installTextView): the writer's font and size on
+/* The text view (#text-view, app.ts installTextView): the writer's font and size on
    #editor, a reading measure, centred once Pages is hidden. .cm-content
    grows to the measure and the scroller centres what is left over. */
 #editor .cm-scroller {
@@ -631,50 +631,34 @@ summary {
 #panes.pages-hidden #editor .cm-scroller {
   justify-content: center;
 }
-#text-view-open {
-  font-family: ui-serif, Georgia, serif;
-  font-size: 15px;
-  padding-block: 3px;
-}
-:root:not([data-mode="write"]) #text-view-open {
-  display: none;
-}
+/* the text view bar along the top of the editor */
 #text-view {
-  position: fixed;
-  inset: 44px 10px auto auto;
-  margin: 0;
-  padding: 6px 14px;
-  width: 280px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--fg);
-  box-shadow: 0 14px 36px var(--backdrop);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
 }
-#text-view .tv-row {
+#text-view label {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 40px;
-}
-#text-view .tv-row + .tv-row {
-  border-top: 1px solid var(--soft);
-}
-#text-view small {
-  display: block;
-  color: var(--muted);
-  font-size: var(--fs-sm);
+  gap: 8px;
+  cursor: pointer;
 }
 #text-view input[type="range"] {
-  flex: 1;
+  width: 90px;
+  margin: 0;
   accent-color: var(--fg);
 }
 #text-view output {
-  min-width: 2.5em;
-  text-align: right;
-  color: var(--muted);
+  min-width: 2.6em;
   font-variant-numeric: tabular-nums;
+}
+#text-view .tv-hide {
+  margin-left: auto;
 }
 /* Changed-on-disk banner: the buffer has unsaved edits and the file moved
    under it. Rare and it blocks saving, so it is the one loud thing in the

@@ -1153,7 +1153,7 @@ function installThemeToggle(): void {
   };
 }
 
-// The text view (Aa): the editor's font and size and Hide markup, a per-reader
+// The text view (the bar atop the editor): the editor's font and size and Hide markup, a per-reader
 // preference kept in localStorage, not the book.
 const TEXT_FONTS: Record<string, string> = {
   serif: "ui-serif, Georgia, serif",

@@ -197,7 +197,7 @@ export function emRanges(line: string): [number, number, number, number][] {
   return out;
 }
 
-// Hide markup (the writer's Aa view): which sentinel-only lines to hide
+// Hide markup (the editor's text view bar): which sentinel-only lines to hide
 // (0-based). Only those in a paragraph that also has prose, so a lone
 // {illustration} or {break} stays and there is always text to click; never a
 // structural line, the writer's landmarks; never in the paragraph holding
