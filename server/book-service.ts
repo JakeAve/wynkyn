@@ -110,6 +110,23 @@ export class BookService {
     return this.store.list();
   }
 
+  /** The library's id (`library.json`), minted on first ask. It lives with
+   * the books, so it is the same from any browser or machine that opens this
+   * folder; the app writes it into its URLs so a link from another library
+   * can be told apart from one of ours. Random: it identifies, not protects. */
+  async libraryId(): Promise<string> {
+    const path = "library.json";
+    try {
+      const id = JSON.parse(await this.store.readText(path) ?? "{}").id;
+      if (typeof id === "string" && id) return id;
+    } catch {
+      // unreadable file: replaced below
+    }
+    const fresh = crypto.randomUUID().slice(0, 8);
+    await this.store.write(path, JSON.stringify({ id: fresh }) + "\n");
+    return fresh; // ponytail: two tabs minting at once leaves one stale URL once
+  }
+
   editions(book: string): Promise<EditionInfo[]> {
     return this.requireBook(book).then(() => listEditions(this.store, book));
   }

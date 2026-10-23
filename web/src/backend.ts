@@ -17,6 +17,8 @@ export interface Backend {
   /** The folder the service runs over; only in-page (the app zips from it). */
   readonly store?: BookStore;
   listBooks(): Promise<string[]>;
+  /** The library's id (BookService.libraryId). */
+  libraryId(): Promise<string>;
   createBook(slug: string, title?: string): Promise<void>;
   /** A book from an import run in the page (§7.9). */
   importBook(
@@ -87,6 +89,7 @@ export function httpBackend(): Backend {
     kind: "http",
     listBooks: () =>
       call<{ books: string[] }>("/api/books").then((r) => r.books),
+    libraryId: () => call<{ id: string }>("/api/library").then((r) => r.id),
     createBook: (slug, title) => post("/api/books", { slug, title }),
     importBook: (slug, r) =>
       post(`/api/books/${encodeURIComponent(slug)}/import`, {
@@ -213,6 +216,7 @@ export function localBackend(
     kind: "local",
     store,
     listBooks: () => service.list(),
+    libraryId: () => service.libraryId(),
     async createBook(slug, title) {
       if (!await service.createBook(slug, assets.template, title)) {
         throw new Error("book already exists");
