@@ -84,14 +84,13 @@ const SAVE_DEBOUNCE_MS = 600;
 
 const clientId = crypto.randomUUID();
 const params = new URLSearchParams(location.search);
-let view: string | null = null; // the Style/Publish nav row, as the panel reports it
+let view: string | null = params.get("view"); // the Style/Publish nav row
 
 // The library's id (library.json, minted by the service), written into the
 // URL so a link from another library (their book, mode and line, meaningless
 // here) goes to the plain home page. Null until known, or when the store
 // couldn't say; then a link is taken as is.
 let libId: string | null = null;
-let cursorLine = 1;
 
 // Keep the address bar at the author's place (appHref) without history
 // entries; debounced because Safari rate-limits replaceState.
@@ -236,6 +235,7 @@ function showPageProblems(problems: PageProblem[]): void {
 }
 
 let treeLines: number[] = []; // start line of every tree node, ascending
+let cursorLine = 1;
 
 function refreshTree(doc: BmlDocument): void {
   const nodes = buildTree(doc);
@@ -797,7 +797,7 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         isNames: () => isNames,
         exportPrint,
         exportEpub,
-        view: params.get("view"),
+        view,
         onRoute: (id) => {
           view = id;
           syncUrl();

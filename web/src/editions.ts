@@ -40,7 +40,6 @@ export function firstSpanLine(
   return spans.find((s) => s.editions.includes(token))?.line ?? null;
 }
 
-// The editor line a switcher jump carries across the navigation: `#line=12`.
 // The app's whole place in one URL, so a reload lands where the author was
 // and a pasted link opens there for someone else. Every part heals on load:
 // an unknown book, edition, mode, view or line falls back to a default.
@@ -50,15 +49,16 @@ export function appHref(s: {
   mode: string;
   view: string | null; // the Style/Publish nav row (config-panel.ts navId)
   line: number; // the editor's cursor line, 1-based
-  lib?: string | null; // this browser's library id; a link from another is sent home
+  lib?: string | null; // the library's id; a link from another is sent home
 }): string {
   let href = editionHref(s.book, s.edition);
-  if (s.lib) href += `&lib=${s.lib}`;
+  if (s.lib) href += `&lib=${encodeURIComponent(s.lib)}`;
   if (s.mode !== "write") href += `&mode=${s.mode}`;
   if (s.view) href += `&view=${encodeURIComponent(s.view)}`;
   return s.line > 1 ? `${href}#line=${s.line}` : href;
 }
 
+// The editor line a switcher jump carries across the navigation: `#line=12`.
 export function lineFromHash(hash: string): number | null {
   const m = hash.match(/^#line=(\d+)$/);
   return m ? Number(m[1]) : null;

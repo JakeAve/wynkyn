@@ -116,18 +116,15 @@ export class BookService {
    * can be told apart from one of ours. Random: it identifies, not protects. */
   async libraryId(): Promise<string> {
     const path = "library.json";
-    const read = async () => {
-      const text = await this.store.readText(path);
-      const id = text ? JSON.parse(text).id : null;
-      return typeof id === "string" && id ? id : null;
-    };
-    const got = await read();
-    if (got) return got;
-    const fresh = crypto.randomUUID().slice(0, 8);
-    if (await this.store.create(path, JSON.stringify({ id: fresh }) + "\n")) {
-      return fresh;
+    try {
+      const id = JSON.parse(await this.store.readText(path) ?? "{}").id;
+      if (typeof id === "string" && id) return id;
+    } catch {
+      // unreadable file: replaced below
     }
-    return (await read()) ?? fresh; // another writer got there first
+    const fresh = crypto.randomUUID().slice(0, 8);
+    await this.store.write(path, JSON.stringify({ id: fresh }) + "\n");
+    return fresh; // ponytail: two tabs minting at once leaves one stale URL once
   }
 
   editions(book: string): Promise<EditionInfo[]> {
