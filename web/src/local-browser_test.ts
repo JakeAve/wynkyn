@@ -135,7 +135,7 @@ Deno.test({
 
 Deno.test({
   name: "local library: a browser without the File System Access API " +
-    "gets the notice, the same Welcome, and the browser's own error on a folder button",
+    "gets the notice, no Create, and Select copies the folder into the browser",
   ignore: !hasChrome || !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
@@ -152,21 +152,26 @@ Deno.test({
       assertEquals(await page.locator("#library[open]").count(), 0);
       await page.locator("#browser-notice-close").click();
       await page.locator("#library[open]").waitFor();
-      // Nothing hidden: the folder button is there and the click says why not.
-      assertEquals(await page.locator("#lib-pick").isVisible(), true);
-      await page.locator("#lib-pick").click();
-      await page.locator("#lib-err:not(:empty)").waitFor();
+      // No Create; Select reads the folder and copies its books in.
+      assert(await page.locator("#lib-new").isDisabled());
       assertStringIncludes(
-        (await page.locator("#lib-err").textContent()) ?? "",
-        "showDirectoryPicker",
+        (await page.locator("#lib-pick small").textContent()) ?? "",
+        "copied",
       );
       // An empty library's Create dialog has a Back to the Welcome.
       await page.locator("#lib-browser").click();
       await page.locator("#create[open]").waitFor();
       await page.locator("#create-back").click();
       await page.locator("#library[open]").waitFor();
-      await seedDemoBook(page, `http://localhost:${site.addr.port}/`);
+      await page.locator("#lib-dir").setInputFiles(
+        new URL("../../server/testdata/demo-book", import.meta.url).pathname,
+      );
       await page.locator('#status[data-kind="saved"]').waitFor();
+      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
+        .first().waitFor();
+      assert(
+        (await page.locator("#preview").innerText()).includes("Chapter One"),
+      );
       // Dismissed once, the notice stays away.
       await page.reload();
       await page.locator('#status[data-kind="saved"]').waitFor();

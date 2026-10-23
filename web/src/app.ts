@@ -68,6 +68,7 @@ import {
   browserFolder,
   createBooksFolder,
   handleStore,
+  importBooks,
   pickFolder,
   rememberedFolder,
   reopenFolder,
@@ -848,10 +849,38 @@ async function chooseLibrary(): Promise<BookStore> {
         } else err.textContent = "The folder wasn't allowed.";
       };
     }
+    // Without the File System Access API (Firefox, Safari) a folder can be
+    // read but not written: Select copies its books into browser storage,
+    // and there is no Create.
+    const native = "showDirectoryPicker" in globalThis;
+    ($("lib-new") as HTMLButtonElement).disabled = !native;
     $("lib-new").onclick = () =>
       createBooksFolder().then((d) => done(handleStore(d), "folder"), fail);
+    const input = $("lib-dir") as HTMLInputElement;
+    if (!native) {
+      $("lib-pick").querySelector("small")!.textContent =
+        "This browser can’t edit a folder in place, so its books are copied " +
+        "into the browser.";
+    }
     $("lib-pick").onclick = () =>
-      pickFolder().then((d) => done(handleStore(d), "folder"), fail);
+      native
+        ? pickFolder().then((d) => done(handleStore(d), "folder"), fail)
+        : input.click();
+    input.onchange = async () => {
+      if (!input.files?.length) return;
+      try {
+        const store = handleStore(await browserFolder());
+        const books = await importBooks(store, input.files);
+        if (!books.length) {
+          err.textContent =
+            "No book found: a book is a folder with a manuscript.md.";
+          return;
+        }
+        done(store, "browser");
+      } catch (e) {
+        fail(e);
+      }
+    };
     $("lib-browser").onclick = () =>
       browserFolder().then((d) => done(handleStore(d), "browser"), fail);
     dlg.showModal();

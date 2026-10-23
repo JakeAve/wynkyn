@@ -87,8 +87,8 @@ mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
   (`web/src/book-zip.ts` zips a book for download out of browser storage); the
   Chrome print export (Proof / Export) says it isn't available; browsers without
   the File System Access API (Firefox, Safari, Brave by default) get a notice
-  pointing at Chrome or Edge, then the same Welcome; a folder button there fails
-  with the browser's own error
+  pointing at Chrome or Edge, then the same Welcome with Create disabled and
+  Select copying the picked folder's books into browser storage
 - `deno task test` all tests (`*_test.ts` next to each module, ~50 s with
   Chrome); `deno task test:fast` skips the Chrome tests (~10 s, what pre-commit
   runs). `web/src/local-browser_test.ts` drives the built `dist/` with no
