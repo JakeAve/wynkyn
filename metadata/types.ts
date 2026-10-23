@@ -115,6 +115,7 @@ export interface TocConfig {
 export interface Metadata {
   spec?: string; // the spec version this file complies with (§4.2); missing = pre-versioned
   name?: string; // the default edition's display name (§4.1); named editions use their slug
+  language?: string; // BCP 47 (§4.2), default "en"; `ebook.language` is the older spelling
   page?: PageConfig;
   fonts?: Record<string, string>;
   elements?: Record<string, ElementStyle>;
@@ -130,6 +131,6 @@ export interface Metadata {
 /** The e-book export (spec §4.12): what an EPUB carries that print does not. */
 export interface EbookConfig {
   identifier?: string; // e.g. "urn:isbn:9780000000000"; default: a stable urn:uuid from the book slug
-  language?: string; // BCP 47, default "en"
+  language?: string; // BCP 47; falls back to the top-level `language`
   cover?: string; // image slug in images/
 }

@@ -23,6 +23,7 @@ export interface RenderOptions {
   notes?: NotesConfig;
   toc?: TocConfig;
   images?: Record<string, string>; // slug → relative path; resolved by the caller
+  language?: string; // BCP 47 (spec §4.2); stamped on the article as `lang`
 }
 
 export function formatNumber(n: number, style: NumberingStyle): string {
@@ -684,7 +685,8 @@ function renderPart(
 }
 
 export function render(doc: BmlDocument, opts: RenderOptions = {}): string {
-  const out: string[] = [`<article class="bml">`];
+  const lang = opts.language ? ` lang="${escapeHtml(opts.language)}"` : "";
+  const out: string[] = [`<article class="bml"${lang}>`];
   for (const m of doc.frontMatter) {
     out.push(renderMatter(m, doc, opts, "front"));
   }

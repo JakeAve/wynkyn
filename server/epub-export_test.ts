@@ -285,6 +285,22 @@ Deno.test("exportEpub: a named edition lands in export/<edition>; a missing book
   );
 });
 
+Deno.test("exportEpub: the top-level language wins over the older ebook.language", async () => {
+  const root = await Deno.makeTempDir();
+  await Deno.mkdir(`${root}/b`);
+  await Deno.writeTextFile(
+    `${root}/b/manuscript.md`,
+    "{chapter: one}\n{title}\nOne\n\nText.\n",
+  );
+  await Deno.writeTextFile(
+    `${root}/b/metadata.json`,
+    '{"language":"fr","ebook":{"language":"es"}}',
+  );
+  const s = await exportEpub(root, "b");
+  const opf = read(await Deno.readFile(s.file))["OEBPS/content.opf"]!;
+  assertStringIncludes(opf, "<dc:language>fr</dc:language>");
+});
+
 // `brew install epubcheck` to run this one; it is skipped where the tool is absent.
 const hasEpubcheck = await (async () => {
   try {

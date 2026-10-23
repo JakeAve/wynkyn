@@ -1152,6 +1152,7 @@ books/
 {
   "spec": "0.6",
   "name": "Standard",
+  "language": "en",
   "page": { ... },
   "fonts": { ... },
   "elements": { ... },
@@ -1170,6 +1171,11 @@ on files that lack one (they predate the key). The app compares it to its own
 `SPEC_VERSION` (`metadata/upgrade.ts`) and warns on a book newer than itself;
 unknown keys are kept, never dropped. Bumping `spec` after an on-load upgrade is
 not done yet; see the todo in `docs/`.
+
+`language` is the book's BCP 47 tag, default `"en"`: the renderer stamps it on
+the article as `lang`, which is what `hyphens: auto` (§4.5) and the EPUB's
+`dc:language` (§4.12) read. A Spanish book that leaves it unset hyphenates by
+English rules.
 
 ### 4.3 Section: `page`
 
@@ -1289,10 +1295,15 @@ default is `1.5em`) and `margin-top` in `lh` units for space between paragraphs
 (`"0.5lh"`). The paragraph that opens a block (`.lead`: first in its container,
 or after a title, heading or break) and the drop-cap paragraph stay flush and
 tight whatever `paragraph` says; one after a quote, poem, list or other block
-keeps its indent. Pullquote text and attributions are flush. Display matter
-(half-title, title-page, copyright, dedication, epigraph, colophon) sets lines,
-not prose: its paragraphs take `text-indent` from the section, none by default,
-so `"dedication": { "text-indent": "1.5em" }` indents a dedication.
+keeps its indent. Pullquote text and attributions are flush. `body` is the whole
+text block (`.bml`); `"hyphens": "auto"` there turns on the browser's dictionary
+hyphenation for the book's `language` (the template ships with it on, since
+justified text without it sets rivers). Titles, numbers and headings never
+hyphenate whatever `body` says, and the base stylesheet allows no fragment under
+three letters (`hyphenate-limit-chars: 6 3 3`). Display matter (half-title,
+title-page, copyright, dedication, epigraph, colophon) sets lines, not prose:
+its paragraphs take `text-indent` from the section, none by default, so
+`"dedication": { "text-indent": "1.5em" }` indents a dedication.
 
 ```json
 "elements": {
@@ -1685,8 +1696,8 @@ optional.
   `urn:uuid` derived from the book slug and edition, the same on every export,
   so a reader's library sees a re-export as the same book. Set an ISBN urn here
   to publish through a store.
-- `language` — BCP 47 tag for `dc:language` and the documents' `lang`. Default
-  `"en"`.
+- `language` — the older spelling of the top-level `language` (§4.2), read only
+  when that is unset.
 - `cover` — an image slug in `images/`. Becomes the package's cover image and
   the first page of the spine.
 

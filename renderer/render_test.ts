@@ -553,3 +553,12 @@ Deno.test("render: blocks carry data-line", () => {
   assertEquals(lines(/<div class="break" data-line="(\d+)"/g), ["25"]);
   assert(!/<(em|br)[^>]*data-line/.test(html), "inline nodes get no attribute");
 });
+
+Deno.test("language lands on the article as lang; absent by default", () => {
+  const doc = parse("{chapter: one}\n{title}\nOne\n\nText.\n");
+  assertStringIncludes(
+    render(doc, { language: "es" }),
+    '<article class="bml" lang="es">',
+  );
+  assertStringIncludes(render(doc), '<article class="bml">');
+});

@@ -182,6 +182,7 @@ export async function buildBook(
       notes: opts.notes ?? m.notes,
       toc: m.toc,
       images,
+      language: m.language ?? m.ebook?.language,
     }),
     baseCss: opts.baseCss ?? await defaultBaseCss(),
     domCss: generateDomCSS(m),
