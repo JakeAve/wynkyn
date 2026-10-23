@@ -86,21 +86,11 @@ const clientId = crypto.randomUUID();
 const params = new URLSearchParams(location.search);
 let view: string | null = null; // the Style/Publish nav row, as the panel reports it
 
-// A random id for this browser's library, so a link pasted by someone else
-// (their book, mode and line, meaningless here) goes to the plain home page
-// instead of landing on some book of ours in their mode. Null = storage
-// blocked, and then any link is taken as is.
-const libId = ((): string | null => {
-  try {
-    const got = localStorage.getItem("lib");
-    if (got) return got;
-    const fresh = crypto.randomUUID().slice(0, 8);
-    localStorage.setItem("lib", fresh);
-    return fresh;
-  } catch {
-    return null;
-  }
-})();
+// The library's id (library.json, minted by the service), written into the
+// URL so a link from another library (their book, mode and line, meaningless
+// here) goes to the plain home page. Null until known, or when the store
+// couldn't say; then a link is taken as is.
+let libId: string | null = null;
 let cursorLine = 1;
 
 // Keep the address bar at the author's place (appHref) without history
@@ -1356,13 +1346,16 @@ function renderImportNotes(text: string): void {
 }
 
 async function main(): Promise<void> {
+  backend = await connect();
+  [books, libId] = await Promise.all([
+    backend.listBooks(),
+    backend.libraryId().catch(() => null),
+  ]);
   const lib = params.get("lib");
   if (lib && libId && lib !== libId) {
     location.replace(location.pathname); // someone else's place: start at home
     return;
   }
-  backend = await connect();
-  books = await backend.listBooks();
   if (!books.length) {
     // An empty library: the first book is the only thing to do.
     createManuscript(false);

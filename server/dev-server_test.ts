@@ -36,6 +36,14 @@ Deno.test("http: shell, book list, build json, images, 404s", async () => {
     const books = await (await fetch(`${base}/api/books`)).json();
     assertEquals(books, { books: ["demo-book"] });
 
+    // The library id is minted into library.json once and then stable.
+    const { id } = await (await fetch(`${base}/api/library`)).json();
+    assert(/^[0-9a-f]{8}$/.test(id));
+    assertEquals(JSON.parse(await Deno.readTextFile(`${root}/library.json`)), {
+      id,
+    });
+    assertEquals((await (await fetch(`${base}/api/library`)).json()).id, id);
+
     const build = await (await fetch(`${base}/api/books/demo-book`)).json();
     assert(build.html.includes("Chapter One"));
     assert(build.pagedCss.includes("@page"));
