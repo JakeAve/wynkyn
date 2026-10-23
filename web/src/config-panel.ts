@@ -58,16 +58,16 @@ const GROUPS: Array<[BookPart["group"], string]> = [
 ];
 
 // Publish nav rows: the Publish view's section focus keys (panel-page.ts).
-// Grouped by what the author is making: an e-book, a PDF of the pages, or
-// sheets to fold and bind.
+// Grouped by what the author is making: sheets to fold and bind, a PDF of
+// the pages, or an e-book.
 const PUBLISH: Array<[string, Array<[string, string]>]> = [
-  ["E-book", [["ebook", "EPUB"]]],
-  ["PDF", [["pdf", "Pages"]]],
   ["Binding", [
     ["sheet", "Paper"],
     ["folios-per-signature", "Signatures"],
     ["print", "Print"],
   ]],
+  ["PDF", [["pdf", "Pages"]]],
+  ["E-book", [["ebook", "EPUB"]]],
 ];
 
 interface NavRow {
@@ -79,7 +79,7 @@ interface NavRow {
 
 // Which nav row a route belongs to.
 function navId(route: Route): string {
-  if (route.tab === "publish") return `publish:${route.focus ?? "ebook"}`;
+  if (route.tab === "publish") return `publish:${route.focus ?? "sheet"}`;
   return route.tab === "parts" ? route.part ?? "" : route.tab;
 }
 

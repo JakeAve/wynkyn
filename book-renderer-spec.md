@@ -2002,13 +2002,15 @@ Includes:
 - The first signature drawn as it prints: each sheet's front and back with the
   book pages that land on it, folds dashed, cuts solid, from the same `impose()`
   export uses
-- The Publish view grouped by what the author is making: **E-book** (Export
-  EPUB, §7.8); **PDF**, the pages in reading order at the page size, one per
-  printed page (Print pages; Save as PDF gives the file `book.pdf` would be);
-  and **Binding** — Paper (the page size, with a link to Style's Page view that
-  Back returns from, and the sheet), Signatures, and Print (duplex, the by-hand
-  flip and back order, and the Print sheets buttons, §7.7). All printing runs in
-  the browser; proofs and the sheet PDFs on disk are `bml export`'s
+- The Publish view grouped by what the author is making: **Binding** — Paper
+  (the page size, with a link to Style's Page view that Back returns from, and
+  the sheet), Signatures, and Print (auto duplex or by hand, the by-hand flip
+  and back order, and the Print sheets buttons, §7.7); **PDF**, the pages in
+  reading order at the page size, one per printed page (Print pages; Save as PDF
+  gives the file `book.pdf` would be); and **E-book** (Export EPUB, §7.8). All
+  printing runs in the browser; proofs and the sheet PDFs on disk are
+  `bml
+  export`'s
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a
   warning under a family that is neither; §4.4)

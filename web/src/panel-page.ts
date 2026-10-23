@@ -21,6 +21,7 @@ import {
   tryParseDims,
 } from "./config-data.ts";
 import {
+  icon,
   makeView,
   row,
   section,
@@ -237,7 +238,7 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
 
   const duplex = v.mark(
     row(
-      "Two-sided",
+      "Auto duplex",
       seg<Duplex>(
         [
           { label: "Short edge", value: "short-edge" },
@@ -255,6 +256,11 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
     ),
     () => !!page.duplex,
   );
+  duplex.querySelector(".lbl")!.append(
+    info(
+      "If your printer does not support duplex / two-sided printing for the sheet size, choose “By hand”.",
+    ),
+  );
   // The printer's settings sit with the buttons they change.
   const printing = printSection(ctx, page, [duplex, ...manual]);
   const showManual = () => {
@@ -264,8 +270,6 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
   showManual();
 
   return [
-    ebookSection(ctx),
-    pagesSection(ctx, page),
     section("Paper", "sheet", [
       pageSizeRow(ctx, page),
       v.mark(
@@ -297,6 +301,8 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       readout,
     ]),
     printing.sec,
+    pagesSection(ctx),
+    ebookSection(ctx),
   ];
 }
 
@@ -388,6 +394,15 @@ function printSection(
   };
 }
 
+// A hover/focus tip beside a row label: the native title is the tooltip.
+function info(text: string): HTMLElement {
+  const b = el("button", "info", icon("info"));
+  b.type = "button";
+  b.title = text;
+  b.setAttribute("aria-label", text);
+  return b;
+}
+
 // The page size is Style's to set; Publish shows it, with the way there. The
 // trip leaves a history entry, so Back returns here.
 function pageSizeRow(ctx: PanelContext, page: PageConfig): HTMLElement {
@@ -411,7 +426,7 @@ function pageSizeRow(ctx: PanelContext, page: PageConfig): HTMLElement {
 
 // The book's pages in reading order, one per printed page at the page size,
 // no imposition: Save as PDF gives a file the size of the book.
-function pagesSection(ctx: PanelContext, page: PageConfig): HTMLElement {
+function pagesSection(ctx: PanelContext): HTMLElement {
   const status = el("div", "export-status");
   status.setAttribute("aria-live", "polite");
   const btn = el("button", "tog primary", "Print pages");
@@ -419,7 +434,7 @@ function pagesSection(ctx: PanelContext, page: PageConfig): HTMLElement {
   btn.onclick = () => {
     status.replaceChildren();
     const pages = ctx.preview.pages();
-    const size = tryParseDims(page.size ?? DEFAULT_SIZE);
+    const size = tryParseDims(ctx.meta.page?.size ?? DEFAULT_SIZE);
     if (!pages.length || !size) {
       status.append(
         el("p", "err", "Nothing to print until the preview has paginated."),
@@ -433,13 +448,8 @@ function pagesSection(ctx: PanelContext, page: PageConfig): HTMLElement {
     printSheets(pages, sides, { sheet: size, page: size, cols: 1, rows: 1 });
   };
   return section("PDF", "pdf", [
-    pageSizeRow(ctx, page),
     el("div", "actions", btn),
-    el(
-      "p",
-      "hint",
-      "One book page per sheet, at the page size. Choose Save as PDF in the print dialog for a file to send to a print shop.",
-    ),
+    el("p", "hint", "Choose Save as PDF in the print dialog."),
     status,
   ]);
 }

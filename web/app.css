@@ -1278,6 +1278,22 @@ summary {
   color: var(--fg);
   background: var(--hover);
 }
+#config-overlay .info {
+  background: none;
+  border: 0;
+  padding: 0 0 0 4px;
+  color: var(--muted);
+  cursor: help;
+  vertical-align: -2px;
+}
+#config-overlay .info:hover,
+#config-overlay .info:focus-visible {
+  color: var(--fg);
+}
+#config-overlay .info svg.i {
+  width: 13px;
+  height: 13px;
+}
 #config-overlay .where svg.i {
   width: 13px;
   height: 13px;
