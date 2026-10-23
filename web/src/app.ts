@@ -854,14 +854,20 @@ async function chooseLibrary(): Promise<BookStore> {
 
 // Without the File System Access API (Firefox, Safari) the app can't open
 // the author's folder, and Safari can't write browser storage from a page
-// either: say so once, and point at the browsers that can.
-function showBrowserBanner(): void {
-  if (canPickFolder() || localStorage.getItem("browser-banner") === "1") return;
-  $("browser-banner").hidden = false;
-  $("browser-banner-close").onclick = () => {
-    $("browser-banner").hidden = true;
-    localStorage.setItem("browser-banner", "1");
-  };
+// either: say so once, before the Welcome, and point at the browsers that can.
+function browserNotice(): Promise<void> {
+  if (canPickFolder() || localStorage.getItem("browser-notice") === "1") {
+    return Promise.resolve();
+  }
+  const dlg = $("browser-notice") as HTMLDialogElement;
+  return new Promise((resolve) => {
+    dlg.onclose = () => {
+      localStorage.setItem("browser-notice", "1");
+      resolve();
+    };
+    $("browser-notice-close").onclick = () => dlg.close();
+    dlg.showModal();
+  });
 }
 
 // metadata.json written by a newer Wynkyn than this one: say so, keep going.
@@ -877,9 +883,9 @@ function showSpecBanner(spec: string | undefined): void {
 
 async function connect(): Promise<Backend> {
   if (await hasServer()) return httpBackend();
-  showBrowserBanner();
-  const [assets, store] = await Promise.all([localAssets(), chooseLibrary()]);
-  return localBackend(store, assets);
+  const assets = localAssets();
+  await browserNotice();
+  return localBackend(await chooseLibrary(), await assets);
 }
 
 // An update built from a version the buffer isn't based on: fetch the current
@@ -1107,8 +1113,8 @@ function installShortcuts(
 
 // ---- Create a new manuscript (spec §7.9) ------------------------------------
 // Import a file, or start blank; both ask for a title, then open the book.
-// `cancelable` is false for an empty library, where there is nothing to go
-// back to.
+// `cancelable` is false for an empty library; there Back returns to the
+// Welcome (no server only: with one, the library is the server's folder).
 function createManuscript(cancelable: boolean): void {
   const dlg = $("create") as HTMLDialogElement;
   const err = $("create-err");
@@ -1119,8 +1125,17 @@ function createManuscript(cancelable: boolean): void {
   const cancel = $("create-cancel");
   cancel.hidden = !cancelable;
   cancel.onclick = () => dlg.close();
+  const back = $("create-back");
+  back.hidden = cancelable || backend.kind !== "local";
+  back.onclick = () => {
+    dlg.close();
+    localStorage.removeItem("library");
+    main();
+  };
   dlg.oncancel = (e) => {
-    if (!cancelable) e.preventDefault();
+    e.preventDefault();
+    if (!back.hidden) back.click();
+    else if (cancelable) cancel.click();
   };
   const input = $("create-file") as HTMLInputElement;
   input.value = "";

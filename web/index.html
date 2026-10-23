@@ -85,13 +85,6 @@
         </svg>
       </button>
     </div>
-    <div id="browser-banner" role="note" hidden>
-      <span>For the best experience use Chrome, Edge or Brave: they open your
-        own books folder and print exact pages. Other browsers keep books in
-        the browser only, and printing may differ.</span>
-      <button id="browser-banner-close" class="btn" type="button"
-        aria-label="Dismiss">Got it</button>
-    </div>
     <div id="spec-banner" role="note" hidden><span></span></div>
     <div id="panes">
       <nav id="tree" aria-label="Contents"></nav>
@@ -161,6 +154,17 @@
         </div>
       </div>
     </dialog>
+    <dialog id="browser-notice" class="ask"
+      aria-labelledby="browser-notice-title">
+      <h2 id="browser-notice-title">For the best experience use Chrome, Edge or
+        Brave</h2>
+      <p>They open your own books folder and print exact pages. Other browsers
+        keep books in the browser only, and printing may differ.</p>
+      <div class="ask-foot">
+        <button id="browser-notice-close" class="btn primary"
+          type="button">Got it</button>
+      </div>
+    </dialog>
     <dialog id="library" class="ask" aria-labelledby="library-title">
       <h2 id="library-title">Welcome to Wynkyn</h2>
       <p>It looks like you don’t have any manuscripts yet. Choose where to keep
@@ -209,6 +213,8 @@
       </div>
       <div class="ask-foot">
         <span id="create-err" class="sw-err"></span>
+        <button id="create-back" class="btn" type="button"
+          hidden>← Back</button>
         <button id="create-cancel" class="btn" type="button"
           hidden>Cancel</button>
       </div>
@@ -225,7 +231,7 @@
           can rename the book later</p>
         <div class="ask-foot">
           <span id="title-err" class="sw-err"></span>
-          <button id="title-back" class="btn" type="button">Back</button>
+          <button id="title-back" class="btn" type="button">← Back</button>
           <button id="title-ok" class="btn primary" type="submit">Create
             book</button>
         </div>
