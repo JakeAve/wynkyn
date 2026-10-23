@@ -118,20 +118,35 @@ export interface PageNumberingConfig {
   front: ZoneNumbering;
   body: ZoneNumbering;
   back: ZoneNumbering;
+  // Chapter and part openers: `position` is null when their folio sits in
+  // the same box as every other page's, so the page map and the CSS agree on
+  // when the number moves to the --folio-opener box.
+  openers: { show: boolean; position: FolioPosition | null };
 }
 
 // Page zone (named page, page map) → its key under numbering.pages.
 const ZONE_KEYS: ReadonlyArray<
-  [keyof PageNumberingConfig, "front-matter" | "body" | "back-matter"]
+  ["front" | "body" | "back", "front-matter" | "body" | "back-matter"]
 > = [["front", "front-matter"], ["body", "body"], ["back", "back-matter"]];
 
 // What the page map (renderer/folios.js) formats folios from, per zone (§4.7).
 export function pageNumberingConfig(metadata: Metadata): PageNumberingConfig {
   const pages = metadata.numbering?.pages;
-  return Object.fromEntries(ZONE_KEYS.map(([zone, key]) => [zone, {
+  const zones = Object.fromEntries(ZONE_KEYS.map(([zone, key]) => [zone, {
     style: pages?.[key]?.style ?? "arabic",
     show: pages?.[key]?.show ?? true,
-  }])) as Record<keyof PageNumberingConfig, ZoneNumbering>;
+  }])) as Record<"front" | "body" | "back", ZoneNumbering>;
+  const at = folioAreas(pages?.position)[0]![1];
+  const openerAt = pages?.openers?.position;
+  return {
+    ...zones,
+    openers: {
+      show: pages?.openers?.show ?? true,
+      position: openerAt && folioAreas(openerAt)[0]![1] !== at
+        ? openerAt
+        : null,
+    },
+  };
 }
 
 // Strings read through --running-off, which the page map sets on pages that
@@ -222,8 +237,19 @@ export function generatePagedCSS(
     const cfg = pages?.[key];
     const { style, show } = numbering[name];
     if (show && style !== "none") {
-      for (const [side, area] of folioAt) {
-        const decls = [`    content: var(--folio);`];
+      // Openers with their own position read --folio-opener, which the page
+      // map fills on an opener page and blanks everywhere else (and blanks
+      // --folio on the opener), so no page shows two numbers.
+      const boxes = [
+        ...folioAt.map((b) => [...b, "--folio"] as const),
+        ...(numbering.openers.position
+          ? folioAreas(numbering.openers.position).map((b) =>
+            [...b, "--folio-opener"] as const
+          )
+          : []),
+      ];
+      for (const [side, area, variable] of boxes) {
+        const decls = [`    content: var(${variable});`];
         // Anchoring first, then shared folio styling, then the zone's own
         // `css`: a book's own keys win (§4.7).
         for (
@@ -277,7 +303,12 @@ export function generatePagedCSS(
   // Display matter (half-title, title page, …) sits on the named page
   // "display" (base.css) and carries no running head or folio: blank every
   // margin box the running/page-number rules above populate.
-  const usedAreas = new Set<string>(folioAt.map(([, area]) => area));
+  const usedAreas = new Set<string>([
+    ...folioAt,
+    ...(numbering.openers.position
+      ? folioAreas(numbering.openers.position)
+      : []),
+  ].map(([, area]) => area));
   for (
     const e of [
       ...(metadata.running?.odd ?? []),

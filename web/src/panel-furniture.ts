@@ -1,7 +1,8 @@
 // web/src/panel-furniture.ts — the Page furniture parts of the Book parts tab
 // (UX round 1): page numbers and running heads. Each has where it sits, its
-// gap from the text block (§4.7, §4.8), type, CSS, and the read-only Chicago
-// rules for the pages that drop it (renderer/folios.js).
+// gap from the text block (§4.7, §4.8), type, CSS, and the Chicago rules for
+// the pages that drop it (renderer/folios.js) — read-only except the opener
+// folio, which a book may drop or move (`numbering.pages.openers`).
 import type {
   CssProps,
   FolioPosition,
@@ -41,6 +42,7 @@ import {
   seg,
   select,
   stepper,
+  switchInput,
   toggle,
   type View,
 } from "./panel-controls.ts";
@@ -67,8 +69,8 @@ export function buildFurniture(
   return part === "folios" ? pageNumbers(ctx, v) : runningHeads(ctx, v);
 }
 
-// What the page map drops where (renderer/folios.js, Chicago). Read-only:
-// docs/todos/folio-drop-rules.md.
+// What the page map drops where (renderer/folios.js, Chicago). Read-only;
+// the one override, the opener folio, has its own section above.
 function dropped(rules: Array<[string, string]>): HTMLElement {
   return section("Where they're dropped", "dropped", [
     el(
@@ -133,6 +135,7 @@ function positionPicker(o: {
   takenBy: string;
   clash: () => string | undefined;
   unset?: () => [name: string, note: string]; // what to say when `at` is undefined
+  clear?: () => void; // clicking the lit slot unsets, when given
 }): { nodes: HTMLElement[]; paint: () => void } {
   const name = el("b", "");
   const note = el("span", "");
@@ -167,7 +170,8 @@ function positionPicker(o: {
           `${label}, ${side === "v" ? "left" : "right"} page`,
         );
         b.onclick = () => {
-          o.set(pos);
+          if (o.clear && pos === o.at()) o.clear();
+          else o.set(pos);
           paint();
         };
         slots.push([pos, b]);
@@ -242,6 +246,54 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
     },
   });
 
+  // Chapter and part openers (§4.7): the folio can be dropped (the switch) or
+  // moved, Chicago's drop folio. Both default to "as every other page".
+  const openers = () => live()?.openers;
+  const editOpeners = (
+    f: (o: NonNullable<NonNullable<typeof numbering.pages>["openers"]>) => void,
+  ) => {
+    const p = numbering.pages ??= {};
+    const o = p.openers ??= {};
+    f(o);
+    if (!Object.keys(o).length) delete p.openers;
+    tidy();
+    ctx.queueSave("numbering");
+  };
+  // Same picker as the Position sections; no slot lit means the opener's
+  // number sits where every other page's does, and clicking the lit slot
+  // goes back to that.
+  const openerPosition = positionPicker({
+    at: () => openers()?.position,
+    set: (pos) => editOpeners((o) => o.position = pos),
+    clear: () => editOpeners((o) => delete o.position),
+    taken: () => undefined,
+    takenBy: "",
+    clash: () => undefined,
+    unset: () => ["Same as other pages", ""],
+  });
+  const openerWhere = el("div", "", ...openerPosition.nodes);
+  openerWhere.hidden = openers()?.show === false;
+  const openerRows = [
+    view.mark(
+      row(
+        "Page number",
+        switchInput(
+          "Page number on chapter and part openers",
+          openers()?.show !== false,
+          (on) => {
+            editOpeners((o) => {
+              if (on) delete o.show;
+              else o.show = false;
+            });
+            openerWhere.hidden = !on;
+          },
+        ),
+      ),
+      () => openers()?.show === false,
+    ),
+    openerWhere,
+  ];
+
   const FOLIO = ["font-size", "font-family", "font-style"];
   const zones = ZONES.map(([zone, label]) => {
     const cfg = pages[zone] ?? {};
@@ -294,6 +346,7 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
       ),
     ]),
     section("Numerals", "numerals", zones),
+    section("Chapter and part openers", "openers", openerRows),
     section("Type", "type", [
       view.mark(
         row(
@@ -358,7 +411,6 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
         "Half title, title page, copyright and other display pages",
         "No number",
       ],
-      ["Chapter and part openers", "Keep their number"],
       ["Back matter", "Continues the body count"],
     ]),
   ];

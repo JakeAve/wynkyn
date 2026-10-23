@@ -1465,7 +1465,8 @@ offer it there.
     "css": { "font-family": "body", "font-size": "9pt" },
     "front-matter": { "style": "roman-lower", "show": true },
     "body": { "style": "arabic", "show": true },
-    "back-matter": { "style": "arabic", "show": true, "css": { "font-family": "display" } }
+    "back-matter": { "style": "arabic", "show": true, "css": { "font-family": "display" } },
+    "openers": { "position": "bottom-center" }
   }
 }
 ```
@@ -1480,8 +1481,8 @@ offer it there.
   count (no restart). Every page counts, including display pages, plates and
   blank padding pages, but display pages (half-title, title page, copyright,
   dedication, epigraph, colophon, plates) and blank pages print no folio.
-  Chapter and part openers keep theirs. TOC and `{ref}` numbers are the page's
-  number regardless of whether its folio prints.
+  Chapter and part openers keep theirs unless `openers` says otherwise. TOC and
+  `{ref}` numbers are the page's number regardless of whether its folio prints.
 - `css` on pages styles the folio's margin box (CSS properties, font aliases
   resolved like §4.5). `pages.css` applies to every zone; a zone's own `css`
   overrides it property by property. Margin boxes are not descendants of the
@@ -1492,6 +1493,16 @@ offer it there.
   `"bottom-outside"`, `"top-center"` or `"top-outside"`. Outside is the
   fore-edge: `bottom-right`/`top-right` on recto (`:right`), `-left` on verso
   (`:left`). It applies to every zone.
+- `openers` on pages is the one override of the drop rules: a page holding the
+  start of a chapter or part (titled or not, in any zone) already carries no
+  running head (§4.8), and Chicago either keeps its folio, omits it, or sets it
+  at the foot of the page (a _drop folio_). `show: false` omits it; `position`
+  (a folio position, as above) moves it, so a book with
+  `"position": "top-outside"` and `"openers": { "position": "bottom-center" }`
+  numbers its openers at the foot. Unset, or set to the book's own position, an
+  opener's folio sits where every other page's does. The opener's number still
+  counts, so its TOC entry and `{ref}`s are unaffected. Edited in the Page
+  numbers part of the Styles panel (§7.4).
 - `gap` on pages (default `5mm`) is the distance between the folio and the text
   block. The folio belongs to the text block, not the margin: a bottom folio
   sits `gap` below the last line, a top folio `gap` above the first, so raising
@@ -1508,8 +1519,14 @@ offer it there.
   `@bottom-center` nested inside `@page :left`/`:right` is unreliable across
   versions). An outside folio gets a `front:right { @bottom-right }` and
   `front:left { @bottom-left }` pair per zone (top boxes for `top-outside`). A
-  zone with `show: false` or style `"none"` gets no rule. The per-zone `style`
-  and `show` reach the handler as the build's `pageNumbering`.
+  zone with `show: false` or style `"none"` gets no rule. An `openers` position
+  that differs from the book's gets the same rules again at its own boxes
+  reading `var(--folio-opener)`: the handler fills `--folio-opener` and blanks
+  `--folio` on an opener page, and the reverse on every other page, so no page
+  shows two numbers. `pageNumberingConfig` resolves an opener position equal to
+  the book's to no override, so the CSS and the handler agree. The per-zone
+  `style` and `show`, and `openers`, reach the handler as the build's
+  `pageNumbering`.
 
 ### 4.8 Section: `running`
 
@@ -1580,7 +1597,8 @@ Running entries apply to body pages only (`@page body:right` /
 body:left`): front and back matter keep their folios (§4.7) but carry no
 running head, and display matter carries neither. Following Chicago, running
 heads are also omitted on chapter and part openers (a page holding the start of
-a chapter or part, titled or not; the folio stays) and on blank padding pages
+a chapter or part, titled or not; the folio stays unless
+`numbering.pages.openers` drops or moves it, §4.7) and on blank padding pages
 (which also lose their folio). `page-number` entries are folios and follow §4.7
 instead. The page map leaves the title variables empty outside the body, so a
 head can't carry the final chapter's title into the back matter.

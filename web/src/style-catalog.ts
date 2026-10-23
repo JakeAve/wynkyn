@@ -126,10 +126,12 @@ const ZONES = [
 
 function pageNumberEntries(metadata: Metadata): StyleEntry[] {
   // The margin boxes a folio sits in (§4.7): outside is two boxes, so a
-  // click on either side's is a folio.
-  const boxes = folioAreas(metadata.numbering?.pages?.position).map(
-    ([, area]) => `.pagedjs_margin-${area}`,
-  );
+  // click on either side's is a folio; so is an opener's drop-folio box.
+  const pages = metadata.numbering?.pages;
+  const boxes = [
+    ...folioAreas(pages?.position),
+    ...(pages?.openers?.position ? folioAreas(pages.openers.position) : []),
+  ].map(([, area]) => `.pagedjs_margin-${area}`);
   return [
     {
       key: "numbering.pages",
