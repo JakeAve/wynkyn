@@ -183,39 +183,6 @@ export async function reopenFolder(
 export const browserFolder = (): Promise<FileSystemDirectoryHandle> =>
   navigator.storage.getDirectory();
 
-// Files picked with <input type="file" webkitdirectory>: every book is a
-// directory with a manuscript.md; its metadata, editions and images come
-// along, anything else is left behind. Returns the books written.
-export async function importBooks(
-  store: BookStore,
-  files: FileList | File[],
-): Promise<string[]> {
-  const roots = new Set<string>(); // "…/<book>" for each manuscript.md
-  for (const f of files) {
-    const p = f.webkitRelativePath || f.name;
-    if (p.endsWith("/manuscript.md")) {
-      roots.add(p.slice(0, -"/manuscript.md".length));
-    } else if (p === "manuscript.md") roots.add("");
-  }
-  const written = new Set<string>();
-  for (const f of files) {
-    const p = f.webkitRelativePath || f.name;
-    const root = [...roots].find((r) => r === "" || p.startsWith(r + "/"));
-    if (root === undefined) continue;
-    const book = root === "" ? "book" : root.slice(root.lastIndexOf("/") + 1);
-    const rel = root === "" ? p : p.slice(root.length + 1);
-    if (
-      !/^(manuscript\.md|metadata\.json|editions\/[^/]+\.json|images\/[^/]+)$/
-        .test(rel)
-    ) continue;
-    const path = `${book}/${rel}`;
-    const data = new Uint8Array(await f.arrayBuffer());
-    if (!await store.create(path, data)) await store.write(path, data);
-    written.add(book);
-  }
-  return [...written].sort();
-}
-
 function idb<T>(
   mode: IDBTransactionMode,
   op: (s: IDBObjectStore) => IDBRequest<T>,

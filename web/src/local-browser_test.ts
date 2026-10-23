@@ -12,6 +12,42 @@ const DIST = new URL("../../dist/", import.meta.url);
 const siteBuilt = await Deno.stat(new URL("web/app.js", DIST))
   .then(() => true, () => false);
 
+// The fixture book, written straight into the page's private storage: the
+// Welcome's browser choice is remembered, so a reload lands in the book.
+async function seedDemoBook(
+  page: import("playwright").Page,
+  url: string,
+): Promise<void> {
+  const dir = new URL("../../server/testdata/demo-book/", import.meta.url);
+  const files: [string, string][] = [];
+  for (
+    const rel of [
+      "manuscript.md",
+      "metadata.json",
+      "editions/pocket.json",
+      "images/ornament.svg",
+    ]
+  ) files.push([rel, await Deno.readTextFile(new URL(rel, dir))]);
+  await page.locator("#lib-browser").click();
+  await page.locator("#create[open]").waitFor();
+  await page.evaluate(async (files: [string, string][]) => {
+    let book = await navigator.storage.getDirectory();
+    book = await book.getDirectoryHandle("demo-book", { create: true });
+    for (const [rel, text] of files) {
+      const parts = rel.split("/");
+      let dir = book;
+      for (const d of parts.slice(0, -1)) {
+        dir = await dir.getDirectoryHandle(d, { create: true });
+      }
+      const fh = await dir.getFileHandle(parts.at(-1)!, { create: true });
+      const w = await fh.createWritable();
+      await w.write(text);
+      await w.close();
+    }
+  }, files);
+  await page.goto(`${url}?book=demo-book`);
+}
+
 Deno.test({
   name: "local library: import into the browser, edit, the file changes, " +
     "the edit survives a reload",
@@ -24,9 +60,7 @@ Deno.test({
       const url = `http://localhost:${site.addr.port}/`;
       await page.goto(url);
       await page.locator("#library[open]").waitFor();
-      await page.locator("#lib-import").setInputFiles(
-        new URL("../../server/testdata/demo-book", import.meta.url).pathname,
-      );
+      await seedDemoBook(page, url);
       await page.locator('#status[data-kind="saved"]').waitFor();
       await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
         .first().waitFor();
@@ -131,9 +165,7 @@ Deno.test({
       await page.locator("#create[open]").waitFor();
       await page.locator("#create-back").click();
       await page.locator("#library[open]").waitFor();
-      await page.locator("#lib-import").setInputFiles(
-        new URL("../../server/testdata/demo-book", import.meta.url).pathname,
-      );
+      await seedDemoBook(page, `http://localhost:${site.addr.port}/`);
       await page.locator('#status[data-kind="saved"]').waitFor();
       // Dismissed once, the notice stays away.
       await page.reload();

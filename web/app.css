@@ -2156,15 +2156,6 @@ summary {
 .ask .privacy b {
   color: var(--fg);
 }
-.ask .small-link {
-  display: block;
-  margin-top: 10px;
-  color: var(--muted);
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
 .ask-foot {
   display: flex;
   align-items: center;
