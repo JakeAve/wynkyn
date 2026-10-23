@@ -73,6 +73,10 @@ export interface Numbering {
     "front-matter"?: PageNumbering;
     body?: PageNumbering;
     "back-matter"?: PageNumbering;
+    // Chapter and part openers (§4.7): `show: false` drops their folio;
+    // `position` moves it (Chicago's drop folio is "bottom-center"). Unset,
+    // an opener's folio sits where every other page's does.
+    openers?: { show?: boolean; position?: FolioPosition };
   };
 }
 

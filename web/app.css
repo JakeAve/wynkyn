@@ -91,8 +91,18 @@ body {
   color: var(--fg);
   background: var(--bg);
   display: grid;
-  grid-template-rows: 46px minmax(0, 1fr) 30px;
+  /* toolbar · spec banner (0 while hidden) · panes · footer */
+  grid-template-rows: 46px auto minmax(0, 1fr) 30px;
   overflow: hidden;
+}
+#spec-banner {
+  grid-row: 2;
+}
+#panes {
+  grid-row: 3;
+}
+#footer {
+  grid-row: 4;
 }
 button,
 select,
@@ -1401,6 +1411,43 @@ summary {
 #config-overlay .tog[aria-pressed="true"] {
   border-color: var(--inv-bg);
 }
+/* switch (panel-controls.ts switchInput): a hairline track, the knob in
+   --muted; on, the track is the inverted pill and the knob its text colour */
+#config-overlay .sw {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: none;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+#config-overlay .sw::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform .15s, background .15s;
+}
+#config-overlay .sw:hover::before {
+  background: var(--fg);
+}
+#config-overlay .sw:checked {
+  background: var(--inv-bg);
+  border-color: var(--inv-bg);
+}
+#config-overlay .sw:checked::before {
+  transform: translateX(12px);
+  background: var(--inv-fg);
+}
 #config-overlay select.sel,
 #config-overlay input.txt {
   height: 28px;
@@ -2062,7 +2109,6 @@ summary {
   font-size: 12px;
   line-height: 1.35;
 }
-#browser-banner,
 #spec-banner {
   display: flex;
   align-items: center;
@@ -2074,11 +2120,9 @@ summary {
   font-size: 13px;
   line-height: 1.4;
 }
-#browser-banner[hidden],
 #spec-banner[hidden] {
   display: none;
 }
-#browser-banner span,
 #spec-banner span {
   flex: 1;
 }

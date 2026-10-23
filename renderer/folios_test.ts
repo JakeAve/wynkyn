@@ -5,7 +5,9 @@ import "./folios.js";
 
 type Zone = "front" | "body" | "back";
 type ZoneNumbering = { style: NumberingStyle; show: boolean };
-type PageNumberingConfig = Record<Zone, ZoneNumbering>;
+type PageNumberingConfig = Record<Zone, ZoneNumbering> & {
+  openers?: { show: boolean; position: string | null };
+};
 type PageFacts = {
   zone: Zone | null;
   display: boolean;
@@ -178,6 +180,18 @@ Deno.test("openers keep their folio but no running head; blanks lose both (Chica
     ],
   );
   assertEquals(map[1]?.partTitle, "Part");
+});
+
+Deno.test("openers.show false drops the opener's folio, not its number (§4.7)", () => {
+  const map = buildPageMap([
+    page({ zone: "body", opener: true }),
+    page({ zone: "body" }),
+    page({ zone: "body", opener: true }),
+  ], { ...numbering, openers: { show: false, position: null } });
+  assertEquals(
+    map.map((p) => [p.folioText, p.refText]),
+    [["", "1"], ["2", "2"], ["", "3"]],
+  );
 });
 
 Deno.test("checkPageMap flags stranded pages and missing anchors", () => {

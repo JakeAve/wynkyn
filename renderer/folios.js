@@ -8,7 +8,8 @@
  * @typedef {import("../metadata/types.ts").NumberingStyle} NumberingStyle
  * @typedef {"front" | "body" | "back"} Zone
  * @typedef {{ style: NumberingStyle; show: boolean }} ZoneNumbering
- * @typedef {{ front: ZoneNumbering; body: ZoneNumbering; back: ZoneNumbering }} PageNumberingConfig
+ * @typedef {{ show: boolean; position: string | null }} OpenerNumbering `show: false` drops an opener's folio; `position` moves it to the --folio-opener box
+ * @typedef {{ front: ZoneNumbering; body: ZoneNumbering; back: ZoneNumbering; openers?: OpenerNumbering }} PageNumberingConfig
  * @typedef {{ zone: Zone | null; display: boolean; blank: boolean; empty: boolean; opener: boolean; chapterTitles: string[]; partTitles: string[]; anchors: string[] }} PageFacts
  * `opener`: the page holds the start of a chapter or part.
  * `index` is the 0-based position in the map; problems and digests use
@@ -124,7 +125,8 @@
       opener: facts.opener,
       head,
       folio,
-      folioText: show && !facts.display && !facts.blank
+      folioText: show && !facts.display && !facts.blank &&
+          !(facts.opener && numbering.openers?.show === false)
         ? formatFolio(folio, style)
         : "",
       refText: formatFolio(folio, style === "none" ? "arabic" : style),
@@ -298,11 +300,21 @@
     };
   }
 
-  /** @param {Element} page @param {PageEntry} entry */
-  function writeEntry(page, entry) {
+  /**
+   * @param {Element} page @param {PageEntry} entry
+   * @param {PageNumberingConfig} numbering
+   */
+  function writeEntry(page, entry, numbering) {
     /** @type {any} */ (page)[PAGE_ENTRY] = entry;
     const style = /** @type {HTMLElement} */ (page).style;
-    style.setProperty("--folio", JSON.stringify(entry.folioText));
+    // An opener with its own folio position shows its number in the
+    // --folio-opener box (metadata/css-generator.ts) and none in --folio.
+    const moved = entry.opener && !!numbering.openers?.position;
+    style.setProperty("--folio", JSON.stringify(moved ? "" : entry.folioText));
+    style.setProperty(
+      "--folio-opener",
+      JSON.stringify(moved ? entry.folioText : ""),
+    );
     style.setProperty("--chapter-title", JSON.stringify(entry.chapterTitle));
     style.setProperty("--part-title", JSON.stringify(entry.partTitle));
     // Literal and book-title running entries read var(--running-off, "…")
@@ -414,6 +426,7 @@
             pageFacts(page),
             this.numbering,
           ),
+          this.numbering,
         );
       }
 

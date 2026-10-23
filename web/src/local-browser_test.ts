@@ -112,16 +112,25 @@ Deno.test({
         delete (globalThis as any).showDirectoryPicker;
       });
       await page.goto(`http://localhost:${site.addr.port}/`);
+      // The notice comes first, on its own; the Welcome waits for it.
+      await page.locator("#browser-notice[open]").waitFor();
+      assertEquals(await page.locator("#library[open]").count(), 0);
+      await page.locator("#browser-notice-close").click();
       await page.locator("#library[open]").waitFor();
       assertEquals(await page.locator("#lib-pick").isVisible(), false);
-      assertEquals(await page.locator("#browser-banner").isVisible(), true);
-      // The modal library dialog sits over the banner until a library is chosen.
+      // An empty library's Create dialog has a Back to the Welcome.
+      await page.locator("#lib-browser").click();
+      await page.locator("#create[open]").waitFor();
+      await page.locator("#create-back").click();
+      await page.locator("#library[open]").waitFor();
       await page.locator("#lib-import").setInputFiles(
         new URL("../../server/testdata/demo-book", import.meta.url).pathname,
       );
       await page.locator('#status[data-kind="saved"]').waitFor();
-      await page.locator("#browser-banner-close").click();
-      assertEquals(await page.locator("#browser-banner").isVisible(), false);
+      // Dismissed once, the notice stays away.
+      await page.reload();
+      await page.locator('#status[data-kind="saved"]').waitFor();
+      assertEquals(await page.locator("#browser-notice[open]").count(), 0);
     } finally {
       await browser.close();
       await site.shutdown();

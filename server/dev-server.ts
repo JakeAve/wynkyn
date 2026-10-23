@@ -27,6 +27,8 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webp": "image/webp",
   ".epub": "application/epub+zip",
   ".pdf": "application/pdf",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml",
 };
 const contentType = (name: string) =>
   CONTENT_TYPES[name.slice(name.lastIndexOf("."))] ??
@@ -204,6 +206,10 @@ export async function startServer(
     }
     if (path.startsWith("/web/")) {
       return serveStatic(WEB_DIR, path.slice("/web/".length));
+    }
+    // Crawler files that must sit at the root, as the static host serves them.
+    if (path === "/robots.txt" || path === "/sitemap.xml") {
+      return serveStatic(WEB_DIR, path.slice(1));
     }
 
     if (path === "/api/books" && req.method === "GET") {

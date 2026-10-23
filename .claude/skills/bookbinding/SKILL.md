@@ -49,7 +49,9 @@ geometry is derived, never configured.
 
 ## Page furniture rules (Chicago)
 
-- Folio hidden on display pages and blanks; shown on openers.
+- Folio hidden on display pages and blanks; shown on openers unless
+  `numbering.pages.openers` drops it (`show: false`) or moves it (`position`,
+  Chicago's drop folio at the foot of the page).
 - Running head on body pages only, never on a display, blank or opener page.
 - Front matter counts in roman, the body restarts in arabic, back matter
   continues the body count. A `{ref}` or contents entry uses the page's number
@@ -58,8 +60,9 @@ geometry is derived, never configured.
   and below the last; the margin is the white space outside all three. Raising
   a margin moves text, head and folio together.
 
-These are read-only in the UI on purpose; `references/page-furniture.md` has
-the detail and the shape an override would take.
+Only the opener folio is editable in the UI (Page numbers part, "Chapter and
+part openers"); the rest is read-only on purpose. `references/page-furniture.md`
+has the detail.
 
 ## Before paper
 
