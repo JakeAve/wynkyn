@@ -15,6 +15,7 @@ import {
   installPageIndicator,
   installPreviewClicks,
   installStyleHover,
+  markEdited,
   type Mode,
   previewLink,
   renderPreview,
@@ -37,7 +38,9 @@ import {
   replaceBuffer,
   scrollEditorToLine,
   setEditionSpans,
+  setStyleChip,
 } from "./editor.ts";
+import { styleKeysAt } from "./bml-language.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
 import { buildTree } from "./tree-data.ts";
@@ -248,10 +251,33 @@ function refreshTree(doc: BmlDocument): void {
   highlightTreeNode(cursorLine);
 }
 
+// Follow the cursor (spec §7.3): the preview outlines the block the line is
+// part of, and the line carries a chip to that block's style.
+function followCursor(line: number): void {
+  if (!editor) return;
+  markEdited($("preview"), mode === "write" ? line : null);
+  const keys = styleKeysAt(editor.state.doc.toString().split("\n"), line);
+  const cat = styleCatalog();
+  const entry = keys.map((k) => cat.find((e) => e.key === k)).find((e) => e);
+  setStyleChip(
+    editor,
+    entry
+      ? {
+        line,
+        label: entry.label === "Everything"
+          ? entry.group
+          : `${entry.group} · ${entry.label}`,
+        open: () => pickStyle(entry.key),
+      }
+      : null,
+  );
+}
+
 // Follow the cursor: the node whose block contains the cursor line is current.
 function highlightTreeNode(line: number): void {
   cursorLine = line;
   syncUrl();
+  followCursor(line);
   let best = 0;
   for (const l of treeLines) if (l <= line) best = l;
   const tree = $("tree");
@@ -828,6 +854,7 @@ function setMode(next: Mode): void {
     // storage blocked: the mode just won't survive a reload
   }
   syncUrl();
+  followCursor(cursorLine);
   if (next === "write") return;
   ensureConfigPanel().then((panel) => {
     if (mode !== "write") panel?.setMode(mode); // the latest, if it changed meanwhile
@@ -1443,6 +1470,7 @@ async function main(): Promise<void> {
   if (cached) {
     restoreCachedRender(cached, previewEl);
     refreshPageIndicator();
+    followCursor(cursorLine);
   }
   const onClose = () => {
     // `deno task dev` restarts the server when app code changes; follow it
@@ -1474,6 +1502,7 @@ async function main(): Promise<void> {
       showPageProblems(problems);
       refreshPageIndicator();
       configPanel?.pagesChanged();
+      followCursor(cursorLine);
     }, (err) => {
       // The old pages stay up; their problems no longer describe this book.
       setStatus("error", `preview: ${brief(err)}`);

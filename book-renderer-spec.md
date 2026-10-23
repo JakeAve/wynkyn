@@ -1890,15 +1890,24 @@ CodeMirror 6 over plain BML text.
   not as blocking dialogs — BML tolerates an unclosed block by falling back to
   implicit-close (§3.2.3), so most "errors" are really just "here's where it
   fell back."
-- Sentinels are styled by kind: structural lines (`matter`, `part`, `chapter`)
-  get a faint band, a hairline above and a gutter mark; field sentinels
-  (`{title}`, `{author}`) are small and muted; a block's opening and closing
-  tags are joined by a 1px rail, so an unclosed block shows at a glance; `{em}`
-  tags dim while their text is italic. The line after `{title}`, `{heading}` or
-  `{subheading}` is bold, after `{subtitle}` italic. A `%%` line of only
-  box-drawing characters draws as a hairline rule, and a `%%` label between two
-  rules as small caps.
+- Sentinels are styled by closing form (§3.2.3), one rule: nesting-close lines
+  (`matter`, `part`, `chapter`) get a faint band, a hairline above and a gutter
+  mark; explicit-close pairs (`quote`, `poem`, `is`, …) are joined by a 1px rail
+  from opening to closing tag, so an unclosed block shows at a glance; every
+  other sentinel line (`{title}`, `{author}`, `{heading}`, `{break}`,
+  `{illustration}`) is small and muted; `{em}` tags dim while their text is
+  italic. The line after `{title}`, `{heading}` or `{subheading}` is bold, after
+  `{subtitle}` italic. A `%%` line of only box-drawing characters draws as a
+  hairline rule, and a `%%` label between two rules as small caps.
 - The selection is a green-grey tint, distinct from the quieter active line.
+- The preview follows the cursor: the rendered block the cursor's line is part
+  of (the nearest `data-line` at or above it) is outlined and scrolled into
+  view, so the writer sees where they are on the page. The cursor's line also
+  carries a chip naming the style that block belongs to ("Chapter · Title",
+  "Body text · Paragraph", a custom `{is}` name); clicking it opens that style
+  in Style mode, the way a preview click does (§7.4). The style is read from the
+  enclosing matter type, part or chapter, the enclosing block, and the field
+  sentinel whose text runs on to the line.
 - Find and replace is a bar pinned to the top of the editor, in the chrome's
   colors: find and replace fields, match case / whole word / regex toggles, an
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"
@@ -1933,7 +1942,9 @@ preview opens its style in the middle column; in Write the same click moves the
 editor cursor to its manuscript line (the nearest rendered block's `data-line`).
 Page furniture (page numbers, running heads) has no source line, so a click on
 it always opens its style, switching to Style. The hover outline shows only
-where a click would style: everything in Style, only furniture in Write.
+where a click would style: everything in Style, only furniture in Write. From
+the editor, the chip on the cursor's line (§7.3) opens the same style the
+preview click would for that block.
 
 The panel exposes the selector model already implicit in `elements`/`is` (§4.5,
 §4.6):
