@@ -411,3 +411,29 @@ Deno.test("inheritedFont names what an unset font actually resolves to", () => {
 function byKey(catalog: ReturnType<typeof catalogFor>, key: string) {
   return catalog.find((e) => e.key === key)!;
 }
+
+Deno.test("toc: the Contents part lists outside in — title, entry, row levels, spans, per-level spans", () => {
+  const keys = catalog.filter((e) => e.key.startsWith("toc.")).map((e) =>
+    e.key
+  );
+  assertEquals(keys, [
+    "toc.title",
+    "toc.entry",
+    "toc.toc-front",
+    "toc.toc-part",
+    "toc.toc-chapter",
+    "toc.toc-heading",
+    "toc.toc-back",
+    "toc.number",
+    "toc.label",
+    "toc.subtitle",
+    "toc.leader",
+    "toc.page",
+    "toc.toc-part.number",
+    "toc.toc-part.label",
+    "toc.toc-part.page",
+    "toc.toc-chapter.number",
+    "toc.toc-chapter.label",
+    "toc.toc-chapter.page",
+  ]);
+});
