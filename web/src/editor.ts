@@ -162,7 +162,6 @@ class ChipWidget extends WidgetType {
     // content stays the manuscript alone.
     b.dataset.label = this.chip.label;
     b.setAttribute("aria-label", `Open the style: ${this.chip.label}`);
-    b.title = "Open this style";
     b.onclick = () => this.chip.open();
     return b;
   }

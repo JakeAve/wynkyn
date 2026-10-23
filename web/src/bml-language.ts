@@ -235,9 +235,9 @@ export function styleKeysAt(lines: string[], line: number): string[] {
       continue;
     }
     field = [];
+    const key = t.name === "is" ? `is.${t.slug ?? ""}` : t.name;
     if (t.closing) {
-      const k = t.name === "is" ? `is.${t.slug ?? ""}` : t.name;
-      if (open.includes(k)) open.length = open.lastIndexOf(k);
+      if (open.includes(key)) open.length = open.lastIndexOf(key);
       continue;
     }
     if (STRUCTURAL.has(t.name)) {
@@ -247,7 +247,7 @@ export function styleKeysAt(lines: string[], line: number): string[] {
       open.length = 0;
       field = [struct];
     } else if (BLOCKS.has(t.name)) {
-      open.push(t.name === "is" ? `is.${t.slug ?? ""}` : t.name);
+      open.push(key);
     } else if (t.name === "attribution") {
       const b = open.at(-1) ?? "epigraph";
       field = [`${b}.attribution`, b];

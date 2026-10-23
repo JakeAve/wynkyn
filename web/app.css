@@ -721,33 +721,31 @@ summary {
 #editor .cm-line.cm-bml-off {
   opacity: var(--off);
 }
-/* the style chip (editor.ts): on the cursor's line, opens the style of
-   what that line is part of */
-#editor .cm-bml-style-chip {
+/* end-of-line tags: the style chip (editor.ts, opens the style of what the
+   cursor's line is part of) and the {only} editions tag */
+#editor .cm-bml-style-chip,
+#editor .cm-bml-cond-tag {
   font: 10.5px system-ui, sans-serif;
-  color: var(--muted);
-  background: none;
-  border: 1px solid var(--line);
+  border: 1px solid currentColor;
   border-radius: 3px;
   padding: 0 5px;
   margin-left: 8px;
+}
+#editor .cm-bml-style-chip {
+  color: var(--muted);
+  background: none;
+  border-color: var(--line);
   cursor: pointer;
-  vertical-align: baseline;
 }
 #editor .cm-bml-style-chip::before {
-  content: attr(data-label);
+  content: attr(data-label); /* not textContent: the buffer's text stays the manuscript */
 }
 #editor .cm-bml-style-chip:hover {
   color: var(--fg);
   background: var(--hover);
 }
 #editor .cm-bml-cond-tag {
-  font: 10.5px system-ui, sans-serif;
   color: var(--warn);
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  padding: 0 5px;
-  margin-left: 8px;
 }
 /* the find/replace bar (search-panel.ts) */
 .cm-bml-find {

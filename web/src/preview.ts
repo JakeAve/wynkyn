@@ -284,18 +284,13 @@ export function markEdited(container: HTMLElement, line: number | null): void {
     el.removeAttribute("data-edit-hl");
   }
   if (line === null) return;
-  let best = 0;
   const live = [...container.querySelectorAll("[data-line]")].filter((el) =>
     !el.closest(".preview-stage")
   );
-  for (const el of live) {
-    const n = Number(el.getAttribute("data-line"));
-    if (n <= line && n > best) best = n;
-  }
+  const at = (el: Element) => Number(el.getAttribute("data-line"));
+  const best = Math.max(0, ...live.map(at).filter((n) => n <= line));
   if (!best) return;
-  const hits = live.filter((el) =>
-    Number(el.getAttribute("data-line")) === best
-  );
+  const hits = live.filter((el) => at(el) === best);
   for (const el of hits) el.setAttribute("data-edit-hl", "");
   // By hand, not scrollIntoView: the pages are CSS-zoomed (fitPreview), and
   // Chrome scrolls a zoomed element to the wrong place.

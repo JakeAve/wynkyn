@@ -854,7 +854,7 @@ function setMode(next: Mode): void {
     // storage blocked: the mode just won't survive a reload
   }
   syncUrl();
-  markEdited($("preview"), next === "write" ? cursorLine : null);
+  followCursor(cursorLine);
   if (next === "write") return;
   ensureConfigPanel().then((panel) => {
     if (mode !== "write") panel?.setMode(mode); // the latest, if it changed meanwhile
