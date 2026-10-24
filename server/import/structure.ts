@@ -481,7 +481,7 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
   );
   const how = chapLevel === null
     ? "no split"
-    : src.name.match(/\.(epub|html?|xhtml)$/i)
+    : src.name.match(/\.(epub|html?|xhtml|docx)$/i)
     ? `level-${chapLevel} headings`
     : atChap.some((h) =>
         CHAPTER_KW.test(plain(h.text)) || LABEL.test(plain(h.text))

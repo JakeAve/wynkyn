@@ -12,6 +12,7 @@ export type Block =
     | { kind: "break" }
     | { kind: "image"; src: string; alt: string }
     | { kind: "toc" } // the source's contents list, dropped later
+    | { kind: "note"; slug: string; text: string } // a {footnote} anchor's text
   )
   & { check?: string }; // a `%% check:` note the structure step attaches
 

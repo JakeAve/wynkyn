@@ -2443,11 +2443,13 @@ START/END markers, join hard-wrapped lines, `_x_` to `{em}`, `[Illustration:]`,
 hr); EPUB (fflate, the OPF spine through the HTML walker, nav/NCX titles as the
 chapter filter, images to `images/`); DOCX (fflate, `word/document.xml`
 paragraph styles and italic runs, `footnotes.xml` to `{footnote}`/`{note}`,
-`word/media` to `images/`). Chapter detection: the shallowest heading level with
-at least two headings; a deeper level with twice as many headings under at most
-twelve shallow ones makes the shallow ones parts; for text, "Chapter N" or `#`
-or standalone ALL-CAPS lines, whichever fires at least twice. Title and author
-from EPUB metadata, DOCX `core.xml` or the Gutenberg header lines. No new
+`word/media` to `images/`; a document with no heading styles has its headings
+read from their look, a short line set larger than the body text or all in bold;
+tables are skipped, as in HTML). Chapter detection: the shallowest heading level
+with at least two headings; a deeper level with twice as many headings under at
+most twelve shallow ones makes the shallow ones parts; for text, "Chapter N" or
+`#` or standalone ALL-CAPS lines, whichever fires at least twice. Title and
+author from EPUB metadata, DOCX `core.xml` or the Gutenberg header lines. No new
 dependencies except deno-dom for the CLI's HTML parsing (Deno has no
 `DOMParser`). Web import in the browser is fetch-or-paste in the page, so it
 needs no server. PDF is out: export to Word or text first.

@@ -3,7 +3,7 @@
 //   deno task bml render <book> [out.html] [--edition e] → standalone HTML
 //   deno task bml list                    → books, with their named editions
 //   deno task bml new <slug> [--theme t]  → books/<slug>/ from templates/ (house-style metadata.json, or theme t's)
-//   deno task bml import <file> [--slug s] [--theme t] [--chapters auto|N|none] [--flat] [--prose] [--force] → books/<slug>/ from a .txt/.md/.html/.epub
+//   deno task bml import <file> [--slug s] [--theme t] [--chapters auto|N|none] [--flat] [--prose] [--force] → books/<slug>/ from a .txt/.md/.html/.epub/.docx
 //   deno task bml edition <book> new <slug> [--from <edition>] → copy an edition under a new name
 //   deno task bml export <book> [--edition e] [--sheet S] [--fold F] [--folios N|booklet] [--duplex short-edge|long-edge|none]
 //                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]
