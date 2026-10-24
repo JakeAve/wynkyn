@@ -1005,6 +1005,41 @@ summary {
   font: 10.5px ui-monospace, Menlo, monospace;
   color: var(--syn-p);
 }
+/* image completions: a thumbnail beside the slug over its note */
+#editor .cm-tooltip-autocomplete > ul > li:has(> .cm-bml-thumb) {
+  grid-template-columns: 30px 1fr;
+  grid-template-rows: 20px 20px;
+  row-gap: 0;
+}
+#editor .cm-tooltip-autocomplete li > .cm-bml-thumb {
+  grid-row: 1 / span 2;
+  width: 30px;
+  height: 40px;
+  object-fit: contain;
+  background: var(--paper);
+  border: 1px solid var(--soft);
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+#editor .cm-tooltip-autocomplete li > .cm-bml-thumb.add {
+  display: grid;
+  place-items: center;
+  background: none;
+  color: var(--muted);
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .cm-completionLabel {
+  align-self: end;
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb):not(:has(> .cm-completionDetail)) > .cm-completionLabel {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .cm-completionDetail {
+  align-self: start;
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .f {
+  display: none;
+}
 #editor .cm-tooltip-autocomplete > ul > li[aria-selected],
 #editor .cm-bml-palette li[aria-selected="true"] {
   background: var(--inv-bg);

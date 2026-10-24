@@ -125,3 +125,73 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "images: the slug of an illustration completes from the book's images",
+  ignore: !hasChrome || !appBuilt,
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const fixture = new URL("../../server/testdata/demo-book", import.meta.url);
+    const cp = await new Deno.Command("cp", {
+      args: ["-R", fixture.pathname, root],
+    }).output();
+    assert(cp.success, "copy the fixture book");
+    const bookDir = `${root}/demo-book`;
+    // ornament.svg is in the text already; night-sky.png isn't
+    await Deno.writeFile(
+      `${bookDir}/images/night-sky.png`,
+      Uint8Array.from(atob(PNG), (c) => c.charCodeAt(0)),
+    );
+    const server = await startServer({ booksRoot: root, port: 0 });
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
+      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
+        .first().waitFor({ timeout: 30_000 });
+
+      await page.locator("#editor .cm-line", { hasText: "Test Author" })
+        .click();
+      await page.keyboard.press("End");
+      await page.keyboard.press("Enter");
+      await page.keyboard.press("Enter");
+      await page.keyboard.type("{illustration: ");
+      const list = page.locator("#editor .cm-tooltip-autocomplete");
+      await list.locator("li", { hasText: "Add image" }).waitFor();
+      assertEquals(
+        await list.locator("completion-section").allTextContents(),
+        ["Images in this book"],
+      );
+      const rows = await list.locator("li").allTextContents();
+      assertEquals(rows.length, 3, "one row per image, then the add row");
+      assert(rows.some((r) => r === "ornament"), "used: no note");
+      assert(rows.some((r) => r === "night-skyNot in the text yet"));
+      assertEquals(
+        rows[2],
+        "+Add image from your computer…Copies it into the book's images folder",
+      );
+      assertEquals(await list.locator("img.cm-bml-thumb").count(), 2);
+
+      await list.locator("li", { hasText: "night-sky" }).click();
+      const lines = await page.locator("#editor .cm-line").allTextContents();
+      const at = lines.indexOf("Test Author");
+      assertEquals(lines.slice(at, at + 3), [
+        "Test Author",
+        "",
+        "{illustration: night-sky}",
+      ]);
+
+      // After placement: the two placements that lay out.
+      await page.keyboard.type(" | placement: ");
+      await list.locator("li", { hasText: "inline" }).waitFor();
+      assertEquals(await list.locator("li").allTextContents(), [
+        "full-pagea page of its own",
+        "inlinein the text",
+      ]);
+    } finally {
+      await browser.close();
+      await server.stop();
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+});

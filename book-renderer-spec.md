@@ -2024,6 +2024,15 @@ CodeMirror 6 over plain BML text.
   no files (moving text) is CodeMirror's own. The image and the save that names
   it paginate once: the service holds a rebuild for a change to `images/` alone
   a moment, and the next change to the book takes it along.
+- In the slug of `{illustration: …}` or `{dropcap | image: …}`, completions list
+  the book's `images/` under "Images in this book": a small thumbnail, the slug,
+  and "Not in the text yet" for an image no `{illustration:}` or `image:` in the
+  manuscript names. The last row, "Add image from your computer…" ("Copies it
+  into the book's images folder"), opens a file picker (PNG, JPEG, WebP, SVG),
+  puts the file in `images/` as a drop does, and writes its slug; a refusal goes
+  to the writer's footer. After `placement:` in an `{illustration}` tag the list
+  offers `full-page` ("a page of its own") and `inline` ("in the text"), the
+  placements that lay out.
 
 ### 7.4 Sentinel Styling
 

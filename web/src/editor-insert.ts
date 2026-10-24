@@ -6,6 +6,7 @@ import {
   type Completion,
   type CompletionContext,
   type CompletionResult,
+  type CompletionSource,
 } from "@codemirror/autocomplete";
 import {
   ChangeSet,
@@ -128,6 +129,11 @@ function completions(ctx: CompletionContext): CompletionResult | null {
     })),
   };
 }
+
+/** A completion that draws its own leading cell (an image's thumbnail). */
+export type CellCompletion = Completion & { cell?: () => Node };
+
+const leadCell = (c: CellCompletion): Node | null => c.cell?.() ?? null;
 
 function formCell(c: Completion): Node {
   const f = document.createElement("span");
@@ -289,12 +295,16 @@ const wrapBarField = StateField.define<boolean>({
     }),
 });
 
-export function insertExtensions(): Extension[] {
+/** `extra` sources join the `{` completions in the one autocompletion. */
+export function insertExtensions(extra: CompletionSource[] = []): Extension[] {
   return [
     autocompletion({
-      override: [completions],
+      override: [completions, ...extra],
       icons: false,
-      addToOptions: [{ render: formCell, position: 90 }],
+      addToOptions: [
+        { render: leadCell, position: 20 },
+        { render: formCell, position: 90 },
+      ],
     }),
     stopField,
     paletteField,
