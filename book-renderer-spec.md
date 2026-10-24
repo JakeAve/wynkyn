@@ -1123,6 +1123,7 @@ books/
     metadata.json          ← the unnamed edition
     editions/              ← optional: named editions, one complete metadata file each
       pocket.json
+    dictionary.json        ← optional: the book's own spelling words (§7.3)
     images/
   great-gatsby/
     manuscript.md
@@ -1978,6 +1979,19 @@ CodeMirror 6 over plain BML text.
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"
   scope that limits Replace All to the structural block under the cursor. The
   current hit is outlined; other hits are tinted.
+- Spell check underlines (wavy, `--err`) prose words that are in neither the
+  English word list (SCOWL, vendored at `vendor/scowl/en.txt`, US and British
+  spellings) nor the book's `dictionary.json`, `{ "words": [...] }`, shared by
+  every edition. Markup, `%%` comments and the word being typed are skipped. A
+  lowercase entry matches any capitalization; a capitalized one (a name) needs
+  its capital; a possessive is checked without its `'s`. Hovering an underlined
+  word offers up to five suggestions and **Add to dictionary**, which writes the
+  word (a possessive as its name) to `dictionary.json` through
+  `POST /api/books/:book/dictionary` with `{ word }`. **Spelling** on the text
+  view bar is a menu of the word lists, English (the default) or None, kept with
+  the reader's other text view choices; each language is one list in `vendor/`
+  and a row in `WORD_LISTS` (`app.ts`), and `dictionary.json` is the same
+  whatever the language.
 - **EXPERIMENTAL:** `{only}` spans (§3.2.9) carry an amber mark on every line's
   gutter and a tag naming their editions; lines the open edition skips are
   dimmed.

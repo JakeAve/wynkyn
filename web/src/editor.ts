@@ -22,6 +22,7 @@ import { bml, ClassMarker, emRanges, hiddenLines } from "./bml-language.ts";
 import { toCmDiagnostics } from "./diagnostics.ts";
 import { searchPanel } from "./search-panel.ts";
 import { insertExtensions } from "./editor-insert.ts";
+import { spellExtensions } from "./spelling.ts";
 import type { Diagnostic, OnlySpan } from "../../parser/types.ts";
 
 // True while replaceBuffer() applies a remote change: those edits must not
@@ -211,6 +212,7 @@ export function createEditor(opts: {
         editionSpans,
         lintGutter(),
         markup.of([]),
+        spellExtensions(),
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !suppressChanges) {

@@ -182,7 +182,38 @@ export class BookService {
     };
   }
 
+  /** The book's own spelling words (`dictionary.json`, spec §4.1); [] when
+   * it has none. Throws 409 when the file is there but isn't a word list, so
+   * addWord never writes over what the author typed. */
+  async dictionary(book: string): Promise<string[]> {
+    checkNames(book, null);
+    await this.requireBook(book);
+    const text = await this.store.readText(`${book}/dictionary.json`);
+    if (text === null) return [];
+    try {
+      const { words } = JSON.parse(text);
+      if (Array.isArray(words) && words.every((w) => typeof w === "string")) {
+        return words;
+      }
+    } catch {
+      // reported below
+    }
+    throw new ServiceError(409, 'dictionary.json is not { "words": [...] }');
+  }
+
   // ---- writing ----------------------------------------------------------
+  /** Adds one word to the book's dictionary.json; the list after. */
+  async addWord(book: string, word: string): Promise<string[]> {
+    if (!word || /\s/.test(word)) throw bad("one word, no spaces");
+    const words = [...new Set([...await this.dictionary(book), word])]
+      .sort((a, b) => a.localeCompare(b));
+    // ponytail: read-then-write; two tabs adding at once can lose one word.
+    await this.store.write(
+      `${book}/dictionary.json`,
+      JSON.stringify({ words }, null, 2) + "\n",
+    );
+    return words;
+  }
 
   /** A new book from a template's metadata; false when the slug is taken. */
   async createBook(

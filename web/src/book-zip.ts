@@ -15,6 +15,7 @@ export async function zipBook(
   };
   await add("manuscript.md");
   await add("metadata.json");
+  await add("dictionary.json");
   for (const dir of ["editions", "images"]) {
     for (const name of await store.listDir(`${book}/${dir}`)) {
       await add(`${dir}/${name}`);

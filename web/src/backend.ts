@@ -49,6 +49,10 @@ export interface Backend {
     edition: string | null,
     metadata: Metadata,
   ): Promise<BuildResult>;
+  /** The book's spelling words (dictionary.json); addWord returns the list
+   * after. */
+  dictionary(book: string): Promise<string[]>;
+  addWord(book: string, word: string): Promise<string[]>;
   /** `from`: "default" or a named edition's slug. */
   createEdition(book: string, slug: string, from: string): Promise<void>;
   renameEdition(book: string, edition: string, slug: string): Promise<void>;
@@ -80,6 +84,8 @@ const metadataUrl = (book: string, edition: string | null) =>
   edition === null
     ? `/api/books/${encodeURIComponent(book)}/metadata`
     : `${editionsUrl(book)}/${encodeURIComponent(edition)}/metadata`;
+const dictionaryUrl = (book: string) =>
+  `/api/books/${encodeURIComponent(book)}/dictionary`;
 const query = (book: string, edition: string | null) =>
   `?book=${encodeURIComponent(book)}` +
   (edition === null ? "" : `&edition=${encodeURIComponent(edition)}`);
@@ -160,6 +166,12 @@ export function httpBackend(): Backend {
       if (!res.ok) throw new Error(await res.text());
       return await res.json();
     },
+    dictionary: (book) =>
+      call<{ words: string[] }>(dictionaryUrl(book)).then((r) => r.words),
+    addWord: (book, word) =>
+      post<{ words: string[] }>(dictionaryUrl(book), { word }).then((r) =>
+        r.words
+      ),
     createEdition: (book, slug, from) =>
       post(editionsUrl(book), { slug, from }),
     renameEdition: (book, edition, slug) =>
@@ -266,6 +278,8 @@ export function localBackend(
     flushMetadata: (book, edition) => service.flushMetadata(book, edition),
     tryBuild: (book, edition, metadata) =>
       service.build(book, edition, metadata),
+    dictionary: (book) => service.dictionary(book),
+    addWord: (book, word) => service.addWord(book, word),
     createEdition: (book, slug, from) =>
       service.createEdition(book, slug, from === "default" ? null : from),
     renameEdition: (book, edition, slug) =>
