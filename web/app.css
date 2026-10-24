@@ -1096,6 +1096,45 @@ summary {
   filter: blur(1px);
   transition: opacity .2s;
 }
+/* The theme preview's bar (spec §7.5) sits over the preview column, not in
+   #preview (preview.ts swaps and caches its children). The preview's top
+   border is the bar's height, so the live pages and a staged render move
+   down together and Paged.js still measures the same box. */
+#panes {
+  --theme-bar-h: 41px;
+}
+#theme-bar {
+  position: absolute;
+  grid-column: -2 / -1;
+  grid-row: 1;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  height: var(--theme-bar-h);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+#theme-bar .what {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#theme-bar[hidden],
+:root:not([data-mode="style"]) #theme-bar,
+#panes.pages-hidden #theme-bar {
+  display: none;
+}
+#preview[data-theme-preview] {
+  border-top: var(--theme-bar-h) solid var(--desk);
+}
 #preview .preview-stage {
   position: absolute;
   inset: 16px;
@@ -2312,6 +2351,16 @@ summary {
 .choice.primary small {
   color: var(--inv-fg);
   opacity: .7;
+}
+/* A dialog's (or the theme bar's) main button: the inverted pill, as the
+   primary choice row. */
+:is(.ask, #theme-bar) .btn.primary {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+:is(.ask, #theme-bar) .btn.primary:hover {
+  background: var(--inv-bg);
+  opacity: .92;
 }
 .ask .sw-err {
   display: block;

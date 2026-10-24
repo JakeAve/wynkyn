@@ -15,6 +15,7 @@ import {
   renderPreview,
   restoreCachedRender,
   scrollPreviewTo,
+  type UpdateMessage,
 } from "./preview.ts";
 import type { ServerMessage } from "../../server/pipeline.ts";
 import {
@@ -48,6 +49,7 @@ import {
   type EditionInfo,
   editionLabel,
   firstSpanLine,
+  freeSlug,
   lineFromHash,
   passagesLabel,
   prettySize,
@@ -74,7 +76,7 @@ import {
 import type { BookStore } from "../../server/store.ts";
 import { importSource } from "../../server/import/mod.ts";
 import { arrowKeys, themeCard } from "./panel-themes.ts";
-import { THEMES } from "../../metadata/themes.ts";
+import { applyTheme, THEMES } from "../../metadata/themes.ts";
 import {
   fetchSource,
   openUrl,
@@ -784,8 +786,8 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         isNames: () => isNames,
         exportEpub,
         toStyle,
-        tryTheme: () => {}, // task 5 wires the theme preview
-        applyTheme: () => {},
+        tryTheme: (slug) => void tryTheme(slug),
+        applyTheme: askApplyTheme,
         view,
         onRoute: (id) => {
           view = id;
@@ -798,6 +800,145 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
       return null;
     }
   })();
+}
+
+// ---- Theme preview and Apply (spec §7.5) ----
+// A previewed theme's build is on screen and nothing is saved. Pushed builds
+// are held meanwhile; ending the preview shows the newest one.
+let paint: (msg: UpdateMessage, cacheKey?: string) => void = () => {}; // set in main
+let previewSlug: string | null = null; // the theme on screen, or null
+let previewGen = 0; // bumped by every try and by the end, so a stale build drops
+let previewFrom: string | null = null; // the manuscript version it was built from
+let previewShown: UpdateMessage | null = null; // the theme's build on screen
+let heldMsg: UpdateMessage | null = null; // newest push held while previewing
+let lastShown: UpdateMessage | null = null; // the last real build painted
+
+const themeName = (slug: string) =>
+  THEMES.find((t) => t.slug === slug)?.name ?? slug;
+
+// The edition's metadata with every style edit landed, so a theme goes over
+// what the author sees rather than the copy fetched at panel load.
+// ponytail: polls the panel's debounce; a flush() on ConfigPanel if it lags.
+async function settledMetadata(): Promise<Metadata> {
+  while (configPanel?.isDirty() || metaSaveInFlight) {
+    await (metaSaveInFlight
+      ? metaSaveDone
+      : new Promise((r) => setTimeout(r, 100)));
+  }
+  return (await fetchMetadata()).metadata;
+}
+
+async function tryTheme(slug: string | null): Promise<void> {
+  if (slug === null) return endPreview();
+  const gen = ++previewGen;
+  previewSlug = slug;
+  const bar = $("theme-bar");
+  bar.querySelector("b")!.textContent = themeName(slug);
+  bar.hidden = false;
+  $("preview").dataset.themePreview = "";
+  $("preview").dataset.stale = "";
+  configPanel?.themeTried(slug);
+  try {
+    const meta = applyTheme(await settledMetadata(), slug);
+    const built = await backend.tryBuild(book, edition, meta);
+    if (gen !== previewGen) return; // another card, or Discard, since
+    previewFrom = built.manuscriptVersion;
+    previewShown = { ...built, type: "update" };
+    // Its own cache row: a reload must not open on a look never applied.
+    paint(previewShown, `${cacheId(book, edition)}|theme`);
+  } catch (err) {
+    if (gen === previewGen) setStatus("error", `preview: ${brief(err)}`);
+  }
+}
+
+// Back to the book's own look: the newest held push, else the last build.
+// `applied`: the previewed look is now the book's, so keep it on screen.
+function endPreview(applied = false): void {
+  if (previewSlug === null) return;
+  previewSlug = null;
+  previewGen++;
+  $("theme-bar").hidden = true;
+  delete $("preview").dataset.themePreview;
+  configPanel?.themeTried(null);
+  if (applied && previewShown) lastShown = previewShown;
+  const next = applied ? null : heldMsg ?? lastShown;
+  heldMsg = previewShown = null;
+  if (next) {
+    lastShown = next;
+    paint(next);
+  } else if (!applied) delete $("preview").dataset.stale; // no build yet
+}
+
+// A push while previewing: held, and a manuscript change rebuilds the theme.
+function holdForPreview(msg: UpdateMessage): boolean {
+  if (previewSlug === null) return false;
+  heldMsg = msg;
+  if (msg.manuscriptVersion !== previewFrom) void tryTheme(previewSlug);
+  return true;
+}
+
+// Apply always asks (spec §7.5): a new edition (the safe choice), or replace
+// this edition's style. Cancel keeps the preview.
+let applying: string | null = null; // the theme the dialog is asking about
+function askApplyTheme(slug: string): void {
+  const dlg = $("theme-dlg") as HTMLDialogElement;
+  applying = slug;
+  for (const el of dlg.querySelectorAll(".t-name")) {
+    el.textContent = themeName(slug);
+  }
+  for (const el of dlg.querySelectorAll(".e-name")) {
+    el.textContent = $("edition-name").textContent;
+  }
+  $("theme-err").textContent = "";
+  if (!dlg.open) dlg.showModal();
+}
+
+// What a theme owns (spec §4.13), as the sections a save replaces.
+const themeSections = (m: Metadata): Partial<Metadata> => ({
+  fonts: m.fonts,
+  elements: m.elements,
+  numbering: m.numbering,
+  running: m.running,
+});
+
+function installThemeApply(): void {
+  const dlg = $("theme-dlg") as HTMLDialogElement;
+  const buttons = [...dlg.querySelectorAll("button")];
+  $("theme-apply").onclick = () => {
+    if (previewSlug) askApplyTheme(previewSlug);
+  };
+  $("theme-discard").onclick = () => endPreview();
+  $("theme-cancel").onclick = () => dlg.close();
+  const run = (act: (slug: string) => Promise<void>) => async () => {
+    if (!applying) return;
+    for (const b of buttons) b.disabled = true;
+    try {
+      await act(applying);
+    } catch (err) {
+      $("theme-err").textContent = brief(err);
+    } finally {
+      for (const b of buttons) b.disabled = false;
+    }
+  };
+  $("theme-new").onclick = run(async (slug) => {
+    const applied = applyTheme(await settledMetadata(), slug);
+    const taken = (await backend.editions(book)).flatMap((e) =>
+      e.slug === null ? [] : [e.slug]
+    );
+    const next = freeSlug(slug, taken);
+    await backend.createEdition(book, next, edition ?? "default");
+    await backend.saveMetadata(book, next, themeSections(applied));
+    await backend.flushMetadata(book, next); // the page is about to go
+    location.href = editionHref(book, next);
+  });
+  $("theme-replace").onclick = run(async (slug) => {
+    const applied = applyTheme(await settledMetadata(), slug);
+    metadata = applied;
+    saveMetadataSections(themeSections(applied));
+    configPanel?.refresh(applied);
+    endPreview(true);
+    dlg.close();
+  });
 }
 
 const MODES: Mode[] = ["write", "style", "publish"];
@@ -819,6 +960,7 @@ function setMode(next: Mode): void {
   }
   syncUrl();
   followCursor(cursorLine);
+  if (next !== "style") endPreview(); // the panel ends it on Publish too
   if (next === "write") return;
   ensureConfigPanel().then((panel) => {
     if (mode !== "write") panel?.setMode(mode); // the latest, if it changed meanwhile
@@ -1654,6 +1796,20 @@ async function main(): Promise<void> {
       else location.reload();
     }, 500);
   };
+  paint = (msg, cacheKey = key) => {
+    renderPreview(msg, previewEl, cacheKey).then((problems) => {
+      delete previewEl.dataset.stale;
+      showPageProblems(problems);
+      refreshPageIndicator();
+      configPanel?.pagesChanged();
+      followCursor(cursorLine);
+    }, (err) => {
+      // The old pages stay up; their problems no longer describe this book.
+      setStatus("error", `preview: ${brief(err)}`);
+      showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
+    });
+  };
+  installThemeApply();
   const onMessage = (msg: ServerMessage) => {
     if (msg.type === "error") {
       if (msg.save === "metadata") { // accepted, then the write failed
@@ -1665,17 +1821,10 @@ async function main(): Promise<void> {
       !dirty && !saveInFlight && !metaSaveInFlight && !configPanel?.isDirty() &&
       !diskOffer
     ) setStatus("saved");
-    renderPreview(msg, previewEl, key).then((problems) => {
-      delete previewEl.dataset.stale;
-      showPageProblems(problems);
-      refreshPageIndicator();
-      configPanel?.pagesChanged();
-      followCursor(cursorLine);
-    }, (err) => {
-      // The old pages stay up; their problems no longer describe this book.
-      setStatus("error", `preview: ${brief(err)}`);
-      showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
-    });
+    if (!holdForPreview(msg)) {
+      lastShown = msg;
+      paint(msg);
+    }
     // Versions this client already reflects need nothing (spec §6).
     if (msg.manuscriptVersion !== base) refreshFromRemote();
     if (msg.metadataVersion !== metaBase) refreshConfigFromRemote();

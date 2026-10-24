@@ -41,6 +41,8 @@ export interface Backend {
     edition: string | null,
     sections: object,
   ): Promise<{ version: string }>;
+  /** Lands a debounced metadata save now; in-page, before the page goes. */
+  flushMetadata(book: string, edition: string | null): Promise<void>;
   /** A build in the given style, nothing saved (try on, spec §4.13). */
   tryBuild(
     book: string,
@@ -144,6 +146,8 @@ export function httpBackend(): Backend {
     },
     saveMetadata: (book, edition, sections) =>
       post(metadataUrl(book, edition), { sections }),
+    // The server lands its own debounced writes; this page going doesn't stop it.
+    flushMetadata: async () => {},
     async tryBuild(book, edition, metadata) {
       const res = await fetch(
         `/api/books/${encodeURIComponent(book)}/try`,
@@ -259,6 +263,7 @@ export function localBackend(
     metadata: (book, edition) => service.metadata(book, edition),
     saveMetadata: (book, edition, sections) =>
       service.saveMetadata(book, edition, sections),
+    flushMetadata: (book, edition) => service.flushMetadata(book, edition),
     tryBuild: (book, edition, metadata) =>
       service.build(book, edition, metadata),
     createEdition: (book, slug, from) =>

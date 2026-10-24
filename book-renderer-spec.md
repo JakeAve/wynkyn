@@ -2072,6 +2072,28 @@ Includes:
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)
+- A **Theme** view, first in Style's Book group: a grid of cards, one per preset
+  theme (§4.13), each drawn in the theme's own fonts (its name in the display
+  face, a chapter label, a line of body text and the description). Clicking a
+  card previews the theme: the preview shows the book built with the theme
+  applied and nothing is saved. A bar across the top of the preview reads
+  "Previewing {Theme}" with **Apply…** and **Discard**. While a theme is
+  previewed, live updates are held rather than shown; a manuscript change
+  rebuilds the previewed theme with the new text. Discard, leaving the Theme
+  view, switching mode or switching edition ends the preview and shows the
+  newest build of the book's own style. Clicking another card switches the
+  preview to that theme.
+- **Apply…** always asks first, in an in-page dialog: "Apply {Theme} to
+  {edition}? Fonts, part styles, chapter numbering and running heads change.
+  Page size, margins and your custom styles stay." Its choices:
+  - **Apply as new edition** (the recommended one): the current edition stays as
+    it is; a new named edition (slug from the theme, de-duplicated: `caslon`,
+    `caslon-2`, …) is copied from it with the theme applied, and the app
+    switches to it.
+  - **Replace this edition's style**: the theme's `fonts`, `elements`,
+    `numbering` and `running` replace the edition's, saved like any panel edit
+    (version checks and the changed-on-disk banner apply). It can't be undone.
+  - **Cancel** closes the dialog and keeps the preview.
 
 ### 7.6 Preview Pane
 

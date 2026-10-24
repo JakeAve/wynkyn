@@ -165,6 +165,14 @@
       <div id="gutter-editor" class="gutter" role="separator"
         aria-orientation="vertical" title="Drag to resize"></div>
       <div id="preview"></div>
+      <!-- The theme preview's bar: over the preview, never inside it, since
+           preview.ts swaps and caches #preview's children. -->
+      <div id="theme-bar" role="status" hidden>
+        <span class="what">Previewing <b></b></span>
+        <button id="theme-apply" class="btn primary"
+          type="button">Apply…</button>
+        <button id="theme-discard" class="btn" type="button">Discard</button>
+      </div>
       <div id="sheet-view"></div>
     </div>
     <div id="footer">
@@ -326,6 +334,26 @@
             book</button>
         </div>
       </form>
+    </dialog>
+    <dialog id="theme-dlg" class="ask" aria-labelledby="theme-dlg-title">
+      <h2 id="theme-dlg-title" tabindex="-1" autofocus>Apply <span
+          class="t-name"></span> to <span class="e-name"></span>?</h2>
+      <p>Fonts, part styles, chapter numbering and running heads change. Page
+        size, margins and your custom styles stay.</p>
+      <div class="choices">
+        <button id="theme-new" class="choice primary" type="button">Apply as
+          new edition
+          <small><span class="e-name"></span> stays as it is. A new edition,
+            <span class="t-name"></span>, gets this theme.</small></button>
+        <button id="theme-replace" class="choice" type="button">Replace this
+          edition's style
+          <small><span class="e-name"></span>'s current fonts and styles are
+            replaced. This can't be undone.</small></button>
+      </div>
+      <div class="ask-foot">
+        <span id="theme-err" class="sw-err"></span>
+        <button id="theme-cancel" class="btn" type="button">Cancel</button>
+      </div>
     </dialog>
     <script src="/vendor/paged.js"></script>
     <script type="module" src="/web/app.js"></script>

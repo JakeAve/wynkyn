@@ -18,7 +18,9 @@ pure        pure          pure+2 js     disk, Chrome   browser only
 
 - `parser/` and `metadata/` know nothing about files or the DOM. `metadata/`
   also holds `page-setup.ts`, the one place page + sheet + signature geometry is
-  resolved (the panel and the exporter both call it so they can't disagree).
+  resolved (the panel and the exporter both call it so they can't disagree),
+  and `themes.ts`, the preset themes (`THEMES`, `applyTheme`: what a theme
+  owns, spec §4.13) shared by `bml new`, the dev server and the browser.
 - `renderer/` is tree → HTML plus `base.css` and two classic scripts,
   `plates.js` and `folios.js`, that run inside Paged.js. The server inlines
   them; Deno imports them for tests.
@@ -52,7 +54,7 @@ never imports from `server/`.
 | New sentinel | spec §3 → `parser/` → `renderer/render.ts` → `base.css` → `style-catalog.ts` → `web/src/snippets.ts` for the editor's insert menu |
 | New server endpoint | a method on `BookService` (over the store, throwing `ServiceError` with the status); `dev-server.ts` routes to it; `web/src/backend.ts` gets it on `Backend` for both `httpBackend` and `localBackend`; `bml.ts` gets the same function if it makes sense on the CLI |
 | Anything that reads or writes a book file | through the `BookStore` only, never `Deno.*` — or it stops working in the browser and the desktop app |
-| New panel view | build from `panel-controls.ts` primitives into `panel-page.ts`, `panel-fonts.ts`, `panel-parts.ts` or `panel-furniture.ts`; `config-panel.ts` only routes and saves |
+| New panel view | build from `panel-controls.ts` primitives into `panel-page.ts`, `panel-fonts.ts`, `panel-parts.ts`, `panel-furniture.ts` or `panel-themes.ts` (the Theme view's cards); `config-panel.ts` only routes and saves; a view that changes the preview without saving (the theme preview) asks `app.ts` through a panel option |
 | Anything a page click should reach | `style-catalog.ts` maps the rendered class to the metadata path; `preview.ts` is only the DOM adapter |
 | Pagination behaviour (folios, heads, TOC numbers, blanks) | `renderer/folios.js`, then read the golden page-map diff (`UPDATE_GOLDEN=1 deno task test`) before accepting it |
 
