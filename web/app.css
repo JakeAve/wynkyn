@@ -1343,6 +1343,90 @@ summary {
   background: var(--hover);
   transition: none;
 }
+/* Theme cards (panel-themes.ts): also used outside the panel, so every rule
+   is plain-class too; the #config-overlay twin outranks its ghost buttons. */
+#config-overlay .tintro {
+  margin: 0 0 10px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.tgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.tcard,
+#config-overlay .tcard {
+  white-space: normal;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  text-align: left;
+  padding: 12px 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  font: inherit;
+}
+.tcard:hover,
+#config-overlay .tcard:hover {
+  background: var(--hover);
+}
+.tcard[aria-pressed="true"],
+#config-overlay .tcard[aria-pressed="true"] {
+  border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg);
+}
+.tname {
+  font-size: 21px;
+  line-height: 1.1;
+}
+.tspec {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  text-align: center;
+  padding: 12px 8px;
+  background: var(--paper);
+  color: var(--sheet-ink);
+  border: 1px solid var(--soft);
+  border-radius: 3px;
+}
+.ttitle {
+  line-height: 1.25;
+}
+.tbody {
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+  justify-self: stretch;
+  margin-top: 6px;
+}
+.tdesc {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.tpair {
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tcard.sm,
+#config-overlay .tcard.sm {
+  padding: 8px 8px 7px;
+  gap: 4px;
+}
+.tcard.sm .tname {
+  font-size: 16px;
+}
+.tcard.sm .tspec {
+  padding: 8px 4px;
+}
 #config-overlay .sech {
   display: flex;
   align-items: baseline;

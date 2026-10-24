@@ -782,6 +782,8 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         isNames: () => isNames,
         exportEpub,
         toStyle,
+        tryTheme: () => {}, // task 5 wires the theme preview
+        applyTheme: () => {},
         view,
         onRoute: (id) => {
           view = id;
