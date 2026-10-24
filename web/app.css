@@ -3895,3 +3895,176 @@ body.typing #editor .pane-head {
   color: var(--muted);
   font: var(--fs-2xs) var(--f-mono);
 }
+
+/* ---- History: versions by day (left), what one changed (middle) ---- */
+.history-list {
+  padding: 8px;
+  overflow: auto;
+}
+.h-filter {
+  display: flex;
+  gap: 2px;
+  padding: 0 2px 4px;
+}
+.h-filter .btn[aria-pressed="true"],
+.h-row[aria-pressed="true"] {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+.h-day {
+  padding: 12px 10px 4px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.h-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  margin: 0 0 1px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.h-row:hover {
+  background: var(--hover);
+}
+.h-row:focus-visible,
+.h-filter .btn:focus-visible,
+.history-changes .btn:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
+}
+.h-line {
+  display: flex;
+  gap: 8px;
+}
+.h-time {
+  flex: 0 0 56px;
+  font-variant-numeric: tabular-nums;
+}
+.h-head {
+  font-weight: 600;
+}
+.h-detail,
+.h-reason {
+  padding-left: 64px;
+  font-size: 12px;
+  opacity: .75;
+}
+.h-detail:empty {
+  display: none;
+}
+.h-reason {
+  font-size: var(--fs-sm);
+  font-style: italic;
+}
+.h-more {
+  margin-left: 56px;
+  font-size: 12px;
+}
+.history-changes {
+  min-width: 0;
+  padding: 20px 28px;
+  overflow: auto;
+}
+.history-changes h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.h-when {
+  margin-top: 4px;
+  color: var(--muted);
+}
+.h-actions {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+.h-name {
+  color: var(--fg);
+}
+.h-menu-wrap {
+  position: relative;
+}
+.history-changes .h-restore {
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+.h-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  width: 260px;
+  margin: 0;
+  padding: 4px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: var(--page-shadow);
+}
+.h-menu[hidden] {
+  display: none;
+}
+.h-summary {
+  max-width: 52ch;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.h-group {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.h-part {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.h-style {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--soft);
+}
+.h-prop,
+.h-from {
+  color: var(--muted);
+}
+.h-from {
+  text-decoration: line-through;
+}
+.h-para {
+  max-width: 60ch;
+  margin: 6px 0 10px;
+  font-family: Georgia, serif;
+  font-size: 16px;
+  line-height: 1.5;
+  user-select: text;
+}
+.h-para del {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+}
+.h-para ins {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  text-decoration: none;
+}
+.h-note {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.h-err {
+  color: var(--err);
+}
