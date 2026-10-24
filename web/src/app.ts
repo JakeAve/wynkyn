@@ -836,10 +836,6 @@ async function tryTheme(slug: string | null): Promise<void> {
   if (slug === null) return endPreview();
   const gen = ++previewGen;
   previewSlug = slug;
-  const bar = $("theme-bar");
-  bar.querySelector("b")!.textContent = themeName(slug);
-  bar.hidden = false;
-  $("preview").dataset.themePreview = "";
   $("preview").dataset.stale = "";
   configPanel?.themeTried(slug);
   try {
@@ -863,8 +859,6 @@ function endPreview(applied = false): void {
   if (previewSlug === null) return;
   previewSlug = null;
   const gen = ++previewGen;
-  $("theme-bar").hidden = true;
-  delete $("preview").dataset.themePreview;
   configPanel?.themeTried(null);
   if (applied && previewShown) lastShown = previewShown;
   const next = heldMsg ?? lastShown;
@@ -933,10 +927,6 @@ const themeSections = (m: Metadata): Partial<Metadata> => ({
 function installThemeApply(): void {
   const dlg = $("theme-dlg") as HTMLDialogElement;
   const buttons = [...dlg.querySelectorAll("button")];
-  $("theme-apply").onclick = () => {
-    if (previewSlug) askApplyTheme(previewSlug);
-  };
-  $("theme-discard").onclick = () => endPreview();
   $("theme-cancel").onclick = () => dlg.close();
   const run = (act: (slug: string) => Promise<void>) => async () => {
     if (!applying) return;

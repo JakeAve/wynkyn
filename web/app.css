@@ -1096,45 +1096,6 @@ summary {
   filter: blur(1px);
   transition: opacity .2s;
 }
-/* The theme preview's bar (spec §7.5) sits over the preview column, not in
-   #preview (preview.ts swaps and caches its children). The preview's top
-   border is the bar's height, so the live pages and a staged render move
-   down together and Paged.js still measures the same box. */
-#panes {
-  --theme-bar-h: 41px;
-}
-#theme-bar {
-  position: absolute;
-  grid-column: -2 / -1;
-  grid-row: 1;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
-  box-sizing: border-box;
-  height: var(--theme-bar-h);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 14px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
-}
-#theme-bar .what {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-#theme-bar[hidden],
-:root:not([data-mode="style"]) #theme-bar,
-#panes.pages-hidden #theme-bar {
-  display: none;
-}
-#preview[data-theme-preview] {
-  border-top: var(--theme-bar-h) solid var(--desk);
-}
 #preview .preview-stage {
   position: absolute;
   inset: 16px;
@@ -1384,6 +1345,30 @@ summary {
 }
 /* Theme cards (panel-themes.ts): also used outside the panel, so every rule
    is plain-class too; the #config-overlay twin outranks its ghost buttons. */
+/* The previewed theme's row (spec §7.5): sticky at the top of the Theme
+   view, next to the cards it acts on. */
+#theme-bar {
+  position: sticky;
+  top: -4px; /* .pbody's top padding */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -14px -16px 6px;
+  padding: 8px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+#theme-bar[hidden] {
+  display: none;
+}
+#theme-bar .what {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 #config-overlay .tintro {
   margin: 0 0 10px;
   color: var(--muted);

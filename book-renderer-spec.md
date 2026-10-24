@@ -2076,13 +2076,13 @@ Includes:
   theme (§4.13), each drawn in the theme's own fonts (its name in the display
   face, a chapter label, a line of body text and the description). Clicking a
   card previews the theme: the preview shows the book built with the theme
-  applied and nothing is saved. A bar across the top of the preview reads
-  "Previewing {Theme}" with **Apply…** and **Discard**. While a theme is
-  previewed, live updates are held rather than shown; a manuscript change
-  rebuilds the previewed theme with the new text. Discard, leaving the Theme
-  view, switching mode or switching edition ends the preview and shows the
-  newest build of the book's own style. Clicking another card switches the
-  preview to that theme.
+  applied and nothing is saved. A row stuck to the top of the Theme view, next
+  to the cards, reads "Previewing {Theme}" with **Apply…** and **Discard**.
+  While a theme is previewed, live updates are held rather than shown; a
+  manuscript change rebuilds the previewed theme with the new text. Discard,
+  leaving the Theme view, switching mode or switching edition ends the preview
+  and shows the newest build of the book's own style. Clicking another card
+  switches the preview to that theme.
 - **Apply…** always asks first, in an in-page dialog: "Apply {Theme} to
   {edition}? Fonts, part styles, chapter numbering and running heads change.
   Page size, margins and your custom styles stay." Its choices:

@@ -120,6 +120,36 @@ export function arrowKeys(grid: HTMLElement): void {
   });
 }
 
+// The previewed theme's row, sticky at the top of the Theme view: its name,
+// Apply… (the app asks how) and Discard. Hidden while nothing is previewed.
+export function showThemeBar(bar: HTMLElement, slug: string | null): void {
+  bar.hidden = slug === null;
+  bar.dataset.slug = slug ?? "";
+  bar.querySelector("b")!.textContent =
+    THEMES.find((t) => t.slug === slug)?.name ?? "";
+}
+
+function themeBar(ctx: PanelContext): HTMLElement {
+  const bar = document.createElement("div");
+  bar.id = "theme-bar";
+  const what = span("what", "Previewing ");
+  what.setAttribute("role", "status");
+  what.append(document.createElement("b"));
+  const apply = document.createElement("button");
+  apply.type = "button";
+  apply.className = "btn primary";
+  apply.textContent = "Apply…";
+  apply.onclick = () => bar.dataset.slug && ctx.applyTheme(bar.dataset.slug);
+  const discard = document.createElement("button");
+  discard.type = "button";
+  discard.className = "btn";
+  discard.textContent = "Discard";
+  discard.onclick = () => ctx.tryTheme(null);
+  bar.append(what, apply, discard);
+  showThemeBar(bar, ctx.themeTried);
+  return bar;
+}
+
 export function buildThemesTab(ctx: PanelContext): Node[] {
   const sec = document.createElement("section");
   sec.className = "sec";
@@ -135,6 +165,6 @@ export function buildThemesTab(ctx: PanelContext): Node[] {
     grid.append(card);
   }
   arrowKeys(grid);
-  sec.append(intro, grid);
+  sec.append(themeBar(ctx), intro, grid);
   return [sec];
 }

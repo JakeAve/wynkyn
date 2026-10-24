@@ -264,7 +264,8 @@ export interface PanelContext {
   exportEpub(): Promise<EpubResult>; // lands pending saves first
   toStyle(view: string, from: string): void; // Publish (section `from`) → a Style view; Back returns
   onPages(redraw: () => void): void; // called after each preview render
-  tryTheme(slug: string): void; // the Theme view: preview this theme
+  tryTheme(slug: string | null): void; // the Theme view: preview a theme; null discards
+  applyTheme(slug: string): void; // the Theme view's Apply…: the app asks how
   themeTried: string | null; // the theme being previewed, if any
 }
 

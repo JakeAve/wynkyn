@@ -8,7 +8,7 @@ import type { Metadata } from "../../metadata/types.ts";
 import { buildFontsTab } from "./panel-fonts.ts";
 import { buildPageTab, buildPublishTab } from "./panel-page.ts";
 import { buildPartsTab } from "./panel-parts.ts";
-import { buildThemesTab } from "./panel-themes.ts";
+import { buildThemesTab, showThemeBar } from "./panel-themes.ts";
 import {
   addIsNames,
   type BookPart,
@@ -276,6 +276,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         onPages = redraw;
       },
       tryTheme: (slug) => opts.tryTheme(slug),
+      applyTheme: (slug) => opts.applyTheme(slug),
       themeTried: tried,
     };
     switch (route.tab) {
@@ -338,6 +339,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       for (const c of body.querySelectorAll<HTMLElement>(".tcard")) {
         c.setAttribute("aria-pressed", String(c.dataset.slug === slug));
       }
+      const bar = body.querySelector<HTMLElement>("#theme-bar");
+      if (bar) showThemeBar(bar, slug);
     },
     selectStyle(key) {
       addIsNames(meta, opts.isNames());
