@@ -238,7 +238,7 @@ function runningEntries(metadata: Metadata): StyleEntry[] {
 
 // ---- Style panel: tabs, book parts, routes (spec R1) ----
 
-export type TabId = "page" | "fonts" | "parts" | "publish";
+export type TabId = "themes" | "page" | "fonts" | "parts" | "publish";
 
 export interface Route {
   tab: TabId;
@@ -264,6 +264,9 @@ export interface PanelContext {
   exportEpub(): Promise<EpubResult>; // lands pending saves first
   toStyle(view: string, from: string): void; // Publish (section `from`) → a Style view; Back returns
   onPages(redraw: () => void): void; // called after each preview render
+  tryTheme(slug: string | null): void; // the Theme view: preview a theme; null discards
+  applyTheme(slug: string): void; // the Theme view's Apply…: the app asks how
+  themeTried: string | null; // the theme being previewed, if any
 }
 
 export interface EpubResult {

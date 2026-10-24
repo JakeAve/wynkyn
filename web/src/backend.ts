@@ -2,12 +2,14 @@
 // the dev server (which runs the BookService over books/ on disk); without
 // a server (the hosted site) the app runs the same BookService itself, over
 // the author's own folder (fs-store.ts). app.ts never knows which.
-import type { ServerMessage } from "../../server/pipeline.ts";
+import type { BuildResult, ServerMessage } from "../../server/pipeline.ts";
+import type { Metadata } from "../../metadata/types.ts";
 import type { EditionInfo } from "../../server/editions.ts";
 import {
   BookService,
   type MetadataResult,
   type SaveResult,
+  themedTemplate,
 } from "../../server/book-service.ts";
 import type { BookStore } from "../../server/store.ts";
 import type { EpubResult } from "./style-catalog.ts";
@@ -19,11 +21,13 @@ export interface Backend {
   listBooks(): Promise<string[]>;
   /** The library's id (BookService.libraryId). */
   libraryId(): Promise<string>;
-  createBook(slug: string, title?: string): Promise<void>;
+  /** `theme`: a preset's slug (spec §4.13); none is House. */
+  createBook(slug: string, title?: string, theme?: string): Promise<void>;
   /** A book from an import run in the page (§7.9). */
   importBook(
     slug: string,
     r: { manuscript: string; images: Record<string, Uint8Array> },
+    theme?: string,
   ): Promise<void>;
   editions(book: string): Promise<EditionInfo[]>;
   manuscript(book: string): Promise<{ text: string; version: string }>;
@@ -37,6 +41,14 @@ export interface Backend {
     edition: string | null,
     sections: object,
   ): Promise<{ version: string }>;
+  /** Lands a debounced metadata save now; in-page, before the page goes. */
+  flushMetadata(book: string, edition: string | null): Promise<void>;
+  /** A build in the given style, nothing saved (try on, spec §4.13). */
+  tryBuild(
+    book: string,
+    edition: string | null,
+    metadata: Metadata,
+  ): Promise<BuildResult>;
   /** The book's spelling words (dictionary.json); addWord returns the list
    * after. */
   dictionary(book: string): Promise<string[]>;
@@ -96,9 +108,11 @@ export function httpBackend(): Backend {
     listBooks: () =>
       call<{ books: string[] }>("/api/books").then((r) => r.books),
     libraryId: () => call<{ id: string }>("/api/library").then((r) => r.id),
-    createBook: (slug, title) => post("/api/books", { slug, title }),
-    importBook: (slug, r) =>
+    createBook: (slug, title, theme) =>
+      post("/api/books", { slug, title, theme }),
+    importBook: (slug, r, theme) =>
       post(`/api/books/${encodeURIComponent(slug)}/import`, {
+        theme,
         manuscript: r.manuscript,
         images: Object.fromEntries(
           Object.entries(r.images).map(([k, v]) => [k, base64(v)]),
@@ -138,6 +152,20 @@ export function httpBackend(): Backend {
     },
     saveMetadata: (book, edition, sections) =>
       post(metadataUrl(book, edition), { sections }),
+    // The server lands its own debounced writes; this page going doesn't stop it.
+    flushMetadata: async () => {},
+    async tryBuild(book, edition, metadata) {
+      const res = await fetch(
+        `/api/books/${encodeURIComponent(book)}/try`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ edition, metadata }),
+        },
+      );
+      if (!res.ok) throw new Error(await res.text());
+      return await res.json();
+    },
     dictionary: (book) =>
       call<{ words: string[] }>(dictionaryUrl(book)).then((r) => r.words),
     addWord: (book, word) =>
@@ -229,13 +257,15 @@ export function localBackend(
     store,
     listBooks: () => service.list(),
     libraryId: () => service.libraryId(),
-    async createBook(slug, title) {
-      if (!await service.createBook(slug, assets.template, title)) {
+    async createBook(slug, title, theme) {
+      const meta = themedTemplate(assets.template, theme);
+      if (!await service.createBook(slug, meta, title)) {
         throw new Error("book already exists");
       }
     },
-    async importBook(slug, r) {
-      if (!await service.importBook(slug, assets.template, r)) {
+    async importBook(slug, r, theme) {
+      const meta = themedTemplate(assets.template, theme);
+      if (!await service.importBook(slug, meta, r)) {
         throw new Error("book already exists");
       }
     },
@@ -245,6 +275,9 @@ export function localBackend(
     metadata: (book, edition) => service.metadata(book, edition),
     saveMetadata: (book, edition, sections) =>
       service.saveMetadata(book, edition, sections),
+    flushMetadata: (book, edition) => service.flushMetadata(book, edition),
+    tryBuild: (book, edition, metadata) =>
+      service.build(book, edition, metadata),
     dictionary: (book) => service.dictionary(book),
     addWord: (book, word) => service.addWord(book, word),
     createEdition: (book, slug, from) =>

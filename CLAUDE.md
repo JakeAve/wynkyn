@@ -106,9 +106,10 @@ mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` / `.hasContent`.
 - `deno task fonts` regenerate `metadata/fonts-catalog.ts` (every Google family,
   for the font picker) from Google's public catalog
 - `deno task bml list` books on disk
-- `deno task bml new <slug>` scaffold `books/<slug>/` from
-  `templates/metadata.json` (house style)
-- `deno task bml import <file> [--slug s] [--chapters auto|N|none] [--flat] [--prose] [--force]`
+- `deno task bml new <slug> [--theme t]` scaffold `books/<slug>/` from
+  `templates/metadata.json` (house style, or preset theme `t` applied, spec
+  §4.13)
+- `deno task bml import <file> [--slug s] [--theme t] [--chapters auto|N|none] [--flat] [--prose] [--force]`
   a book from a .txt/.md/.html/.epub: `server/import/` reads it into blocks,
   finds the chapters, writes `manuscript.md` in the house shape with `%% check:`
   notes (spec §7.9). The browser app runs the same code from Create a new

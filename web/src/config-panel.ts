@@ -8,6 +8,7 @@ import type { Metadata } from "../../metadata/types.ts";
 import { buildFontsTab } from "./panel-fonts.ts";
 import { buildPageTab, buildPublishTab } from "./panel-page.ts";
 import { buildPartsTab } from "./panel-parts.ts";
+import { buildThemesTab, markTried } from "./panel-themes.ts";
 import {
   addIsNames,
   type BookPart,
@@ -28,10 +29,12 @@ export type PanelMode = "style" | "publish";
 export interface ConfigPanel {
   setMode(mode: PanelMode): void; // swap the nav and body between style and publish
   isDirty(): boolean; // sections touched but not yet handed to saveSections
+  flush(): void; // hand any pending sections to saveSections now
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   selectStyle(key: string): void; // style mode, where a catalog entry is styled (§7.4)
   pagesChanged(): void; // the preview repaginated
   open(view: string): void; // the nav row `view` (navId), if this book has it
+  themeTried(slug: string | null): void; // mark the previewed theme's card
 }
 
 export interface ConfigPanelOptions {
@@ -47,6 +50,8 @@ export interface ConfigPanelOptions {
   toStyle(view: string): void; // leave Publish for a Style view, Back returns
   view?: string | null; // the nav row to open on (navId); unknown = default
   onRoute?(id: string): void; // the nav row changed (for the URL)
+  tryTheme(slug: string | null): void; // preview a theme; null on leaving the Theme view
+  applyTheme(slug: string): void; // the app's Apply flow
 }
 
 const GROUPS: Array<[BookPart["group"], string]> = [
@@ -97,6 +102,7 @@ function styleNav(meta: Metadata): Array<[string, NavRow[]]> {
   const out: Array<[string, NavRow[]]> = [[
     "Book",
     [
+      { id: "themes", label: "Theme", route: { tab: "themes" } },
       { id: "page", label: "Page size & margins", route: { tab: "page" } },
       { id: "fonts", label: "Fonts", route: { tab: "fonts" } },
       row(body),
@@ -201,7 +207,10 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   body.className = "pbody";
   opts.overlay.replaceChildren(head, body);
 
+  let tried: string | null = null;
+
   function go(next: Route): void {
+    if (route.tab === "themes" && next.tab !== "themes") opts.tryTheme(null);
     route = next;
     if (next.tab !== "publish") styleRoute = next;
     current = navId(next);
@@ -266,8 +275,13 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       onPages: (redraw) => {
         onPages = redraw;
       },
+      tryTheme: (slug) => opts.tryTheme(slug),
+      applyTheme: (slug) => opts.applyTheme(slug),
+      themeTried: tried,
     };
     switch (route.tab) {
+      case "themes":
+        return buildThemesTab(ctx);
       case "page":
         return buildPageTab(ctx);
       case "fonts":
@@ -310,6 +324,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       go(mode === "publish" ? { tab: "publish" } : styleRoute);
     },
     isDirty: () => dirty.size > 0,
+    flush: flushSave,
     refresh(metadata: Metadata) {
       meta = structuredClone(metadata);
       render(true);
@@ -318,6 +333,10 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     open(view) {
       const next = routeById(view, meta);
       if (next) go(next);
+    },
+    themeTried(slug) {
+      tried = slug;
+      markTried(body, slug);
     },
     selectStyle(key) {
       addIsNames(meta, opts.isNames());

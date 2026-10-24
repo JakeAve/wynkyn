@@ -122,3 +122,65 @@ Deno.test("bml check: {only} notes go to stderr; unknown tokens fail", async () 
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("bml new --theme: the theme's fonts; unknown theme fails, writes nothing", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const made = await bml(root, "new", "x", "--theme", "caslon");
+    assertEquals(made.code, 0, made.err);
+    const meta = JSON.parse(await Deno.readTextFile(`${root}/x/metadata.json`));
+    assertEquals(meta.fonts.body, "Libre Caslon Text");
+    assertEquals(meta.fonts.display, "Libre Caslon Display");
+
+    const house = await bml(root, "new", "h");
+    assertEquals(house.code, 0, house.err);
+    assertEquals(
+      await Deno.readTextFile(`${root}/h/metadata.json`),
+      await Deno.readTextFile("templates/metadata.json"),
+    );
+
+    const bad = await bml(root, "new", "y", "--theme", "nope");
+    assertEquals(bad.code, 2);
+    assertStringIncludes(bad.err, "no such theme: nope");
+    assertEquals(await exists(`${root}/y`), false);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("bml new: an unreadable template says so, not 'no such theme'", async () => {
+  const root = await Deno.makeTempDir(); // run from here: no templates/
+  try {
+    const { code, stderr } = await new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-env",
+        "--config",
+        new URL("./deno.json", import.meta.url).pathname,
+        new URL("./bml.ts", import.meta.url).pathname,
+        "new",
+        "x",
+      ],
+      cwd: root,
+      env: { BML_BOOKS: root },
+      stderr: "piped",
+    }).output();
+    const err = new TextDecoder().decode(stderr);
+    assertEquals(code === 0, false);
+    assertStringIncludes(err, "templates/metadata.json");
+    assertEquals(err.includes("no such theme"), false);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await Deno.stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}

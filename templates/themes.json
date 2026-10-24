@@ -1,0 +1,970 @@
+[
+  {
+    "slug": "house",
+    "name": "House",
+    "description": "Crimson Pro under Cormorant Garamond: the default look of a new book."
+  },
+  {
+    "slug": "aldine",
+    "name": "Aldine",
+    "description": "One Garamond throughout, small-capital heads and a fleuron, after the Venetian books of Aldus.",
+    "fonts": {
+      "body": "EB Garamond",
+      "display": "EB Garamond"
+    },
+    "elements": {
+      "body": {
+        "font-size": "11.5pt",
+        "line-height": "1.45"
+      },
+      "chapter": {
+        "padding-top": "90pt",
+        "title": {
+          "font-size": "13pt",
+          "font-variant-caps": "all-small-caps",
+          "letter-spacing": "0.14em",
+          "font-weight": "400",
+          "margin-top": "-30pt",
+          "margin-bottom": "40pt"
+        },
+        "number": {
+          "font-size": "12pt",
+          "text-transform": "none",
+          "letter-spacing": "0.14em",
+          "margin-top": "0",
+          "margin-bottom": "40pt",
+          "font-variant-caps": "all-small-caps"
+        }
+      },
+      "half-title": {
+        "title": {
+          "font-variant-caps": "all-small-caps",
+          "letter-spacing": "0.14em",
+          "font-weight": "400"
+        }
+      },
+      "title-page": {
+        "title": {
+          "font-variant-caps": "all-small-caps",
+          "letter-spacing": "0.12em",
+          "font-weight": "400"
+        },
+        "author": {
+          "text-transform": "none",
+          "font-variant-caps": "all-small-caps",
+          "letter-spacing": "0.12em"
+        }
+      },
+      "toc": {
+        "title": {
+          "font-variant-caps": "all-small-caps",
+          "letter-spacing": "0.14em",
+          "font-weight": "400"
+        },
+        "leader": {
+          "content": ". ",
+          "opacity": "0.45"
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-variant-caps": "all-small-caps",
+          "letter-spacing": "0.14em",
+          "font-weight": "400"
+        }
+      },
+      "heading": {
+        "text-transform": "none",
+        "font-variant-caps": "all-small-caps",
+        "letter-spacing": "0.1em",
+        "font-weight": "400"
+      },
+      "dropcap": {
+        "font-size": "3.3em"
+      },
+      "break": {
+        "content": "❦"
+      }
+    },
+    "numbering": {
+      "chapters": {
+        "prefix": "Chapter ",
+        "suffix": ""
+      }
+    },
+    "running": {
+      "odd": [
+        {
+          "content": "chapter-title",
+          "area": "top-center",
+          "font-size": "8.5pt",
+          "font-variant-caps": "all-small-caps",
+          "letter-spacing": "0.12em"
+        }
+      ],
+      "even": [
+        {
+          "content": "book-title",
+          "area": "top-center",
+          "font-size": "8.5pt",
+          "font-variant-caps": "all-small-caps",
+          "letter-spacing": "0.12em"
+        }
+      ]
+    }
+  },
+  {
+    "slug": "caslon",
+    "name": "Caslon",
+    "description": "The type of colonial printers: a ruled chapter number, folios in the head, three stars between scenes.",
+    "fonts": {
+      "body": "Libre Caslon Text",
+      "display": "Libre Caslon Display"
+    },
+    "elements": {
+      "body": {
+        "font-size": "10pt",
+        "line-height": "1.55"
+      },
+      "chapter": {
+        "padding-top": "72pt",
+        "title": {
+          "font-size": "17pt",
+          "margin-top": "-24pt",
+          "font-weight": "400",
+          "margin-bottom": "36pt"
+        },
+        "number": {
+          "font-size": "8.5pt",
+          "letter-spacing": "0.18em",
+          "padding-bottom": "8pt",
+          "border-bottom": "0.5pt solid",
+          "margin-left": "auto",
+          "margin-right": "auto",
+          "display": "table",
+          "padding-left": "6pt",
+          "padding-right": "6pt",
+          "margin-top": "0",
+          "margin-bottom": "36pt"
+        }
+      },
+      "title-page": {
+        "title": {
+          "font-size": "30pt",
+          "font-weight": "400"
+        }
+      },
+      "dropcap": {
+        "font-size": "3.7em"
+      },
+      "break": {
+        "content": "⁂",
+        "font-size": "13pt"
+      },
+      "toc": {
+        "leader": {
+          "content": ". "
+        },
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "half-title": {
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "heading": {
+        "font-weight": "400"
+      }
+    },
+    "numbering": {
+      "chapters": {
+        "prefix": "Chapter ",
+        "suffix": "."
+      },
+      "pages": {
+        "position": "top-outside",
+        "css": {
+          "font-size": "8pt"
+        },
+        "openers": {
+          "position": "bottom-center"
+        },
+        "gap": "4mm"
+      }
+    },
+    "running": {
+      "odd": [
+        {
+          "content": "chapter-title",
+          "area": "top-center",
+          "font-size": "7pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.16em"
+        }
+      ],
+      "even": [
+        {
+          "content": "book-title",
+          "area": "top-center",
+          "font-size": "7pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.16em"
+        }
+      ]
+    }
+  },
+  {
+    "slug": "baskerville",
+    "name": "Baskerville",
+    "description": "Georgian and open: chapters numbered in words, spaced capitals, italic heads.",
+    "fonts": {
+      "body": "Baskervville",
+      "display": "Libre Baskerville"
+    },
+    "elements": {
+      "body": {
+        "font-size": "11pt",
+        "line-height": "1.5"
+      },
+      "chapter": {
+        "padding-top": "96pt",
+        "title": {
+          "font-size": "16pt",
+          "text-transform": "none",
+          "letter-spacing": "normal",
+          "margin-top": "-34pt",
+          "font-weight": "400",
+          "margin-bottom": "44pt",
+          "font-style": "italic"
+        },
+        "number": {
+          "font-family": "body",
+          "font-size": "8.5pt",
+          "font-style": "normal",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.24em",
+          "margin-top": "0",
+          "margin-bottom": "44pt"
+        }
+      },
+      "title-page": {
+        "title": {
+          "font-size": "20pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.16em",
+          "font-weight": "400"
+        }
+      },
+      "half-title": {
+        "title": {
+          "font-size": "14pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.2em",
+          "font-weight": "400"
+        }
+      },
+      "toc": {
+        "title": {
+          "font-size": "11pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.2em",
+          "font-weight": "400"
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-size": "11pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.2em",
+          "font-weight": "400"
+        }
+      },
+      "dropcap": {
+        "font-size": "3.2em",
+        "line-height": "0.8"
+      },
+      "break": {
+        "content": "· · ·"
+      },
+      "heading": {
+        "font-weight": "400"
+      }
+    },
+    "numbering": {
+      "chapters": {
+        "style": "words",
+        "prefix": "Chapter ",
+        "suffix": ""
+      }
+    }
+  },
+  {
+    "slug": "regency",
+    "name": "Regency",
+    "description": "High-contrast Bodoni with big chapter numerals and hairline rules. Print it dark.",
+    "fonts": {
+      "body": "Libre Bodoni",
+      "display": "Bodoni Moda"
+    },
+    "elements": {
+      "body": {
+        "font-size": "10.5pt",
+        "line-height": "1.55"
+      },
+      "chapter": {
+        "padding-top": "90pt",
+        "title": {
+          "font-size": "13pt",
+          "margin-top": "-30pt",
+          "font-weight": "400",
+          "margin-bottom": "44pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.14em"
+        },
+        "number": {
+          "font-family": "display",
+          "font-size": "17pt",
+          "text-transform": "none",
+          "letter-spacing": "normal",
+          "margin-top": "0",
+          "margin-bottom": "44pt",
+          "font-style": "italic"
+        }
+      },
+      "title-page": {
+        "title": {
+          "font-size": "30pt",
+          "font-weight": "400"
+        },
+        "subtitle": {
+          "font-size": "12pt"
+        }
+      },
+      "dropcap": {
+        "font-size": "3.5em"
+      },
+      "break": {
+        "content": "◆",
+        "font-size": "8pt"
+      },
+      "half-title": {
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "toc": {
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "heading": {
+        "font-weight": "400"
+      }
+    },
+    "numbering": {
+      "chapters": {
+        "style": "words",
+        "prefix": "Chapter ",
+        "suffix": ""
+      }
+    },
+    "running": {
+      "odd": [
+        {
+          "content": "chapter-title",
+          "area": "top-center",
+          "font-size": "6.5pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.2em"
+        }
+      ],
+      "even": [
+        {
+          "content": "book-title",
+          "area": "top-center",
+          "font-size": "6.5pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.2em"
+        }
+      ]
+    }
+  },
+  {
+    "slug": "private-press",
+    "name": "Private Press",
+    "description": "Old Fell types, red drop capitals and a hedera, in the manner of the Arts & Crafts presses.",
+    "fonts": {
+      "body": "IM Fell DW Pica",
+      "display": "IM Fell English",
+      "caps": "IM Fell English SC"
+    },
+    "elements": {
+      "body": {
+        "font-size": "11pt",
+        "line-height": "1.4"
+      },
+      "chapter": {
+        "padding-top": "60pt",
+        "title": {
+          "font-family": "caps",
+          "font-size": "17pt",
+          "letter-spacing": "0.04em",
+          "font-weight": "400",
+          "margin-top": "-22pt",
+          "margin-bottom": "32pt"
+        },
+        "number": {
+          "font-family": "caps",
+          "font-size": "11pt",
+          "color": "#9b2a1c",
+          "text-transform": "none",
+          "margin-top": "0",
+          "margin-bottom": "32pt"
+        }
+      },
+      "half-title": {
+        "title": {
+          "font-family": "caps",
+          "font-weight": "400"
+        }
+      },
+      "title-page": {
+        "title": {
+          "font-family": "caps",
+          "font-size": "28pt",
+          "font-weight": "400"
+        },
+        "author": {
+          "font-family": "caps",
+          "text-transform": "none",
+          "font-size": "14pt"
+        }
+      },
+      "toc": {
+        "title": {
+          "font-family": "caps",
+          "font-weight": "400"
+        },
+        "leader": {
+          "content": ". "
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-family": "caps",
+          "font-weight": "400"
+        }
+      },
+      "heading": {
+        "font-family": "caps",
+        "text-transform": "none",
+        "font-size": "12pt",
+        "font-weight": "400"
+      },
+      "dropcap": {
+        "font-size": "4em",
+        "color": "#9b2a1c"
+      },
+      "break": {
+        "content": "❧",
+        "color": "#9b2a1c",
+        "font-size": "13pt"
+      }
+    },
+    "running": {
+      "odd": [
+        {
+          "content": "chapter-title",
+          "area": "top-center",
+          "font-family": "caps",
+          "font-size": "9pt"
+        }
+      ],
+      "even": [
+        {
+          "content": "book-title",
+          "area": "top-center",
+          "font-family": "caps",
+          "font-size": "9pt"
+        }
+      ]
+    }
+  },
+  {
+    "slug": "modern",
+    "name": "Modern",
+    "description": "Source Serif set ragged right under Inter: flush-left heads, big numerals, no ornaments.",
+    "fonts": {
+      "body": "Source Serif 4",
+      "display": "Inter"
+    },
+    "elements": {
+      "body": {
+        "font-size": "10pt",
+        "line-height": "1.5",
+        "text-align": "left"
+      },
+      "chapter": {
+        "padding-top": "110pt",
+        "title": {
+          "font-size": "18pt",
+          "font-weight": "700",
+          "text-align": "left",
+          "margin-top": "-34pt",
+          "margin-bottom": "44pt"
+        },
+        "number": {
+          "font-family": "display",
+          "font-size": "8.5pt",
+          "text-align": "left",
+          "letter-spacing": "0.14em",
+          "margin-bottom": "44pt",
+          "margin-top": "0",
+          "font-weight": "700",
+          "text-transform": "uppercase"
+        }
+      },
+      "half-title": {
+        "title": {
+          "font-size": "16pt",
+          "font-weight": "700",
+          "text-align": "left"
+        }
+      },
+      "title-page": {
+        "title": {
+          "font-size": "24pt",
+          "font-weight": "700",
+          "text-align": "left"
+        },
+        "subtitle": {
+          "font-family": "display",
+          "font-style": "normal",
+          "text-align": "left"
+        },
+        "author": {
+          "font-family": "display",
+          "text-align": "left",
+          "font-size": "10pt"
+        },
+        "edition": {
+          "font-family": "display",
+          "font-style": "normal",
+          "text-align": "left"
+        },
+        "epigraph": {
+          "text-align": "left"
+        },
+        "imprint": {
+          "font-family": "display",
+          "font-size": "8.5pt",
+          "text-align": "left"
+        }
+      },
+      "toc": {
+        "title": {
+          "font-size": "15pt",
+          "font-weight": "700",
+          "text-align": "left"
+        },
+        "entry": {
+          "font-family": "display",
+          "font-size": "9pt"
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-size": "15pt",
+          "font-weight": "700",
+          "text-align": "left"
+        }
+      },
+      "heading": {
+        "font-family": "display",
+        "font-size": "8.5pt",
+        "font-weight": "700",
+        "letter-spacing": "0.1em",
+        "text-align": "left"
+      },
+      "dropcap": {
+        "font-family": "body",
+        "font-size": "1em",
+        "line-height": "inherit",
+        "float": "none"
+      },
+      "break": {
+        "content": "—"
+      },
+      "pullquote": {
+        "font-family": "display",
+        "font-style": "normal",
+        "font-weight": "700",
+        "text-align": "left"
+      }
+    },
+    "numbering": {
+      "chapters": {
+        "style": "arabic",
+        "prefix": "Chapter ",
+        "suffix": ""
+      },
+      "pages": {
+        "position": "bottom-outside",
+        "css": {
+          "font-family": "display",
+          "font-size": "7.5pt"
+        }
+      }
+    },
+    "running": {
+      "odd": [
+        {
+          "content": "chapter-title",
+          "area": "top-right",
+          "font-family": "display",
+          "font-size": "6.5pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.12em"
+        }
+      ],
+      "even": [
+        {
+          "content": "book-title",
+          "area": "top-left",
+          "font-family": "display",
+          "font-size": "6.5pt",
+          "text-transform": "uppercase",
+          "letter-spacing": "0.12em"
+        }
+      ]
+    }
+  },
+  {
+    "slug": "storybook",
+    "name": "Storybook",
+    "description": "Large, warm Alegreya with generous leading: for reading aloud and young readers.",
+    "fonts": {
+      "body": "Alegreya",
+      "display": "Alegreya SC"
+    },
+    "elements": {
+      "body": {
+        "font-size": "12.5pt",
+        "line-height": "1.6"
+      },
+      "chapter": {
+        "padding-top": "80pt",
+        "title": {
+          "font-family": "body",
+          "font-size": "20pt",
+          "font-style": "italic",
+          "font-weight": "400",
+          "margin-top": "-28pt",
+          "margin-bottom": "40pt"
+        },
+        "number": {
+          "font-family": "display",
+          "font-size": "13pt",
+          "text-transform": "none",
+          "letter-spacing": "0.06em",
+          "margin-top": "0",
+          "margin-bottom": "40pt"
+        }
+      },
+      "heading": {
+        "font-family": "display",
+        "text-transform": "none",
+        "font-size": "13pt",
+        "font-weight": "400"
+      },
+      "dropcap": {
+        "font-size": "3.6em"
+      },
+      "break": {
+        "content": "✶ ✶ ✶",
+        "font-size": "8pt"
+      },
+      "title-page": {
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "half-title": {
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "toc": {
+        "title": {
+          "font-weight": "400"
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-weight": "400"
+        }
+      }
+    },
+    "numbering": {
+      "chapters": {
+        "style": "words",
+        "prefix": "Chapter ",
+        "suffix": ""
+      }
+    },
+    "running": {
+      "odd": [
+        {
+          "content": "chapter-title",
+          "area": "top-center",
+          "font-size": "9pt",
+          "font-style": "italic"
+        }
+      ],
+      "even": [
+        {
+          "content": "book-title",
+          "area": "top-center",
+          "font-size": "9pt",
+          "font-style": "italic"
+        }
+      ]
+    }
+  },
+  {
+    "slug": "devotional",
+    "name": "Devotional",
+    "description": "Gentium under Cinzel capitals: centred, quiet and formal, with styled verse numbers.",
+    "fonts": {
+      "body": "Gentium Book Plus",
+      "display": "Cinzel"
+    },
+    "elements": {
+      "body": {
+        "font-size": "10.5pt",
+        "line-height": "1.5"
+      },
+      "chapter": {
+        "padding-top": "90pt",
+        "title": {
+          "font-size": "14pt",
+          "letter-spacing": "0.06em",
+          "font-weight": "400",
+          "margin-top": "-28pt",
+          "margin-bottom": "40pt"
+        },
+        "number": {
+          "font-family": "display",
+          "font-size": "10pt",
+          "letter-spacing": "0.24em",
+          "margin-top": "0",
+          "margin-bottom": "40pt"
+        }
+      },
+      "title-page": {
+        "title": {
+          "font-size": "22pt",
+          "letter-spacing": "0.06em",
+          "font-weight": "400"
+        }
+      },
+      "toc": {
+        "title": {
+          "font-size": "13pt",
+          "letter-spacing": "0.08em",
+          "font-weight": "400"
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-size": "13pt",
+          "letter-spacing": "0.08em",
+          "font-weight": "400"
+        }
+      },
+      "heading": {
+        "font-family": "display",
+        "text-transform": "none",
+        "font-size": "10pt",
+        "letter-spacing": "0.1em",
+        "font-weight": "400"
+      },
+      "dropcap": {
+        "font-size": "3.3em",
+        "line-height": "0.85"
+      },
+      "verses": {
+        "number": {
+          "font-family": "display",
+          "font-size": "6.5pt"
+        }
+      },
+      "break": {
+        "content": "❖",
+        "font-size": "8pt"
+      },
+      "half-title": {
+        "title": {
+          "font-weight": "400"
+        }
+      }
+    },
+    "running": {
+      "odd": [
+        {
+          "content": "chapter-title",
+          "area": "top-center",
+          "font-family": "display",
+          "font-size": "7pt",
+          "letter-spacing": "0.16em"
+        }
+      ],
+      "even": [
+        {
+          "content": "book-title",
+          "area": "top-center",
+          "font-family": "display",
+          "font-size": "7pt",
+          "letter-spacing": "0.16em"
+        }
+      ]
+    }
+  },
+  {
+    "slug": "typescript",
+    "name": "Typescript",
+    "description": "Courier Prime, ragged and roomy, like a manuscript off the typewriter.",
+    "fonts": {
+      "body": "Courier Prime",
+      "display": "Courier Prime"
+    },
+    "elements": {
+      "body": {
+        "font-size": "9.5pt",
+        "line-height": "1.7",
+        "text-align": "left",
+        "hyphens": "manual"
+      },
+      "chapter": {
+        "padding-top": "140pt",
+        "title": {
+          "font-size": "9.5pt",
+          "text-transform": "uppercase",
+          "text-decoration": "underline",
+          "margin-top": "-24pt",
+          "font-weight": "400",
+          "margin-bottom": "36pt"
+        },
+        "number": {
+          "font-size": "9.5pt",
+          "letter-spacing": "normal",
+          "margin-top": "0",
+          "margin-bottom": "36pt"
+        }
+      },
+      "half-title": {
+        "title": {
+          "font-size": "12pt",
+          "text-transform": "uppercase",
+          "font-weight": "400"
+        }
+      },
+      "title-page": {
+        "title": {
+          "font-size": "14pt",
+          "text-transform": "uppercase",
+          "font-weight": "400"
+        },
+        "subtitle": {
+          "font-size": "9.5pt"
+        },
+        "author": {
+          "font-size": "9.5pt",
+          "letter-spacing": "normal"
+        }
+      },
+      "toc": {
+        "title": {
+          "font-size": "9.5pt",
+          "text-transform": "uppercase",
+          "font-weight": "400"
+        },
+        "entry": {
+          "font-size": "9.5pt"
+        }
+      },
+      "prose-matter": {
+        "title": {
+          "font-size": "9.5pt",
+          "text-transform": "uppercase",
+          "font-weight": "400"
+        }
+      },
+      "heading": {
+        "font-size": "9.5pt",
+        "letter-spacing": "normal",
+        "text-decoration": "underline",
+        "font-weight": "400"
+      },
+      "dropcap": {
+        "font-family": "body",
+        "font-size": "1em",
+        "line-height": "inherit",
+        "float": "none"
+      },
+      "break": {
+        "content": "#"
+      },
+      "quote": {
+        "font-size": "9.5pt"
+      },
+      "poem": {
+        "font-size": "9.5pt"
+      }
+    },
+    "numbering": {
+      "chapters": {
+        "style": "arabic",
+        "prefix": "Chapter ",
+        "suffix": ""
+      },
+      "pages": {
+        "position": "top-outside",
+        "css": {
+          "font-size": "9.5pt"
+        },
+        "gap": "4mm"
+      }
+    },
+    "running": {
+      "odd": [
+        {
+          "content": "book-title",
+          "area": "top-center",
+          "font-size": "9.5pt",
+          "text-transform": "uppercase"
+        }
+      ],
+      "even": [
+        {
+          "content": "book-title",
+          "area": "top-center",
+          "font-size": "9.5pt",
+          "text-transform": "uppercase"
+        }
+      ]
+    }
+  }
+]

@@ -13,6 +13,16 @@ export function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+// A slug for a new edition that no existing one has: `caslon`, then
+// `caslon-2`, `caslon-3`… "default" names the unnamed edition, so never it.
+export function freeSlug(base: string, taken: string[]): string {
+  const root = slugify(base) || "edition";
+  const used = new Set([...taken, "default"]);
+  let slug = root;
+  for (let n = 2; used.has(slug); n++) slug = `${root}-${n}`;
+  return slug;
+}
+
 export function editionHref(book: string, edition: string | null): string {
   let href = `?book=${encodeURIComponent(book)}`;
   if (edition !== null) href += `&edition=${encodeURIComponent(edition)}`;

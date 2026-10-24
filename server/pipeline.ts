@@ -21,7 +21,7 @@ import {
 } from "./editions.ts";
 import { asStore, type BookStore } from "./store.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
-import type { NotesConfig } from "../metadata/types.ts";
+import type { Metadata, NotesConfig } from "../metadata/types.ts";
 
 // spec §4.11 item 8: try these in order for each {illustration:}/{dropcap|image:} slug.
 const IMAGE_EXT_ORDER = ["svg", "png", "jpg", "jpeg", "webp"];
@@ -35,6 +35,10 @@ export interface BuildOptions {
   imageUrl?: (book: string, name: string) => string | Promise<string>;
   edition?: string | null; // null/undefined = the unnamed edition (metadata.json)
   notes?: NotesConfig; // overrides metadata's note placement (the e-book wants endnotes)
+  /** Style the build with this instead of the file's metadata (try it on, spec
+   * §4.13): nothing is written, and `metadataVersion` stays the file's. A
+   * missing named edition still throws NotFoundError. */
+  metadata?: Metadata;
   baseCss?: string; // renderer/base.css; Deno callers may leave it to be read from disk
 }
 
@@ -159,12 +163,11 @@ export async function buildBook(
   const metaPath = metadataKey(book, edition);
   const text = await store.readText(metaPath);
   const loaded = text === null ? null : parseMetadataText(text, metaPath);
-  const meta = loaded?.meta ?? null;
-  if (meta === null && edition !== null) {
+  if (loaded === null && edition !== null) {
     // Missing metadata.json is fine (spec §4); a missing named edition is not.
     throw new NotFoundError(`no such edition: ${book}/${edition}`);
   }
-  const m = meta ?? {};
+  const m = opts.metadata ?? loaded?.meta ?? {};
   const images = await resolveImages(
     store,
     book,

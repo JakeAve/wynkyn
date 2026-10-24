@@ -2,8 +2,8 @@
 //   deno task bml check <book>            → diagnostics; exit 1 if any
 //   deno task bml render <book> [out.html] [--edition e] → standalone HTML
 //   deno task bml list                    → books, with their named editions
-//   deno task bml new <slug>              → books/<slug>/ from templates/ (house-style metadata.json)
-//   deno task bml import <file> [--slug s] [--chapters auto|N|none] [--flat] [--prose] [--force] → books/<slug>/ from a .txt/.md/.html/.epub
+//   deno task bml new <slug> [--theme t]  → books/<slug>/ from templates/ (house-style metadata.json, or theme t's)
+//   deno task bml import <file> [--slug s] [--theme t] [--chapters auto|N|none] [--flat] [--prose] [--force] → books/<slug>/ from a .txt/.md/.html/.epub
 //   deno task bml edition <book> new <slug> [--from <edition>] → copy an edition under a new name
 //   deno task bml export <book> [--edition e] [--sheet S] [--fold F] [--folios N|booklet] [--duplex short-edge|long-edge|none]
 //                                [--flip F] [--reverse-backs] [--proof] [--pages N] [--out dir] [--force]
@@ -22,6 +22,7 @@ import {
   safeName,
 } from "./server/editions.ts";
 import { checkOnlySpans, parse } from "./parser/parser.ts";
+import { themedTemplate } from "./server/book-service.ts";
 
 export { toHtml } from "./server/export-html.ts";
 
@@ -51,6 +52,7 @@ if (import.meta.main) {
       "pages",
       "edition",
       "from",
+      "theme",
     ],
     boolean: ["proof", "reverse-backs", "force", "flat", "prose"],
     unknown: (_arg, key) => {
@@ -67,6 +69,16 @@ if (import.meta.main) {
     console.error(`bad edition slug: ${edition}`);
     Deno.exit(2);
   }
+  // A new book's metadata.json text, with --theme applied (spec §4.13).
+  const template = async () => {
+    const text = await Deno.readTextFile("templates/metadata.json");
+    try {
+      return themedTemplate(text, a.theme);
+    } catch {
+      console.error(`no such theme: ${a.theme}`);
+      Deno.exit(2);
+    }
+  };
   if (cmd === "list") {
     for (const b of await listBooks(BOOKS)) {
       console.log(b);
@@ -104,8 +116,9 @@ if (import.meta.main) {
     console.log(`created ${metadataPath(BOOKS, book, sub)}`);
   } else if (cmd === "new" && book) {
     const dir = `${BOOKS}/${book}`;
+    const meta = await template();
     await Deno.mkdir(`${dir}/images`, { recursive: true });
-    await Deno.copyFile("templates/metadata.json", `${dir}/metadata.json`);
+    await Deno.writeTextFile(`${dir}/metadata.json`, meta);
     await Deno.writeTextFile(
       `${dir}/manuscript.md`,
       `{matter: half-title}\n{title}\n${book}\n`,
@@ -135,9 +148,12 @@ if (import.meta.main) {
       Deno.exit(2);
     }
     const dir = `${BOOKS}/${slug}`;
+    const meta = await template();
     await Deno.mkdir(`${dir}/images`, { recursive: true });
     try {
-      await Deno.copyFile("templates/metadata.json", `${dir}/metadata.json`);
+      await Deno.writeTextFile(`${dir}/metadata.json`, meta, {
+        createNew: true,
+      });
     } catch {
       // keep an existing metadata.json: a re-import changes the manuscript only
     }

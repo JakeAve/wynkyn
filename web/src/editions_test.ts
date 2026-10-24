@@ -4,6 +4,7 @@ import {
   editionHref,
   editionLabel,
   firstSpanLine,
+  freeSlug,
   lineFromHash,
   passagesLabel,
   prettySize,
@@ -19,6 +20,13 @@ Deno.test("editionLabel: the server's resolved name", () => {
     editionLabel({ slug: "pocket", name: "Pocket", summary: "", passages: 2 }),
     "Pocket",
   );
+});
+
+Deno.test("freeSlug: the theme's slug, then -2, -3…, never default", () => {
+  assertEquals(freeSlug("caslon", []), "caslon");
+  assertEquals(freeSlug("caslon", ["caslon"]), "caslon-2");
+  assertEquals(freeSlug("Caslon", ["caslon", "caslon-2"]), "caslon-3");
+  assertEquals(freeSlug("default", []), "default-2");
 });
 
 Deno.test("slugify: lowercase, hyphens, no leading/trailing/double hyphens", () => {

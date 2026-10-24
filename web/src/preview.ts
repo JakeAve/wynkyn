@@ -84,15 +84,16 @@ let pending: Promise<PageProblem[]> | null = null;
 let queuedUpdate: {
   update: UpdateMessage;
   container: HTMLElement;
-  cacheKey: string;
+  cacheKey: string | null;
   done: PromiseWithResolvers<PageProblem[]>;
 } | null = null;
 
 // Resolves to the page-map problems of the render that ends up on screen.
+// A null cacheKey renders without saving (a theme preview, spec §7.5).
 export function renderPreview(
   update: UpdateMessage,
   container: HTMLElement,
-  cacheKey: string,
+  cacheKey: string | null,
 ): Promise<PageProblem[]> {
   const hash = renderHash(update);
   // Same content as what's on screen or already on its way (e.g. the first
@@ -119,7 +120,7 @@ export function renderPreview(
 async function runRender(
   update: UpdateMessage,
   container: HTMLElement,
-  cacheKey: string,
+  cacheKey: string | null,
   hash: string,
 ): Promise<PageProblem[]> {
   rendering = true;
@@ -179,6 +180,7 @@ async function runRender(
       URL.revokeObjectURL(blobUrl);
       // Whoever waited on this render gets the outcome of the one replacing it.
       if (err === CANCELLED && queuedUpdate) return queuedUpdate.done.promise;
+      if (err === CANCELLED) return problems; // a restore took the screen
       throw err;
     }
     for (const old of container.children) if (old !== stage) old.remove();
@@ -192,21 +194,23 @@ async function runRender(
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
     ({ seed, problems } = result);
-    const { styleEl, inserted } = livePreviewer.polisher;
-    // Head order is cascade order: the base sheet, styleEl, then the book CSS.
-    const styles = [...document.head.querySelectorAll("style")]
-      .filter((el) => el === styleEl || inserted.includes(el))
-      .map((el) =>
-        [...el.sheet?.cssRules ?? []].map((r) => r.cssText).join("\n")
-      );
-    void saveCachedRender(cacheKey, {
-      hash,
-      pages: container.innerHTML,
-      styles,
-      fontLinks: update.fontLinks,
-      seed,
-      problems,
-    }); // fire-and-forget: never throws, and the render shouldn't wait on it
+    if (cacheKey !== null) {
+      const { styleEl, inserted } = livePreviewer.polisher;
+      // Head order is cascade order: the base sheet, styleEl, then the book CSS.
+      const styles = [...document.head.querySelectorAll("style")]
+        .filter((el) => el === styleEl || inserted.includes(el))
+        .map((el) =>
+          [...el.sheet?.cssRules ?? []].map((r) => r.cssText).join("\n")
+        );
+      void saveCachedRender(cacheKey, {
+        hash,
+        pages: container.innerHTML,
+        styles,
+        fontLinks: update.fontLinks,
+        seed,
+        problems,
+      }); // fire-and-forget: never throws, and the render shouldn't wait on it
+    }
     return problems;
   } finally {
     rendering = false;
@@ -228,11 +232,18 @@ async function runRender(
 
 // Put a cached render on screen without Paged.js: its pages plus the sheets
 // Paged.js had inserted for them. targetHash is set so the first WebSocket
-// update, which carries the same content, is skipped.
+// update, which carries the same content, is skipped. A render under way or
+// queued is dropped, and the sheets of the pages it replaces come down.
 export function restoreCachedRender(
   cached: CachedRender,
   container: HTMLElement,
 ): void {
+  const dropped = queuedUpdate;
+  queuedUpdate = null;
+  cancelCurrent?.();
+  livePreviewer?.polisher.destroy();
+  livePreviewer = null;
+  for (const el of restoredStyles) el.remove();
   setFontLinks(cached.fontLinks);
   restoredStyles = cached.styles.map((css) => {
     const el = document.createElement("style");
@@ -246,6 +257,7 @@ export function restoreCachedRender(
   seed = cached.seed ?? {};
   problems = cached.problems ?? [];
   fitPreview(container);
+  dropped?.done.resolve(problems);
 }
 
 export function setFontLinks(html: string): void {

@@ -14,6 +14,7 @@ import {
 } from "./pipeline.ts";
 import { upgradeMetadata } from "../metadata/upgrade.ts";
 import type { Metadata } from "../metadata/types.ts";
+import { applyTheme } from "../metadata/themes.ts";
 import {
   classifyChange,
   createEdition,
@@ -131,11 +132,20 @@ export class BookService {
     return this.requireBook(book).then(() => listEditions(this.store, book));
   }
 
-  /** Throws ServiceError 404 when the book or edition is missing. */
-  async build(book: string, edition: string | null): Promise<BuildResult> {
+  /** Throws ServiceError 404 when the book or edition is missing. With
+   * `metadata`, builds in that style and writes nothing (try on, spec §4.13). */
+  async build(
+    book: string,
+    edition: string | null,
+    metadata?: Metadata,
+  ): Promise<BuildResult> {
     checkNames(book, edition);
     try {
-      return await buildBook(this.store, book, { edition, ...this.buildOpts });
+      return await buildBook(this.store, book, {
+        edition,
+        metadata,
+        ...this.buildOpts,
+      });
     } catch (err) {
       if (err instanceof NotFoundError) {
         throw notFound("book or edition not found");
@@ -648,3 +658,12 @@ export function mergeSections(
   return merged;
 }
 const serializeMeta = (m: object) => JSON.stringify(m, null, 2) + "\n";
+
+/** A new book's metadata.json text: the template with a theme applied (spec
+ * §4.13); no theme or House is the template as it is. Throws on an unknown
+ * theme. Every front door (bml, the dev server, the in-page backend) runs it
+ * before handing the text to createBook / importBook. */
+export function themedTemplate(template: string, theme?: string): string {
+  if (!theme || theme === "house") return template;
+  return serializeMeta(applyTheme(JSON.parse(template) as Metadata, theme));
+}

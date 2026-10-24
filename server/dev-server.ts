@@ -3,16 +3,30 @@
 // e-book export. Print PDFs come from the browser's print dialog, or from
 // `bml export`.
 import { NotFoundError } from "./pipeline.ts";
-import { BookService, ServiceError } from "./book-service.ts";
+import { BookService, ServiceError, themedTemplate } from "./book-service.ts";
 import { diskStore } from "./store.ts";
 import { defaultPort } from "./port.ts";
 import { installedFonts } from "./local-fonts.ts";
+import type { Metadata } from "../metadata/types.ts";
 import { safeName } from "./editions.ts";
 import { siteFile } from "../scripts/build-site.ts";
 
 const WEB_DIR = new URL("../web/", import.meta.url);
 const ROOT = new URL("../", import.meta.url);
 const TEMPLATE = new URL("../templates/metadata.json", import.meta.url);
+
+// A new book's metadata.json text with the posted theme applied, or a 400
+// for an unknown one (never a silent House).
+async function template(theme: unknown): Promise<string | Response> {
+  if (theme !== undefined && typeof theme !== "string") {
+    return new Response("bad theme", { status: 400 });
+  }
+  try {
+    return themedTemplate(await Deno.readTextFile(TEMPLATE), theme);
+  } catch {
+    return new Response(`no such theme: ${theme}`, { status: 400 });
+  }
+}
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -164,13 +178,15 @@ export async function startServer(
       return Response.json({ books: await service.list() });
     }
     if (path === "/api/books" && req.method === "POST") {
-      const { slug, title } = await json(req);
+      const { slug, title, theme } = await json(req);
       if (typeof slug !== "string" || !safeName(slug)) {
         return new Response("bad book slug", { status: 400 });
       }
+      const meta = await template(theme);
+      if (meta instanceof Response) return meta;
       const made = await service.createBook(
         slug,
-        await Deno.readTextFile(TEMPLATE),
+        meta,
         typeof title === "string" ? title : slug,
       );
       return made
@@ -186,6 +202,24 @@ export async function startServer(
 
     if ((p = m(/^\/api\/books\/([^/]+)$/)) && req.method === "GET") {
       return Response.json(await service.build(p[0]!, edition));
+    }
+
+    // Build in a style the caller passes, writing nothing (try on, §4.13).
+    if ((p = m(/^\/api\/books\/([^/]+)\/try$/)) && req.method === "POST") {
+      const { edition, metadata } = await json(req);
+      if (
+        (edition !== null && typeof edition !== "string") ||
+        metadata === null || typeof metadata !== "object" ||
+        Array.isArray(metadata)
+      ) {
+        return new Response(
+          "body must be { edition: string | null, metadata: object }",
+          { status: 400 },
+        );
+      }
+      return Response.json(
+        await service.build(p[0]!, edition, metadata as Metadata),
+      );
     }
 
     if ((p = m(/^\/api\/books\/([^/]+)\/manuscript$/))) {
@@ -228,9 +262,11 @@ export async function startServer(
         }
         images[path] = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       }
+      const meta = await template(body.theme);
+      if (meta instanceof Response) return meta;
       const made = await service.importBook(
         p[0]!,
-        await Deno.readTextFile(TEMPLATE),
+        meta,
         { manuscript: body.manuscript, images },
       );
       return made
