@@ -45,14 +45,39 @@ const DEST = Object.fromEntries(
   Object.entries(FILES).map(([src, dest]) => [dest, src]),
 );
 
-if (import.meta.main) await build();
+// Prefixes root-absolute links to the site's own files with `base`: "/web/…",
+// '/app/', `/renderer/…` in pages, styles, the manifest and the bundle, and a
+// page's href="/". Other root paths ("/api/…", the bundle's "/" separators)
+// are left alone.
+const TOP = [...new Set(Object.values(FILES).map((d) => d.split("/")[0]!))];
+const OWN = new RegExp(
+  `(["'\`(])/(?=(?:${TOP.join("|").replaceAll(".", "\\.")})[/"'\`)])`,
+  "g",
+);
+export function rebase(text: string, base: string): string {
+  base = base.replace(/\/?$/, "/");
+  if (base === "/") return text;
+  return text.replace(OWN, `$1${base}`).replace(
+    /((?:href|src)=")\/"/g,
+    `$1${base}"`,
+  );
+}
 
-export async function build(): Promise<void> {
+export async function build(base = "/"): Promise<void> {
   await Deno.remove(OUT, { recursive: true }).catch(() => {});
   for (const [src, dest] of Object.entries(FILES)) {
     const to = `${OUT}/${dest}`;
     await Deno.mkdir(to.slice(0, to.lastIndexOf("/")), { recursive: true });
-    await Deno.copyFile(src, to);
+    if (/\.(html|css|webmanifest)$/.test(dest) || dest === "web/app.js") {
+      await Deno.writeTextFile(to, rebase(await Deno.readTextFile(src), base));
+    } else await Deno.copyFile(src, to);
   }
   console.log(`${OUT}/: ${Object.keys(FILES).length} files`);
+}
+
+// `--base=/wynkyn/` builds for a host that serves the site under a folder
+// (GitHub Pages); the links stay root-absolute, under that folder.
+if (import.meta.main) {
+  const base = Deno.args.find((a) => a.startsWith("--base="))?.slice(7);
+  await build(base);
 }

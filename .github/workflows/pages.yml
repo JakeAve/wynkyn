@@ -25,7 +25,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno task build:site
+      # Pages serves the repo under /wynkyn/, not at the root.
+      - run: deno task build:site --base=/wynkyn/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
