@@ -1036,6 +1036,20 @@ summary {
   margin: 0 4px;
   background: var(--line);
 }
+/* spell check (spelling.ts): a wavy underline, and the hover menu is the wrap bar */
+#editor .cm-bml-misspelled {
+  text-decoration: underline wavy var(--err);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+#editor .cm-bml-spell {
+  visibility: visible; /* a hover, focused or not, unlike the wrap bar */
+}
+#editor .cm-bml-spell .none {
+  padding: 4px 9px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
 #editor .cm-bml-wrapbar kbd {
   font: 10px ui-monospace, Menlo, monospace;
   padding: 0 4px;
@@ -1579,7 +1593,7 @@ summary {
   transform: translateX(12px);
   background: var(--inv-fg);
 }
-#config-overlay select.sel,
+:is(#config-overlay, #text-view) select.sel,
 #config-overlay input.txt {
   height: 28px;
   border: 1px solid var(--line);
@@ -1589,9 +1603,13 @@ summary {
   min-width: 0;
   max-width: 100%;
 }
-#config-overlay select.sel {
+:is(#config-overlay, #text-view) select.sel {
   padding-right: 4px;
   cursor: pointer;
+}
+#text-view select.sel {
+  height: 22px; /* the bar's other controls are 20px */
+  padding-left: 6px;
 }
 #config-overlay input.txt {
   width: 140px;

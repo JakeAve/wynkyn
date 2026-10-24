@@ -1069,3 +1069,37 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("dictionary: words added land sorted in dictionary.json; a broken file is never overwritten", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const url = `http://localhost:${server.port}/api/books/demo-book/dictionary`;
+  const add = (word: string) =>
+    fetch(url, { method: "POST", body: JSON.stringify({ word }) });
+  try {
+    assertEquals(await (await fetch(url)).json(), { words: [] });
+    await (await add("Gatsby")).body?.cancel();
+    assertEquals(await (await add("Daisy")).json(), {
+      words: ["Daisy", "Gatsby"],
+    });
+    assertEquals(
+      JSON.parse(await Deno.readTextFile(`${root}/demo-book/dictionary.json`)),
+      { words: ["Daisy", "Gatsby"] },
+    );
+    const spaced = await add("two words");
+    assertEquals(spaced.status, 400);
+    await spaced.body?.cancel();
+
+    await Deno.writeTextFile(`${root}/demo-book/dictionary.json`, "{ oops");
+    const broken = await add("Nick");
+    assertEquals(broken.status, 409);
+    await broken.body?.cancel();
+    assertEquals(
+      await Deno.readTextFile(`${root}/demo-book/dictionary.json`),
+      "{ oops",
+    );
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
