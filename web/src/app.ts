@@ -41,6 +41,7 @@ import { styleKeysAt } from "./bml-language.ts";
 import { parseWordList, setSpeller } from "./spelling.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
+import { IMAGE_ACCEPT, type ImageHost } from "./editor-images.ts";
 import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
@@ -182,6 +183,29 @@ function imageNote(text: string, warn = false): void {
   el.classList.toggle("warn", warn);
   clearTimeout(imageNoteTimer);
   imageNoteTimer = setTimeout(() => el.textContent = "", 6000);
+}
+
+// An empty illustration placeholder's image (spec §7.6): the dropped file, or
+// one picked now, saved as exactly its slug; the rebuild shows it.
+function fillPlaceholder(host: ImageHost, slug: string, file?: File): void {
+  const save = (f: File) =>
+    host.add(f, slug).then(
+      (img) => host.note(`Added to the book's images as ${img.name}`),
+      (err) =>
+        host.note(err instanceof Error ? err.message : String(err), true),
+    );
+  if (file) {
+    save(file);
+    return;
+  }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = IMAGE_ACCEPT;
+  input.onchange = () => {
+    const picked = input.files?.[0];
+    if (picked) save(picked);
+  };
+  input.click();
 }
 
 function brief(err: unknown): string {
@@ -1819,17 +1843,18 @@ async function main(): Promise<void> {
 
   const { text, version } = await fetchManuscript(book);
   base = version;
+  const images: ImageHost = {
+    images: () => backend.images(book),
+    url: (name) => backend.imageUrl(book, name),
+    add: (file, slug) => backend.addImage(book, file, slug),
+    note: imageNote,
+  };
   editor = createEditor({
     parent: $("editor"),
     text,
     onDocChanged,
     onCursorLine: highlightTreeNode,
-    images: {
-      images: () => backend.images(book),
-      url: (name) => backend.imageUrl(book, name),
-      add: (file, slug) => backend.addImage(book, file, slug),
-      note: imageNote,
-    },
+    images,
   });
   reparse(text);
   installTextView();
@@ -1872,6 +1897,7 @@ async function main(): Promise<void> {
     mode: () => mode,
     style: pickStyle,
     source: (line) => scrollEditorToLine(editor, line),
+    addImage: (slug, file) => fillPlaceholder(images, slug, file),
   });
   installStyleHover(previewEl, styleCatalog, () => mode);
   // Restore before opening the socket so the previous render is on screen

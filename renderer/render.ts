@@ -400,9 +400,11 @@ function renderContent(
       const src = opts.images?.[node.slug];
       const media = src
         ? `<img src="${src}" alt="${escapeHtml(captionText)}">`
-        : `<div class="illustration-placeholder">[illustration: ${
+        : `<div class="illustration-placeholder" data-slug="${
           escapeHtml(node.slug)
-        }]</div>`;
+        }"><span>No image named ${
+          escapeHtml(node.slug)
+        } yet</span><span>Click to add one</span></div>`;
       const cap = node.caption
         ? `<figcaption class="caption">${
           renderInlines(node.caption, ctx)

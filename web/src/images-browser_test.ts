@@ -12,6 +12,17 @@ const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
 const PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==";
 
+// Writes the PNG as `root/name` for a file chooser (Playwright's in-memory
+// payload wants a Node Buffer).
+async function pngFile(root: string, name: string): Promise<string> {
+  const path = `${root}/${name}`;
+  await Deno.writeFile(
+    path,
+    Uint8Array.from(atob(PNG), (c) => c.charCodeAt(0)),
+  );
+  return path;
+}
+
 // Drops a DataTransfer on the editor line holding `text`: files by name (PNG
 // bytes), or a plain text payload with no files.
 function drop(
@@ -188,6 +199,100 @@ Deno.test({
         "full-pagea page of its own",
         "inlinein the text",
       ]);
+
+      // The add row: the picked file goes in images/, its slug in the tag.
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("End");
+      await page.keyboard.press("Enter");
+      await page.keyboard.press("Enter");
+      await page.keyboard.type("{illustration: ");
+      const chooser = page.waitForEvent("filechooser");
+      await list.locator("li", { hasText: "Add image" }).click();
+      await (await chooser).setFiles(await pngFile(root, "Harbour.png"));
+      await page.locator("#editor .cm-line", {
+        hasText: "{illustration: harbour",
+      }).waitFor();
+      assert((await Deno.stat(`${bookDir}/images/harbour.png`)).isFile);
+    } finally {
+      await browser.close();
+      await server.stop();
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "images: an empty placeholder takes a picked or dropped image (Write)",
+  ignore: !hasChrome || !appBuilt,
+  async fn() {
+    const root = await Deno.makeTempDir();
+    const fixture = new URL("../../server/testdata/demo-book", import.meta.url);
+    const cp = await new Deno.Command("cp", {
+      args: ["-R", fixture.pathname, root],
+    }).output();
+    assert(cp.success, "copy the fixture book");
+    const bookDir = `${root}/demo-book`;
+    const tag = "{illustration: harbour | placement: inline}";
+    await Deno.writeTextFile(
+      `${bookDir}/manuscript.md`,
+      `\n${tag}\nThe Harbour\n\n{illustration: pier}\n`,
+      { append: true },
+    );
+    const server = await startServer({ booksRoot: root, port: 0 });
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
+      const live = "#preview > :not(.preview-stage)";
+      const empty = page.locator(
+        `${live} .illustration-placeholder[data-slug="harbour"]`,
+      );
+      await empty.waitFor({ timeout: 30_000 });
+      assertEquals(
+        await empty.locator("span").allTextContents(),
+        ["No image named harbour yet", "Click to add one"],
+      );
+
+      const chooser = page.waitForEvent("filechooser");
+      await empty.click();
+      const picker = await chooser;
+      assertEquals(
+        await page.locator("#editor .cm-activeLine").textContent(),
+        tag,
+        "the click puts the cursor on the illustration's line",
+      );
+      await picker.setFiles(await pngFile(root, "Some Photo.png"));
+      // Saved under the placeholder's slug; the rebuild (held ~1.2 s for an
+      // images-only change) shows the image.
+      await page.locator(`${live} figure#harbour img`).waitFor({
+        timeout: 30_000,
+      });
+      assert((await Deno.stat(`${bookDir}/images/harbour.png`)).isFile);
+      assertEquals(await empty.count(), 0);
+
+      // A file dropped on a placeholder goes in under its slug too.
+      const taken = await page.evaluate(({ live, png }) => {
+        const el = document.querySelector(
+          `${live} .illustration-placeholder[data-slug="pier"]`,
+        )!;
+        const dt = new DataTransfer();
+        const bytes = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
+        dt.items.add(new File([bytes], "dock.png"));
+        const fire = (type: string) =>
+          el.dispatchEvent(
+            new DragEvent(type, {
+              dataTransfer: dt,
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        return !fire("dragover") && !fire("drop");
+      }, { live, png: PNG });
+      assert(taken, "the preview takes the drop");
+      await page.locator(`${live} figure#pier img`).waitFor({
+        timeout: 30_000,
+      });
+      assert((await Deno.stat(`${bookDir}/images/pier.png`)).isFile);
     } finally {
       await browser.close();
       await server.stop();

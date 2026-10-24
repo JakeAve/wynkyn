@@ -214,7 +214,8 @@ export function imageExtensions(host: ImageHost): Extension[] {
 
 // ---- completions: the book's images in a slug, placements after `placement:`
 
-const ACCEPT = "image/png,image/jpeg,image/webp,image/svg+xml";
+/** The file picker's filter: the types images/ accepts. */
+export const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/svg+xml";
 const SECTION = { name: "Images in this book", rank: 0 };
 // Only the placements that lay out today.
 const PLACEMENTS: CellCompletion[] = [
@@ -250,7 +251,7 @@ function pickImage(
   closeCompletion(view);
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ACCEPT;
+  input.accept = IMAGE_ACCEPT;
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;

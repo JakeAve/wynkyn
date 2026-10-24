@@ -1652,7 +1652,11 @@ When `metadata.json` is present, the renderer:
 8. Resolves image slugs (`{illustration: slug}`, `{dropcap | image: slug}`)
    against the book's `images/` directory, trying `<slug>.svg`, `.png`, `.jpg`,
    `.jpeg`, `.webp` in that order and using the first match; an unresolved slug
-   renders a visible placeholder, not an error.
+   renders a visible placeholder, not an error:
+   `<div class="illustration-placeholder" data-slug="<slug>">` reading "No image
+   named <slug> yet" over "Click to add one". The copy is part of the render, so
+   a `bml export` proof prints it too; the editor makes it a way to add the
+   image (§7.6).
 9. Resolves `{ref: slug}` to the target's page number: the page map (§4.7)
    records the page each anchor lands on, and its folio is written into the
    `a.ref` link as text.
@@ -2159,6 +2163,14 @@ is laid out, with a "Rendering pages… N" count at the pane's foot (the first
 load shows the count alone). The layout keeps going in a background tab. An
 update that arrives mid-render abandons that render and starts its own, so a run
 of edits costs one render after the last, not one per edit.
+
+An illustration whose image is missing shows its placeholder (§4.10 item 8). In
+Write, a click on it moves the editor's cursor to its line, as any page click
+does, then opens the file picker; a file dropped on it is taken too. Either way
+the file goes in `images/` under exactly the placeholder's slug (its extension
+from the file), and the rebuild shows the image. A taken slug or a refused type
+is reported in the footer note. In Style the placeholder is the illustration's
+style target like any other part.
 
 ### 7.7 Page Setup & Print Imposition
 
