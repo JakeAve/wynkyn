@@ -2031,9 +2031,12 @@ CodeMirror 6 over plain BML text.
   labelled "Drop to add an illustration here". The writer's footer says "Added
   to the book's images as <name>", or why a file was refused ("Only PNG, JPEG,
   WebP or SVG images can go in a book") and nothing goes in for it. A drag with
-  no files (moving text) is CodeMirror's own. The image and the save that names
-  it paginate once: the service holds a rebuild for a change to `images/` alone
-  a moment, and the next change to the book takes it along.
+  no files (moving text) is CodeMirror's own, and so is a paste that carries
+  text beside its files (Word and Pages copy a picture of the text with it). A
+  file dropped anywhere else in the app is ignored, never opened in the tab. The
+  image and the save that names it paginate once: the service holds a rebuild
+  for a change to `images/` alone a moment, and the next change to the book
+  takes it along.
 - In the slug of `{illustration: …}` or `{dropcap | image: …}`, completions list
   the book's `images/` under "Images in this book": a small thumbnail, the slug,
   and "Not in the text yet" for an image no `{illustration:}` or `image:` in the
@@ -2174,9 +2177,12 @@ An illustration whose image is missing shows its placeholder (§4.10 item 8). In
 Write, a click on it moves the editor's cursor to its line, as any page click
 does, then opens the file picker; a file dropped on it is taken too. Either way
 the file goes in `images/` under exactly the placeholder's slug (its extension
-from the file), and the rebuild shows the image. A taken slug or a refused type
-is reported in the footer note. In Style the placeholder is the illustration's
-style target like any other part.
+from the file), and the rebuild shows the image. Any slug safe as a file name
+can be filled (`orchard.1943`, `Orchard 1943`); one that is empty, starts with
+`.`, or holds `/`, `\` or a control character is refused. A slug is taken only
+by a file the renderer can show (a `harbour.tif` doesn't block `harbour`). A
+taken slug or a refused type is reported in the footer note. In Style the
+placeholder is the illustration's style target like any other part.
 
 Every illustration under 200 dpi at its laid-out size, and every placeholder, is
 a page-map warning in the page problems (§5.4). While the editor's cursor is on

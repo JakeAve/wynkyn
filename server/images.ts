@@ -34,6 +34,13 @@ export function imageSlug(
   return { slug: slug || "image", ext };
 }
 
+/** A name that is safe as one file in images/: not empty, no path
+ * separator, no leading dot (hidden, `..`), no control characters. A slug
+ * can be any of these, as BML allows (`orchard.1943`, `Orchard 1943`). */
+export function safeImageName(name: string): boolean {
+  return name !== "" && !name.startsWith(".") && !/[/\\\p{Cc}]/u.test(name);
+}
+
 /** `slug` when free, else the first free `slug-2`, `slug-3`, … */
 export function freeSlug(slug: string, taken: Set<string>): string {
   if (!taken.has(slug)) return slug;

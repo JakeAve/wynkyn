@@ -2,6 +2,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { BookService, ServiceError } from "./book-service.ts";
 import { diskStore } from "./store.ts";
+import { imageFiles } from "./pipeline.ts";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
 
@@ -41,10 +42,36 @@ Deno.test("images: list by slug; add names from the file, never overwrites", asy
       ),
       409,
     );
+    for (const bad of ["", "../x", "a/b", "a\\b", ".hidden", "a\u0007b"]) {
+      assertEquals(
+        await status(service.addImage("demo-book", "b.png", bytes("y"), bad)),
+        400,
+        JSON.stringify(bad),
+      );
+    }
+    // Any slug BML allows that is safe as a file name; the resolver slices
+    // at the last dot, so orchard.1943.png serves orchard.1943.
+    for (const slug of ["orchard.1943", "Orchard 1943"]) {
+      assertEquals(
+        await service.addImage("demo-book", "b.png", bytes("y"), slug),
+        { slug, name: `${slug}.png` },
+      );
+    }
     assertEquals(
-      await status(service.addImage("demo-book", "b.png", bytes("y"), "../x")),
-      400,
+      (await imageFiles(diskStore(root), "demo-book"))["orchard.1943"],
+      "orchard.1943.png",
     );
+    assertEquals(
+      await service.image("demo-book", "Orchard 1943.png"),
+      bytes("y"),
+    );
+    // A file the renderer can't show neither lists nor takes its slug.
+    await Deno.writeTextFile(`${dir}/harbour.tif`, "tif");
+    assertEquals(
+      await service.addImage("demo-book", "h.png", bytes("h"), "harbour"),
+      { slug: "harbour", name: "harbour.png" },
+    );
+    assertEquals(await Deno.readTextFile(`${dir}/harbour.tif`), "tif");
     const heic = await assertRejects(
       () => service.addImage("demo-book", "x.heic", bytes("z")),
       ServiceError,

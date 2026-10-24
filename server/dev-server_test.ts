@@ -1230,6 +1230,18 @@ Deno.test("images: GET lists, POST adds the body under a free name; bad type 415
     const nameless = await fetch(url, { method: "POST", body: "x" });
     assertEquals(nameless.status, 400);
     await nameless.body?.cancel();
+    // A slug with a space or a dot round-trips the query and the image route.
+    const spaced = await add("x.png", "sp", encodeURIComponent("Orchard 1943"));
+    assertEquals(await spaced.json(), {
+      slug: "Orchard 1943",
+      name: "Orchard 1943.png",
+    });
+    const served = await fetch(
+      `http://localhost:${server.port}/books/demo-book/images/${
+        encodeURIComponent("Orchard 1943.png")
+      }`,
+    );
+    assertEquals(await served.text(), "sp");
   } finally {
     await server.stop();
     await Deno.remove(root, { recursive: true });

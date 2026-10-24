@@ -401,11 +401,18 @@ export async function startServer(
     if (
       (p = m(/^\/books\/([^/]+)\/images\/([^/]+)$/)) && req.method === "GET"
     ) {
-      const data = await service.image(p[0]!, p[1]!);
+      // The name as written in the URL (`Orchard%201943.png`).
+      let name: string;
+      try {
+        name = decodeURIComponent(p[1]!);
+      } catch {
+        return new Response("bad path", { status: 400 });
+      }
+      const data = await service.image(p[0]!, name);
       return data === null
         ? new Response("not found", { status: 404 })
         : new Response(data, {
-          headers: { "content-type": contentType(p[1]!) },
+          headers: { "content-type": contentType(name) },
         });
     }
 

@@ -26,7 +26,13 @@ import {
   safeName,
 } from "./editions.ts";
 import type { BookStore } from "./store.ts";
-import { freeSlug, IMAGE_EXTS, type ImageFile, imageSlug } from "./images.ts";
+import {
+  freeSlug,
+  IMAGE_EXTS,
+  type ImageFile,
+  imageSlug,
+  safeImageName,
+} from "./images.ts";
 import { type EpubBytes, epubBytes } from "./epub-export.ts";
 
 /** A refused request; `status` is the HTTP status the dev server answers with. */
@@ -169,7 +175,7 @@ export class BookService {
   }
 
   image(book: string, file: string): Promise<Uint8Array<ArrayBuffer> | null> {
-    if (!safeName(book) || !safeName(file)) throw bad("bad path");
+    if (!safeName(book) || !safeImageName(file)) throw bad("bad path");
     return this.store.read(`${book}/images/${file}`);
   }
 
@@ -177,12 +183,19 @@ export class BookService {
   async images(book: string): Promise<ImageFile[]> {
     checkNames(book, null);
     await this.requireBook(book);
-    return Object.entries(await imageFiles(this.store, book))
-      .filter(([, name]) =>
-        IMAGE_EXTS.includes(name.slice(name.lastIndexOf(".") + 1).toLowerCase())
-      )
+    return Object.entries(await this.shownImages(book))
       .map(([slug, name]) => ({ slug, name }))
       .sort((a, b) => a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+  }
+
+  // slug → file name, only the files the renderer can show: a harbour.tif
+  // neither lists nor takes the slug from a harbour.png.
+  private async shownImages(book: string): Promise<Record<string, string>> {
+    return Object.fromEntries(
+      Object.entries(await imageFiles(this.store, book)).filter(([, name]) =>
+        IMAGE_EXTS.includes(name.slice(name.lastIndexOf(".") + 1).toLowerCase())
+      ),
+    );
   }
 
   async metadata(
@@ -234,8 +247,9 @@ export class BookService {
   }
 
   /** Puts a file in the book's images/, named for its file name (or `slug`),
-   * never over an existing one. A slug is taken under any extension: the
-   * resolver serves the first match, so a second would be shadowed. Without
+   * never over an existing one. A slug is taken under any accepted extension:
+   * the resolver serves the first match, so a second would be shadowed (a
+   * file it can't show, harbour.tif, doesn't count). Without
    * `slug` a taken name gets -2, -3, …; with one, a taken slug is a 409. */
   async addImage(
     book: string,
@@ -251,13 +265,13 @@ export class BookService {
         "Only PNG, JPEG, WebP or SVG images can go in a book",
       );
     }
-    if (slug !== undefined && !/^[\w-]+$/.test(slug)) {
+    if (slug !== undefined && !safeImageName(slug)) {
       throw bad("bad image slug");
     }
     // In the folder's queue, so two adds never pick the same free name.
     return await this.serialize(`${book}/images`, async () => {
       await this.requireBook(book);
-      const taken = new Set(Object.keys(await imageFiles(this.store, book)));
+      const taken = new Set(Object.keys(await this.shownImages(book)));
       if (slug !== undefined && taken.has(slug)) {
         throw new ServiceError(409, "an image with that name is already there");
       }

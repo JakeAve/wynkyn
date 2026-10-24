@@ -130,7 +130,7 @@ export async function resolveImages(
   ) {
     images[slug] = imageUrl
       ? await imageUrl(book, name)
-      : `${urlPrefix}/${name}`;
+      : `${urlPrefix}/${encodeURIComponent(name)}`;
   }
   return images;
 }
