@@ -257,6 +257,14 @@
 .bml :where(.matter-title-page) {
   text-align: center;
 }
+/* A head or folio's line is trimmed to its cap height and baseline, so the
+   generated `gap` (css-generator.ts anchorToTextBlock) measures from the
+   baseline, not from a line box that grows with font size (§4.7, §4.8).
+   folios.js's wrappedMargins sets data-measuring to count whole lines. */
+.pagedjs_margin-top .pagedjs_margin-content:not([data-measuring])::after,
+.pagedjs_margin-bottom .pagedjs_margin-content:not([data-measuring])::after {
+  text-box: trim-both cap alphabetic;
+}
 /* A top/bottom margin row holding a centre box and a side box (a centred head
    beside an outside folio): Paged.js sizes it by measuring text, and 0.4.3
    measures the right-only case wrong, squeezing recto heads. Lay those rows

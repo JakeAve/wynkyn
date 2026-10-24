@@ -324,7 +324,8 @@
   }
 
   // A head or folio that runs to a second line: measured against the same
-  // box held to one line, so it holds for any font or line-height. A warning:
+  // box held to one line, so it holds for any font or line-height, untrimmed
+  // (base.css) so each line counts whole. A warning:
   // it's a typographic flaw the preview shows, and never moves the text.
   /**
    * @param {Element} page @param {number} pageNumber
@@ -338,10 +339,12 @@
         box.querySelector(".pagedjs_margin-content")
       );
       if (!content) continue;
+      content.dataset.measuring = "";
       const height = content.offsetHeight;
       content.style.whiteSpace = "nowrap";
       const line = content.offsetHeight;
       content.style.whiteSpace = "";
+      delete content.dataset.measuring;
       if (line > 0 && height > line * 1.5) {
         const area = [...box.classList].find((c) =>
           c.startsWith("pagedjs_margin-") && c !== "pagedjs_margin-content"

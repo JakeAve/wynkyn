@@ -491,3 +491,65 @@ Deno.test({
       assert(heads[two + 1]!.length > 0, "the page after it runs");
     }),
 });
+
+Deno.test({
+  name: "furniture: a head's and a folio's baseline sit `gap` from the text " +
+    "block, whatever their size (§4.7, §4.8)",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      const head = (size: string) => [
+        { content: "Heading", area: "top-center" as const, "font-size": size },
+      ];
+      const book = build(
+        ["{chapter: one}", "{title}", "One", "", prose(12)].join("\n"),
+        {
+          ...metadata,
+          numbering: {
+            pages: {
+              ...metadata.numbering!.pages,
+              css: { "font-size": "16pt" },
+            },
+          },
+          running: { gap: "4mm", odd: head("8pt"), even: head("20pt") },
+        },
+      );
+      const gaps = await page.evaluate(async ({ html, css, numbering }) => {
+        const out = document.getElementById("out")!;
+        const url = URL.createObjectURL(new Blob([css], { type: "text/css" }));
+        // deno-lint-ignore no-explicit-any
+        await new (globalThis as any).Paged.Previewer({
+          pageMap: { seed: {}, numbering },
+        }).preview(html, [url], out);
+        // The trimmed line runs cap height to baseline, so the content box's
+        // bottom edge is the baseline.
+        return [...out.querySelectorAll(".pagedjs_page")].slice(1, 3).map(
+          (p) => {
+            const area = p.querySelector(".pagedjs_area")!
+              .getBoundingClientRect();
+            const box = (s: string) =>
+              p.querySelector(`${s} .pagedjs_margin-content`)!
+                .getBoundingClientRect();
+            const mm = (px: number) => Math.round(px / 96 * 25.4 * 10) / 10;
+            // Under 0.8em tall: trimmed to the caps, not a whole line box.
+            const capped = (s: string) =>
+              box(s).height <
+                0.8 *
+                  parseFloat(getComputedStyle(p.querySelector(s)!).fontSize);
+            const top = ".pagedjs_margin-top-center";
+            const bottom = ".pagedjs_margin-bottom-center";
+            return {
+              head: mm(area.top - box(top).bottom),
+              folio: mm(box(bottom).bottom - area.bottom),
+              capped: capped(top) && capped(bottom),
+            };
+          },
+        );
+      }, book);
+      // An 8pt and a 20pt head, a 16pt folio: the same gaps.
+      assertEquals(gaps, [
+        { head: 4, folio: 5, capped: true },
+        { head: 4, folio: 5, capped: true },
+      ]);
+    }),
+});

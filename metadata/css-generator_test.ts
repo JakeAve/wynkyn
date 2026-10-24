@@ -416,7 +416,7 @@ Deno.test("generatePagedCSS anchors the folio a gap below the text block", () =>
   const css = generatePagedCSS({ numbering: { pages: {} } });
   assertStringIncludes(
     css,
-    `@page body {\n  @bottom-center {\n    content: var(--folio);\n    vertical-align: top;\n    padding-top: ${DEFAULT_FOLIO_GAP};`,
+    `@page body {\n  @bottom-center {\n    content: var(--folio);\n    vertical-align: top;\n    padding-top: calc(${DEFAULT_FOLIO_GAP} - 1cap);`,
   );
   // A book's own keys win over the default.
   const own = generatePagedCSS({
@@ -426,7 +426,7 @@ Deno.test("generatePagedCSS anchors the folio a gap below the text block", () =>
   });
   const box = own.slice(own.indexOf("@page body {"));
   assertStringIncludes(box, "vertical-align: middle;");
-  assertStringIncludes(box, "padding-top: 7mm;");
+  assertStringIncludes(box, "padding-top: calc(7mm - 1cap);");
 });
 
 Deno.test("running heads anchor a gap above the text block (§4.8)", () => {
@@ -440,7 +440,10 @@ Deno.test("running heads anchor a gap above the text block (§4.8)", () => {
     css,
     `@top-right {\n    content: var(--running-off, "");\n    vertical-align: bottom;\n    padding-bottom: ${DEFAULT_HEAD_GAP};`,
   );
-  assertStringIncludes(css, `vertical-align: top;\n    padding-top: 4mm;`);
+  assertStringIncludes(
+    css,
+    `vertical-align: top;\n    padding-top: calc(4mm - 1cap);`,
+  );
   const gapped = generatePagedCSS({
     running: {
       gap: "6mm",

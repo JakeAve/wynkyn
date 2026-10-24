@@ -34,9 +34,12 @@ consistently. Golden page maps (`testdata/*/page-map.json`) hold the digest
 Paged.js makes each margin box exactly the size of its margin and centres
 content in it, so a head would sit at half the top margin and drift as the
 margin grows. The generator (`metadata/css-generator.ts`) anchors instead:
-every bottom box gets `vertical-align: top` + `padding-top: <gap>`, every top
-box `vertical-align: bottom` + `padding-bottom: <gap>`, emitted before user CSS
-so a book's own keys still win. Defaults `DEFAULT_FOLIO_GAP = "5mm"`,
+every bottom box gets `vertical-align: top` + `padding-top: calc(<gap> - 1cap)`,
+every top box `vertical-align: bottom` + `padding-bottom: <gap>`, emitted
+before user CSS so a book's own keys still win. `renderer/base.css` trims each
+top/bottom box's line to cap height and baseline (`text-box: trim-both cap
+alphabetic`), so the gap runs from the text block edge to the head's or
+folio's baseline and a bigger size doesn't push it further out. Defaults `DEFAULT_FOLIO_GAP = "5mm"`,
 `DEFAULT_HEAD_GAP = "4mm"`; `numbering.pages.gap` and `running.gap` tune them.
 Side boxes (`left-*`/`right-*`) are not anchored: the gap is a vertical
 distance from the text block.
