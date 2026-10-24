@@ -2,7 +2,8 @@
 // the dev server (which runs the BookService over books/ on disk); without
 // a server (the hosted site) the app runs the same BookService itself, over
 // the author's own folder (fs-store.ts). app.ts never knows which.
-import type { ServerMessage } from "../../server/pipeline.ts";
+import type { BuildResult, ServerMessage } from "../../server/pipeline.ts";
+import type { Metadata } from "../../metadata/types.ts";
 import type { EditionInfo } from "../../server/editions.ts";
 import {
   BookService,
@@ -37,6 +38,12 @@ export interface Backend {
     edition: string | null,
     sections: object,
   ): Promise<{ version: string }>;
+  /** A build in the given style, nothing saved (try on, spec §4.13). */
+  tryBuild(
+    book: string,
+    edition: string | null,
+    metadata: Metadata,
+  ): Promise<BuildResult>;
   /** `from`: "default" or a named edition's slug. */
   createEdition(book: string, slug: string, from: string): Promise<void>;
   renameEdition(book: string, edition: string, slug: string): Promise<void>;
@@ -132,6 +139,18 @@ export function httpBackend(): Backend {
     },
     saveMetadata: (book, edition, sections) =>
       post(metadataUrl(book, edition), { sections }),
+    async tryBuild(book, edition, metadata) {
+      const res = await fetch(
+        `/api/books/${encodeURIComponent(book)}/try`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ edition, metadata }),
+        },
+      );
+      if (!res.ok) throw new Error(await res.text());
+      return await res.json();
+    },
     createEdition: (book, slug, from) =>
       post(editionsUrl(book), { slug, from }),
     renameEdition: (book, edition, slug) =>
@@ -233,6 +252,8 @@ export function localBackend(
     metadata: (book, edition) => service.metadata(book, edition),
     saveMetadata: (book, edition, sections) =>
       service.saveMetadata(book, edition, sections),
+    tryBuild: (book, edition, metadata) =>
+      service.build(book, edition, metadata),
     createEdition: (book, slug, from) =>
       service.createEdition(book, slug, from === "default" ? null : from),
     renameEdition: (book, edition, slug) =>

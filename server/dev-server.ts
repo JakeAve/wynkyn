@@ -7,6 +7,7 @@ import { BookService, ServiceError } from "./book-service.ts";
 import { diskStore } from "./store.ts";
 import { defaultPort } from "./port.ts";
 import { installedFonts } from "./local-fonts.ts";
+import type { Metadata } from "../metadata/types.ts";
 import { safeName } from "./editions.ts";
 import { siteFile } from "../scripts/build-site.ts";
 
@@ -186,6 +187,24 @@ export async function startServer(
 
     if ((p = m(/^\/api\/books\/([^/]+)$/)) && req.method === "GET") {
       return Response.json(await service.build(p[0]!, edition));
+    }
+
+    // Build in a style the caller passes, writing nothing (try on, §4.13).
+    if ((p = m(/^\/api\/books\/([^/]+)\/try$/)) && req.method === "POST") {
+      const { edition, metadata } = await json(req);
+      if (
+        (edition !== null && typeof edition !== "string") ||
+        metadata === null || typeof metadata !== "object" ||
+        Array.isArray(metadata)
+      ) {
+        return new Response(
+          "body must be { edition: string | null, metadata: object }",
+          { status: 400 },
+        );
+      }
+      return Response.json(
+        await service.build(p[0]!, edition, metadata as Metadata),
+      );
     }
 
     if ((p = m(/^\/api\/books\/([^/]+)\/manuscript$/))) {

@@ -1069,3 +1069,47 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("try: builds in the posted style, writes nothing; bad body 400, missing edition 404", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const url = `http://localhost:${server.port}/api/books/demo-book/try`;
+  const post = (body: unknown) =>
+    fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  try {
+    const file = `${root}/demo-book/metadata.json`;
+    const before = await Deno.readTextFile(file);
+    const ok = await post({
+      edition: null,
+      metadata: { fonts: { body: "Playfair Display" } },
+    });
+    assertEquals(ok.status, 200);
+    const built = await ok.json();
+    assert(built.fontLinks.includes("family=Playfair+Display"));
+    assertEquals(built.metadataVersion, await contentVersion(before));
+    assertEquals(await Deno.readTextFile(file), before);
+
+    for (
+      const bad of [
+        { edition: null },
+        { edition: 3, metadata: {} },
+        { edition: null, metadata: [] },
+        { edition: null, metadata: null },
+      ]
+    ) {
+      const res = await post(bad);
+      assertEquals(res.status, 400);
+      await res.body?.cancel();
+    }
+    const missing = await post({ edition: "nope", metadata: {} });
+    assertEquals(missing.status, 404);
+    await missing.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});

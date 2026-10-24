@@ -155,3 +155,31 @@ Deno.test("buildBook: metadataVersion is null without a metadata file", async ()
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("buildBook with metadata styles from it and leaves the file and its version alone", async () => {
+  const dir = await Deno.makeTempDir();
+  await Deno.mkdir(`${dir}/demo-book/editions`, { recursive: true });
+  for (const f of ["manuscript.md", "metadata.json", "editions/pocket.json"]) {
+    await Deno.copyFile(`${ROOT}/demo-book/${f}`, `${dir}/demo-book/${f}`);
+  }
+  const file = `${dir}/demo-book/metadata.json`;
+  const before = await Deno.readTextFile(file);
+  const plain = await buildBook(dir, "demo-book");
+  const metadata = { fonts: { body: "Playfair Display" } };
+
+  const tried = await buildBook(dir, "demo-book", { metadata });
+  assert(tried.fontLinks.includes("family=Playfair+Display"));
+  assert(!plain.fontLinks.includes("Playfair"));
+  assertEquals(tried.metadataVersion, plain.metadataVersion);
+  assertEquals(tried.metadataVersion, await contentVersion(before));
+  assertEquals(await Deno.readTextFile(file), before);
+
+  // A named edition is styled from the passed metadata too, but must exist.
+  const ed = await buildBook(dir, "demo-book", { edition: "pocket", metadata });
+  assert(ed.fontLinks.includes("family=Playfair+Display"));
+  await assertRejects(
+    () => buildBook(dir, "demo-book", { edition: "nope", metadata }),
+    NotFoundError,
+  );
+  await Deno.remove(dir, { recursive: true });
+});

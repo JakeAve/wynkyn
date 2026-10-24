@@ -131,11 +131,20 @@ export class BookService {
     return this.requireBook(book).then(() => listEditions(this.store, book));
   }
 
-  /** Throws ServiceError 404 when the book or edition is missing. */
-  async build(book: string, edition: string | null): Promise<BuildResult> {
+  /** Throws ServiceError 404 when the book or edition is missing. With
+   * `metadata`, builds in that style and writes nothing (try on, spec §4.13). */
+  async build(
+    book: string,
+    edition: string | null,
+    metadata?: Metadata,
+  ): Promise<BuildResult> {
     checkNames(book, edition);
     try {
-      return await buildBook(this.store, book, { edition, ...this.buildOpts });
+      return await buildBook(this.store, book, {
+        edition,
+        metadata,
+        ...this.buildOpts,
+      });
     } catch (err) {
       if (err instanceof NotFoundError) {
         throw notFound("book or edition not found");
