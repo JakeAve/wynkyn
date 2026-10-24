@@ -266,7 +266,7 @@ export class BookService {
       );
     }
     if (slug !== undefined && !safeImageName(slug)) {
-      throw bad("bad image slug");
+      throw bad("bad image name");
     }
     // In the folder's queue, so two adds never pick the same free name.
     return await this.serialize(`${book}/images`, async () => {

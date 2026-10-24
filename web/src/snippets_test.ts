@@ -22,10 +22,10 @@ Deno.test("block snippet separates itself with blank lines and selects the place
   const tr = state.update(applySnippet(state, snippet("chapter")));
   assertEquals(
     tr.state.doc.toString(),
-    "Some prose.\n\n{chapter: slug}\n{title}\nChapter Title\n\nMore prose.",
+    "Some prose.\n\n{chapter: name}\n{title}\nChapter Title\n\nMore prose.",
   );
   const sel = tr.state.selection.main;
-  assertEquals(tr.state.sliceDoc(sel.from, sel.to), "slug");
+  assertEquals(tr.state.sliceDoc(sel.from, sel.to), "name");
 });
 
 Deno.test("block snippet after an existing blank line adds no extra separation", () => {
@@ -53,9 +53,9 @@ Deno.test("wrap snippet with empty selection inserts a placeholder", () => {
 Deno.test("inline snippet inserts at the cursor and selects its slug", () => {
   const state = stateWith("was poor.", 9);
   const tr = state.update(applySnippet(state, snippet("footnote")));
-  assertEquals(tr.state.doc.toString(), "was poor.{footnote: slug}");
+  assertEquals(tr.state.doc.toString(), "was poor.{footnote: name}");
   const sel = tr.state.selection.main;
-  assertEquals(tr.state.sliceDoc(sel.from, sel.to), "slug");
+  assertEquals(tr.state.sliceDoc(sel.from, sel.to), "name");
 });
 
 Deno.test("every block snippet with an explicit close names the same sentinel", () => {
@@ -114,6 +114,6 @@ Deno.test("overSelection: a block without a close goes after the selected line, 
   const at = state.update({ selection: over.selection }).state;
   assertEquals(
     at.update(applySnippet(at, over.snippet)).state.doc.toString(),
-    "Para one here.\n\n{chapter: slug}\n{title}\nChapter Title\n\nNext.",
+    "Para one here.\n\n{chapter: name}\n{title}\nChapter Title\n\nNext.",
   );
 });
