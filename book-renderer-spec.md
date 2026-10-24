@@ -1706,6 +1706,40 @@ optional.
 - `cover` — an image slug in `images/`. Becomes the package's cover image and
   the first page of the spine.
 
+---
+
+### 4.13 Themes
+
+A theme is a preset look laid over a book's metadata, not a section of it:
+nothing in `metadata.json` records which theme a book has. The themes are an
+ordered array in `templates/themes.json`, each
+`{ slug, name, description, fonts?, elements?, numbering?, running? }`, read by
+`metadata/themes.ts`.
+
+**House = template.** Each theme is written as overrides on the House look: the
+`fonts`, `elements`, `numbering` and `running` of `templates/metadata.json`.
+House itself is `{}`, so a new book and House can never disagree. A theme's look
+is House deep-merged with its overrides: objects merge key by key, arrays and
+strings replace, and `null` deletes the House key.
+
+**What a theme owns.** Applying a theme changes only these, and replaces them
+rather than mixing with the book's:
+
+- `fonts` — the look's aliases are set; the book's other aliases (`mono`, any
+  alias an `is` style uses) stay.
+- `elements` — each element the look names replaces the book's entry for it
+  wholesale. Elements it doesn't name stay.
+- `numbering` — `chapters` and `parts` `style`/`prefix`/`suffix`; `pages`
+  `css`/`position`/`gap`, `openers.position`, and each zone's `style`. These are
+  cleared first, so a key the look leaves unset falls back to the renderer's
+  default (Caslon's folio in the head goes back to the foot under House). Never
+  any `show`: whether numbers appear is the book's choice. A zone's own `css`
+  stays.
+- `running` — replaced wholesale.
+
+Never touched: `page`, `is`, `notes`, `toc`, `ebook`, `language`, `name`,
+`spec`, and any key this schema doesn't know.
+
 ## 5. Module Contracts
 
 These are the contracts each module must satisfy, per the layout in §1. Plan 0
