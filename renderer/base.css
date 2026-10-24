@@ -258,8 +258,9 @@
   text-align: center;
 }
 /* A head or folio's line is trimmed to its cap height and baseline, so the
-   generated `gap` (css-generator.ts anchorToTextBlock) measures from the
-   baseline, not from a line box that grows with font size (§4.7, §4.8).
+   generated `gap` (css-generator.ts anchorToTextBlock) reaches a head's
+   baseline or a foot's cap height, not a line box that grows with font size
+   (§4.7, §4.8).
    folios.js's wrappedMargins sets data-measuring to count whole lines. */
 .pagedjs_margin-top .pagedjs_margin-content:not([data-measuring])::after,
 .pagedjs_margin-bottom .pagedjs_margin-content:not([data-measuring])::after {

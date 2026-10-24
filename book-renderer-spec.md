@@ -1520,16 +1520,16 @@ offer it there.
   opener's folio sits where every other page's does. The opener's number still
   counts, so its TOC entry and `{ref}`s are unaffected. Edited in the Page
   numbers part of the Styles panel (§7.4).
-- `gap` on pages (default `5mm`) is the distance between the text block and the
-  folio's baseline, whatever the folio's size. The folio belongs to the text
-  block, not the margin: a bottom folio's baseline sits `gap` below the last
-  line, a top folio's `gap` above the first, so raising a margin moves text and
-  folio together. The generator emits this as
-  `vertical-align: top; padding-top: calc(<gap> - 1cap)` on a bottom box
-  (`bottom` / `padding-bottom: <gap>` on a top box) ahead of `css`, so a book's
-  own keys win; `renderer/base.css` trims every top and bottom margin box's line
-  to its cap height and baseline (`text-box: trim-both cap alphabetic`), so the
-  box's edge is the baseline.
+- `gap` on pages (default `5mm`) is the clear space between the text block and
+  the folio, whatever the folio's size: to the top of its figures (cap height)
+  below the text block, to its baseline above it. The folio belongs to the text
+  block, not the margin: raising a margin moves text and folio together. The
+  generator emits this as `vertical-align: top; padding-top: <gap>` on a bottom
+  box (`bottom` / `padding-bottom` on a top box) ahead of `css`, so a book's own
+  keys win; `renderer/base.css` trims every top and bottom margin box's line to
+  its cap height and baseline (`text-box: trim-both cap alphabetic`), so those
+  are the box's edges. Oldstyle figures rise or dip a little past them; a book
+  that uses them adds a millimetre to taste.
 - **Current implementation note:** folios are not Paged.js counters. A handler
   (`renderer/folios.js`) builds a page map after layout: for every page its
   zone, its folio (counted per zone, body restarting at 1, formatted in the
@@ -1575,14 +1575,14 @@ without an explicit `font-family` a running head renders in the browser's
 default font. The configuration panel offers the same font picker as the Styles
 panel on each running entry (§7.5).
 
-**`gap`** (on `running`, default `4mm`) — the distance between a head's baseline
-and the text block, whatever the head's size (as for folios, §4.7). Paged.js
-makes each top/bottom margin box as tall as the margin and centres its content,
-so without anchoring a head floats at half the margin. The generator anchors
-every `top-*` box to its bottom edge and every `bottom-*` box to its top edge
-(`vertical-align` plus `padding-bottom`/`padding-top` of `gap`, less `1cap` on a
-bottom box), ahead of the entry's own keys, which win. Side boxes (`left-*`,
-`right-*`) are not anchored.
+**`gap`** (on `running`, default `4mm`) — the clear space between a head and the
+text block, whatever the head's size: to its baseline above the text block, to
+its cap height below (as for folios, §4.7). Paged.js makes each top/bottom
+margin box as tall as the margin and centres its content, so without anchoring a
+head floats at half the margin. The generator anchors every `top-*` box to its
+bottom edge and every `bottom-*` box to its top edge (`vertical-align` plus
+`padding-bottom`/`padding-top` of `gap`), ahead of the entry's own keys, which
+win. Side boxes (`left-*`, `right-*`) are not anchored.
 
 ```json
 "running": {

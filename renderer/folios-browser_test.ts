@@ -493,8 +493,8 @@ Deno.test({
 });
 
 Deno.test({
-  name: "furniture: a head's and a folio's baseline sit `gap` from the text " +
-    "block, whatever their size (§4.7, §4.8)",
+  name: "furniture: a head's baseline and a foot's cap height sit `gap` from " +
+    "the text block, whatever their size (§4.7, §4.8)",
   ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
@@ -522,7 +522,7 @@ Deno.test({
           pageMap: { seed: {}, numbering },
         }).preview(html, [url], out);
         // The trimmed line runs cap height to baseline, so the content box's
-        // bottom edge is the baseline.
+        // top edge is the cap height and its bottom edge the baseline.
         return [...out.querySelectorAll(".pagedjs_page")].slice(1, 3).map(
           (p) => {
             const area = p.querySelector(".pagedjs_area")!
@@ -540,7 +540,7 @@ Deno.test({
             const bottom = ".pagedjs_margin-bottom-center";
             return {
               head: mm(area.top - box(top).bottom),
-              folio: mm(box(bottom).bottom - area.bottom),
+              folio: mm(box(bottom).top - area.bottom),
               capped: capped(top) && capped(bottom),
             };
           },
