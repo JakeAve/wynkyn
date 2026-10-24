@@ -72,7 +72,7 @@ interface PendingMetaSave {
   text: string; // metadata serialized: what the write lands, unless...
   sections: object; // every section POSTed in this window, merged
   diskText: string | null; // ...the file moved on from this, its base
-  timer: number;
+  timer: ReturnType<typeof setTimeout> | undefined;
   cancelled?: boolean;
   write(): Promise<void>; // the debounced write; also run early by an export
 }
@@ -98,7 +98,10 @@ export class BookService {
   >();
   private readonly stopWatch: (() => void) | undefined;
   // book → a rebuild held back after a change to images/ alone (onChanged).
-  private readonly heldImages = new Map<string, number>();
+  private readonly heldImages = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
 
   constructor(opts: ServiceOptions) {
     this.store = opts.store;
@@ -605,7 +608,7 @@ export class BookService {
       text: serializeMeta(merged),
       sections: { ...existing?.sections, ...sections },
       diskText: existing ? existing.diskText : base.text,
-      timer: 0,
+      timer: undefined,
       write: () => {
         clearTimeout(save.timer);
         if (this.pendingMetaSaves.get(key) !== save) {

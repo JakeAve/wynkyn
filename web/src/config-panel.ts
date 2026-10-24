@@ -138,7 +138,7 @@ function routeById(id: string, meta: Metadata): Route | null {
 export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   let meta = structuredClone(opts.metadata);
   const dirty = new Set<keyof Metadata>();
-  let timer = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
 
   const queueSave = (key: keyof Metadata): void => {
     dirty.add(key);
