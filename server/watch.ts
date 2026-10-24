@@ -12,7 +12,7 @@ export function watchTree(
   const debounceMs = opts.debounceMs ?? 150;
   const fsWatcher = Deno.watchFs(root, { recursive: true });
   let pending = new Set<string>();
-  let timer: number | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
 
   (async () => {
     for await (const event of fsWatcher) {

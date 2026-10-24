@@ -111,7 +111,7 @@ let libId: string | null = null;
 
 // Keep the address bar at the author's place (appHref) without history
 // entries; debounced because Safari rate-limits replaceState.
-let urlTimer = 0;
+let urlTimer: ReturnType<typeof setTimeout> | undefined;
 const here = () =>
   appHref({ book, edition, mode, view, line: cursorLine, lib: libId });
 function syncUrl(): void {
@@ -192,7 +192,7 @@ for (const type of ["dragover", "drop"] as const) {
 
 // The writer's footer note: after an image drop or paste, for a few seconds;
 // otherwise, with the cursor on an illustration, its print resolution.
-let imageNoteTimer = 0;
+let imageNoteTimer: ReturnType<typeof setTimeout> | undefined;
 let cursorNote = { text: "", warn: false };
 function showImageNote({ text, warn }: typeof cursorNote): void {
   const el = $("image-note");
@@ -203,7 +203,7 @@ function imageNote(text: string, warn = false): void {
   showImageNote({ text, warn });
   clearTimeout(imageNoteTimer);
   imageNoteTimer = setTimeout(() => {
-    imageNoteTimer = 0;
+    imageNoteTimer = undefined;
     showImageNote(cursorNote);
   }, 6000);
 }
@@ -256,8 +256,8 @@ let editor: EditorView;
 let backend: Backend; // the dev server, or the service in-page over a folder
 let book: string;
 let edition: string | null = null; // null = the unnamed edition (metadata.json)
-let parseTimer = 0;
-let saveTimer = 0;
+let parseTimer: ReturnType<typeof setTimeout> | undefined;
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let saveInFlight = false;
 let queuedSaveText: string | null = null;
 let dirty = false; // local edits newer than the last completed save
