@@ -32,8 +32,8 @@ export interface EpubInput {
   identifier: string;
   modified: string; // ISO 8601, whole seconds
   rows: TocRow[];
-  images: Record<string, Uint8Array>; // images/<name> → bytes
-  cover?: string; // images/<name>
+  images: Record<string, Uint8Array>; // images/<name, URL-encoded> → bytes
+  cover?: string; // images/<name, URL-encoded>
 }
 
 const XHTML = "application/xhtml+xml";
@@ -270,7 +270,7 @@ export function buildEpub(input: EpubInput): Uint8Array {
         MEDIA_TYPES[ext] ?? "application/octet-stream"
       }"${cover}/>`,
     );
-    files[`OEBPS/${name}`] = bytes;
+    files[`OEBPS/${decodeURIComponent(name)}`] = bytes;
   }
   files["OEBPS/book.css"] = strToU8(input.css + EPUB_CSS);
   files["OEBPS/content.opf"] = strToU8(
@@ -365,7 +365,8 @@ export async function epubBytes(
   );
   if (cover) used.add(cover);
   for (const name of used) {
-    const bytes = await store.read(`${book}/${name}`);
+    // `name` is as the HTML links it (`images/Orchard%201943.png`).
+    const bytes = await store.read(`${book}/${decodeURIComponent(name)}`);
     if (bytes) images[name] = bytes;
   }
   const epub = buildEpub({

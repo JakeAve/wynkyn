@@ -453,6 +453,15 @@ summary {
   text-overflow: ellipsis;
   cursor: pointer;
 }
+/* after an image drop or paste (app.ts imageNote) */
+#image-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#image-note.warn {
+  color: var(--warn);
+}
 #page-problems {
   display: flex;
   gap: 12px;
@@ -839,6 +848,24 @@ summary {
   margin-left: 8px;
   color: var(--warn);
 }
+/* where a dragged image file would land (editor-images.ts): a hairline at
+   the paragraph break with a pill label, taking no height of its own */
+#editor .cm-image-drop {
+  position: relative;
+  height: 0;
+  border-top: 2px solid var(--fg);
+  pointer-events: none;
+}
+#editor .cm-image-drop span {
+  position: absolute;
+  left: 0;
+  top: -11px;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+  font: var(--fs-sm)/16px system-ui, sans-serif;
+}
 /* the find/replace bar (search-panel.ts) */
 .cm-bml-find {
   display: grid;
@@ -977,6 +1004,41 @@ summary {
 #editor :is(.cm-tooltip-autocomplete, .cm-bml-palette) .f {
   font: 10.5px ui-monospace, Menlo, monospace;
   color: var(--syn-p);
+}
+/* image completions: a thumbnail beside the slug over its note */
+#editor .cm-tooltip-autocomplete > ul > li:has(> .cm-bml-thumb) {
+  grid-template-columns: 30px 1fr;
+  grid-template-rows: 20px 20px;
+  row-gap: 0;
+}
+#editor .cm-tooltip-autocomplete li > .cm-bml-thumb {
+  grid-row: 1 / span 2;
+  width: 30px;
+  height: 40px;
+  object-fit: contain;
+  background: var(--paper);
+  border: 1px solid var(--soft);
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+#editor .cm-tooltip-autocomplete li > .cm-bml-thumb.add {
+  display: grid;
+  place-items: center;
+  background: none;
+  color: var(--muted);
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .cm-completionLabel {
+  align-self: end;
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb):not(:has(> .cm-completionDetail)) > .cm-completionLabel {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .cm-completionDetail {
+  align-self: start;
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .f {
+  display: none;
 }
 #editor .cm-tooltip-autocomplete > ul > li[aria-selected],
 #editor .cm-bml-palette li[aria-selected="true"] {

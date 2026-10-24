@@ -246,6 +246,21 @@
     }
   }
 
+  // An image's print resolution at its laid-out size: pixels over CSS inches
+  // (96 px each). The computed width is the unzoomed CSS length, so it holds
+  // in the preview's zoomed pages. null for a broken image (no pixels) and for
+  // vector art, which has no resolution: SVG by its extension (localBackend's
+  // object URLs carry the file name as a fragment for this).
+  /** @param {HTMLImageElement} img @returns {number | null} */
+  function printDpi(img) {
+    if (!img.naturalWidth) return null;
+    if (/\.svg([?#]|$)|^data:image\/svg/i.test(img.currentSrc || img.src)) {
+      return null;
+    }
+    const width = parseFloat(getComputedStyle(img).width);
+    return width > 0 ? Math.round(img.naturalWidth / (width / 96)) : null;
+  }
+
   /** @type {any} */ (globalThis).BookPageMap = {
     formatFolio,
     pageEntry,
@@ -255,6 +270,7 @@
     checkPageMap,
     digest,
     settle,
+    printDpi,
   };
 
   /** @type {any} */
@@ -353,6 +369,39 @@
             Math.round(height / line)
           } lines`,
         });
+      }
+    }
+    return problems;
+  }
+
+  // An illustration that will print badly: under 200 dpi at its laid-out size,
+  // or no image at all (its placeholder, or a file that won't load). Warnings:
+  // a proof is worth printing anyway.
+  /**
+   * @param {Element} page @param {number} pageNumber
+   * @returns {PageProblem[]}
+   */
+  function imageProblems(page, pageNumber) {
+    /** @type {PageProblem[]} */
+    const problems = [];
+    /** @param {string} message */
+    const warn = (message) =>
+      problems.push({ page: pageNumber, warn: true, message });
+    for (
+      const el of page.querySelectorAll(
+        "figure.illustration img, figure.illustration .illustration-placeholder",
+      )
+    ) {
+      // The figure's id is its slug (plates.js strips the placeholder's
+      // data-slug from a plate's copy).
+      const slug = el.closest("figure")?.id ?? "";
+      if (!(el instanceof HTMLImageElement) || !el.naturalWidth) {
+        warn(`an illustration has no image (${slug})`);
+        continue;
+      }
+      const dpi = printDpi(el);
+      if (dpi !== null && dpi < 200) {
+        warn(`${slug} prints at ${dpi} dpi (300 looks sharp)`);
       }
     }
     return problems;
@@ -480,7 +529,10 @@
           else {
             this.problems.push({ page: i + 1, message: "no page-map entry" });
           }
-          this.problems.push(...wrappedMargins(page, i + 1));
+          this.problems.push(
+            ...wrappedMargins(page, i + 1),
+            ...imageProblems(page, i + 1),
+          );
         });
         /** @type {RenderResult} */
         this.chunker.pageMapResult = {

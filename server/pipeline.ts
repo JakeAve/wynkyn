@@ -20,11 +20,9 @@ import {
   metadataKey,
 } from "./editions.ts";
 import { asStore, type BookStore } from "./store.ts";
+import { IMAGE_EXTS } from "./images.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 import type { Metadata, NotesConfig } from "../metadata/types.ts";
-
-// spec §4.11 item 8: try these in order for each {illustration:}/{dropcap|image:} slug.
-const IMAGE_EXT_ORDER = ["svg", "png", "jpg", "jpeg", "webp"];
 
 export class NotFoundError extends Error {}
 
@@ -114,7 +112,7 @@ export async function imageFiles(
   }
   const files: Record<string, string> = {};
   for (const [slug, exts] of bySlug) {
-    const ext = IMAGE_EXT_ORDER.find((e) => exts.has(e));
+    const ext = IMAGE_EXTS.find((e) => exts.has(e));
     files[slug] = ext ? exts.get(ext)! : [...exts.values()].sort()[0]!;
   }
   return files; // no images/ folder → {}: unresolved slugs render placeholders
@@ -132,7 +130,7 @@ export async function resolveImages(
   ) {
     images[slug] = imageUrl
       ? await imageUrl(book, name)
-      : `${urlPrefix}/${name}`;
+      : `${urlPrefix}/${encodeURIComponent(name)}`;
   }
   return images;
 }

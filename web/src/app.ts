@@ -41,6 +41,8 @@ import { styleKeysAt } from "./bml-language.ts";
 import { parseWordList, setSpeller } from "./spelling.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
+import { type ImageHost, pickImageFile } from "./editor-images.ts";
+import type { ImageFile } from "../../server/images.ts";
 import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
@@ -88,6 +90,11 @@ import {
 } from "./web-source.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
+// folios.js is a classic script (toHtml inlines it), so its helpers hang off
+// this global rather than being exported.
+declare const BookPageMap: {
+  printDpi(img: HTMLImageElement): number | null;
+};
 
 const PARSE_DEBOUNCE_MS = 250;
 const SAVE_DEBOUNCE_MS = 600;
@@ -172,6 +179,73 @@ function setStatus(kind: StatusKind, detail?: string): void {
 setInterval(() => {
   if ($("status").dataset.kind === "saved") setStatus("saved");
 }, 1000);
+
+// A file dropped where nothing takes it (the editor and an empty placeholder
+// do) would open in the tab and lose unsaved edits. Bubbling, so it runs last.
+for (const type of ["dragover", "drop"] as const) {
+  addEventListener(type, (e) => {
+    if (e.defaultPrevented || !e.dataTransfer?.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "none";
+  });
+}
+
+// The writer's footer note: after an image drop or paste, for a few seconds;
+// otherwise, with the cursor on an illustration, its print resolution.
+let imageNoteTimer = 0;
+let cursorNote = { text: "", warn: false };
+function showImageNote({ text, warn }: typeof cursorNote): void {
+  const el = $("image-note");
+  el.textContent = text;
+  el.classList.toggle("warn", warn);
+}
+function imageNote(text: string, warn = false): void {
+  showImageNote({ text, warn });
+  clearTimeout(imageNoteTimer);
+  imageNoteTimer = setTimeout(() => {
+    imageNoteTimer = 0;
+    showImageNote(cursorNote);
+  }, 6000);
+}
+
+// The cursor on an illustration's line or its caption (the line after): how
+// its image prints where the live pages lay it out. A plate's copy has no
+// data-line; it keeps the figure's id, the slug.
+function noteImageDpi(lines: string[], line: number): void {
+  const at = (n: number) =>
+    lines[n - 1]?.match(/^\{illustration:\s*([^\s|}]+)/);
+  const own = at(line);
+  const above = lines[line - 1]?.trim() ? at(line - 1) : null;
+  const slug = (own ?? above)?.[1];
+  const figLine = own ? line : line - 1;
+  const img = slug
+    ? [
+      ...$("preview").querySelectorAll<HTMLImageElement>(
+        `figure[data-line="${figLine}"] img, .plate-shell > figure#${
+          CSS.escape(slug)
+        } img`,
+      ),
+    ].find((el) => !el.closest(".preview-stage"))
+    : undefined;
+  const dpi = img ? BookPageMap.printDpi(img) : null;
+  cursorNote = dpi === null
+    ? { text: "", warn: false }
+    : { text: `Prints at ${dpi} dpi here; 300 looks sharp`, warn: dpi < 200 };
+  if (!imageNoteTimer) showImageNote(cursorNote);
+}
+
+// An empty illustration placeholder's image (spec §7.6): the dropped file, or
+// one picked now, saved as exactly its slug; the rebuild shows it.
+function fillPlaceholder(host: ImageHost, slug: string, file?: File): void {
+  const save = (f: File) =>
+    host.add(f, slug).then(
+      (img) => host.note(`Added to the book's images as ${img.name}`),
+      (err) =>
+        host.note(err instanceof Error ? err.message : String(err), true),
+    );
+  if (file) save(file);
+  else pickImageFile().then((picked) => picked && save(picked));
+}
 
 // Short, readable tail of an error for the footer; full text stays in the title.
 function brief(err: unknown): string {
@@ -272,7 +346,9 @@ function refreshTree(doc: BmlDocument): void {
 function followCursor(line: number): void {
   if (!editor) return;
   markEdited($("preview"), mode === "write" ? line : null);
-  const keys = styleKeysAt(editor.state.doc.toString().split("\n"), line);
+  const lines = editor.state.doc.toString().split("\n");
+  noteImageDpi(lines, line);
+  const keys = styleKeysAt(lines, line);
   const cat = styleCatalog();
   const entry = keys.map((k) => cat.find((e) => e.key === k)).find((e) => e);
   const btn = $("style-here") as HTMLButtonElement;
@@ -1809,11 +1885,30 @@ async function main(): Promise<void> {
 
   const { text, version } = await fetchManuscript(book);
   base = version;
+  // The list is fetched once per few seconds, not per keystroke in a slug's
+  // completion; an add drops it so the new image shows next time.
+  let imageList: Promise<ImageFile[]> | null = null;
+  let imageListAt = 0;
+  const images: ImageHost = {
+    images: () => {
+      if (!imageList || Date.now() - imageListAt > 5000) {
+        imageList = backend.images(book);
+        imageListAt = Date.now();
+        imageList.catch(() => imageList = null);
+      }
+      return imageList;
+    },
+    url: (name) => backend.imageUrl(book, name),
+    add: (file, slug) =>
+      backend.addImage(book, file, slug).finally(() => imageList = null),
+    note: imageNote,
+  };
   editor = createEditor({
     parent: $("editor"),
     text,
     onDocChanged,
     onCursorLine: highlightTreeNode,
+    images,
   });
   reparse(text);
   installTextView();
@@ -1856,6 +1951,7 @@ async function main(): Promise<void> {
     mode: () => mode,
     style: pickStyle,
     source: (line) => scrollEditorToLine(editor, line),
+    addImage: (slug, file) => fillPlaceholder(images, slug, file),
   });
   installStyleHover(previewEl, styleCatalog, () => mode);
   // Restore before opening the socket so the previous render is on screen
