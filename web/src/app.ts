@@ -41,7 +41,8 @@ import { styleKeysAt } from "./bml-language.ts";
 import { parseWordList, setSpeller } from "./spelling.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
-import { IMAGE_ACCEPT, type ImageHost } from "./editor-images.ts";
+import { type ImageHost, pickImageFile } from "./editor-images.ts";
+import type { ImageFile } from "../../server/images.ts";
 import { buildTree } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
@@ -179,7 +180,16 @@ setInterval(() => {
   if ($("status").dataset.kind === "saved") setStatus("saved");
 }, 1000);
 
-// Short, readable tail of an error for the footer; full text stays in the title.
+// A file dropped where nothing takes it (the editor and an empty placeholder
+// do) would open in the tab and lose unsaved edits. Bubbling, so it runs last.
+for (const type of ["dragover", "drop"] as const) {
+  addEventListener(type, (e) => {
+    if (e.defaultPrevented || !e.dataTransfer?.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "none";
+  });
+}
+
 // The writer's footer note: after an image drop or paste, for a few seconds;
 // otherwise, with the cursor on an illustration, its print resolution.
 let imageNoteTimer = 0;
@@ -233,20 +243,11 @@ function fillPlaceholder(host: ImageHost, slug: string, file?: File): void {
       (err) =>
         host.note(err instanceof Error ? err.message : String(err), true),
     );
-  if (file) {
-    save(file);
-    return;
-  }
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = IMAGE_ACCEPT;
-  input.onchange = () => {
-    const picked = input.files?.[0];
-    if (picked) save(picked);
-  };
-  input.click();
+  if (file) save(file);
+  else pickImageFile().then((picked) => picked && save(picked));
 }
 
+// Short, readable tail of an error for the footer; full text stays in the title.
 function brief(err: unknown): string {
   return String(err).replace(/^Error:\s*/, "").split("\n")[0]!.slice(0, 80);
 }
@@ -1884,10 +1885,22 @@ async function main(): Promise<void> {
 
   const { text, version } = await fetchManuscript(book);
   base = version;
+  // The list is fetched once per few seconds, not per keystroke in a slug's
+  // completion; an add drops it so the new image shows next time.
+  let imageList: Promise<ImageFile[]> | null = null;
+  let imageListAt = 0;
   const images: ImageHost = {
-    images: () => backend.images(book),
+    images: () => {
+      if (!imageList || Date.now() - imageListAt > 5000) {
+        imageList = backend.images(book);
+        imageListAt = Date.now();
+        imageList.catch(() => imageList = null);
+      }
+      return imageList;
+    },
     url: (name) => backend.imageUrl(book, name),
-    add: (file, slug) => backend.addImage(book, file, slug),
+    add: (file, slug) =>
+      backend.addImage(book, file, slug).finally(() => imageList = null),
     note: imageNote,
   };
   editor = createEditor({

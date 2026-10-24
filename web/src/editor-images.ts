@@ -203,7 +203,11 @@ export function imageExtensions(host: ImageHost): Extension[] {
       },
       paste(e, view) {
         const files = [...e.clipboardData?.files ?? []];
-        if (!files.length) return false;
+        // Word and Pages put a picture of copied text beside the text itself:
+        // that paste is the text's.
+        if (!files.length || e.clipboardData!.getData("text/plain").trim()) {
+          return false;
+        }
         e.preventDefault();
         addImages(view, host, files, view.state.selection.main.head, true);
         return true;
@@ -214,8 +218,8 @@ export function imageExtensions(host: ImageHost): Extension[] {
 
 // ---- completions: the book's images in a slug, placements after `placement:`
 
-/** The file picker's filter: the types images/ accepts. */
-export const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/svg+xml";
+// The file picker's filter: the types images/ accepts.
+const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/svg+xml";
 const SECTION = { name: "Images in this book", rank: 0 };
 // Only the placements that lay out today.
 const PLACEMENTS: CellCompletion[] = [
@@ -240,36 +244,43 @@ function addCell(): Node {
   return s;
 }
 
+/** Opens the file picker on the types images/ accepts; the picked file, or
+ * null when the picker closes without one. */
+export function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = IMAGE_ACCEPT;
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
 // Opens the file picker; the picked file goes in images/ and its slug at
 // from–to (clamped: the doc may have moved on while it saved).
-function pickImage(
+async function pickImage(
   view: EditorView,
   host: ImageHost,
   from: number,
   to: number,
 ) {
   closeCompletion(view);
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = IMAGE_ACCEPT;
-  input.onchange = async () => {
-    const file = input.files?.[0];
-    if (!file) return;
-    try {
-      const { slug } = await host.add(file);
-      const len = view.state.doc.length;
-      const at = Math.min(from, len);
-      view.dispatch({
-        changes: { from: at, to: Math.min(to, len), insert: slug },
-        selection: { anchor: at + slug.length },
-        userEvent: "input.complete",
-      });
-      view.focus();
-    } catch (err) {
-      host.note(err instanceof Error ? err.message : String(err), true);
-    }
-  };
-  input.click();
+  const file = await pickImageFile();
+  if (!file) return;
+  try {
+    const { slug } = await host.add(file);
+    const len = view.state.doc.length;
+    const at = Math.min(from, len);
+    view.dispatch({
+      changes: { from: at, to: Math.min(to, len), insert: slug },
+      selection: { anchor: at + slug.length },
+      userEvent: "input.complete",
+    });
+    view.focus();
+  } catch (err) {
+    host.note(err instanceof Error ? err.message : String(err), true);
+  }
 }
 
 /** In `{illustration: …}` or `{dropcap | image: …}`, the book's images (a
@@ -313,7 +324,7 @@ export function imageCompletions(host: ImageHost): CompletionSource {
       detail: "Copies it into the book's images folder",
       section: SECTION,
       cell: addCell,
-      apply: (view, _c, from, to) => pickImage(view, host, from, to),
+      apply: (view, _c, from, to) => void pickImage(view, host, from, to),
     });
     // The add row stays whatever is typed, so this source filters itself.
     return { from: ctx.pos - typed.length, filter: false, options };

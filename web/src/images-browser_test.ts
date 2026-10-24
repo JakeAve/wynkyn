@@ -129,6 +129,51 @@ Deno.test({
         (await page.locator("#editor .cm-content").textContent())!
           .includes("MOVED"),
       );
+
+      // A paste from Word or Pages, a picture of the text beside the text:
+      // the text goes in, no image does.
+      const before = [...Deno.readDirSync(`${bookDir}/images`)].length;
+      await page.locator("#editor .cm-line", { hasText: "Test Author" })
+        .click();
+      await page.evaluate((png) => {
+        const dt = new DataTransfer();
+        const bytes = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
+        dt.items.add(new File([bytes], "image.png", { type: "image/png" }));
+        dt.setData("text/plain", "PASTED WORDS");
+        document.querySelector("#editor .cm-content")!.dispatchEvent(
+          new ClipboardEvent("paste", {
+            clipboardData: dt,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      }, PNG);
+      assert(
+        (await page.locator("#editor .cm-content").textContent())!
+          .includes("PASTED WORDS"),
+      );
+      await page.waitForTimeout(300);
+      assertEquals([...Deno.readDirSync(`${bookDir}/images`)].length, before);
+
+      // A file dropped where nothing takes it (the tree) doesn't open in the
+      // tab: the window's guard cancels it.
+      const url = page.url();
+      const guarded = await page.evaluate((png) => {
+        const dt = new DataTransfer();
+        const bytes = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
+        dt.items.add(new File([bytes], "stray.png"));
+        const fire = (type: string) =>
+          document.getElementById("tree")!.dispatchEvent(
+            new DragEvent(type, {
+              dataTransfer: dt,
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        return !fire("dragover") && !fire("drop");
+      }, PNG);
+      assert(guarded, "the drop on the tree is cancelled");
+      assertEquals(page.url(), url);
     } finally {
       await browser.close();
       await server.stop();
