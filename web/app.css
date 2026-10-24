@@ -2418,6 +2418,20 @@ summary {
 #title-source {
   font-size: 12.5px;
 }
+/* The title dialog's theme picker: a row of five small cards, wide enough
+   for them. */
+#title-dlg {
+  width: 620px;
+}
+#title-themes {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+/* A fifth of 620px: 16px names (Devotional's Cinzel) outrun the card. */
+#title-themes .tname {
+  font-size: 14px;
+}
 #import-notes {
   font: inherit;
   color: var(--warn);

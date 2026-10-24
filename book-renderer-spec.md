@@ -1740,6 +1740,9 @@ rather than mixing with the book's:
 Never touched: `page`, `is`, `notes`, `toc`, `ebook`, `language`, `name`,
 `spec`, and any key this schema doesn't know.
 
+**A new book** can start from any theme: its `metadata.json` is the template
+with the theme applied (§7.9). House, or no theme, is the template as it is.
+
 ## 5. Module Contracts
 
 These are the contracts each module must satisfy, per the layout in §1. Plan 0
@@ -2311,8 +2314,13 @@ address and the manuscript's summary comment names it.
 (file name and size, or the address) above the title field and prefill the title
 from the file's metadata, falling back to the file name; blank starts empty. The
 folder slug is shown live under the field and the book can be renamed later. The
-button reads _Import_ or _Create book_. Blank then opens the editor on a
-half-title page carrying the title.
+button reads _Import_ or _Create book_. Under the folder line a **Theme** row of
+small cards, one per theme (§4.13) in its own fonts, House first and picked; the
+line under them names the picked theme and describes it. The new book's
+`metadata.json` is the template with that theme applied, the same as
+`bml new <slug> --theme <t>` and `bml import <file> --theme <t>` (an unknown
+theme is an error, never House; a re-import keeps the existing `metadata.json`).
+Blank then opens the editor on a half-title page carrying the title.
 
 **No wizard.** An import always makes its best guess and opens the editor; the
 editor and preview are the review step. Structural decisions the detector could

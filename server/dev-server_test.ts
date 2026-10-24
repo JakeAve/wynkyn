@@ -1113,3 +1113,48 @@ Deno.test("try: builds in the posted style, writes nothing; bad body 400, missin
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("create and import: a posted theme's fonts; unknown theme 400", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const base = `http://localhost:${server.port}`;
+  const post = (path: string, body: unknown) =>
+    fetch(`${base}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  const fonts = async (book: string) =>
+    JSON.parse(await Deno.readTextFile(`${root}/${book}/metadata.json`)).fonts;
+  try {
+    const made = await post("/api/books", { slug: "c", theme: "caslon" });
+    assertEquals(made.status, 201);
+    await made.body?.cancel();
+    assertEquals((await fonts("c")).body, "Libre Caslon Text");
+
+    const imported = await post("/api/books/i/import", {
+      manuscript: "{title}\nI\n",
+      images: {},
+      theme: "caslon",
+    });
+    assertEquals(imported.status, 201);
+    await imported.body?.cancel();
+    assertEquals((await fonts("i")).display, "Libre Caslon Display");
+
+    for (
+      const [path, body] of [
+        ["/api/books", { slug: "u", theme: "nope" }],
+        ["/api/books", { slug: "u", theme: 3 }],
+        ["/api/books/u/import", { manuscript: "", images: {}, theme: "nope" }],
+      ] as const
+    ) {
+      const res = await post(path, body);
+      assertEquals(res.status, 400);
+      await res.body?.cancel();
+    }
+    await assertRejects(() => Deno.stat(`${root}/u`));
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});

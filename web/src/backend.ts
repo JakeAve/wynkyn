@@ -9,6 +9,7 @@ import {
   BookService,
   type MetadataResult,
   type SaveResult,
+  themedTemplate,
 } from "../../server/book-service.ts";
 import type { BookStore } from "../../server/store.ts";
 import type { EpubResult } from "./style-catalog.ts";
@@ -20,11 +21,13 @@ export interface Backend {
   listBooks(): Promise<string[]>;
   /** The library's id (BookService.libraryId). */
   libraryId(): Promise<string>;
-  createBook(slug: string, title?: string): Promise<void>;
+  /** `theme`: a preset's slug (spec §4.13); none is House. */
+  createBook(slug: string, title?: string, theme?: string): Promise<void>;
   /** A book from an import run in the page (§7.9). */
   importBook(
     slug: string,
     r: { manuscript: string; images: Record<string, Uint8Array> },
+    theme?: string,
   ): Promise<void>;
   editions(book: string): Promise<EditionInfo[]>;
   manuscript(book: string): Promise<{ text: string; version: string }>;
@@ -97,9 +100,11 @@ export function httpBackend(): Backend {
     listBooks: () =>
       call<{ books: string[] }>("/api/books").then((r) => r.books),
     libraryId: () => call<{ id: string }>("/api/library").then((r) => r.id),
-    createBook: (slug, title) => post("/api/books", { slug, title }),
-    importBook: (slug, r) =>
+    createBook: (slug, title, theme) =>
+      post("/api/books", { slug, title, theme }),
+    importBook: (slug, r, theme) =>
       post(`/api/books/${encodeURIComponent(slug)}/import`, {
+        theme,
         manuscript: r.manuscript,
         images: Object.fromEntries(
           Object.entries(r.images).map(([k, v]) => [k, base64(v)]),
@@ -236,13 +241,15 @@ export function localBackend(
     store,
     listBooks: () => service.list(),
     libraryId: () => service.libraryId(),
-    async createBook(slug, title) {
-      if (!await service.createBook(slug, assets.template, title)) {
+    async createBook(slug, title, theme) {
+      const meta = themedTemplate(assets.template, theme);
+      if (!await service.createBook(slug, meta, title)) {
         throw new Error("book already exists");
       }
     },
-    async importBook(slug, r) {
-      if (!await service.importBook(slug, assets.template, r)) {
+    async importBook(slug, r, theme) {
+      const meta = themedTemplate(assets.template, theme);
+      if (!await service.importBook(slug, meta, r)) {
         throw new Error("book already exists");
       }
     },

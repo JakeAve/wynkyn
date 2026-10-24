@@ -73,6 +73,8 @@ import {
 } from "./fs-store.ts";
 import type { BookStore } from "../../server/store.ts";
 import { importSource } from "../../server/import/mod.ts";
+import { arrowKeys, themeCard } from "./panel-themes.ts";
+import { THEMES } from "../../metadata/themes.ts";
 import {
   fetchSource,
   openUrl,
@@ -1310,7 +1312,7 @@ function createManuscript(cancelable: boolean): void {
     try {
       const got = await askTitle("", null, "Create book");
       if (!got) return createManuscript(cancelable);
-      await backend.createBook(got.slug, got.title);
+      await backend.createBook(got.slug, got.title, got.theme);
       location.href = editionHref(got.slug, null);
     } catch (e) {
       err.textContent = brief(e);
@@ -1337,7 +1339,7 @@ async function importPicked(
     dlg.close();
     const got = await askTitle(r.title, label, "Import");
     if (!got) return createManuscript(cancelable);
-    await backend.importBook(got.slug, r);
+    await backend.importBook(got.slug, r, got.theme);
     location.href = editionHref(got.slug, null);
   } catch (e) {
     err.textContent = brief(e);
@@ -1350,12 +1352,37 @@ const sizeLabel = (bytes: number) =>
     ? `${Math.max(1, Math.round(bytes / 1024))} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-/** The title dialog: the title and its slug, or null for Back. */
+// The title dialog's theme cards, built once; each opening starts on House.
+let titleTheme = "house";
+function themePicker(): void {
+  const grid = $("title-themes");
+  const sub = $("title-theme-sub");
+  const pick = (slug: string) => {
+    titleTheme = slug;
+    for (const c of grid.querySelectorAll<HTMLElement>(".tcard")) {
+      c.setAttribute("aria-pressed", String(c.dataset.slug === slug));
+    }
+    const t = THEMES.find((t) => t.slug === slug)!;
+    sub.textContent = `${t.name}: ${t.description}`;
+  };
+  if (!grid.childElementCount) {
+    for (const t of THEMES) {
+      const card = themeCard(t, "small");
+      card.onclick = () => pick(t.slug);
+      grid.append(card);
+    }
+    arrowKeys(grid);
+  }
+  pick("house");
+}
+
+/** The title dialog: the title, its slug and the picked theme, or null for
+ *  Back. */
 function askTitle(
   title: string,
   source: string | null,
   cta: string,
-): Promise<{ slug: string; title: string } | null> {
+): Promise<{ slug: string; title: string; theme: string } | null> {
   const dlg = $("title-dlg") as HTMLDialogElement;
   const input = $("title-input") as HTMLInputElement;
   const slugEl = $("title-slug");
@@ -1371,8 +1398,11 @@ function askTitle(
   };
   input.oninput = show;
   show();
+  themePicker();
   return new Promise((resolve) => {
-    const finish = (v: { slug: string; title: string } | null) => {
+    const finish = (
+      v: { slug: string; title: string; theme: string } | null,
+    ) => {
       dlg.close();
       resolve(v);
     };
@@ -1384,7 +1414,7 @@ function askTitle(
         err.textContent = `“${slug}” is taken; pick another title.`;
         return;
       }
-      finish({ slug, title: input.value });
+      finish({ slug, title: input.value, theme: titleTheme });
     };
     dlg.oncancel = (e) => {
       e.preventDefault();

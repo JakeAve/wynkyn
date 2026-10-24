@@ -104,7 +104,7 @@ export function themeCard(
 }
 
 // Arrow keys move focus across the grid, a row at a time up and down.
-function arrowKeys(grid: HTMLElement): void {
+export function arrowKeys(grid: HTMLElement): void {
   grid.addEventListener("keydown", (e) => {
     const step = { ArrowLeft: -1, ArrowRight: 1 }[e.key] ??
       (e.key === "ArrowUp" || e.key === "ArrowDown"
