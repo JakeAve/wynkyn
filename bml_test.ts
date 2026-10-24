@@ -148,6 +148,34 @@ Deno.test("bml new --theme: the theme's fonts; unknown theme fails, writes nothi
   }
 });
 
+Deno.test("bml new: an unreadable template says so, not 'no such theme'", async () => {
+  const root = await Deno.makeTempDir(); // run from here: no templates/
+  try {
+    const { code, stderr } = await new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-env",
+        "--config",
+        new URL("./deno.json", import.meta.url).pathname,
+        new URL("./bml.ts", import.meta.url).pathname,
+        "new",
+        "x",
+      ],
+      cwd: root,
+      env: { BML_BOOKS: root },
+      stderr: "piped",
+    }).output();
+    const err = new TextDecoder().decode(stderr);
+    assertEquals(code === 0, false);
+    assertStringIncludes(err, "templates/metadata.json");
+    assertEquals(err.includes("no such theme"), false);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
 async function exists(path: string): Promise<boolean> {
   try {
     await Deno.stat(path);

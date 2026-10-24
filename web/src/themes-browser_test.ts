@@ -1,7 +1,7 @@
 // web/src/themes-browser_test.ts — a theme previewed and applied in the real
 // app (spec §7.5): previewing writes nothing and holds live pushes, Discard
-// restores the book's look, and Apply asks: a new edition, a replace, or
-// Cancel.
+// restores the book's look, a failed try ends the preview, and Apply asks: a
+// new edition, a replace, or Cancel; a new edition whose save fails is undone.
 import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
@@ -107,6 +107,29 @@ Deno.test({
       assertEquals(await caslon.getAttribute("aria-pressed"), "false");
       assertEquals(await Deno.readTextFile(metaPath), metaBefore);
 
+      // A try build that fails ends the preview, and pushes paint again.
+      await page.route("**/try", (r) => r.fulfill({ status: 500, body: "x" }));
+      await caslon.click();
+      await until(
+        async () =>
+          await page.locator("#status").getAttribute("title") ===
+            "preview: x",
+        "the failure shows in the status",
+      );
+      await bar.waitFor({ state: "hidden" });
+      assertEquals(await caslon.getAttribute("aria-pressed"), "false");
+      await page.unroute("**/try");
+      await Deno.writeTextFile(
+        ms,
+        (await Deno.readTextFile(ms)).replace("fourteen", "fifteen"),
+      );
+      await until(
+        async () => (await liveText(page)).includes("fifteen"),
+        "pushes are not held after a failed preview",
+      );
+      await settled(page);
+      assert((await liveFont(page)).includes("EB Garamond"));
+
       // Apply… asks; Cancel changes nothing and keeps the preview.
       await caslon.click();
       await bar.waitFor();
@@ -153,6 +176,20 @@ Deno.test({
       await page.locator('#config-overlay .tcard[data-slug="aldine"]').click();
       await bar.waitFor();
       await page.getByRole("button", { name: "Apply…" }).click();
+      // A save that fails after the edition is made takes the edition back.
+      const aldineMeta = "**/editions/aldine/metadata";
+      await page.route(
+        aldineMeta,
+        (r) => r.fulfill({ status: 500, body: "disk full" }),
+      );
+      await dlg.getByRole("button", { name: /Apply as new edition/ }).click();
+      await until(
+        async () =>
+          (await page.locator("#theme-err").innerText()).includes("disk full"),
+        "the failed save shows in the dialog",
+      );
+      assertEquals(await editions(), edsBefore);
+      await page.unroute(aldineMeta);
       await dlg.getByRole("button", { name: /Apply as new edition/ }).click();
       await page.waitForURL(/edition=aldine/);
       const aldine = JSON.parse(

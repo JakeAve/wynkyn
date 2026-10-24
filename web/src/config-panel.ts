@@ -29,6 +29,7 @@ export type PanelMode = "style" | "publish";
 export interface ConfigPanel {
   setMode(mode: PanelMode): void; // swap the nav and body between style and publish
   isDirty(): boolean; // sections touched but not yet handed to saveSections
+  flush(): void; // hand any pending sections to saveSections now
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   selectStyle(key: string): void; // style mode, where a catalog entry is styled (§7.4)
   pagesChanged(): void; // the preview repaginated
@@ -322,6 +323,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       go(mode === "publish" ? { tab: "publish" } : styleRoute);
     },
     isDirty: () => dirty.size > 0,
+    flush: flushSave,
     refresh(metadata: Metadata) {
       meta = structuredClone(metadata);
       render(true);

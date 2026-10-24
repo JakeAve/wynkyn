@@ -71,11 +71,9 @@ if (import.meta.main) {
   }
   // A new book's metadata.json text, with --theme applied (spec §4.13).
   const template = async () => {
+    const text = await Deno.readTextFile("templates/metadata.json");
     try {
-      return themedTemplate(
-        await Deno.readTextFile("templates/metadata.json"),
-        a.theme,
-      );
+      return themedTemplate(text, a.theme);
     } catch {
       console.error(`no such theme: ${a.theme}`);
       Deno.exit(2);

@@ -19,9 +19,11 @@ import {
 } from "./preview.ts";
 import type { ServerMessage } from "../../server/pipeline.ts";
 import {
+  type CachedRender,
   cacheId,
   deleteCachedRender,
   loadCachedRender,
+  renderHash,
 } from "./preview-cache.ts";
 import {
   formatProblem,
@@ -714,6 +716,8 @@ async function doSave(text: string): Promise<void> {
 
 function saveMetadataSections(sections: Partial<Metadata>): void {
   if ("page" in sections) setCrumbSize(sections.page?.size);
+  // Saves replace whole sections, so this keeps `metadata` what the panel shows.
+  if (metadata) metadata = { ...metadata, ...structuredClone(sections) };
   if (metaSaveInFlight) {
     queuedMetaSections = { ...queuedMetaSections, ...sections };
     return;
@@ -805,7 +809,9 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
 // ---- Theme preview and Apply (spec §7.5) ----
 // A previewed theme's build is on screen and nothing is saved. Pushed builds
 // are held meanwhile; ending the preview shows the newest one.
-let paint: (msg: UpdateMessage, cacheKey?: string) => void = () => {}; // set in main
+// A null cacheKey paints without touching the book's cached render.
+let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {}; // set in main
+let restore: (cached: CachedRender) => void = () => {}; // set in main
 let previewSlug: string | null = null; // the theme on screen, or null
 let previewGen = 0; // bumped by every try and by the end, so a stale build drops
 let previewFrom: string | null = null; // the manuscript version it was built from
@@ -817,14 +823,12 @@ const themeName = (slug: string) =>
   THEMES.find((t) => t.slug === slug)?.name ?? slug;
 
 // The edition's metadata with every style edit landed, so a theme goes over
-// what the author sees rather than the copy fetched at panel load.
-// ponytail: polls the panel's debounce; a flush() on ConfigPanel if it lags.
+// what the author sees. The held copy is current unless another writer changed
+// metadata.json since (metaStale until refreshConfigFromRemote catches up).
 async function settledMetadata(): Promise<Metadata> {
-  while (configPanel?.isDirty() || metaSaveInFlight) {
-    await (metaSaveInFlight
-      ? metaSaveDone
-      : new Promise((r) => setTimeout(r, 100)));
-  }
+  configPanel?.flush();
+  while (metaSaveInFlight) await metaSaveDone;
+  if (metadata && !metaStale) return metadata;
   return (await fetchMetadata()).metadata;
 }
 
@@ -844,10 +848,12 @@ async function tryTheme(slug: string | null): Promise<void> {
     if (gen !== previewGen) return; // another card, or Discard, since
     previewFrom = built.manuscriptVersion;
     previewShown = { ...built, type: "update" };
-    // Its own cache row: a reload must not open on a look never applied.
-    paint(previewShown, `${cacheId(book, edition)}|theme`);
+    // Not cached: a reload must not open on a look never applied.
+    paint(previewShown, null);
   } catch (err) {
-    if (gen === previewGen) setStatus("error", `preview: ${brief(err)}`);
+    if (gen !== previewGen) return;
+    endPreview(); // a held push must not stay held behind a bar for good
+    setStatus("error", `preview: ${brief(err)}`);
   }
 }
 
@@ -856,17 +862,40 @@ async function tryTheme(slug: string | null): Promise<void> {
 function endPreview(applied = false): void {
   if (previewSlug === null) return;
   previewSlug = null;
-  previewGen++;
+  const gen = ++previewGen;
   $("theme-bar").hidden = true;
   delete $("preview").dataset.themePreview;
   configPanel?.themeTried(null);
   if (applied && previewShown) lastShown = previewShown;
-  const next = applied ? null : heldMsg ?? lastShown;
+  const next = heldMsg ?? lastShown;
   heldMsg = previewShown = null;
-  if (next) {
+  if (!applied) void showBookPages(next, gen);
+}
+
+// The book's cached render when it is what should show (no Paged.js pass),
+// else a fresh render of `next`. With neither, the pages clear: the book's
+// first build paints when it lands.
+async function showBookPages(
+  next: UpdateMessage | null,
+  gen: number,
+): Promise<void> {
+  const cached = await loadCachedRender(cacheId(book, edition));
+  if (gen !== previewGen) return; // a new preview since
+  if (next && cached?.hash !== renderHash(next)) {
     lastShown = next;
-    paint(next);
-  } else if (!applied) delete $("preview").dataset.stale; // no build yet
+    return paint(next);
+  }
+  restore(
+    cached ??
+      {
+        hash: "",
+        pages: "",
+        styles: [],
+        fontLinks: "",
+        seed: {},
+        problems: [],
+      },
+  );
 }
 
 // A push while previewing: held, and a manuscript change rebuilds the theme.
@@ -927,8 +956,14 @@ function installThemeApply(): void {
     );
     const next = freeSlug(slug, taken);
     await backend.createEdition(book, next, edition ?? "default");
-    await backend.saveMetadata(book, next, themeSections(applied));
-    await backend.flushMetadata(book, next); // the page is about to go
+    try {
+      await backend.saveMetadata(book, next, themeSections(applied));
+      await backend.flushMetadata(book, next); // the page is about to go
+    } catch (err) {
+      // An edition named for the theme but holding the old style misleads.
+      await backend.deleteEdition(book, next).catch(() => {});
+      throw err;
+    }
     location.href = editionHref(book, next);
   });
   $("theme-replace").onclick = run(async (slug) => {
@@ -1796,7 +1831,7 @@ async function main(): Promise<void> {
       else location.reload();
     }, 500);
   };
-  paint = (msg, cacheKey = key) => {
+  paint = (msg, cacheKey: string | null = key) => {
     renderPreview(msg, previewEl, cacheKey).then((problems) => {
       delete previewEl.dataset.stale;
       showPageProblems(problems);
@@ -1808,6 +1843,14 @@ async function main(): Promise<void> {
       setStatus("error", `preview: ${brief(err)}`);
       showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
     });
+  };
+  restore = (cached) => {
+    restoreCachedRender(cached, previewEl);
+    delete previewEl.dataset.stale;
+    showPageProblems(cached.problems ?? []);
+    refreshPageIndicator();
+    configPanel?.pagesChanged();
+    followCursor(cursorLine);
   };
   installThemeApply();
   const onMessage = (msg: ServerMessage) => {
@@ -1827,7 +1870,10 @@ async function main(): Promise<void> {
     }
     // Versions this client already reflects need nothing (spec §6).
     if (msg.manuscriptVersion !== base) refreshFromRemote();
-    if (msg.metadataVersion !== metaBase) refreshConfigFromRemote();
+    if (msg.metadataVersion !== metaBase) {
+      metaStale = true; // until refreshConfigFromRemote fetches it
+      refreshConfigFromRemote();
+    }
   };
   backend.subscribe(book, edition, clientId, onMessage, onClose);
 }
