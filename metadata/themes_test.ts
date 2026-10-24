@@ -5,7 +5,7 @@ import {
   assertNotEquals,
   assertThrows,
 } from "@std/assert";
-import { applyTheme, themeLook, THEMES } from "./themes.ts";
+import { applyTheme, currentTheme, themeLook, THEMES } from "./themes.ts";
 import { FONT_CATALOG } from "./fonts-catalog.ts";
 import { safeName } from "../server/editions.ts";
 import type { Metadata } from "./types.ts";
@@ -144,5 +144,19 @@ Deno.test("theme slugs are unique and safe as edition slugs", () => {
   const slugs = THEMES.map((t) => t.slug);
   assertEquals(new Set(slugs).size, slugs.length);
   for (const s of slugs) assert(safeName(s), s);
-  assertEquals(slugs[0], "house");
+  const names = THEMES.map((t) => t.name);
+  assertEquals(names, names.toSorted((a, b) => a.localeCompare(b)));
+});
+
+Deno.test("currentTheme names the theme a book matches, null once edited", async () => {
+  const house: Metadata = JSON.parse(
+    await Deno.readTextFile(
+      new URL("../templates/metadata.json", import.meta.url),
+    ),
+  );
+  assertEquals(currentTheme(house), "house");
+  assertEquals(currentTheme(applyTheme(house, "caslon")), "caslon");
+  const edited = applyTheme(house, "caslon");
+  edited.fonts = { ...edited.fonts, body: "Lora" };
+  assertEquals(currentTheme(edited), null);
 });

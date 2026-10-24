@@ -1712,7 +1712,7 @@ optional.
 
 A theme is a preset look laid over a book's metadata, not a section of it:
 nothing in `metadata.json` records which theme a book has. The themes are an
-ordered array in `templates/themes.json`, each
+array in `templates/themes.json`, shown in name order, each
 `{ slug, name, description, fonts?, elements?, numbering?, running? }`, read by
 `metadata/themes.ts`.
 
@@ -2074,15 +2074,19 @@ Includes:
 - Note placement: footnotes vs. endnotes (§4.9)
 - A **Theme** view, first in Style's Book group: a grid of cards, one per preset
   theme (§4.13), each drawn in the theme's own fonts (its name in the display
-  face, a chapter label, a line of body text and the description). Clicking a
-  card previews the theme: the preview shows the book built with the theme
-  applied and nothing is saved. A row stuck to the top of the Theme view, next
-  to the cards, reads "Previewing {Theme}" with **Apply…** and **Discard**.
-  While a theme is previewed, live updates are held rather than shown; a
-  manuscript change rebuilds the previewed theme with the new text. Discard,
-  leaving the Theme view, switching mode or switching edition ends the preview
-  and shows the newest build of the book's own style. Clicking another card
-  switches the preview to that theme.
+  face, a chapter label, a line of body text and the description), in name
+  order. When the book's look matches no theme (applying any would change it), a
+  **Custom** card comes first, drawn in the book's own style and naming its
+  fonts. The pressed card is the previewed theme, or with none the book's own:
+  Custom, or the theme it matches; clicking that card discards. Clicking a card
+  previews the theme: the preview shows the book built with the theme applied
+  and nothing is saved. A row stuck to the top of the Theme view, next to the
+  cards, reads "Previewing {Theme}" with **Apply…** and **Discard**. While a
+  theme is previewed, live updates are held rather than shown; a manuscript
+  change rebuilds the previewed theme with the new text. Discard, leaving the
+  Theme view, switching mode or switching edition ends the preview and shows the
+  newest build of the book's own style. Clicking another card switches the
+  preview to that theme.
 - **Apply…** always asks first, in an in-page dialog: "Apply {Theme} to
   {edition}? Fonts, part styles, chapter numbering and running heads change.
   Page size, margins and your custom styles stay." Its choices:
@@ -2337,9 +2341,9 @@ address and the manuscript's summary comment names it.
 from the file's metadata, falling back to the file name; blank starts empty. The
 folder slug is shown live under the field and the book can be renamed later. The
 button reads _Import_ or _Create book_. Under the folder line a **Theme** row of
-small cards, one per theme (§4.13) in its own fonts, House first and picked; the
-line under them names the picked theme and describes it. The new book's
-`metadata.json` is the template with that theme applied, the same as
+small cards, one per theme (§4.13) in its own fonts, in name order, House
+picked; the line under them names the picked theme and describes it. The new
+book's `metadata.json` is the template with that theme applied, the same as
 `bml new <slug> --theme <t>` and `bml import <file> --theme <t>` (an unknown
 theme is an error, never House; a re-import keeps the existing `metadata.json`).
 Blank then opens the editor on a half-title page carrying the title.

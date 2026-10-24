@@ -15,7 +15,9 @@ export interface Theme {
   running?: Running;
 }
 
-export const THEMES: readonly Theme[] = themesJson as unknown as Theme[];
+// In name order, as the cards show them.
+export const THEMES: readonly Theme[] = (themesJson as unknown as Theme[])
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 const HOUSE = template as unknown as Metadata;
 
@@ -104,4 +106,24 @@ export function applyTheme(meta: Metadata, slug: string): Metadata {
   ) as Numbering;
   out.running = look.running;
   return out;
+}
+
+// Key order aside, the same value: objects with their keys sorted.
+function canon(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(canon);
+  if (!isObj(v)) return v;
+  return Object.fromEntries(
+    Object.keys(v).sort().map((k) => [k, canon(v[k])]),
+  );
+}
+
+/**
+ * The theme the book's look is as it stands (applying it would change
+ * nothing), or null once the author has made the look their own.
+ */
+export function currentTheme(meta: Metadata): string | null {
+  const own = JSON.stringify(canon(meta));
+  return THEMES.find((t) =>
+    JSON.stringify(canon(applyTheme(meta, t.slug))) === own
+  )?.slug ?? null;
 }

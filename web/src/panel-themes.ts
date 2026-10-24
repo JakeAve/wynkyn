@@ -1,32 +1,37 @@
 // web/src/panel-themes.ts — the style panel's Theme view (spec §4.13, §7.5):
 // a grid of cards, one per preset theme, each set in the theme's own fonts.
-// A click asks the app to preview the theme; the app marks the previewed card
+// A book whose look is no theme's gets a Custom card first, its own style. The
+// pressed card is the previewed theme, or with none the book's own look. A
+// click asks the app to preview the theme; the app marks the previewed card
 // back through ConfigPanel.themeTried. `themeCard` is also the new-book
 // dialog's, so its CSS works outside the panel too.
 import { generateFontLinks } from "../../metadata/css-generator.ts";
-import { type Theme, themeLook, THEMES } from "../../metadata/themes.ts";
+import {
+  currentTheme,
+  type Theme,
+  themeLook,
+  THEMES,
+} from "../../metadata/themes.ts";
 import type { Metadata } from "../../metadata/types.ts";
 import { formatNumber } from "../../renderer/render.ts";
 import type { PanelContext } from "./style-catalog.ts";
 
-const INTRO = "Pick a theme to preview it on your pages. Nothing changes " +
-  "until you apply it. A theme sets fonts, part styles, chapter numbers " +
-  "and running heads; your page size, margins and custom styles stay.";
+const INTRO = "Get started fast by previewing a pre-built theme. A theme " +
+  "sets fonts, part styles, chapter numbers and running heads.";
 const TITLE = "The Valley of Ashes";
 const BODY =
   "In my younger and more vulnerable years my father gave me some advice.";
 
-let fontsLoaded = false;
+const loaded = new Set<string>();
 
-// Every family the cards use, in one Google Fonts link, the first time a card
-// is built rather than at app start.
-function loadFonts(): void {
-  if (fontsLoaded) return;
-  fontsLoaded = true;
-  const families = new Set(
-    THEMES.flatMap((t) => Object.values(themeLook(t.slug).fonts)),
-  );
-  const fonts = Object.fromEntries([...families].map((f) => [f, f]));
+// The families the cards use and no link has loaded yet, in one Google Fonts
+// link: every theme's the first time a card is built rather than at app start,
+// and a Custom card's own (a theme preview swaps the book's links out).
+function loadFonts(families: Iterable<string>): void {
+  const fresh = [...new Set(families)].filter((f) => !loaded.has(f));
+  if (!fresh.length) return;
+  for (const f of fresh) loaded.add(f);
+  const fonts = Object.fromEntries(fresh.map((f) => [f, f]));
   document.head.insertAdjacentHTML(
     "beforeend",
     generateFontLinks({ fonts } as Metadata),
@@ -66,14 +71,41 @@ export function themeCard(
   theme: Theme,
   size: "full" | "small",
 ): HTMLButtonElement {
-  loadFonts();
-  const look = themeLook(theme.slug);
-  const { fonts } = look;
-  const chapter = (look.elements.chapter ?? {}) as Record<
+  loadFonts(THEMES.flatMap((t) => Object.values(themeLook(t.slug).fonts)));
+  const b = card(themeLook(theme.slug), theme.slug, theme.name, size);
+  if (size === "full") {
+    b.lastElementChild!.before(span("tdesc", theme.description));
+  }
+  return b;
+}
+
+// The book's own look as a card, first when it is no theme's: its fonts named.
+function customCard(meta: Metadata): HTMLButtonElement {
+  const fonts = meta.fonts ?? {};
+  loadFonts(Object.values(fonts));
+  const b = card({ ...meta, fonts }, "custom", "Custom", "full");
+  const body = fonts.body ?? "the default face";
+  const display = fonts.display ?? body;
+  b.lastElementChild!.replaceWith(span(
+    "tdesc",
+    `The style you've made for this book: ${body}` +
+      (display === body ? "." : ` with ${display} for display.`),
+  ));
+  return b;
+}
+
+function card(
+  look: Pick<Metadata, "fonts" | "elements" | "numbering">,
+  slug: string,
+  title: string,
+  size: "full" | "small",
+): HTMLButtonElement {
+  const fonts = look.fonts ?? {};
+  const chapter = (look.elements?.chapter ?? {}) as Record<
     string,
     Record<string, unknown> | undefined
   >;
-  const c = look.numbering.chapters ?? {};
+  const c = look.numbering?.chapters ?? {};
   const label = `${c.prefix ?? ""}${formatNumber(1, c.style ?? "roman-upper")}${
     c.suffix ?? ""
   }`;
@@ -83,9 +115,9 @@ export function themeCard(
   const b = document.createElement("button");
   b.type = "button";
   b.className = size === "small" ? "tcard sm" : "tcard";
-  b.dataset.slug = theme.slug;
+  b.dataset.slug = slug;
   b.setAttribute("aria-pressed", "false");
-  const name = span("tname", theme.name);
+  const name = span("tname", title);
   name.style.fontFamily = face(display);
   const spec = span("tspec", "");
   spec.append(
@@ -97,7 +129,6 @@ export function themeCard(
     const line = span("tbody", BODY);
     line.style.fontFamily = face(body);
     spec.append(line);
-    b.append(span("tdesc", theme.description));
   }
   b.append(span("tpair", body === display ? body : `${body} · ${display}`));
   return b;
@@ -120,9 +151,22 @@ export function arrowKeys(grid: HTMLElement): void {
   });
 }
 
+// Presses the previewed theme's card, or with none the book's own, and shows
+// the Previewing row for it.
+export function markTried(view: HTMLElement, slug: string | null): void {
+  const grid = view.querySelector<HTMLElement>(".tgrid");
+  const bar = view.querySelector<HTMLElement>("#theme-bar");
+  if (!grid || !bar) return;
+  const on = slug ?? grid.dataset.current;
+  for (const c of grid.querySelectorAll<HTMLElement>(".tcard")) {
+    c.setAttribute("aria-pressed", String(c.dataset.slug === on));
+  }
+  showThemeBar(bar, slug);
+}
+
 // The previewed theme's row, sticky at the top of the Theme view: its name,
 // Apply… (the app asks how) and Discard. Hidden while nothing is previewed.
-export function showThemeBar(bar: HTMLElement, slug: string | null): void {
+function showThemeBar(bar: HTMLElement, slug: string | null): void {
   bar.hidden = slug === null;
   bar.dataset.slug = slug ?? "";
   bar.querySelector("b")!.textContent =
@@ -146,7 +190,6 @@ function themeBar(ctx: PanelContext): HTMLElement {
   discard.textContent = "Discard";
   discard.onclick = () => ctx.tryTheme(null);
   bar.append(what, apply, discard);
-  showThemeBar(bar, ctx.themeTried);
   return bar;
 }
 
@@ -158,13 +201,17 @@ export function buildThemesTab(ctx: PanelContext): Node[] {
   intro.textContent = INTRO;
   const grid = document.createElement("div");
   grid.className = "tgrid";
-  for (const t of THEMES) {
-    const card = themeCard(t, "full");
-    card.setAttribute("aria-pressed", String(t.slug === ctx.themeTried));
-    card.onclick = () => ctx.tryTheme(t.slug);
-    grid.append(card);
+  const current = currentTheme(ctx.meta) ?? "custom";
+  grid.dataset.current = current;
+  if (current === "custom") grid.append(customCard(ctx.meta));
+  grid.append(...THEMES.map((t) => themeCard(t, "full")));
+  for (const c of grid.querySelectorAll<HTMLElement>(".tcard")) {
+    // The book's own look is what Discard shows; previewing it changes nothing.
+    const slug = c.dataset.slug!;
+    c.onclick = () => ctx.tryTheme(slug === current ? null : slug);
   }
   arrowKeys(grid);
   sec.append(themeBar(ctx), intro, grid);
+  markTried(sec, ctx.themeTried);
   return [sec];
 }
