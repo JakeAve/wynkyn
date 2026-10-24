@@ -1950,11 +1950,11 @@ CodeMirror 6 over plain BML text.
   its capital; a possessive is checked without its `'s`. Hovering an underlined
   word offers up to five suggestions and **Add to dictionary**, which writes the
   word (a possessive as its name) to `dictionary.json` through
-  `POST /api/books/:book/dictionary` with `{ word }`. Spelling is a switch on
-  the text view bar, on by default; a book whose `language` (§4.2) isn't English
-  gets no spell check yet. Each language is one word list, picked by
-  `language`'s primary subtag (`WORD_LISTS` in `app.ts`); `dictionary.json` is
-  the same whatever the language.
+  `POST /api/books/:book/dictionary` with `{ word }`. **Spelling** on the text
+  view bar is a menu of the word lists, English (the default) or None, kept with
+  the reader's other text view choices; each language is one list in `vendor/`
+  and a row in `WORD_LISTS` (`app.ts`), and `dictionary.json` is the same
+  whatever the language.
 - **EXPERIMENTAL:** `{only}` spans (§3.2.9) carry an amber mark on every line's
   gutter and a tag naming their editions; lines the open edition skips are
   dimmed.

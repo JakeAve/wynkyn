@@ -1593,7 +1593,7 @@ summary {
   transform: translateX(12px);
   background: var(--inv-fg);
 }
-#config-overlay select.sel,
+:is(#config-overlay, #text-view) select.sel,
 #config-overlay input.txt {
   height: 28px;
   border: 1px solid var(--line);
@@ -1603,9 +1603,13 @@ summary {
   min-width: 0;
   max-width: 100%;
 }
-#config-overlay select.sel {
+:is(#config-overlay, #text-view) select.sel {
   padding-right: 4px;
   cursor: pointer;
+}
+#text-view select.sel {
+  height: 22px; /* the bar's other controls are 20px */
+  padding-left: 6px;
 }
 #config-overlay input.txt {
   width: 140px;

@@ -1119,32 +1119,32 @@ function installThemeToggle(): void {
   };
 }
 
-// Spell check (spec §7.3): the word list for the book's `language`, fetched
+// Spell check (spec §7.3): the word list the Spelling menu picks, fetched
 // once, and the book's dictionary.json, which Add to dictionary grows.
-// Another language is one more list in vendor/ and one row here; a language
-// without a list gets no spell check.
-const WORD_LISTS: Record<string, string> = { en: "/vendor/words-en.txt" };
-let wordList: Promise<Set<string>> | undefined;
-async function spellCheck(on: boolean): Promise<void> {
-  const toggle = $("tv-spell") as HTMLInputElement;
+// Another language is one more list in vendor/ and one row here.
+const WORD_LISTS: Record<string, { name: string; url: string }> = {
+  en: { name: "English", url: "/vendor/words-en.txt" },
+};
+const wordLists = new Map<string, Promise<Set<string>>>();
+async function spellCheck(lang: string): Promise<void> {
+  const url = WORD_LISTS[lang]?.url;
+  if (!url) return setSpeller(editor, null);
   try {
-    const lang = (await fetchMetadata()).metadata.language ?? "en";
-    const url = WORD_LISTS[lang.split("-")[0]!.toLowerCase()];
-    if (!url) {
-      toggle.disabled = true;
-      toggle.parentElement!.title = `No spell check for “${lang}” yet`;
-      return;
+    let list = wordLists.get(lang);
+    if (!list) {
+      wordLists.set(
+        lang,
+        list = fetch(url).then((r) =>
+          r.ok ? r.text() : Promise.reject(new Error(`word list: ${r.status}`))
+        ).then(parseWordList),
+      );
     }
-    if (!on) return setSpeller(editor, null);
-    wordList ??= fetch(url).then((r) =>
-      r.ok ? r.text() : Promise.reject(new Error(`word list: ${r.status}`))
-    ).then(parseWordList);
-    const [list, words] = await Promise.all([
-      wordList,
+    const [known, words] = await Promise.all([
+      list,
       backend.dictionary(book),
     ]);
     const speller = (mine: Set<string>) => ({
-      has: (w: string) => list.has(w) || mine.has(w),
+      has: (w: string) => known.has(w) || mine.has(w),
       async add(w: string) {
         try {
           setSpeller(editor, speller(new Set(await backend.addWord(book, w))));
@@ -1153,9 +1153,12 @@ async function spellCheck(on: boolean): Promise<void> {
         }
       },
     });
-    if (toggle.checked) setSpeller(editor, speller(new Set(words)));
+    // Unless the menu moved on while the list loaded.
+    if (($("tv-spell") as HTMLSelectElement).value === lang) {
+      setSpeller(editor, speller(new Set(words)));
+    }
   } catch (err) {
-    wordList = undefined; // try the fetch again next time
+    wordLists.delete(lang); // try the fetch again next time
     setStatus("error", `spell check: ${brief(err)}`);
   }
 }
@@ -1168,7 +1171,7 @@ const TEXT_FONTS: Record<string, string> = {
   mono: "var(--mono)",
 };
 function installTextView(): void {
-  let prefs = { font: "serif", size: 16, hide: false, spell: true };
+  let prefs = { font: "serif", size: 16, hide: false, spell: "en" };
   try {
     prefs = { ...prefs, ...JSON.parse(localStorage.getItem("text-view")!) };
   } catch {
@@ -1177,7 +1180,14 @@ function installTextView(): void {
   const ed = $("editor");
   const size = $("tv-size") as HTMLInputElement;
   const hide = $("tv-hide") as HTMLInputElement;
-  const spell = $("tv-spell") as HTMLInputElement;
+  const spell = $("tv-spell") as HTMLSelectElement;
+  spell.append(
+    ...Object.entries(WORD_LISTS).map(([v, l]) => new Option(l.name, v)),
+    new Option("None", "none"),
+  );
+  if (prefs.spell !== "none" && !(prefs.spell in WORD_LISTS)) {
+    prefs.spell = "en";
+  }
   const fonts = [
     ...$("text-view").querySelectorAll<HTMLElement>("[data-font]"),
   ];
@@ -1191,7 +1201,7 @@ function installTextView(): void {
     size.value = String(prefs.size);
     size.nextElementSibling!.textContent = `${prefs.size}px`;
     hide.checked = prefs.hide;
-    spell.checked = prefs.spell;
+    spell.value = prefs.spell;
     setHideMarkup(editor, prefs.hide);
     try {
       localStorage.setItem("text-view", JSON.stringify(prefs));
@@ -1221,9 +1231,8 @@ function installTextView(): void {
     prefs.hide = hide.checked;
     apply();
   };
-  spell.checked = prefs.spell;
   spell.onchange = () => {
-    prefs.spell = spell.checked;
+    prefs.spell = spell.value;
     apply();
     spellCheck(prefs.spell);
   };
