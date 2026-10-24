@@ -313,6 +313,28 @@ export async function startServer(
       }
     }
 
+    // An image added from the page: the file's bytes as the body.
+    if ((p = m(/^\/api\/books\/([^/]+)\/images$/))) {
+      if (req.method === "GET") {
+        return Response.json({ images: await service.images(p[0]!) });
+      }
+      if (req.method === "POST") {
+        const filename = url.searchParams.get("filename");
+        if (!filename) {
+          return new Response("filename query required", { status: 400 });
+        }
+        return Response.json(
+          await service.addImage(
+            p[0]!,
+            filename,
+            new Uint8Array(await req.arrayBuffer()),
+            url.searchParams.get("slug") ?? undefined,
+          ),
+          { status: 201 },
+        );
+      }
+    }
+
     if ((p = m(/^\/api\/books\/([^/]+)\/editions$/))) {
       if (req.method === "GET") {
         return Response.json({ editions: await service.editions(p[0]!) });

@@ -1192,3 +1192,46 @@ Deno.test("dictionary: words added land sorted in dictionary.json; a broken file
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("images: GET lists, POST adds the body under a free name; bad type 415", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const url = `http://localhost:${server.port}/api/books/demo-book/images`;
+  const add = (filename: string, body: string, slug?: string) =>
+    fetch(
+      `${url}?filename=${encodeURIComponent(filename)}${
+        slug ? `&slug=${slug}` : ""
+      }`,
+      { method: "POST", body },
+    );
+  try {
+    assertEquals(await (await fetch(url)).json(), {
+      images: [{ slug: "ornament", name: "ornament.svg" }],
+    });
+    const added = await add("Ornament.PNG", "png");
+    assertEquals(added.status, 201);
+    assertEquals(await added.json(), {
+      slug: "ornament-2",
+      name: "ornament-2.png",
+    });
+    assertEquals(
+      await Deno.readTextFile(`${root}/demo-book/images/ornament-2.png`),
+      "png",
+    );
+    const taken = await add("x.png", "x", "ornament");
+    assertEquals(taken.status, 409);
+    await taken.body?.cancel();
+    const heic = await add("x.heic", "x");
+    assertEquals(heic.status, 415);
+    assertEquals(
+      await heic.text(),
+      "Only PNG, JPEG, WebP or SVG images can go in a book",
+    );
+    const nameless = await fetch(url, { method: "POST", body: "x" });
+    assertEquals(nameless.status, 400);
+    await nameless.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});

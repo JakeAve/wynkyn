@@ -2416,8 +2416,6 @@ Explicitly out of scope, to bound the work below:
 - Multi-user/collaborative real-time editing
 - Structural editing via drag-and-drop in the project tree (§7.2) — tree is
   navigation-only in v1
-- Image upload/management UI — `{illustration:}` slugs are assumed to resolve to
-  files the user places manually for now
 - Automated table-of-contents _authoring_ beyond what the renderer already
   generates from the tree (manual TOC entry per §3.4.6 remains available as a
   fallback)

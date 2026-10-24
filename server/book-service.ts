@@ -9,6 +9,7 @@ import {
   type BuildOptions,
   type BuildResult,
   contentVersion,
+  imageFiles,
   NotFoundError,
   type ServerMessage,
 } from "./pipeline.ts";
@@ -25,6 +26,7 @@ import {
   safeName,
 } from "./editions.ts";
 import type { BookStore } from "./store.ts";
+import { freeSlug, IMAGE_EXTS, type ImageFile, imageSlug } from "./images.ts";
 import { type EpubBytes, epubBytes } from "./epub-export.ts";
 
 /** A refused request; `status` is the HTTP status the dev server answers with. */
@@ -75,8 +77,9 @@ export class BookService {
   private readonly buildOpts: Pick<BuildOptions, "baseCss" | "imageUrl">;
   private readonly clients = new Set<Client>();
   // key → the tail of its work queue. Keys are a book (its manuscript: a
-  // save's check + write, a rename's token rewrite) or a metadata path (its
-  // writes); safeName keeps the two apart, a path always has a "/".
+  // save's check + write, a rename's token rewrite), a metadata path (its
+  // writes) or "<book>/images" (adds); safeName keeps a book apart from the
+  // others, a path always has a "/".
   private readonly chains = new Map<string, Promise<void>>();
   private readonly pendingMetaSaves = new Map<string, PendingMetaSave>();
   // EXPERIMENTAL (§3.2.9): book → edition renames whose {only} token a stale
@@ -167,6 +170,18 @@ export class BookService {
     return this.store.read(`${book}/images/${file}`);
   }
 
+  /** The book's images in an accepted format, by slug. */
+  async images(book: string): Promise<ImageFile[]> {
+    checkNames(book, null);
+    await this.requireBook(book);
+    return Object.entries(await imageFiles(this.store, book))
+      .filter(([, name]) =>
+        IMAGE_EXTS.includes(name.slice(name.lastIndexOf(".") + 1).toLowerCase())
+      )
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+  }
+
   async metadata(
     book: string,
     edition: string | null,
@@ -213,6 +228,44 @@ export class BookService {
       JSON.stringify({ words }, null, 2) + "\n",
     );
     return words;
+  }
+
+  /** Puts a file in the book's images/, named for its file name (or `slug`),
+   * never over an existing one. A slug is taken under any extension: the
+   * resolver serves the first match, so a second would be shadowed. Without
+   * `slug` a taken name gets -2, -3, …; with one, a taken slug is a 409. */
+  async addImage(
+    book: string,
+    filename: string,
+    bytes: Uint8Array,
+    slug?: string,
+  ): Promise<ImageFile> {
+    checkNames(book, null);
+    const parsed = imageSlug(filename);
+    if (!parsed) {
+      throw new ServiceError(
+        415,
+        "Only PNG, JPEG, WebP or SVG images can go in a book",
+      );
+    }
+    if (slug !== undefined && !/^[\w-]+$/.test(slug)) {
+      throw bad("bad image slug");
+    }
+    // In the folder's queue, so two adds never pick the same free name.
+    return await this.serialize(`${book}/images`, async () => {
+      await this.requireBook(book);
+      const taken = new Set(Object.keys(await imageFiles(this.store, book)));
+      if (slug !== undefined && taken.has(slug)) {
+        throw new ServiceError(409, "an image with that name is already there");
+      }
+      const name = `${slug ?? freeSlug(parsed.slug, taken)}.${parsed.ext}`;
+      const path = `${book}/images/${name}`;
+      if (!await this.store.create(path, bytes)) {
+        throw new ServiceError(409, "an image with that name is already there");
+      }
+      this.notify([path]);
+      return { slug: name.slice(0, -parsed.ext.length - 1), name };
+    });
   }
 
   /** A new book from a template's metadata; false when the slug is taken. */
