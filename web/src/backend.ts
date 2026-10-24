@@ -263,9 +263,13 @@ export function localBackend(
     if (!url) {
       const bytes = await store.read(path);
       const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
-      url = URL.createObjectURL(
-        new Blob([bytes ?? new Uint8Array()], { type: IMAGE_TYPES[ext] }),
-      );
+      // The name as a fragment (ignored on load): folios.js's printDpi tells
+      // vector art by its extension.
+      url = `${
+        URL.createObjectURL(
+          new Blob([bytes ?? new Uint8Array()], { type: IMAGE_TYPES[ext] }),
+        )
+      }#${name}`;
       urls.set(path, url); // ponytail: never revoked; an added image gets a new name, never new bytes
     }
     return url;

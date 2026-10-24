@@ -1655,8 +1655,8 @@ When `metadata.json` is present, the renderer:
    renders a visible placeholder, not an error:
    `<div class="illustration-placeholder" data-slug="<slug>">` reading "No image
    named <slug> yet" over "Click to add one". The copy is part of the render, so
-   a `bml export` proof prints it too; the editor makes it a way to add the
-   image (§7.6).
+   a `bml export` proof prints it too, and the page map warns of it (§5.4); the
+   editor makes it a way to add the image (§7.6).
 9. Resolves `{ref: slug}` to the target's page number: the page map (§4.7)
    records the page each anchor lands on, and its folio is written into the
    `a.ref` link as text.
@@ -1842,9 +1842,15 @@ physical page where it has one:
 - the book's last anchor on no page — the render was cut short;
 - no fixed point after three passes.
 
-One check is a **warning**, listed with the rest but never blocking an export: a
-margin box (running head or folio) that runs to a second line, measured against
-the same box held to one line (§4.8).
+Some checks are **warnings**, listed with the rest but never blocking an export:
+
+- a margin box (running head or folio) that runs to a second line, measured
+  against the same box held to one line (§4.8);
+- an illustration whose image prints under 200 dpi at its laid-out size (its
+  pixel width over its width in CSS inches), as "<slug> prints at <N> dpi (300
+  looks sharp)"; vector art (SVG) has no resolution and is never warned;
+- an illustration with no image — its placeholder (§4.10 item 8) or a file that
+  won't load — as "an illustration has no image (<slug>)".
 
 Print export fails on any other problem, listing each as `page N: message`,
 before `book.pdf` is written; `bml export --force` prints them as warnings and
@@ -2171,6 +2177,12 @@ the file goes in `images/` under exactly the placeholder's slug (its extension
 from the file), and the rebuild shows the image. A taken slug or a refused type
 is reported in the footer note. In Style the placeholder is the illustration's
 style target like any other part.
+
+Every illustration under 200 dpi at its laid-out size, and every placeholder, is
+a page-map warning in the page problems (§5.4). While the editor's cursor is on
+an illustration — its `{illustration}` line or its caption line — the footer
+note says "Prints at N dpi here; 300 looks sharp", in the warning colour below
+200.
 
 ### 7.7 Page Setup & Print Imposition
 

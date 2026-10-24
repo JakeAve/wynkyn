@@ -10,7 +10,11 @@ Deno.test({
   name: "renderPdf paginates the demo book at trim size",
   ignore: !hasChrome,
   fn: async () => {
-    const html = toHtml(await buildBook(ROOT, "demo-book"));
+    const html = toHtml(
+      await buildBook(ROOT, "demo-book", {
+        imageUrlPrefix: `file://${ROOT}/demo-book/images`,
+      }),
+    );
     const { pdf, problems, passes } = await renderPdf(html);
     assertEquals(problems, []);
     assert(passes === 1 || passes === 2, `settled in ${passes} passes`);
