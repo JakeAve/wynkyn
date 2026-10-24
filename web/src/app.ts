@@ -174,6 +174,16 @@ setInterval(() => {
 }, 1000);
 
 // Short, readable tail of an error for the footer; full text stays in the title.
+// The writer's footer note after an image drop or paste; gone in a few seconds.
+let imageNoteTimer = 0;
+function imageNote(text: string, warn = false): void {
+  const el = $("image-note");
+  el.textContent = text;
+  el.classList.toggle("warn", warn);
+  clearTimeout(imageNoteTimer);
+  imageNoteTimer = setTimeout(() => el.textContent = "", 6000);
+}
+
 function brief(err: unknown): string {
   return String(err).replace(/^Error:\s*/, "").split("\n")[0]!.slice(0, 80);
 }
@@ -1814,6 +1824,12 @@ async function main(): Promise<void> {
     text,
     onDocChanged,
     onCursorLine: highlightTreeNode,
+    images: {
+      images: () => backend.images(book),
+      url: (name) => backend.imageUrl(book, name),
+      add: (file, slug) => backend.addImage(book, file, slug),
+      note: imageNote,
+    },
   });
   reparse(text);
   installTextView();

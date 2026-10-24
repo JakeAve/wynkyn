@@ -2012,6 +2012,18 @@ CodeMirror 6 over plain BML text.
     the selection.
   - Per-sentinel shortcuts remain (em ⌘E, chapter ⌘⇧C, heading ⌘⇧H, footnote
     ⌘⇧F, quote ⌘⇧Q, break ⌘⇧B), in Write only.
+- Image files dropped or pasted on the editor go in the book's `images/`
+  (`POST /api/books/:book/images`, named for the file, never over one already
+  there) and come back as `{illustration: slug}` / `Caption` blocks, one per
+  file in drop order, at the nearest paragraph break (for a paste, the end of
+  the cursor's paragraph), with a blank line either side and the first `Caption`
+  selected. While a file is dragged over the editor a line marks that break,
+  labelled "Drop to add an illustration here". The writer's footer says "Added
+  to the book's images as <name>", or why a file was refused ("Only PNG, JPEG,
+  WebP or SVG images can go in a book") and nothing goes in for it. A drag with
+  no files (moving text) is CodeMirror's own. The image and the save that names
+  it paginate once: the service holds a rebuild for a change to `images/` alone
+  a moment, and the next change to the book takes it along.
 
 ### 7.4 Sentinel Styling
 

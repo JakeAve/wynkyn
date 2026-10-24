@@ -453,6 +453,15 @@ summary {
   text-overflow: ellipsis;
   cursor: pointer;
 }
+/* after an image drop or paste (app.ts imageNote) */
+#image-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#image-note.warn {
+  color: var(--warn);
+}
 #page-problems {
   display: flex;
   gap: 12px;
@@ -838,6 +847,24 @@ summary {
   padding: 0 5px;
   margin-left: 8px;
   color: var(--warn);
+}
+/* where a dragged image file would land (editor-images.ts): a hairline at
+   the paragraph break with a pill label, taking no height of its own */
+#editor .cm-image-drop {
+  position: relative;
+  height: 0;
+  border-top: 2px solid var(--fg);
+  pointer-events: none;
+}
+#editor .cm-image-drop span {
+  position: absolute;
+  left: 0;
+  top: -11px;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+  font: var(--fs-sm)/16px system-ui, sans-serif;
 }
 /* the find/replace bar (search-panel.ts) */
 .cm-bml-find {

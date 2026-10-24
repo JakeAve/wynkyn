@@ -23,6 +23,7 @@ import { toCmDiagnostics } from "./diagnostics.ts";
 import { searchPanel } from "./search-panel.ts";
 import { insertExtensions } from "./editor-insert.ts";
 import { spellExtensions } from "./spelling.ts";
+import { imageExtensions, type ImageHost } from "./editor-images.ts";
 import type { Diagnostic, OnlySpan } from "../../parser/types.ts";
 
 // True while replaceBuffer() applies a remote change: those edits must not
@@ -197,6 +198,7 @@ export function createEditor(opts: {
   text: string;
   onDocChanged: (text: string) => void;
   onCursorLine?: (line: number) => void; // 1-based; fires when the cursor moves lines
+  images?: ImageHost; // dropped or pasted image files go in the book
 }): EditorView {
   let lastLine = 0;
   return new EditorView({
@@ -213,6 +215,7 @@ export function createEditor(opts: {
         lintGutter(),
         markup.of([]),
         spellExtensions(),
+        opts.images ? imageExtensions(opts.images) : [],
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !suppressChanges) {

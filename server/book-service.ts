@@ -91,6 +91,8 @@ export class BookService {
     { from: string; to: string; stale: Set<string> }[]
   >();
   private readonly stopWatch: (() => void) | undefined;
+  // book → a rebuild held back after a change to images/ alone (onChanged).
+  private readonly heldImages = new Map<string, number>();
 
   constructor(opts: ServiceOptions) {
     this.store = opts.store;
@@ -104,6 +106,7 @@ export class BookService {
   async stop(): Promise<void> {
     this.stopWatch?.();
     for (const p of this.pendingMetaSaves.values()) clearTimeout(p.timer);
+    for (const t of this.heldImages.values()) clearTimeout(t);
     await Promise.all(this.chains.values()); // writes under way land
     this.clients.clear();
   }
@@ -642,6 +645,7 @@ export class BookService {
   private onChanged(paths: string[]) {
     // book → set of affected editions; undefined marks "shared: everyone".
     const changed = new Map<string, Set<string | null | undefined>>();
+    const notImages = new Set<string>(); // books with a change outside images/
     for (const p of paths) {
       const [book, ...rest] = p.split("/");
       const change = book ? classifyChange(rest) : null;
@@ -649,8 +653,26 @@ export class BookService {
       let set = changed.get(book);
       if (!set) changed.set(book, set = new Set());
       set.add(change.kind === "shared" ? undefined : change.edition);
+      if (rest[0] !== "images") notImages.add(book);
     }
     for (const [book, editions] of changed) {
+      // An image dropped on the editor is followed by the manuscript save
+      // naming it: hold an images-only rebuild a moment so the two paginate
+      // once. Whatever comes next for the book takes the held one with it.
+      const held = this.heldImages.get(book);
+      clearTimeout(held);
+      this.heldImages.delete(book);
+      if (!notImages.has(book)) {
+        this.heldImages.set(
+          book,
+          setTimeout(() => {
+            this.heldImages.delete(book);
+            this.broadcast(book, undefined);
+          }, IMAGE_HOLD_MS),
+        );
+        continue;
+      }
+      if (held !== undefined) editions.add(undefined);
       if (editions.has(undefined)) this.broadcast(book, undefined);
       else for (const e of editions) this.broadcast(book, e);
     }
@@ -686,6 +708,9 @@ export class BookService {
     }
   }
 }
+
+// Longer than the editor's save debounce (600ms in app.ts) plus the watcher's.
+const IMAGE_HOLD_MS = 1200;
 
 // Metadata state is per edition; the manuscript's is per book.
 const metaKey = (book: string, edition: string | null) =>
