@@ -1119,25 +1119,28 @@ function installThemeToggle(): void {
   };
 }
 
-// Spell check (spec §7.3): the English word list, fetched once, and the
-// book's dictionary.json, which Add to dictionary grows. A book whose
-// `language` isn't English gets none.
-let english: Promise<Set<string>> | undefined;
+// Spell check (spec §7.3): the word list for the book's `language`, fetched
+// once, and the book's dictionary.json, which Add to dictionary grows.
+// Another language is one more list in vendor/ and one row here; a language
+// without a list gets no spell check.
+const WORD_LISTS: Record<string, string> = { en: "/vendor/words-en.txt" };
+let wordList: Promise<Set<string>> | undefined;
 async function spellCheck(on: boolean): Promise<void> {
   const toggle = $("tv-spell") as HTMLInputElement;
   try {
     const lang = (await fetchMetadata()).metadata.language ?? "en";
-    if (!/^en\b/i.test(lang)) {
+    const url = WORD_LISTS[lang.split("-")[0]!.toLowerCase()];
+    if (!url) {
       toggle.disabled = true;
-      toggle.parentElement!.title = "Spell check is English only for now";
+      toggle.parentElement!.title = `No spell check for “${lang}” yet`;
       return;
     }
     if (!on) return setSpeller(editor, null);
-    english ??= fetch("/vendor/words-en.txt").then((r) =>
+    wordList ??= fetch(url).then((r) =>
       r.ok ? r.text() : Promise.reject(new Error(`word list: ${r.status}`))
     ).then(parseWordList);
     const [list, words] = await Promise.all([
-      english,
+      wordList,
       backend.dictionary(book),
     ]);
     const speller = (mine: Set<string>) => ({
@@ -1152,7 +1155,7 @@ async function spellCheck(on: boolean): Promise<void> {
     });
     if (toggle.checked) setSpeller(editor, speller(new Set(words)));
   } catch (err) {
-    english = undefined; // try the fetch again next time
+    wordList = undefined; // try the fetch again next time
     setStatus("error", `spell check: ${brief(err)}`);
   }
 }
