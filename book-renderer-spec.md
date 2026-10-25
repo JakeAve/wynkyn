@@ -1923,11 +1923,15 @@ and the mode persists across reloads:
 | Publish | print and e-book rows   | page setup, print and e-book exports | the first signature as it prints |
 
 Each side column has a toggle at its own edge of the toolbar — Contents at the
-far left before the book title (⌘\), Pages at the far right (⌘.) — drawn as a
-panel icon whose side is half filled while that column shows; both persist.
-Gutters between the columns drag to resize them. A hidden preview still lays out
-(it leaves the grid, never `display: none`), since Paged.js paginates by
-measuring.
+far left before the crumb (⌘\), Pages at the far right (⌘.) — drawn as a panel
+icon whose side is half filled while that column shows; both persist. The crumb
+reads library / book / edition. The library step, muted so the title leads, is
+an icon for where the books live (a folder on this device, or this browser) and
+its name (the folder's, or "This browser"); its tooltip says where, and a click
+goes back to the Welcome (§7.9) to pick another. The dev server has only its
+`books/`, so there the crumb starts at the book. Gutters between the columns
+drag to resize them. A hidden preview still lays out (it leaves the grid, never
+`display: none`), since Paged.js paginates by measuring.
 
 ### 7.2 Project Tree
 
