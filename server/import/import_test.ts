@@ -473,6 +473,53 @@ Deno.test("docx reader: drop caps, deleted marks, indented quotes, text boxes", 
   assertEquals(parse(m).diagnostics, []);
 });
 
+Deno.test("docx reader: a Google Docs export's tab names, title lines, typed contents, hand-set volumes, ornaments", () => {
+  const r = (t: string, rpr = "") =>
+    `<w:r><w:rPr>${rpr}</w:rPr><w:t xml:space="preserve">${t}</w:t></w:r>`;
+  const p = (body: string, ppr = "") =>
+    `<w:p><w:pPr>${ppr}</w:pPr>${body}</w:p>`;
+  const style = (s: string) => `<w:pStyle w:val="${s}"/>`;
+  const tab = (name: string) => p(r(name), style("Title") + "<w:sectPr/>");
+  const ornament =
+    `<w:r><w:drawing><wp:anchor><wp:wrapNone/><wp:docPr id="1" name="o"/><a:blip r:embed="rId1"/></wp:anchor></w:drawing></w:r>`;
+  const volume = (n: string) =>
+    tab(`Vol ${n}`) + p(ornament) +
+    p(r(`Volume ${n}.`, `<w:sz w:val="180"/>`));
+  const chapter = (n: string) =>
+    p(r(`CHAPTER ${n}.`), style("Heading1")) +
+    p(r("Text of the chapter, long enough to be the body of the book."));
+  const doc = tab("Title Pages") + p(r("THE LONG"), style("Title")) +
+    p(r("WAY."), style("Title")) +
+    p(r("by A. Writer")) + p(r("Contents")) +
+    p(r("Chapter I……………………3")) + p(r("Chapter II……………….")) +
+    volume("I") + chapter("I") + chapter("II") + volume("II") + chapter("I") +
+    chapter("II");
+  const res = importSource(
+    "Long Way.docx",
+    zipSync({
+      "word/document.xml": strToU8(
+        `<w:document><w:body>${doc}</w:body></w:document>`,
+      ),
+      "word/styles.xml": strToU8(
+        `<w:styles><w:style w:styleId="Title"><w:name w:val="Title"/></w:style><w:style w:styleId="Heading1"><w:name w:val="heading 1"/></w:style></w:styles>`,
+      ),
+      "word/_rels/document.xml.rels": strToU8(
+        `<Relationships><Relationship Id="rId1" Target="media/o.png"/></Relationships>`,
+      ),
+      "word/media/o.png": new Uint8Array([1]),
+    }),
+  );
+  const m = res.manuscript;
+  assertEquals(res.title, "The Long Way", "the Title lines, joined");
+  assert(!/Title Pages|Vol I\b/.test(m), "tab names are not text");
+  assert(!m.includes("……"), "the typed contents is dropped");
+  assertStringIncludes(m, "its contents list");
+  assertEquals(m.match(/^\{(part|chapter): .*$/gm)?.length, 6);
+  assertEquals(m.match(/^\{part: .*$/gm)?.length, 2, "volumes set by hand");
+  assertEquals(Object.keys(res.images), [], "ornaments are not plates");
+  assertEquals(parse(m).diagnostics, []);
+});
+
 Deno.test("structure: BOOK headings above chapters become parts", () => {
   const text = [
     "BOOK I",

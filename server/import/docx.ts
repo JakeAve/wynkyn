@@ -7,6 +7,7 @@
 // `word/media`. Title and author from `docProps/core.xml`.
 import { strFromU8, type Unzipped } from "fflate";
 import { balanceEm, type Block, esc, type Source } from "./blocks.ts";
+import { PART_KW, titleCase } from "./structure.ts";
 import { BREAK } from "./text.ts";
 import { textOf, type Tok, tokenize } from "./xml.ts";
 
@@ -24,12 +25,13 @@ interface Para {
   outline?: number;
   owner?: string; // the footnote or endnote holding it, as `fn-3` / `en-3`
   text: string; // BML inline text, `\n` at soft line breaks
-  images: { rel: string; alt: string }[];
+  images: { rel: string; alt: string; decor?: boolean }[];
   notes: string[]; // slugs anchored in it
   size: number; // the largest text run's, in half-points; 0 when unset
   bold: boolean; // every text run bold
   indent?: boolean; // set in from the left by hand, not as a list
   join?: boolean; // runs on into the next: a drop cap, a deleted paragraph mark
+  section?: boolean; // the last of a section
 }
 
 const on = (t: Tok) =>
@@ -73,6 +75,7 @@ function paragraphs(xml: string, sty: Map<string, Style>): Para[] {
   let carry: Para | null = null; // a paragraph that runs on into the next
   let owner: string | undefined;
   let skip = 0, inT = false, inPPr = false, italic = false, run = "";
+  let floating = false; // the picture sits behind or in front of the text
   let bold: boolean | undefined, size: number | undefined;
   type Open = {
     p: Para;
@@ -143,6 +146,7 @@ function paragraphs(xml: string, sty: Map<string, Style>): Para[] {
       p.indent ??= Number(a["w:left"] ?? a["w:start"] ?? 0) >= 360;
     } else if (inPPr && n === "w:numpr") p.indent = false;
     else if (inPPr && n === "w:del") p.join = true;
+    else if (inPPr && n === "w:sectpr") p.section = true;
     else if (inPPr && n === "w:framepr") {
       p.join ||= !!a["w:dropcap"] && a["w:dropcap"] !== "none";
     } else if (n === "w:pstyle") p.style = a["w:val"];
@@ -162,8 +166,14 @@ function paragraphs(xml: string, sty: Map<string, Style>): Para[] {
       const slug = `${n === "w:footnotereference" ? "fn" : "en"}-${a["w:id"]}`;
       run += `{footnote: ${slug}}`;
       p.notes.push(slug);
-    } else if (n === "wp:docpr") {
-      p.images.push({ rel: "", alt: a.descr || a.title || "" });
+    } else if (n === "wp:anchor" || n === "wp:inline") floating = false;
+    else if (n === "wp:wrapnone") floating = true;
+    else if (n === "wp:docpr") {
+      p.images.push({
+        rel: "",
+        alt: a.descr || a.title || "",
+        decor: floating,
+      });
     } else if (n === "a:blip" || n === "v:imagedata") {
       const rel = a["r:embed"] ?? a["r:id"] ?? "";
       const last = p.images.at(-1);
@@ -222,34 +232,40 @@ export function readDocx(name: string, files: Unzipped): Source {
 
   // A document with no heading styles marked its headings by hand: a short
   // line set larger than the body text, the largest size first, or in bold.
+  // One with them may still have set its volumes or parts that way.
   const paras = paragraphs(text("word/document.xml") ?? "", sty);
   const length = (p: Para) =>
     p.text.replace(/\{\/?em\}|\{footnote: [^}]*\}/g, "").trim().length;
   // A paragraph indented by hand is a block quote, unless most of them are.
   const texty = paras.filter(length);
   const indentQuotes = texty.filter((p) => p.indent).length * 3 < texty.length;
-  let byLook = (_: Para) => 0;
-  if (!paras.some((p) => kind(p).level)) {
-    const chars = new Map<number, number>();
-    for (const p of paras) {
-      chars.set(p.size, (chars.get(p.size) ?? 0) + length(p));
-    }
-    const body = [...chars].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
-    const larger = [...chars.keys()].filter((s) => s > body).sort((a, b) =>
-      b - a
-    );
-    byLook = (p) => {
-      const n = length(p);
-      if (!n || n > 100 || p.text.includes("\n")) return 0;
-      if (p.size > body) return larger.indexOf(p.size) + 1;
-      return p.bold ? larger.length + 1 : 0;
-    };
+  const chars = new Map<number, number>();
+  for (const p of paras) {
+    chars.set(p.size, (chars.get(p.size) ?? 0) + length(p));
   }
+  const body = [...chars].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
+  const larger = [...chars.keys()].filter((s) => s > body).sort((a, b) =>
+    b - a
+  );
+  const styled = paras.some((p) => kind(p).level);
+  const byLook = (p: Para) => {
+    const n = length(p);
+    if (!n || n > 100 || p.text.includes("\n")) return 0;
+    const marked = p.size > body || p.bold;
+    if (styled) {
+      const t = p.text.replace(/\{\/?em\}/g, "").trim();
+      return marked && n <= 40 && PART_KW.test(t) ? 1 : 0;
+    }
+    if (p.size > body) return larger.indexOf(p.size) + 1;
+    return p.bold ? larger.length + 1 : 0;
+  };
 
-  let titleStyled: string | undefined;
+  const title: string[] = [];
+  let titleDone = false;
   let toc = false;
   for (const p of paras) {
     for (const im of p.images) {
+      if (im.decor) continue; // an ornament laid over the page, not a plate
       const target = rels.get(im.rel);
       const data = target && files[`word/${target.replace(/^\/?word\//, "")}`];
       if (!target || !data) continue;
@@ -259,13 +275,14 @@ export function readDocx(name: string, files: Unzipped): Source {
       // generated") is no caption.
       const alt = /automatically generated/i.test(im.alt) ? "" : im.alt.trim();
       src.blocks.push({ kind: "image", src: src_, alt: esc(alt) });
+      titleDone ||= title.length > 0;
     }
     const lines = p.text.split("\n").map((l) => l.replace(/\s+/g, " ").trim())
       .filter((l) => l.replace(/\{\/?em\}/g, ""));
     if (!lines.length) continue;
     const joined = lines.join(" ").replace(/\{\/em\}(\s*)\{em\}/g, "$1");
-    const { is, level: styled } = kind(p);
-    const level = styled || byLook(p);
+    const { is, level: byStyle } = kind(p);
+    const level = byStyle || byLook(p);
     let b: Block;
     if (is(/^toc/)) {
       // Word's own contents list: drop it, once.
@@ -273,8 +290,13 @@ export function readDocx(name: string, files: Unzipped): Source {
       toc = true;
       continue;
     } else if (is(/^title$/)) {
-      titleStyled ??= joined.replace(/\{\/?em\}/g, "");
-      b = { kind: "para", text: joined };
+      // The book's title is the first run of Title lines; the house shape
+      // sets its own title pages. Google Docs writes each document tab's
+      // name as a Title line ending a section of its own: not text.
+      if (!p.section && !titleDone) {
+        title.push(joined.replace(/\{\/?em\}/g, "").replace(/\\\{/g, "{"));
+      }
+      continue;
     } else if (level) {
       // ponytail: a note on a heading is dropped with its anchor
       const text = joined.replace(/\{footnote: [^}]*\}/g, "");
@@ -284,6 +306,7 @@ export function readDocx(name: string, files: Unzipped): Source {
     else if (is(/quote|block text/) || (indentQuotes && p.indent)) {
       b = { kind: "quote", text: joined };
     } else b = { kind: "para", text: joined };
+    titleDone ||= title.length > 0;
     src.blocks.push(b);
     if (b.kind === "heading") continue;
     for (const slug of p.notes) {
@@ -292,6 +315,8 @@ export function readDocx(name: string, files: Unzipped): Source {
     }
   }
   // What the author typed in the Title style beats a stale document property.
-  if (titleStyled) src.title = titleStyled;
+  if (title.length) {
+    src.title = titleCase(title.join(" ")).replace(/[.;,:]$/, "");
+  }
   return src;
 }
