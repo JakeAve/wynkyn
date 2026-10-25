@@ -440,7 +440,10 @@ Deno.test("running heads anchor a gap above the text block (§4.8)", () => {
     css,
     `@top-right {\n    content: var(--running-off, "");\n    vertical-align: bottom;\n    padding-bottom: ${DEFAULT_HEAD_GAP};`,
   );
-  assertStringIncludes(css, `vertical-align: top;\n    padding-top: 4mm;`);
+  assertStringIncludes(
+    css,
+    `vertical-align: top;\n    padding-top: 4mm;`,
+  );
   const gapped = generatePagedCSS({
     running: {
       gap: "6mm",

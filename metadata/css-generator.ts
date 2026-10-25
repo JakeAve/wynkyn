@@ -174,7 +174,9 @@ export const DEFAULT_HEAD_GAP = "4mm";
 
 // Paged.js sizes a top/bottom margin box to the whole margin and centres its
 // content, so a head or folio would float at half the margin. Pin it to the
-// text block edge instead, `gap` away (§4.7, §4.8). Side boxes are untouched.
+// text block edge instead, `gap` away whatever its size: a head's baseline, a
+// foot's cap height (§4.7, §4.8). base.css trims the line to cap height and
+// baseline, so those are the content box's edges. Side boxes are untouched.
 function anchorToTextBlock(area: string, gap: string): CssProps {
   if (area.startsWith("top-")) {
     return { "vertical-align": "bottom", "padding-bottom": gap };
