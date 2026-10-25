@@ -28,14 +28,21 @@ interface Para {
   notes: string[]; // slugs anchored in it
   size: number; // the largest text run's, in half-points; 0 when unset
   bold: boolean; // every text run bold
+  indent?: boolean; // set in from the left by hand, not as a list
+  join?: boolean; // runs on into the next: a drop cap, a deleted paragraph mark
 }
 
 const on = (t: Tok) =>
   t.type === "open" && !["0", "false", "off"].includes(t.attrs["w:val"] ?? "");
 
-// Text boxes nest paragraphs inside a paragraph, and a Fallback repeats its
-// Choice; neither is the body text.
-const SKIP = new Set(["w:tbl", "w:txbxcontent", "mc:fallback", "w:movefrom"]);
+// A Fallback repeats its Choice, and a change record holds the old properties.
+const SKIP = new Set([
+  "w:tbl",
+  "mc:fallback",
+  "w:movefrom",
+  "w:pprchange",
+  "w:rprchange",
+]);
 
 function styles(xml: string | undefined): Map<string, Style> {
   const out = new Map<string, Style>();
@@ -58,13 +65,23 @@ function styles(xml: string | undefined): Map<string, Style> {
   return out;
 }
 
-/** Every paragraph of a document part, in order. */
+/** Every paragraph of a document part, in order; a text box's paragraphs
+ * come before the one it is anchored in. */
 function paragraphs(xml: string, sty: Map<string, Style>): Para[] {
   const out: Para[] = [];
   let p: Para | null = null;
+  let carry: Para | null = null; // a paragraph that runs on into the next
   let owner: string | undefined;
-  let skip = 0, inT = false, italic = false, run = "";
+  let skip = 0, inT = false, inPPr = false, italic = false, run = "";
   let bold: boolean | undefined, size: number | undefined;
+  type Open = {
+    p: Para;
+    run: string;
+    italic: boolean;
+    bold?: boolean;
+    size?: number;
+  };
+  const outer: Open[] = []; // paragraphs a text box is open inside
   /** A paragraph style's property, through `basedOn`. */
   const inherit = <K extends "bold" | "size">(id = "", k: K) => {
     for (
@@ -99,21 +116,36 @@ function paragraphs(xml: string, sty: Map<string, Style>): Para[] {
     if (skip) continue;
     if (t.type === "close") {
       if (n === "w:t") inT = false;
+      else if (n === "w:ppr") inPPr = false;
       else if (n === "w:r") endRun();
       else if (n === "w:p" && p) {
         endRun();
-        out.push(p);
+        if (p.join) carry = p;
+        else out.push(p);
         p = null;
+        const o = outer.pop();
+        if (o) ({ p, run, italic, bold, size } = o);
       }
       continue;
     }
     const a = t.attrs;
     if (n === "w:footnote" || n === "w:endnote") {
       owner = `${n === "w:footnote" ? "fn" : "en"}-${a["w:id"]}`;
-    } else if (n === "w:p") {
-      p = { owner, text: "", images: [], notes: [], size: 0, bold: true };
+    } else if (n === "w:p" && !t.self) {
+      if (p) outer.push({ p, run, italic, bold, size });
+      p = carry
+        ? { ...carry, join: false, size: 0, bold: true }
+        : { owner, text: "", images: [], notes: [], size: 0, bold: true };
+      carry = null;
     } else if (!p) continue;
-    else if (n === "w:pstyle") p.style = a["w:val"];
+    else if (n === "w:ppr") inPPr = !t.self;
+    else if (inPPr && n === "w:ind") {
+      p.indent ??= Number(a["w:left"] ?? a["w:start"] ?? 0) >= 360;
+    } else if (inPPr && n === "w:numpr") p.indent = false;
+    else if (inPPr && n === "w:del") p.join = true;
+    else if (inPPr && n === "w:framepr") {
+      p.join ||= !!a["w:dropcap"] && a["w:dropcap"] !== "none";
+    } else if (n === "w:pstyle") p.style = a["w:val"];
     else if (n === "w:outlinelvl") p.outline = Number(a["w:val"]);
     else if (n === "w:r") {
       italic = false, run = "", bold = undefined, size = undefined;
@@ -193,6 +225,9 @@ export function readDocx(name: string, files: Unzipped): Source {
   const paras = paragraphs(text("word/document.xml") ?? "", sty);
   const length = (p: Para) =>
     p.text.replace(/\{\/?em\}|\{footnote: [^}]*\}/g, "").trim().length;
+  // A paragraph indented by hand is a block quote, unless most of them are.
+  const texty = paras.filter(length);
+  const indentQuotes = texty.filter((p) => p.indent).length * 3 < texty.length;
   let byLook = (_: Para) => 0;
   if (!paras.some((p) => kind(p).level)) {
     const chars = new Map<number, number>();
@@ -246,8 +281,9 @@ export function readDocx(name: string, files: Unzipped): Source {
       b = { kind: "heading", level, text };
     } else if (BREAK.test(joined)) b = { kind: "break" };
     else if (lines.length >= 2) b = { kind: "verse", lines: balanceEm(lines) };
-    else if (is(/quote|block text/)) b = { kind: "quote", text: joined };
-    else b = { kind: "para", text: joined };
+    else if (is(/quote|block text/) || (indentQuotes && p.indent)) {
+      b = { kind: "quote", text: joined };
+    } else b = { kind: "para", text: joined };
     src.blocks.push(b);
     if (b.kind === "heading") continue;
     for (const slug of p.notes) {

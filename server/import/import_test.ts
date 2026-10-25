@@ -423,6 +423,56 @@ Deno.test("docx reader: without heading styles, large or bold lines are headings
   assertEquals(parse(res.manuscript).diagnostics, []);
 });
 
+Deno.test("docx reader: drop caps, deleted marks, indented quotes, text boxes", () => {
+  const r = (t: string) => `<w:r><w:t xml:space="preserve">${t}</w:t></w:r>`;
+  const doc =
+    `<w:p><w:pPr><w:framePr w:dropCap="drop" w:lines="3"/></w:pPr>${
+      r("O")
+    }</w:p><w:p/>` + `<w:p>${r("nce upon a time.")}</w:p>` +
+    `<w:p><w:pPr><w:rPr><w:del w:id="1"/></w:rPr></w:pPr>${
+      r("Joined ")
+    }</w:p><w:p>${r("on.")}</w:p>` +
+    `<w:p><w:pPr><w:ind w:left="1440"/></w:pPr>${r("Set in by hand.")}</w:p>` +
+    `<w:p><w:pPr><w:pPrChange><w:pPr><w:pStyle w:val="Heading1"/></w:pPr></w:pPrChange></w:pPr>${
+      r("Was a heading once.")
+    }</w:p>` +
+    `<w:p><w:r><w:drawing><wps:txbx><w:txbxContent><w:p><w:r><w:drawing><wp:docPr id="1" name="P"/><a:blip r:embed="rId1"/></w:drawing></w:r></w:p><w:p>${
+      r("A caption")
+    }</w:p></w:txbxContent></wps:txbx></w:drawing></w:r>${
+      r("After the box.")
+    }</w:p>`;
+  const res = importSource(
+    "box.docx",
+    zipSync({
+      "word/document.xml": strToU8(
+        `<w:document><w:body>${doc}</w:body></w:document>`,
+      ),
+      "word/styles.xml": strToU8(
+        `<w:styles><w:style w:styleId="Heading1"><w:name w:val="heading 1"/></w:style></w:styles>`,
+      ),
+      "word/_rels/document.xml.rels": strToU8(
+        `<Relationships><Relationship Id="rId1" Target="media/p.png"/></Relationships>`,
+      ),
+      "word/media/p.png": new Uint8Array([1]),
+    }),
+  );
+  const m = res.manuscript;
+  assertStringIncludes(m, "{dropcap}\nOnce upon a time.");
+  assertStringIncludes(m, "Joined on.");
+  assertStringIncludes(m, "{quote}\nSet in by hand.\n{/quote}");
+  assert(!m.includes("{heading}"), "a tracked change's old style is ignored");
+  assertStringIncludes(
+    m,
+    "{illustration: p | placement: full-page}\n\nA caption\n\nAfter the box.",
+  );
+  assertEquals(
+    Object.keys(res.images),
+    ["images/p.png"],
+    "no chapters, so not a cover",
+  );
+  assertEquals(parse(m).diagnostics, []);
+});
+
 Deno.test("structure: BOOK headings above chapters become parts", () => {
   const text = [
     "BOOK I",

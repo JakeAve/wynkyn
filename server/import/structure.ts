@@ -377,11 +377,14 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
       target().push({ kind: "heading", level: lvl, text: b.text, sub: b.sub });
       continue;
     }
-    if (!chapter && !body.length && b.kind === "image") {
-      coverImages++;
-      continue;
-    }
     target().push(b);
+  }
+
+  // Images before the first chapter are a cover or frontispiece; with no
+  // chapters at all they are the text's own, and stay.
+  if (body.length) {
+    coverImages = preamble.filter((b) => b.kind === "image").length;
+    preamble = preamble.filter((b) => b.kind !== "image");
   }
 
   // A part with text but no chapter headings under it keeps its text (a
