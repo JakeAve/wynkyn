@@ -156,8 +156,10 @@ Deno.test({
       assertEquals([...Deno.readDirSync(`${bookDir}/images`)].length, before);
 
       // A file dropped where nothing takes it (the tree) doesn't open in the
-      // tab: the window's guard cancels it.
-      const url = page.url();
+      // tab: the window's guard cancels it. The hash is left out: it follows
+      // the cursor on a debounce, so it can still be catching up here.
+      const address = () => page.url().split("#")[0];
+      const url = address();
       const guarded = await page.evaluate((png) => {
         const dt = new DataTransfer();
         const bytes = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
@@ -173,7 +175,7 @@ Deno.test({
         return !fire("dragover") && !fire("drop");
       }, PNG);
       assert(guarded, "the drop on the tree is cancelled");
-      assertEquals(page.url(), url);
+      assertEquals(address(), url);
     } finally {
       await browser.close();
       await server.stop();
