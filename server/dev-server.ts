@@ -313,6 +313,28 @@ export async function startServer(
       }
     }
 
+    // An image added from the page: the file's bytes as the body.
+    if ((p = m(/^\/api\/books\/([^/]+)\/images$/))) {
+      if (req.method === "GET") {
+        return Response.json({ images: await service.images(p[0]!) });
+      }
+      if (req.method === "POST") {
+        const filename = url.searchParams.get("filename");
+        if (!filename) {
+          return new Response("filename query required", { status: 400 });
+        }
+        return Response.json(
+          await service.addImage(
+            p[0]!,
+            filename,
+            new Uint8Array(await req.arrayBuffer()),
+            url.searchParams.get("slug") ?? undefined,
+          ),
+          { status: 201 },
+        );
+      }
+    }
+
     if ((p = m(/^\/api\/books\/([^/]+)\/editions$/))) {
       if (req.method === "GET") {
         return Response.json({ editions: await service.editions(p[0]!) });
@@ -379,11 +401,18 @@ export async function startServer(
     if (
       (p = m(/^\/books\/([^/]+)\/images\/([^/]+)$/)) && req.method === "GET"
     ) {
-      const data = await service.image(p[0]!, p[1]!);
+      // The name as written in the URL (`Orchard%201943.png`).
+      let name: string;
+      try {
+        name = decodeURIComponent(p[1]!);
+      } catch {
+        return new Response("bad path", { status: 400 });
+      }
+      const data = await service.image(p[0]!, name);
       return data === null
         ? new Response("not found", { status: 404 })
         : new Response(data, {
-          headers: { "content-type": contentType(p[1]!) },
+          headers: { "content-type": contentType(name) },
         });
     }
 

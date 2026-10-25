@@ -71,11 +71,16 @@ const metadata: Metadata = {
 };
 const baseCss = await Deno.readTextFile(new URL("./base.css", import.meta.url));
 // What the pipeline hands Paged.js for a manuscript + metadata.
-function build(manuscript: string, metadata: Metadata) {
+function build(
+  manuscript: string,
+  metadata: Metadata,
+  images: Record<string, string> = {},
+) {
   return {
     html: render(parse(manuscript), {
       numbering: metadata.numbering,
       notes: metadata.notes,
+      images,
     }),
     css: [
       baseCss,
@@ -180,12 +185,20 @@ Deno.test({
     withPage(async (page) => {
       const book = build(manuscript, metadata);
       const first = await pass(page, book, {});
-      assertEquals(first.result.problems, []);
+      // The plate has no image yet: a warning, nothing else.
+      const plateWarning = {
+        warn: true,
+        message: "an illustration has no image (plate)",
+      };
+      assertEquals(
+        // deno-lint-ignore no-explicit-any
+        first.result.problems.map(({ page: _, ...p }: any) => p),
+        [plateWarning],
+      );
       assertEquals(Object.keys(first.toc), ["matter-preface", "one", "two"]);
       assert(Object.values(first.toc).every((t) => t === "000"));
       const second = await pass(page, book, first.result.seed);
       const { map, seed, problems } = second.result;
-      assertEquals(problems, []);
       assertEquals(seed, first.result.seed); // settled in two passes
 
       assertEquals(second.margins.length, map.length);
@@ -210,6 +223,7 @@ Deno.test({
       // The plate (added outside the flow by plates.js) counts, unnumbered.
       const plate = map.findIndex((p, i) => i > one && p.display);
       assert(plate > one, "plate page in the body");
+      assertEquals(problems, [{ page: plate + 1, ...plateWarning }]);
       assertEquals(map[plate].folioText, "");
       assertEquals(map[plate + 1].folio, map[plate - 1].folio + 2);
       // An opener carries no running title; the page after it does.
@@ -551,5 +565,45 @@ Deno.test({
         { head: 4, folio: 5, capped: true },
         { head: 4, folio: 5, capped: true },
       ]);
+    }),
+});
+
+Deno.test({
+  name: "folios: a low-resolution image and a missing one are warnings",
+  ignore: !hasChrome,
+  fn: () =>
+    withPage(async (page) => {
+      // 100 px wide, laid out at its own 100 CSS px (1in = 96px): 96 dpi.
+      const png = await page.evaluate(() => {
+        const c = document.createElement("canvas");
+        c.width = 100;
+        c.height = 50;
+        return c.toDataURL("image/png");
+      });
+      const book = build(
+        [
+          "{chapter: one}",
+          "{title}",
+          "Chapter One",
+          "",
+          "{illustration: small}",
+          "A small picture",
+          "",
+          "{illustration: missing}",
+          "",
+          "The end.",
+        ].join("\n"),
+        metadata,
+        { small: png },
+      );
+      const { result } = await pass(page, book, {});
+      assertEquals(
+        // deno-lint-ignore no-explicit-any
+        (result.problems as any[]).map((p) => [p.warn, p.message]),
+        [
+          [true, "small prints at 96 dpi (300 looks sharp)"],
+          [true, "an illustration has no image (missing)"],
+        ],
+      );
     }),
 });

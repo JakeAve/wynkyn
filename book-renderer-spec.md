@@ -1657,7 +1657,11 @@ When `metadata.json` is present, the renderer:
 8. Resolves image slugs (`{illustration: slug}`, `{dropcap | image: slug}`)
    against the book's `images/` directory, trying `<slug>.svg`, `.png`, `.jpg`,
    `.jpeg`, `.webp` in that order and using the first match; an unresolved slug
-   renders a visible placeholder, not an error.
+   renders a visible placeholder, not an error:
+   `<div class="illustration-placeholder" data-slug="<slug>">` reading "No image
+   named <slug> yet" over "Click to add one". The copy is part of the render, so
+   a `bml export` proof prints it too, and the page map warns of it (§5.4); the
+   editor makes it a way to add the image (§7.6).
 9. Resolves `{ref: slug}` to the target's page number: the page map (§4.7)
    records the page each anchor lands on, and its folio is written into the
    `a.ref` link as text.
@@ -1843,9 +1847,15 @@ physical page where it has one:
 - the book's last anchor on no page — the render was cut short;
 - no fixed point after three passes.
 
-One check is a **warning**, listed with the rest but never blocking an export: a
-margin box (running head or folio) that runs to a second line, measured against
-the same box held to one line (§4.8).
+Some checks are **warnings**, listed with the rest but never blocking an export:
+
+- a margin box (running head or folio) that runs to a second line, measured
+  against the same box held to one line (§4.8);
+- an illustration whose image prints under 200 dpi at its laid-out size (its
+  pixel width over its width in CSS inches), as "<slug> prints at <N> dpi (300
+  looks sharp)"; vector art (SVG) has no resolution and is never warned;
+- an illustration with no image — its placeholder (§4.10 item 8) or a file that
+  won't load — as "an illustration has no image (<slug>)".
 
 Print export fails on any other problem, listing each as `page N: message`,
 before `book.pdf` is written; `bml export --force` prints them as warnings and
@@ -2017,6 +2027,30 @@ CodeMirror 6 over plain BML text.
     the selection.
   - Per-sentinel shortcuts remain (em ⌘E, chapter ⌘⇧C, heading ⌘⇧H, footnote
     ⌘⇧F, quote ⌘⇧Q, break ⌘⇧B), in Write only.
+- Image files dropped or pasted on the editor go in the book's `images/`
+  (`POST /api/books/:book/images`, named for the file, never over one already
+  there) and come back as `{illustration: slug}` / `Caption` blocks, one per
+  file in drop order, at the nearest paragraph break (for a paste, the end of
+  the cursor's paragraph), with a blank line either side and the first `Caption`
+  selected. While a file is dragged over the editor a line marks that break,
+  labelled "Drop to add an illustration here". The writer's footer says "Added
+  to the book's images as <name>", or why a file was refused ("Only PNG, JPEG,
+  WebP or SVG images can go in a book") and nothing goes in for it. A drag with
+  no files (moving text) is CodeMirror's own, and so is a paste that carries
+  text beside its files (Word and Pages copy a picture of the text with it). A
+  file dropped anywhere else in the app is ignored, never opened in the tab. The
+  image and the save that names it paginate once: the service holds a rebuild
+  for a change to `images/` alone a moment, and the next change to the book
+  takes it along.
+- In the slug of `{illustration: …}` or `{dropcap | image: …}`, completions list
+  the book's `images/` under "Images in this book": a small thumbnail, the slug,
+  and "Not in the text yet" for an image no `{illustration:}` or `image:` in the
+  manuscript names. The last row, "Add image from your computer…" ("Copies it
+  into the book's images folder"), opens a file picker (PNG, JPEG, WebP, SVG),
+  puts the file in `images/` as a drop does, and writes its slug; a refusal goes
+  to the writer's footer. After `placement:` in an `{illustration}` tag the list
+  offers `full-page` ("a page of its own") and `inline` ("in the text"), the
+  placements that lay out.
 
 ### 7.4 Sentinel Styling
 
@@ -2143,6 +2177,23 @@ is laid out, with a "Rendering pages… N" count at the pane's foot (the first
 load shows the count alone). The layout keeps going in a background tab. An
 update that arrives mid-render abandons that render and starts its own, so a run
 of edits costs one render after the last, not one per edit.
+
+An illustration whose image is missing shows its placeholder (§4.10 item 8). In
+Write, a click on it moves the editor's cursor to its line, as any page click
+does, then opens the file picker; a file dropped on it is taken too. Either way
+the file goes in `images/` under exactly the placeholder's slug (its extension
+from the file), and the rebuild shows the image. Any slug safe as a file name
+can be filled (`orchard.1943`, `Orchard 1943`); one that is empty, starts with
+`.`, or holds `/`, `\` or a control character is refused. A slug is taken only
+by a file the renderer can show (a `harbour.tif` doesn't block `harbour`). A
+taken slug or a refused type is reported in the footer note. In Style the
+placeholder is the illustration's style target like any other part.
+
+Every illustration under 200 dpi at its laid-out size, and every placeholder, is
+a page-map warning in the page problems (§5.4). While the editor's cursor is on
+an illustration — its `{illustration}` line or its caption line — the footer
+note says "Prints at N dpi here; 300 looks sharp", in the warning colour below
+200.
 
 ### 7.7 Page Setup & Print Imposition
 
@@ -2421,8 +2472,6 @@ Explicitly out of scope, to bound the work below:
 - Multi-user/collaborative real-time editing
 - Structural editing via drag-and-drop in the project tree (§7.2) — tree is
   navigation-only in v1
-- Image upload/management UI — `{illustration:}` slugs are assumed to resolve to
-  files the user places manually for now
 - Automated table-of-contents _authoring_ beyond what the renderer already
   generates from the tree (manual TOC entry per §3.4.6 remains available as a
   fallback)

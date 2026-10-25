@@ -11,11 +11,12 @@ import { hasChrome } from "../testing/chrome.ts";
 
 const ROOT = new URL("../testdata/", import.meta.url).pathname;
 const BOOKS = ["common-sense", "great-gatsby"];
-// Pages warned for a running head that runs to a second line (folios.js).
-// Common Sense's first chapter title is too long for a head until short
-// running titles exist.
-const WRAPPED_HEADS: Record<string, number[]> = {
+// Pages warned (folios.js). Common Sense's first chapter title is too long for
+// a running head until short running titles exist; Gatsby's mansion plate has
+// no image in the corpus, so it prints its placeholder.
+const WARNED: Record<string, number[]> = {
   "common-sense": [14, 16, 18],
+  "great-gatsby": [17],
 };
 
 interface Digest {
@@ -105,8 +106,8 @@ for (const book of BOOKS) {
       assertZonesOpenOnContent(book, result);
       assertEquals(
         report.problems.filter((p) => p.warn).map((p) => p.page),
-        WRAPPED_HEADS[book] ?? [],
-        `${book}: wrapped running heads`,
+        WARNED[book] ?? [],
+        `${book}: warnings`,
       );
       assert(report.passes <= 2, `${book}: took ${report.passes} passes`);
 

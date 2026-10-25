@@ -9,6 +9,7 @@ import {
   type BuildOptions,
   type BuildResult,
   contentVersion,
+  imageFiles,
   NotFoundError,
   type ServerMessage,
 } from "./pipeline.ts";
@@ -25,6 +26,13 @@ import {
   safeName,
 } from "./editions.ts";
 import type { BookStore } from "./store.ts";
+import {
+  freeSlug,
+  IMAGE_EXTS,
+  type ImageFile,
+  imageSlug,
+  safeImageName,
+} from "./images.ts";
 import { type EpubBytes, epubBytes } from "./epub-export.ts";
 
 /** A refused request; `status` is the HTTP status the dev server answers with. */
@@ -64,7 +72,7 @@ interface PendingMetaSave {
   text: string; // metadata serialized: what the write lands, unless...
   sections: object; // every section POSTed in this window, merged
   diskText: string | null; // ...the file moved on from this, its base
-  timer: number;
+  timer: ReturnType<typeof setTimeout> | undefined;
   cancelled?: boolean;
   write(): Promise<void>; // the debounced write; also run early by an export
 }
@@ -75,8 +83,9 @@ export class BookService {
   private readonly buildOpts: Pick<BuildOptions, "baseCss" | "imageUrl">;
   private readonly clients = new Set<Client>();
   // key → the tail of its work queue. Keys are a book (its manuscript: a
-  // save's check + write, a rename's token rewrite) or a metadata path (its
-  // writes); safeName keeps the two apart, a path always has a "/".
+  // save's check + write, a rename's token rewrite), a metadata path (its
+  // writes) or "<book>/images" (adds); safeName keeps a book apart from the
+  // others, a path always has a "/".
   private readonly chains = new Map<string, Promise<void>>();
   private readonly pendingMetaSaves = new Map<string, PendingMetaSave>();
   // EXPERIMENTAL (§3.2.9): book → edition renames whose {only} token a stale
@@ -88,6 +97,11 @@ export class BookService {
     { from: string; to: string; stale: Set<string> }[]
   >();
   private readonly stopWatch: (() => void) | undefined;
+  // book → a rebuild held back after a change to images/ alone (onChanged).
+  private readonly heldImages = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
 
   constructor(opts: ServiceOptions) {
     this.store = opts.store;
@@ -101,6 +115,7 @@ export class BookService {
   async stop(): Promise<void> {
     this.stopWatch?.();
     for (const p of this.pendingMetaSaves.values()) clearTimeout(p.timer);
+    for (const t of this.heldImages.values()) clearTimeout(t);
     await Promise.all(this.chains.values()); // writes under way land
     this.clients.clear();
   }
@@ -163,8 +178,27 @@ export class BookService {
   }
 
   image(book: string, file: string): Promise<Uint8Array<ArrayBuffer> | null> {
-    if (!safeName(book) || !safeName(file)) throw bad("bad path");
+    if (!safeName(book) || !safeImageName(file)) throw bad("bad path");
     return this.store.read(`${book}/images/${file}`);
+  }
+
+  /** The book's images in an accepted format, by slug. */
+  async images(book: string): Promise<ImageFile[]> {
+    checkNames(book, null);
+    await this.requireBook(book);
+    return Object.entries(await this.shownImages(book))
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+  }
+
+  // slug → file name, only the files the renderer can show: a harbour.tif
+  // neither lists nor takes the slug from a harbour.png.
+  private async shownImages(book: string): Promise<Record<string, string>> {
+    return Object.fromEntries(
+      Object.entries(await imageFiles(this.store, book)).filter(([, name]) =>
+        IMAGE_EXTS.includes(name.slice(name.lastIndexOf(".") + 1).toLowerCase())
+      ),
+    );
   }
 
   async metadata(
@@ -213,6 +247,45 @@ export class BookService {
       JSON.stringify({ words }, null, 2) + "\n",
     );
     return words;
+  }
+
+  /** Puts a file in the book's images/, named for its file name (or `slug`),
+   * never over an existing one. A slug is taken under any accepted extension:
+   * the resolver serves the first match, so a second would be shadowed (a
+   * file it can't show, harbour.tif, doesn't count). Without
+   * `slug` a taken name gets -2, -3, …; with one, a taken slug is a 409. */
+  async addImage(
+    book: string,
+    filename: string,
+    bytes: Uint8Array,
+    slug?: string,
+  ): Promise<ImageFile> {
+    checkNames(book, null);
+    const parsed = imageSlug(filename);
+    if (!parsed) {
+      throw new ServiceError(
+        415,
+        "Only PNG, JPEG, WebP or SVG images can go in a book",
+      );
+    }
+    if (slug !== undefined && !safeImageName(slug)) {
+      throw bad("bad image name");
+    }
+    // In the folder's queue, so two adds never pick the same free name.
+    return await this.serialize(`${book}/images`, async () => {
+      await this.requireBook(book);
+      const taken = new Set(Object.keys(await this.shownImages(book)));
+      if (slug !== undefined && taken.has(slug)) {
+        throw new ServiceError(409, "an image with that name is already there");
+      }
+      const name = `${slug ?? freeSlug(parsed.slug, taken)}.${parsed.ext}`;
+      const path = `${book}/images/${name}`;
+      if (!await this.store.create(path, bytes)) {
+        throw new ServiceError(409, "an image with that name is already there");
+      }
+      this.notify([path]);
+      return { slug: name.slice(0, -parsed.ext.length - 1), name };
+    });
   }
 
   /** A new book from a template's metadata; false when the slug is taken. */
@@ -535,7 +608,7 @@ export class BookService {
       text: serializeMeta(merged),
       sections: { ...existing?.sections, ...sections },
       diskText: existing ? existing.diskText : base.text,
-      timer: 0,
+      timer: undefined,
       write: () => {
         clearTimeout(save.timer);
         if (this.pendingMetaSaves.get(key) !== save) {
@@ -589,6 +662,7 @@ export class BookService {
   private onChanged(paths: string[]) {
     // book → set of affected editions; undefined marks "shared: everyone".
     const changed = new Map<string, Set<string | null | undefined>>();
+    const notImages = new Set<string>(); // books with a change outside images/
     for (const p of paths) {
       const [book, ...rest] = p.split("/");
       const change = book ? classifyChange(rest) : null;
@@ -596,8 +670,26 @@ export class BookService {
       let set = changed.get(book);
       if (!set) changed.set(book, set = new Set());
       set.add(change.kind === "shared" ? undefined : change.edition);
+      if (rest[0] !== "images") notImages.add(book);
     }
     for (const [book, editions] of changed) {
+      // An image dropped on the editor is followed by the manuscript save
+      // naming it: hold an images-only rebuild a moment so the two paginate
+      // once. Whatever comes next for the book takes the held one with it.
+      const held = this.heldImages.get(book);
+      clearTimeout(held);
+      this.heldImages.delete(book);
+      if (!notImages.has(book)) {
+        this.heldImages.set(
+          book,
+          setTimeout(() => {
+            this.heldImages.delete(book);
+            this.broadcast(book, undefined);
+          }, IMAGE_HOLD_MS),
+        );
+        continue;
+      }
+      if (held !== undefined) editions.add(undefined);
       if (editions.has(undefined)) this.broadcast(book, undefined);
       else for (const e of editions) this.broadcast(book, e);
     }
@@ -633,6 +725,9 @@ export class BookService {
     }
   }
 }
+
+// Longer than the editor's save debounce (600ms in app.ts) plus the watcher's.
+const IMAGE_HOLD_MS = 1200;
 
 // Metadata state is per edition; the manuscript's is per book.
 const metaKey = (book: string, edition: string | null) =>

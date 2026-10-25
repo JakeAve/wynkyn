@@ -154,11 +154,20 @@
   min-height: 0;
   object-fit: contain;
 }
+/* An unresolved slug (spec §4.10 item 8): two lines of copy, the second a
+   quieter hint. It prints in a proof too; the editor makes it a drop target. */
 .bml .illustration-placeholder {
   border: 1px dashed #999;
   padding: 2em;
   text-align: center;
   color: #777;
+}
+.bml .illustration-placeholder > span {
+  display: block;
+}
+.bml .illustration-placeholder > span:last-child {
+  font-size: 0.85em;
+  color: #999;
 }
 /* TOC rows (spec §3.4.6 / §4.11 item 10). Row = .entry so existing
    toc.entry styles keep applying to the whole line. Folio sits on the last

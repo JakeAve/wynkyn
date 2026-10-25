@@ -68,12 +68,30 @@ Deno.test({
       assertAlmostEquals(width / 72, imp.sheet.w, 0.01);
       assertAlmostEquals(height / 72, imp.sheet.h, 0.01);
 
-      // Print pages: every page in reading order at the page size.
-      await page.evaluate(() =>
-        document.documentElement.removeAttribute("data-printed")
-      );
+      // Print pages: every page in reading order at the page size. A picked
+      // and a highlighted element in the preview print without their marks.
+      await page.evaluate(() => {
+        document.documentElement.removeAttribute("data-printed");
+        const els = document.querySelectorAll(
+          "#preview > :not(.preview-stage) .pagedjs_page .bml p",
+        );
+        els[0]?.setAttribute("data-style-selected", "");
+        els[1]?.setAttribute("data-style-hl", "");
+      });
       await page.getByRole("button", { name: "Print pages" }).click();
       await page.locator("html[data-printed]").waitFor();
+      await page.emulateMedia({ media: "print" });
+      const marks = await page.evaluate(() =>
+        [
+          ...document.querySelectorAll(
+            "#print-sheets [data-style-selected], #print-sheets [data-style-hl]",
+          ),
+        ].map((el) => {
+          const s = getComputedStyle(el);
+          return `${s.outlineStyle} ${s.backgroundColor}`;
+        })
+      );
+      assertEquals(marks, ["none rgba(0, 0, 0, 0)", "none rgba(0, 0, 0, 0)"]);
       const pages = await PDFDocument.load(
         await page.pdf({ preferCSSPageSize: true, printBackground: true }),
       );

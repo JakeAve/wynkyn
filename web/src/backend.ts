@@ -12,6 +12,7 @@ import {
   themedTemplate,
 } from "../../server/book-service.ts";
 import type { BookStore } from "../../server/store.ts";
+import type { ImageFile } from "../../server/images.ts";
 import type { EpubResult } from "./style-catalog.ts";
 
 export interface Backend {
@@ -53,6 +54,12 @@ export interface Backend {
    * after. */
   dictionary(book: string): Promise<string[]>;
   addWord(book: string, word: string): Promise<string[]>;
+  /** The book's images, by slug (BookService.images). */
+  images(book: string): Promise<ImageFile[]>;
+  /** Puts the file in the book's images/ (BookService.addImage). */
+  addImage(book: string, file: File, slug?: string): Promise<ImageFile>;
+  /** Where the page shows an image, by its file name. */
+  imageUrl(book: string, name: string): Promise<string>;
   /** `from`: "default" or a named edition's slug. */
   createEdition(book: string, slug: string, from: string): Promise<void>;
   renameEdition(book: string, edition: string, slug: string): Promise<void>;
@@ -86,6 +93,8 @@ const metadataUrl = (book: string, edition: string | null) =>
     : `${editionsUrl(book)}/${encodeURIComponent(edition)}/metadata`;
 const dictionaryUrl = (book: string) =>
   `/api/books/${encodeURIComponent(book)}/dictionary`;
+const imagesUrl = (book: string) =>
+  `/api/books/${encodeURIComponent(book)}/images`;
 const query = (book: string, edition: string | null) =>
   `?book=${encodeURIComponent(book)}` +
   (edition === null ? "" : `&edition=${encodeURIComponent(edition)}`);
@@ -172,6 +181,19 @@ export function httpBackend(): Backend {
       post<{ words: string[] }>(dictionaryUrl(book), { word }).then((r) =>
         r.words
       ),
+    images: (book) =>
+      call<{ images: ImageFile[] }>(imagesUrl(book)).then((r) => r.images),
+    addImage: (book, file, slug) =>
+      call<ImageFile>(
+        `${imagesUrl(book)}?filename=${encodeURIComponent(file.name)}${
+          slug === undefined ? "" : `&slug=${encodeURIComponent(slug)}`
+        }`,
+        { method: "POST", body: file },
+      ),
+    imageUrl: (book, name) =>
+      Promise.resolve(
+        `/books/${encodeURIComponent(book)}/images/${encodeURIComponent(name)}`,
+      ),
     createEdition: (book, slug, from) =>
       post(editionsUrl(book), { slug, from }),
     renameEdition: (book, edition, slug) =>
@@ -235,22 +257,27 @@ export function localBackend(
   assets: { baseCss: string; template: string },
 ): Backend {
   const urls = new Map<string, string>(); // image path → object URL
+  async function imageUrl(book: string, name: string): Promise<string> {
+    const path = `${book}/images/${name}`;
+    let url = urls.get(path);
+    if (!url) {
+      const bytes = await store.read(path);
+      const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
+      // The name as a fragment (ignored on load): folios.js's printDpi tells
+      // vector art by its extension.
+      url = `${
+        URL.createObjectURL(
+          new Blob([bytes ?? new Uint8Array()], { type: IMAGE_TYPES[ext] }),
+        )
+      }#${name}`;
+      urls.set(path, url); // ponytail: never revoked; an added image gets a new name, never new bytes
+    }
+    return url;
+  }
   const service = new BookService({
     store,
     baseCss: assets.baseCss,
-    async imageUrl(book, name) {
-      const path = `${book}/images/${name}`;
-      let url = urls.get(path);
-      if (!url) {
-        const bytes = await store.read(path);
-        const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
-        url = URL.createObjectURL(
-          new Blob([bytes ?? new Uint8Array()], { type: IMAGE_TYPES[ext] }),
-        );
-        urls.set(path, url); // ponytail: never revoked; images don't change under the page
-      }
-      return url;
-    },
+    imageUrl,
   });
   return {
     kind: "local",
@@ -280,6 +307,15 @@ export function localBackend(
       service.build(book, edition, metadata),
     dictionary: (book) => service.dictionary(book),
     addWord: (book, word) => service.addWord(book, word),
+    images: (book) => service.images(book),
+    addImage: async (book, file, slug) =>
+      service.addImage(
+        book,
+        file.name,
+        new Uint8Array(await file.arrayBuffer()),
+        slug,
+      ),
+    imageUrl,
     createEdition: (book, slug, from) =>
       service.createEdition(book, slug, from === "default" ? null : from),
     renameEdition: (book, edition, slug) =>

@@ -348,15 +348,42 @@ function resolveStyle(
 
 // Where a click on the pages goes (spec §7.4): in Style, to the clicked
 // element's style; in Write, to its manuscript line (the nearest rendered
-// block's data-line). Furniture always goes to its style. A styled node is
-// outlined until the next pick or re-render; consumed clicks don't let the
-// TOC's links navigate. `catalog` is read per click — `is:` entries change
-// with the metadata.
+// block's data-line), and on an empty illustration placeholder then to
+// `addImage` with its slug (no file: the app opens the picker). A file dropped
+// on a placeholder in Write goes to `addImage` too (spec §7.6). Furniture
+// always goes to its style. A styled node is outlined until the next pick or
+// re-render; consumed clicks don't let the TOC's links navigate. `catalog` is
+// read per click — `is:` entries change with the metadata.
 export function installPreviewClicks(
   container: HTMLElement,
   catalog: () => StyleEntry[],
-  on: { mode(): Mode; style(key: string): void; source(line: number): void },
+  on: {
+    mode(): Mode;
+    style(key: string): void;
+    source(line: number): void;
+    addImage?(slug: string, file?: File): void;
+  },
 ): void {
+  // The slug of the live placeholder at or above `target`, in Write only.
+  const placeholder = (target: EventTarget | null) => {
+    if (on.mode() !== "write" || !(target instanceof Element)) return;
+    if (target.closest(".preview-stage")) return;
+    return target.closest<HTMLElement>(".illustration-placeholder")?.dataset
+      .slug;
+  };
+  container.addEventListener("dragover", (e) => {
+    if (!on.addImage || !placeholder(e.target)) return;
+    if (![...e.dataTransfer?.types ?? []].includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = "copy";
+  });
+  container.addEventListener("drop", (e) => {
+    const slug = placeholder(e.target);
+    const file = e.dataTransfer?.files[0];
+    if (!on.addImage || !slug || !file) return;
+    e.preventDefault();
+    on.addImage(slug, file);
+  });
   container.addEventListener("click", (e) => {
     const target = e.target as Element | null;
     const mode = on.mode();
@@ -377,6 +404,8 @@ export function installPreviewClicks(
     if (!line) return;
     e.preventDefault();
     on.source(line);
+    const slug = placeholder(target);
+    if (slug) on.addImage?.(slug);
   });
 }
 

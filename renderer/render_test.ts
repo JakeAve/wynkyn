@@ -385,7 +385,12 @@ Deno.test("illustration: resolved image vs visible placeholder (§4.11)", () => 
   const without = render(parse(src));
   assertStringIncludes(
     without,
-    '<div class="illustration-placeholder">[illustration: orchard]</div>',
+    '<div class="illustration-placeholder" data-slug="orchard">' +
+      "<span>No image named orchard yet</span><span>Click to add one</span></div>",
+  );
+  assertStringIncludes(
+    render(parse('{chapter: a}\n{illustration: a"b}')),
+    'data-slug="a&quot;b"><span>No image named a&quot;b yet</span>',
   );
 });
 
