@@ -91,3 +91,21 @@ Deno.test("images: list by slug; add names from the file, never overwrites", asy
     await Deno.remove(root, { recursive: true });
   }
 });
+
+Deno.test("importBook: a new book's images/ is made for its pictures", async () => {
+  const root = await Deno.makeTempDir();
+  const service = new BookService({ store: diskStore(root) });
+  try {
+    assertEquals(
+      await service.importBook("pics", "{}", {
+        manuscript: "{title}\nPics\n",
+        images: { "images/p.png": bytes("png") },
+      }),
+      true,
+    );
+    assertEquals(await Deno.readTextFile(`${root}/pics/images/p.png`), "png");
+  } finally {
+    await service.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});

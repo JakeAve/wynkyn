@@ -4,7 +4,7 @@
 // and again after a reload.
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { chromium } from "playwright";
-import { unzipSync } from "fflate";
+import { strToU8, unzipSync, zipSync } from "fflate";
 import { hasChrome } from "../../testing/chrome.ts";
 import { serveSite } from "../../scripts/serve-site.ts";
 
@@ -156,6 +156,117 @@ Deno.test({
     } finally {
       await browser.close();
       await site.shutdown();
+    }
+  },
+});
+
+// A Word file with a heading style, a picture and a footnote.
+const PNG = Uint8Array.from(
+  atob(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  ),
+  (c) => c.charCodeAt(0),
+);
+const docx = (): Uint8Array => {
+  const p = (body: string, style = "") =>
+    `<w:p>${
+      style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : ""
+    }${body}</w:p>`;
+  const r = (t: string) => `<w:r><w:t xml:space="preserve">${t}</w:t></w:r>`;
+  const chapter = (n: string) => p(r(`Chapter ${n}`), "Heading1");
+  return zipSync({
+    "word/document.xml": strToU8(
+      `<w:document><w:body>${
+        chapter("One") +
+        p(
+          r("A sentence with a note.") +
+            `<w:r><w:footnoteReference w:id="1"/></w:r>`,
+        ) +
+        p(`<w:r><w:drawing><wp:docPr id="1" name="P" descr="A dot"/><a:blip r:embed="rId1"/></w:drawing></w:r>`) +
+        chapter("Two") + p(r("The end of it."))
+      }</w:body></w:document>`,
+    ),
+    "word/styles.xml": strToU8(
+      `<w:styles><w:style w:styleId="Heading1"><w:name w:val="heading 1"/></w:style></w:styles>`,
+    ),
+    "word/footnotes.xml": strToU8(
+      `<w:footnotes><w:footnote w:id="1"><w:p>${
+        r("The note.")
+      }</w:p></w:footnote></w:footnotes>`,
+    ),
+    "word/_rels/document.xml.rels": strToU8(
+      `<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>`,
+    ),
+    "word/media/image1.png": PNG,
+  });
+};
+
+Deno.test({
+  name: "import a Word file: the typed title, its picture and its footnote " +
+    "reach the pages",
+  ignore: !hasChrome || !siteBuilt,
+  async fn() {
+    const site = serveSite(DIST, 0);
+    const browser = await chromium.launch({ channel: "chrome" });
+    const tmp = await Deno.makeTempDir();
+    const file = `${tmp}/Manuscript_final_v3.docx`;
+    await Deno.writeFile(file, docx());
+    try {
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${site.addr.port}/app/`);
+      await page.locator("#library[open]").waitFor();
+      await page.locator("#lib-browser").click();
+      await page.locator("#create[open]").waitFor();
+      await page.locator("#create-file").setInputFiles(file);
+      await page.locator("#title-dlg[open]").waitFor({ timeout: 5000 }).catch(
+        async (e) => {
+          throw new Error(
+            `${await page.locator("#create-err").innerText()} (${e})`,
+          );
+        },
+      );
+      assertEquals(
+        await page.locator("#title-input").inputValue(),
+        "Manuscript_final_v3",
+        "a Word file rarely names its title: the file name stands in",
+      );
+      await page.locator("#title-input").fill("The Long Way");
+      await page.locator("#title-ok").click();
+
+      await page.waitForURL(/book=the-long-way/, { timeout: 5000 }).catch(
+        async (e) => {
+          throw new Error(
+            `${await page.locator("#create-err").innerText()} (${e})`,
+          );
+        },
+      );
+      const live = "#preview > :not(.preview-stage) .pagedjs_page";
+      await page.locator(`${live} img`).first().waitFor();
+      const pages = page.locator(live);
+      assertEquals(
+        (await pages.first().innerText()).trim(),
+        "The Long Way",
+        "the typed title, not the file name, is the book's",
+      );
+      assert(
+        await page.locator(`${live} img`).first().evaluate((i) =>
+          (i as HTMLImageElement).naturalWidth > 0
+        ),
+        "the picture was saved with the book and loads",
+      );
+      const text = await page.locator("#preview > :not(.preview-stage)")
+        .innerText();
+      assertStringIncludes(text, "The note.");
+      const tree = await page.locator("#tree").innerText();
+      assert(
+        tree.includes("Chapter One") || tree.includes("one"),
+        `chapters from Heading 1: ${tree}`,
+      );
+      await page.close();
+    } finally {
+      await browser.close();
+      await site.shutdown();
+      await Deno.remove(tmp, { recursive: true });
     }
   },
 });

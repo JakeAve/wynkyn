@@ -44,10 +44,12 @@ export function readSource(name: string, bytes: Uint8Array): Source {
 export function importSource(
   name: string,
   bytes: Uint8Array,
-  { from, ...opts }: ImportOptions & { from?: string } = {},
+  { from, title, ...opts }: ImportOptions & { from?: string; title?: string } =
+    {},
 ): ImportResult {
   const src = readSource(name, bytes);
   src.from = from;
+  if (title) src.title = title; // the author's own, over the file's guess
   if (from) src.gutenberg ??= gutenbergNumber(from);
   const outline = structure(src, opts);
   const { manuscript, images } = emit(outline);
