@@ -485,30 +485,23 @@ summary {
   white-space: nowrap;
   display: flex;
   align-items: center;
-  gap: 6px;
 }
-#status::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--muted);
-}
+/* Saved is the quiet state: a check, no words (they stay for screen readers). */
 #status[data-kind="saved"] {
-  color: var(--ok);
+  font-size: 0;
 }
 #status[data-kind="saved"]::before {
-  background: var(--ok);
+  content: "";
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 #status[data-kind="error"],
 #status[data-kind="offline"],
 #status[data-kind="failed"] {
   color: var(--err);
-}
-#status[data-kind="error"]::before,
-#status[data-kind="offline"]::before,
-#status[data-kind="failed"]::before {
-  background: var(--err);
 }
 
 /* ---- panes ---- */

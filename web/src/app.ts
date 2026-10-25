@@ -137,8 +137,9 @@ function toStyle(next: string): void {
 }
 const $ = (id: string) => document.getElementById(id)!;
 
-// Author-facing status in the toolbar: a glyph + a short phrase, so it clears
-// the mode switch; the detail goes in the tooltip. "Saved" says how long ago.
+// Author-facing status in the toolbar: a short phrase, so it clears the mode
+// switch; the detail goes in the tooltip. "Saved" draws as a muted check (the
+// text stays for screen readers) and says when in the tooltip.
 type StatusKind =
   | "connecting"
   | "saved"
@@ -155,30 +156,21 @@ const STATUS_TEXT: Record<StatusKind, string> = {
   failed: "Couldn't load", // the app never got going; the title says why
 };
 let lastSaved: Date | null = null; // when a manuscript or metadata save last landed
-const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-
-function ago(then: Date): string {
-  const s = Math.round((Date.now() - then.getTime()) / 1000);
-  if (s < 5) return "just now";
-  if (s < 60) return rtf.format(-s, "second");
-  if (s < 3600) return rtf.format(-Math.floor(s / 60), "minute");
-  if (s < 86400) return rtf.format(-Math.floor(s / 3600), "hour");
-  return rtf.format(-Math.floor(s / 86400), "day");
-}
 
 function setStatus(kind: StatusKind, detail?: string): void {
   const el = $("status");
-  el.textContent = kind === "saved" && lastSaved
-    ? `Saved ${ago(lastSaved)}`
-    : STATUS_TEXT[kind];
+  el.textContent = STATUS_TEXT[kind];
   el.dataset.kind = kind;
-  el.title = kind === "saved" && lastSaved
-    ? `Saved at ${lastSaved.toLocaleTimeString()}`
-    : detail ?? "";
+  const at = lastSaved?.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  el.title = kind !== "saved"
+    ? detail ?? ""
+    : at
+    ? `Saved at ${at}`
+    : "All changes saved";
 }
-setInterval(() => {
-  if ($("status").dataset.kind === "saved") setStatus("saved");
-}, 1000);
 
 // A file dropped where nothing takes it (the editor and an empty placeholder
 // do) would open in the tab and lose unsaved edits. Bubbling, so it runs last.
