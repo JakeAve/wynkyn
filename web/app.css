@@ -1348,19 +1348,22 @@ summary {
   margin-top: 6px;
 }
 /* Click-to-style: hovered, highlighted ("on N pages") and picked
-   elements in the preview; the pick stays solid over the others */
-[data-style-hover],
-[data-style-hl] {
-  outline: 1px solid var(--hover-ring);
-  outline-offset: 3px;
-}
-[data-style-hl] {
-  background: var(--hl);
-}
-[data-style-selected],
-[data-edit-hl] {
-  outline: 1px solid var(--pick);
-  outline-offset: 3px;
+   elements in the preview; the pick stays solid over the others. Screen
+   only: print.ts clones the pages with these attributes on them. */
+@media screen {
+  [data-style-hover],
+  [data-style-hl] {
+    outline: 1px solid var(--hover-ring);
+    outline-offset: 3px;
+  }
+  [data-style-hl] {
+    background: var(--hl);
+  }
+  [data-style-selected],
+  [data-edit-hl] {
+    outline: 1px solid var(--pick);
+    outline-offset: 3px;
+  }
 }
 .pagedjs_page .bml *,
 .pagedjs_margin-content {
