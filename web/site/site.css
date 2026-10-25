@@ -42,8 +42,9 @@ footer {
 }
 header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
+  gap: .5rem 1rem;
   padding-top: 1.25rem;
   padding-bottom: 1.25rem;
   font-size: 15px;
@@ -65,6 +66,7 @@ header nav {
   gap: 1.25rem;
 }
 header nav a {
+  white-space: nowrap;
   color: var(--muted);
   text-decoration: none;
 }
