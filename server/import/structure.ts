@@ -52,7 +52,7 @@ export interface Outline {
   readings: Reading[];
 }
 
-const PART_KW = /^(book|part|volume)\b/i;
+export const PART_KW = /^(book|part|volume)\b/i;
 const CHAPTER_KW =
   /^(chapter|stave|letter|canto|act|scene|section|prologue|epilogue|interlude|conclusion|etymology|extracts)\b/i;
 const FRONT_KW =
@@ -188,6 +188,33 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
   };
   if (blocks.some((b) => b.kind === "toc")) dropped.add("its contents list");
   blocks = blocks.filter((b) => !isJunk(b));
+
+  // Lines ending in a dot leader and a page number are a contents list typed
+  // by hand: drop from the first to the last, and a Contents title before.
+  const LEADER = /((\.\s*){4,}|(…\s*){2,}|_{4,})\s*(\d+|[ivxlcdm]+)?\.?\s*$/i;
+  const lineText = (b: Block | undefined) =>
+    b?.kind === "para" || b?.kind === "heading" ? plain(b.text).trim() : null;
+  for (let i = 0; i < blocks.length; i++) {
+    if (!LEADER.test(lineText(blocks[i]) ?? "")) continue;
+    let last = i, n = 1;
+    for (let j = i + 1; j < blocks.length && j - last <= 3; j++) {
+      if (LEADER.test(lineText(blocks[j]) ?? "")) (last = j), n++;
+    }
+    if (n < 2) continue;
+    let start = i;
+    for (let k = i - 1; k >= i - 3; k--) {
+      if (/^(table of )?contents\.?$/i.test(lineText(blocks[k]) ?? "")) {
+        start = k;
+      }
+    }
+    for (const b of blocks.slice(i, last + 1)) {
+      const t = lineText(b)?.replace(LEADER, "").trim();
+      if (t) src.tocTitles.push(t);
+    }
+    blocks.splice(start, last - start + 1);
+    dropped.add("its contents list");
+    i = start - 1;
+  }
 
   // A run of heading-like lines whose texts recur later as headings is the
   // source's contents list, however it was marked up.
@@ -377,11 +404,14 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
       target().push({ kind: "heading", level: lvl, text: b.text, sub: b.sub });
       continue;
     }
-    if (!chapter && !body.length && b.kind === "image") {
-      coverImages++;
-      continue;
-    }
     target().push(b);
+  }
+
+  // Images before the first chapter are a cover or frontispiece; with no
+  // chapters at all they are the text's own, and stay.
+  if (body.length) {
+    coverImages = preamble.filter((b) => b.kind === "image").length;
+    preamble = preamble.filter((b) => b.kind !== "image");
   }
 
   // A part with text but no chapter headings under it keeps its text (a
@@ -481,7 +511,7 @@ export function structure(src: Source, opts: ImportOptions = {}): Outline {
   );
   const how = chapLevel === null
     ? "no split"
-    : src.name.match(/\.(epub|html?|xhtml)$/i)
+    : src.name.match(/\.(epub|html?|xhtml|docx)$/i)
     ? `level-${chapLevel} headings`
     : atChap.some((h) =>
         CHAPTER_KW.test(plain(h.text)) || LABEL.test(plain(h.text))

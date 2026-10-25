@@ -1642,7 +1642,10 @@ async function importPicked(
     dlg.close();
     const got = await askTitle(r.title, label, "Import");
     if (!got) return createManuscript(cancelable);
-    await backend.importBook(got.slug, r, got.theme);
+    const book = got.title === r.title
+      ? r
+      : importSource(src.name, bytes, { from: src.from, title: got.title });
+    await backend.importBook(got.slug, book, got.theme);
     location.href = editionHref(got.slug, null);
   } catch (e) {
     err.textContent = brief(e);

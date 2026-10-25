@@ -322,7 +322,11 @@ export class BookService {
     }
     for (const [path, data] of Object.entries(r.images)) {
       if (!/^images\/[^/]+$/.test(path)) throw bad("bad image path");
-      await this.store.write(`${book}/${path}`, data);
+      // create makes images/; write replaces a stray file already there
+      const file = `${book}/${path}`;
+      if (!await this.store.create(file, data)) {
+        await this.store.write(file, data);
+      }
     }
     this.notify([manuscript, meta]);
     return true;

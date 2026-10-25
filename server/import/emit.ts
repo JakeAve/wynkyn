@@ -151,6 +151,9 @@ export function emit(o: Outline, today = new Date()): Emitted {
         case "image":
           image(b);
           break;
+        case "note":
+          out.push(`{note: ${b.slug}}`, line(b.text));
+          break;
       }
       out.push("");
     }

@@ -10,7 +10,7 @@ const END = /\*\*\* ?END OF/i;
 export const KEYWORD =
   /^(chapter|part|book|stave|letter|canto|act|scene|section|prologue|epilogue|preface|introduction|foreword|afterword|appendix|etymology|extracts|dedication|contents|conclusion|interlude)\b/i;
 const NUMERAL = /^([IVXLCDM]+|\d+)\.?$/;
-const BREAK = /^(\*\s*){2,}$|^-{3,}$|^_{3,}$|^~{3,}$|^(•\s*){3,}$/;
+export const BREAK = /^(\*\s*){2,}$|^-{3,}$|^_{3,}$|^~{3,}$|^(•\s*){3,}$/;
 const MD_HEADING = /^(#{1,6})\s+(.+?)\s*#*$/;
 
 const isCaps = (t: string) =>

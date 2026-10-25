@@ -306,6 +306,220 @@ Deno.test("epub reader: package metadata, nav, spine order, images", () => {
   assertEquals(parse(r.manuscript).diagnostics, []);
 });
 
+Deno.test("docx reader: styles, italic runs, verse, notes, images, Word's contents", () => {
+  const W = `xmlns:w="w" xmlns:r="r" xmlns:a="a" xmlns:wp="wp"`;
+  const p = (style: string, runs: string) =>
+    `<w:p><w:pPr>${
+      style ? `<w:pStyle w:val="${style}"/>` : ""
+    }</w:pPr>${runs}</w:p>`;
+  const r = (t: string, i = false) =>
+    `<w:r>${
+      i ? "<w:rPr><w:i/></w:rPr>" : ""
+    }<w:t xml:space="preserve">${t}</w:t></w:r>`;
+  const chapter = (n: string, body: string) =>
+    p("Heading1", r(`Chapter ${n}`)) + body;
+  const files = {
+    "word/document.xml": strToU8(
+      `<?xml version="1.0"?><w:document ${W}><w:body>` +
+        p("Title", r("The Long Way")) +
+        p("TOC1", r("Chapter One")) + p("TOC1", r("Chapter Two")) +
+        chapter(
+          "One",
+          p("", r("It was ") + r("very", true) + r(" late", true) + r(".")) +
+            p(
+              "",
+              r("A note here.") +
+                `<w:r><w:footnoteReference w:id="2"/></w:r>`,
+            ) +
+            p("", r("* * *")) +
+            p("", "") + // a blank line for spacing
+            p(
+              "",
+              r("Roses are red,") + "<w:r><w:br/></w:r>" + r("violets {blue}."),
+            ) +
+            p("CustomQuote", r("Said the sage.")),
+        ) +
+        chapter(
+          "Two",
+          p("", r("Plain ") + r("{x}") + r(" text.")) +
+            p(
+              "",
+              `<w:r><w:drawing><wp:inline><wp:docPr id="1" name="Picture 1" descr="A map"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rId9"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`,
+            ) +
+            `<w:tbl><w:tr><w:tc>${
+              p("", r("In a table"))
+            }</w:tc></w:tr></w:tbl>`,
+        ) +
+        `</w:body></w:document>`,
+    ),
+    "word/styles.xml": strToU8(
+      `<w:styles ${W}><w:style w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style><w:style w:styleId="Title"><w:name w:val="Title"/></w:style><w:style w:styleId="TOC1"><w:name w:val="toc 1"/></w:style><w:style w:styleId="Quote"><w:name w:val="Quote"/></w:style><w:style w:styleId="CustomQuote"><w:name w:val="Sage"/><w:basedOn w:val="Quote"/></w:style></w:styles>`,
+    ),
+    "word/footnotes.xml": strToU8(
+      `<w:footnotes ${W}><w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote><w:footnote w:id="2"><w:p><w:r><w:footnoteRef/></w:r>${
+        r(" The ") + r("note", true) + r(" itself.")
+      }</w:p></w:footnote></w:footnotes>`,
+    ),
+    "word/_rels/document.xml.rels": strToU8(
+      `<Relationships><Relationship Id="rId9" Type="image" Target="media/image1.png"/></Relationships>`,
+    ),
+    "word/media/image1.png": new Uint8Array([1, 2, 3]),
+    "docProps/core.xml": strToU8(
+      `<cp:coreProperties xmlns:dc="dc"><dc:title>Old name</dc:title><dc:creator>C. Writer</dc:creator></cp:coreProperties>`,
+    ),
+  };
+  const res = importSource("long-way.docx", zipSync(files));
+  assertEquals(res.title, "The Long Way", "the Title style beats core.xml");
+  assertEquals(res.outline.src.author, "C. Writer");
+  const m = res.manuscript;
+  assertEquals(m.match(/^\{chapter: .*$/gm), [
+    "{chapter: chapter-one}",
+    "{chapter: chapter-two}",
+  ]);
+  assertStringIncludes(m, "It was {em}very late{/em}.");
+  assertStringIncludes(
+    m,
+    "A note here.{footnote: fn-2}\n\n{note: fn-2}\nThe {em}note{/em} itself.",
+  );
+  assertStringIncludes(m, "{break}");
+  assertStringIncludes(
+    m,
+    "{poem}\nRoses are red,\\\nviolets \\{blue}.\n{/poem}",
+  );
+  assertStringIncludes(m, "{quote}\nSaid the sage.\n{/quote}", "basedOn Quote");
+  assertStringIncludes(m, "Plain \\{x} text.");
+  assertStringIncludes(
+    m,
+    "{illustration: a-map | placement: full-page}\nA map",
+  );
+  assertEquals(Object.keys(res.images), ["images/a-map.png"]);
+  assert(!m.includes("In a table"));
+  assert(!m.includes("Old name"));
+  assertStringIncludes(m, "its contents list", "Word's contents dropped");
+  assertEquals(parse(m).diagnostics, []);
+});
+
+Deno.test("docx reader: without heading styles, large or bold lines are headings", () => {
+  const p = (t: string, rpr = "") =>
+    `<w:p><w:r><w:rPr>${rpr}</w:rPr><w:t>${t}</w:t></w:r></w:p>`;
+  const big = `<w:b/><w:sz w:val="48"/>`, body = `<w:sz w:val="24"/>`;
+  const doc = p("The Long Way", `<w:sz w:val="64"/>`) +
+    p("Chapter One", big) + p("A long first paragraph of the story.", body) +
+    p("A bold aside", `<w:b/>` + body) + p("More of the story.", body) +
+    p("Chapter Two", big) + p("The rest of the story, told plainly.", body);
+  const res = importSource(
+    "plain.docx",
+    zipSync({
+      "word/document.xml": strToU8(
+        `<w:document xmlns:w="w"><w:body>${doc}</w:body></w:document>`,
+      ),
+    }),
+  );
+  assertEquals(res.manuscript.match(/^\{chapter: .*$/gm), [
+    "{chapter: chapter-one}",
+    "{chapter: chapter-two}",
+  ]);
+  assertStringIncludes(res.manuscript, "{heading}\nA bold aside");
+  assertEquals(parse(res.manuscript).diagnostics, []);
+});
+
+Deno.test("docx reader: drop caps, deleted marks, indented quotes, text boxes", () => {
+  const r = (t: string) => `<w:r><w:t xml:space="preserve">${t}</w:t></w:r>`;
+  const doc =
+    `<w:p><w:pPr><w:framePr w:dropCap="drop" w:lines="3"/></w:pPr>${
+      r("O")
+    }</w:p><w:p/>` + `<w:p>${r("nce upon a time.")}</w:p>` +
+    `<w:p><w:pPr><w:rPr><w:del w:id="1"/></w:rPr></w:pPr>${
+      r("Joined ")
+    }</w:p><w:p>${r("on.")}</w:p>` +
+    `<w:p><w:pPr><w:ind w:left="1440"/></w:pPr>${r("Set in by hand.")}</w:p>` +
+    `<w:p><w:pPr><w:pPrChange><w:pPr><w:pStyle w:val="Heading1"/></w:pPr></w:pPrChange></w:pPr>${
+      r("Was a heading once.")
+    }</w:p>` +
+    `<w:p><w:r><w:drawing><wps:txbx><w:txbxContent><w:p><w:r><w:drawing><wp:docPr id="1" name="P"/><a:blip r:embed="rId1"/></w:drawing></w:r></w:p><w:p>${
+      r("A caption")
+    }</w:p></w:txbxContent></wps:txbx></w:drawing></w:r>${
+      r("After the box.")
+    }</w:p>`;
+  const res = importSource(
+    "box.docx",
+    zipSync({
+      "word/document.xml": strToU8(
+        `<w:document><w:body>${doc}</w:body></w:document>`,
+      ),
+      "word/styles.xml": strToU8(
+        `<w:styles><w:style w:styleId="Heading1"><w:name w:val="heading 1"/></w:style></w:styles>`,
+      ),
+      "word/_rels/document.xml.rels": strToU8(
+        `<Relationships><Relationship Id="rId1" Target="media/p.png"/></Relationships>`,
+      ),
+      "word/media/p.png": new Uint8Array([1]),
+    }),
+  );
+  const m = res.manuscript;
+  assertStringIncludes(m, "{dropcap}\nOnce upon a time.");
+  assertStringIncludes(m, "Joined on.");
+  assertStringIncludes(m, "{quote}\nSet in by hand.\n{/quote}");
+  assert(!m.includes("{heading}"), "a tracked change's old style is ignored");
+  assertStringIncludes(
+    m,
+    "{illustration: p | placement: full-page}\n\nA caption\n\nAfter the box.",
+  );
+  assertEquals(
+    Object.keys(res.images),
+    ["images/p.png"],
+    "no chapters, so not a cover",
+  );
+  assertEquals(parse(m).diagnostics, []);
+});
+
+Deno.test("docx reader: a Google Docs export's tab names, title lines, typed contents, hand-set volumes, ornaments", () => {
+  const r = (t: string, rpr = "") =>
+    `<w:r><w:rPr>${rpr}</w:rPr><w:t xml:space="preserve">${t}</w:t></w:r>`;
+  const p = (body: string, ppr = "") =>
+    `<w:p><w:pPr>${ppr}</w:pPr>${body}</w:p>`;
+  const style = (s: string) => `<w:pStyle w:val="${s}"/>`;
+  const tab = (name: string) => p(r(name), style("Title") + "<w:sectPr/>");
+  const ornament =
+    `<w:r><w:drawing><wp:anchor><wp:wrapNone/><wp:docPr id="1" name="o"/><a:blip r:embed="rId1"/></wp:anchor></w:drawing></w:r>`;
+  const volume = (n: string) =>
+    tab(`Vol ${n}`) + p(ornament) +
+    p(r(`Volume ${n}.`, `<w:sz w:val="180"/>`));
+  const chapter = (n: string) =>
+    p(r(`CHAPTER ${n}.`), style("Heading1")) +
+    p(r("Text of the chapter, long enough to be the body of the book."));
+  const doc = tab("Title Pages") + p(r("THE LONG"), style("Title")) +
+    p(r("WAY."), style("Title")) +
+    p(r("by A. Writer")) + p(r("Contents")) +
+    p(r("Chapter I……………………3")) + p(r("Chapter II……………….")) +
+    volume("I") + chapter("I") + chapter("II") + volume("II") + chapter("I") +
+    chapter("II");
+  const res = importSource(
+    "Long Way.docx",
+    zipSync({
+      "word/document.xml": strToU8(
+        `<w:document><w:body>${doc}</w:body></w:document>`,
+      ),
+      "word/styles.xml": strToU8(
+        `<w:styles><w:style w:styleId="Title"><w:name w:val="Title"/></w:style><w:style w:styleId="Heading1"><w:name w:val="heading 1"/></w:style></w:styles>`,
+      ),
+      "word/_rels/document.xml.rels": strToU8(
+        `<Relationships><Relationship Id="rId1" Target="media/o.png"/></Relationships>`,
+      ),
+      "word/media/o.png": new Uint8Array([1]),
+    }),
+  );
+  const m = res.manuscript;
+  assertEquals(res.title, "The Long Way", "the Title lines, joined");
+  assert(!/Title Pages|Vol I\b/.test(m), "tab names are not text");
+  assert(!m.includes("……"), "the typed contents is dropped");
+  assertStringIncludes(m, "its contents list");
+  assertEquals(m.match(/^\{(part|chapter): .*$/gm)?.length, 6);
+  assertEquals(m.match(/^\{part: .*$/gm)?.length, 2, "volumes set by hand");
+  assertEquals(Object.keys(res.images), [], "ornaments are not plates");
+  assertEquals(parse(m).diagnostics, []);
+});
+
 Deno.test("structure: BOOK headings above chapters become parts", () => {
   const text = [
     "BOOK I",

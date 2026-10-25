@@ -2,7 +2,7 @@
 // package document for metadata, manifest and spine, the nav document (or
 // NCX) for the book's own contents, then every spine item through the HTML
 // reader. Images are collected by the `src` the blocks reference.
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8, type Unzipped } from "fflate";
 import { gutenbergNumber, type Source } from "./blocks.ts";
 import { readHtml } from "./html.ts";
 import { textOf, tokenize } from "./xml.ts";
@@ -35,8 +35,7 @@ function innerTexts(doc: string, tag: string): string[] {
   return out;
 }
 
-export function readEpub(name: string, bytes: Uint8Array): Source {
-  const files = unzipSync(bytes);
+export function readEpub(name: string, files: Unzipped): Source {
   const text = (p: string) => files[p] ? strFromU8(files[p]!) : undefined;
   const container = text("META-INF/container.xml") ?? "";
   const rootfile = tokenize(container).find((t) =>
