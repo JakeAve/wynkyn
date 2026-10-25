@@ -31,12 +31,13 @@ Deno.test({
     const editions = () =>
       [...Deno.readDirSync(`${dir}/editions`)].map((e) => e.name).sort();
     const until = async (ok: () => Promise<boolean>, what: string) => {
-      for (let i = 0; i < 100 && !await ok(); i++) {
+      for (let i = 0; i < 100; i++) {
+        if (await ok()) return;
         await new Promise((r) => setTimeout(r, 100));
       }
       assert(await ok(), what);
     };
-    // The body face of the pages on screen, once no render is staged.
+    // No render staged and the pages not dimmed.
     const settled = async (page: Page) => {
       await page.locator("#preview .preview-stage").waitFor({
         state: "detached",
@@ -47,9 +48,17 @@ Deno.test({
         timeout: 30_000,
       });
     };
+    // The body face of the pages on screen, or "" while a render is under
+    // way: Paged.js puts the staged render's sheets in the document, so the
+    // pages on screen take its look mid-render and lose it between passes.
     const liveFont = (page: Page) =>
-      page.locator("#preview > :not(.preview-stage) .pagedjs_page p").first()
-        .evaluate((p) => getComputedStyle(p).fontFamily);
+      page.locator("#preview").evaluate((el) => {
+        if ("stale" in el.dataset || el.querySelector(".preview-stage")) {
+          return "";
+        }
+        const p = el.querySelector(".pagedjs_page p");
+        return p ? getComputedStyle(p).fontFamily : "";
+      });
     const liveText = (page: Page) =>
       page.locator("#preview > :not(.preview-stage)").first().innerText();
     try {
