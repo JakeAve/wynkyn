@@ -149,6 +149,15 @@ Deno.test({
       assert(
         (await page.locator("#preview").innerText()).includes("Chapter One"),
       );
+      // The crumb starts with the library: this browser, and its warning.
+      assertEquals(
+        await page.locator("#library-name").textContent(),
+        "This browser",
+      );
+      assertStringIncludes(
+        (await page.locator("#library-open").getAttribute("title")) ?? "",
+        "download a book to keep it",
+      );
       // Dismissed once, the notice stays away.
       await page.reload();
       await page.locator('#status[data-kind="saved"]').waitFor();
@@ -404,7 +413,21 @@ Deno.test({
         )
       );
       await page.keyboard.press("Escape"); // the switcher covers the toolbar
-      await page.locator("#library-open").click();
+      // The crumb's first step names the folder, and says where in its title.
+      const lib = page.locator("#library-open");
+      assertEquals(
+        await page.locator("#library-name").textContent(),
+        "My Books",
+      );
+      assertEquals(
+        await page.locator("#library-icon").getAttribute("href"),
+        "#where-folder",
+      );
+      assertStringIncludes(
+        (await lib.getAttribute("title")) ?? "",
+        "“My Books”",
+      );
+      await lib.click();
       await page.locator("#library[open]").waitFor();
       assertStringIncludes(
         (await page.locator("#lib-reopen").textContent()) ?? "",

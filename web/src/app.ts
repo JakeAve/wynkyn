@@ -643,7 +643,9 @@ function installSwitcher(): void {
   for (const b of crumbs) {
     b.onclick = () => {
       search.value = "";
-      dialog.style.left = `${$("crumb").getBoundingClientRect().left}px`;
+      dialog.style.left = `${
+        $("book-switcher").getBoundingClientRect().left
+      }px`;
       dialog.showModal();
       for (const c of crumbs) c.setAttribute("aria-expanded", "true");
       search.focus();
@@ -678,21 +680,40 @@ function installSwitcher(): void {
       $("book-err").textContent = brief(err);
     }
   };
-  // Where the library lives, and the way to a different one: forget the
-  // choice and pick again on the next load.
+  // Where the library lives, in the switcher's foot and as the crumb's first
+  // step, which is the way to a different one: forget the choice and pick
+  // again on the next load. The dev server's books/ has no other to pick.
   const note = $("library-note");
+  const lib = $("library-open");
   const pref = localStorage.getItem("library");
-  note.hidden = backend.kind !== "local";
+  note.hidden =
+    lib.hidden =
+    $("library-slash").hidden =
+      backend.kind !== "local";
+  const where = (icon: string, name: string, about: string, title: string) => {
+    $("library-icon").setAttribute("href", `#${icon}`);
+    $("library-name").textContent = name;
+    lib.title = title;
+    lib.ariaLabel = `Library: ${name}. Change library`;
+    note.textContent = about;
+  };
   if (pref === "browser") {
-    note.textContent = "Kept in this browser only. Browsers clear site " +
-      "storage without asking, so download a book to keep it.";
+    const about = "Kept in this browser only. Browsers clear site storage " +
+      "without asking, so download a book to keep it.";
+    where("where-browser", "This browser", about, about);
   } else if (pref === "folder") {
     note.textContent = "Loading…";
     rememberedFolder().then((dir) => {
-      note.textContent = `Books in the “${dir?.name}” folder on this device.`;
+      const about = `Books in the “${dir?.name}” folder on this device.`;
+      where(
+        "where-folder",
+        dir?.name ?? "",
+        about,
+        `${about} Click to change.`,
+      );
     });
   }
-  $("library-open").onclick = () => {
+  lib.onclick = () => {
     localStorage.removeItem("library");
     location.href = location.pathname;
   };

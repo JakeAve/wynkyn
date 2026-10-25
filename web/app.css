@@ -184,6 +184,18 @@ summary {
 #crumb .btn[aria-expanded="true"] {
   background: var(--hover);
 }
+/* The library, the crumb's first step: muted, so the book title leads. */
+#crumb #library-open:not(:hover) {
+  color: var(--muted);
+}
+#crumb #library-open[hidden] {
+  display: none;
+}
+#library-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 #book-name {
   font-weight: 600;
   letter-spacing: -.01em;
