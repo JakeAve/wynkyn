@@ -47,7 +47,7 @@ Visual references (private artifacts; this document stands without them):
 2. **As minimal or as powerful as you need.** Every pane opens in its simple
    form; depth is one control away in the pane it belongs to, never a separate
    screen. Power is ordered, not hidden.
-3. **One red.** A single red-orange printer's ink (minium) marks structure,
+3. **One red.** A single vermilion-red printer's ink (minium) marks structure,
    position and the one action that matters. Everything else is ink on paper.
 4. **Plain words first, winks second.** Every label is the plain word. The
    period flavour lives in glyphs, small caps, tooltips, status lines and empty
@@ -83,13 +83,13 @@ possible later; it is not a setting.
 
 ### 2.2 The red: minium
 
-Red lead, the orange-red of early printed rubrics. Two strengths, because the
+Red lead, the vermilion-red of early printed rubrics. Two strengths, because the
 bright pigment is too light to carry small text.
 
 | Token        | Use                                  | Light                    | Dark        |
 | ------------ | ------------------------------------ | ------------------------ | ----------- |
-| `--acc`      | marks and fills: cursor, dots, rules | `#e2582b`                | `#f58a5f`   |
-| `--acc-ink`  | red text, red icons                  | `#b53e18`                | `#f8a07a`   |
+| `--acc`      | marks and fills: cursor, dots, rules | `#d93a24`                | `#f0705c`   |
+| `--acc-ink`  | red text, red icons                  | `#b02a17`                | `#f59384`   |
 | `--acc-wash` | the selected thing's background      | `--acc` 10%, transparent | `--acc` 16% |
 | `--acc-btn`  | primary button fill                  | `--acc-ink`              | `--acc`     |
 | `--on-acc`   | text on the primary button           | `#ffffff`                | `--bg`      |
@@ -640,7 +640,7 @@ Out of scope unless asked: illustrations, woodcut empty states, blackletter.
 ## 10. The mark
 
 The existing sun (`web/brand/mark.svg`), rays and disc, drawn in `--acc`: the
-SVG sets its own `color` (`#e2582b`, `#f58a5f` under
+SVG sets its own `color` (`#d93a24`, `#f0705c` under
 `prefers-color-scheme:
 dark`), since an `<img>` or favicon cannot read the
 page's tokens. Favicon and app icons keep their artwork until re-exported in
