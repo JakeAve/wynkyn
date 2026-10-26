@@ -403,7 +403,12 @@ function printSection(
     });
   };
   const btn = (label: string, mode: "duplex" | "fronts" | "backs") => {
-    const b = el("button", "tog primary", label);
+    // One primary on a screen: Print sheets.
+    const b = el(
+      "button",
+      mode === "duplex" ? "tog primary" : "tog outline",
+      label,
+    );
     b.type = "button";
     b.onclick = () => run(mode);
     return b;
@@ -469,7 +474,7 @@ function pageSizeRow(ctx: PanelContext, page: PageConfig): HTMLElement {
 function pagesSection(ctx: PanelContext): HTMLElement {
   const status = el("div", "export-status");
   status.setAttribute("aria-live", "polite");
-  const btn = el("button", "tog primary", "Print pages");
+  const btn = el("button", "tog outline", "Print pages");
   btn.type = "button";
   btn.onclick = () => {
     status.replaceChildren();
@@ -499,7 +504,7 @@ function pagesSection(ctx: PanelContext): HTMLElement {
 function ebookSection(ctx: PanelContext): HTMLElement {
   const status = el("div", "export-status");
   status.setAttribute("aria-live", "polite");
-  const btn = el("button", "tog primary", "Export EPUB");
+  const btn = el("button", "tog outline", "Export EPUB");
   btn.type = "button";
   btn.onclick = async () => {
     btn.disabled = true;

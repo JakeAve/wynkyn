@@ -335,7 +335,7 @@ same radius; no clip-path imitation.
 **Depth:** shadows only under pages (`--page-shadow`), popovers (`--shadow-pop`)
 and dialogs (`--shadow-dlg` over `--backdrop`).
 
-## 6. Components (planned)
+## 6. Components
 
 The sheet (`components.html`) shows each in every state. They are built from
 `web/src/panel-controls.ts` primitives (`h`, `icon`, `stepper`, `seg`,
@@ -347,7 +347,7 @@ States, everywhere: **hover** `--hover` wash; **focus** 2px `--acc` ring offset
 pressed** `--acc-wash` + `--acc-ink`; **disabled** 45% opacity, no pointer
 events.
 
-### 6.1 Button (planned)
+### 6.1 Button
 
 | Variant | Look                                                                                                                           |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -362,7 +362,14 @@ events.
 Ink's inverted black pill is gone everywhere. Labels are one line
 (`white-space: nowrap`); text that may wrap is not a button.
 
-### 6.2 Segmented control (`seg`) (planned)
+In `web/app.css`: `.btn` is the ghost and `.btn.primary` the primary, anywhere.
+Inside the style panel a `toggle` (`.tog`) keeps a 1px `--line` frame so it
+reads as a control beside the fields, and drops it for the wash when pressed;
+`.tog.primary` and `.tog.outline` (`--fg` text) are the panel's actions, e.g.
+Publish's one primary "Print sheets" beside the outlined "Print pages" and
+"Export EPUB". The small, large and icon classes arrive with their first use.
+
+### 6.2 Segmented control (`seg`)
 
 One choice among two to five. A 1px `--line` frame with `--s-1` inset; segments
 `--h-md` minus the inset, `--muted`; the chosen one takes the red wash.
@@ -370,7 +377,7 @@ Variants: icon segments (square), small (`--h-sm`, pane headers), and the
 toolbar's mode switch (the same control). `role="radiogroup"`, `aria-checked`.
 `allowNone` lets a click on the chosen segment clear it.
 
-### 6.3 Fields (planned)
+### 6.3 Fields
 
 - **Frame:** `--h-md`, 1px `--line` on `--bg`, `--r` + corner. Focus: border
   `--acc` plus a 1px `--acc` ring.
@@ -378,32 +385,37 @@ toolbar's mode switch (the same control). `role="radiogroup"`, `aria-checked`.
   centred in tabular figures (about 3.25rem), the unit beside it in `--fs-xs`
   `--muted` (a select when the unit can change). Steps stay 0.5pt / 0.05em /
   1mm; units are never converted.
-- **Select:** native `<select>`, custom chevron, padding-right `--s-7`.
+- **Select:** native `<select>`, custom chevron (a mid-grey stroke that reads on
+  both papers), padding-right `--s-7`.
 - **Text and search:** the same frame; search has a leading icon.
 - **Code** (More CSS): `--f-hivis` `--fs-sm`, at least 5.5rem tall, resizes
   vertically.
-- **Inherited value:** text `--muted` and italic; the row names the source
-  (§6.5).
+- **Inherited value:** text `--muted` and italic (a stepper shows it as its
+  placeholder); the row names the source (§6.5).
 
-### 6.4 Switch (planned)
+### 6.4 Switch
 
 `switchInput`: a checkbox with `role="switch"`. 1.875 × 1.0625rem pill, `--line`
-off, `--acc` on, white knob with a 1px shadow, 120ms slide. Always a pill,
-whatever the corner shape.
+off, `--acc` on, a `--paper` knob with a 1px shadow, `--t-fast` slide. Always a
+pill, whatever the corner shape.
 
-### 6.5 Panel: view heading, section, row (planned)
+### 6.5 Panel: view heading, section, row
 
-- **View heading:** crumb (`--fs-xs`, `--muted`) over the heading in Fell
-  `--fs-h`, with "On N pages" right-aligned (`--fs-xs`, dotted underline;
-  hovering outlines every match). A hairline below.
+- **View heading:** crumb (the nav group, `--fs-xs`, `--muted`) over the heading
+  in Fell `--fs-h`, with "On N pages" right-aligned (`--fs-xs`, dotted
+  underline; hovering outlines every match, a click steps through them). A
+  hairline below. `applies` in `panel-controls.ts` makes "On N pages"; a view
+  with just one shows it in the heading, a view of several elements (an opener's
+  number and title) keeps one at each section label's right.
 - **Section** (`section`): `--s-5` vertical padding, a hairline below, a
-  small-caps group label, and the view's Reset as a small icon button at the
-  label's right when the section has set values.
+  small-caps group label. (planned: the view's Reset as a small icon button at
+  the label's right when the section has set values; today it sits at the view's
+  foot beside "N settings in this book".)
 - **Row** (`row`): label column 8.5rem, control left-aligned in the rest,
-  `--h-md` minimum, `--s-4` gap. A 6px `--acc` dot before the label marks a
+  `--h-md` minimum, `--s-4` gap. A 0.375rem `--acc` dot before the label marks a
   value this view set; an inherited value's label carries "from Body text" in
   `--fs-xs` `--muted` beneath.
-- **Tip line:** a red ☞ in Fell before `--fs-sm` `--muted` text.
+- **Tip line** (planned): a red ☞ in Fell before `--fs-sm` `--muted` text.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.
 

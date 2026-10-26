@@ -44,7 +44,7 @@ summary {
   outline: none;
 }
 
-/* ---- shared control look: borderless ghosts ---- */
+/* ---- shared control look: borderless ghosts (design-language.md §6.1) ---- */
 .btn,
 #config-overlay button {
   background: none;
@@ -55,6 +55,15 @@ summary {
   padding: var(--s-3) var(--s-4);
   cursor: pointer;
   white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: var(--h-md);
+  padding-block: 0;
 }
 .btn:hover,
 #config-overlay button:hover {
@@ -63,6 +72,23 @@ summary {
 }
 .btn[aria-pressed="true"] {
   color: var(--fg);
+}
+.btn:disabled {
+  opacity: .45;
+  pointer-events: none;
+}
+/* The one primary action on a screen: the --acc-btn fill. */
+.btn.primary,
+#config-overlay :is(.btn, .tog).primary {
+  background: var(--acc-btn);
+  color: var(--on-acc);
+  font-weight: 600;
+  padding-inline: var(--s-5);
+}
+.btn.primary:hover,
+#config-overlay :is(.btn, .tog).primary:hover {
+  background: color-mix(in oklab, var(--acc-btn) 88%, var(--fg));
+  color: var(--on-acc);
 }
 .btn svg,
 .tico {
@@ -148,15 +174,15 @@ summary {
   gap: var(--s-1);
   padding: var(--s-1);
   border: 1px solid var(--line);
-  border-radius: calc(var(--r) + var(--s-1));
+  border-radius: var(--r);
   corner-shape: var(--corner);
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
 }
 #modes .btn {
-  padding: var(--s-1) var(--s-5);
-  min-height: var(--h-sm);
+  padding: 0 var(--s-5);
+  min-height: calc(var(--h-md) - 2 * var(--s-1) - 2 * var(--hair));
 }
 #modes .btn[aria-pressed="true"] {
   background: var(--acc-wash);
@@ -879,7 +905,8 @@ summary {
   font-size: var(--fs-sm);
 }
 .cm-bml-find .btn {
-  padding: var(--s-1) var(--s-4);
+  min-height: var(--h-sm);
+  padding: 0 var(--s-3);
   font-size: var(--fs-sm);
 }
 .cm-bml-find .count {
@@ -1336,22 +1363,44 @@ summary {
   stroke-linejoin: round;
   flex: none;
 }
+/* View heading (§6.5): the nav group over the view's name in Fell, and
+   where it applies at the right. */
 #config-overlay .phead {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-4) var(--s-4) var(--s-4) var(--s-5);
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-5) var(--s-6) var(--s-4);
   border-bottom: 1px solid var(--line);
 }
-#config-overlay .crumbs {
+#config-overlay .crumb {
+  font-size: var(--fs-xs);
   color: var(--muted);
-  white-space: nowrap;
+}
+#config-overlay .vh-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-width: 0;
+}
+#config-overlay .phead h2 {
+  margin: 0;
+  font: 400 var(--fs-h)/var(--lh-tight) var(--f-title);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-#config-overlay .crumbs b {
+#config-overlay .applies {
+  flex: none;
+  padding: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 0.1875rem;
+}
+#config-overlay .applies:hover {
+  background: none;
   color: var(--fg);
-  font-weight: 600;
 }
 #config-overlay .pbody {
   overflow-y: auto;
@@ -1364,9 +1413,7 @@ summary {
   padding: var(--s-5) 0;
   border-bottom: 1px solid var(--line);
   display: grid;
-  gap: var(--s-2);
-  border-radius: var(--r);
-  corner-shape: var(--corner);
+  gap: var(--s-3);
   transition: background-color .8s cubic-bezier(.16,1,.3,1);
 }
 #config-overlay .sec[hidden] {
@@ -1494,13 +1541,15 @@ summary {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-4);
-  margin: 0 0 var(--s-2);
 }
+/* A group label (§3): small caps, tracked, muted. */
 #config-overlay .sech h3 {
   margin: 0;
-  font-size: var(--fs);
-  font-weight: 600;
-  letter-spacing: -.005em;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  color: var(--muted);
 }
 #config-overlay .where {
   background: none;
@@ -1536,13 +1585,9 @@ summary {
   width: 0.8125rem;
   height: 0.8125rem;
 }
-#config-overlay .where svg.i {
-  width: 0.8125rem;
-  height: 0.8125rem;
-}
 #config-overlay .row {
   display: grid;
-  grid-template-columns: 7.25rem minmax(0,1fr);
+  grid-template-columns: 8.5rem minmax(0,1fr);
   align-items: center;
   gap: var(--s-4);
   min-height: var(--h-md);
@@ -1551,22 +1596,22 @@ summary {
   display: none;
 }
 #config-overlay .lbl {
-  color: var(--muted);
   position: relative;
   padding-left: var(--s-5);
 }
-#config-overlay .row.set .lbl {
-  color: var(--fg);
-}
+/* The set dot: a value this view set. */
 #config-overlay .row.set .lbl::before {
   content: "";
   position: absolute;
   left: 0;
-  top: .55em;
-  width: 0.3125rem;
-  height: 0.3125rem;
+  top: .6em;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: 50%;
   background: var(--acc);
+}
+#config-overlay .lbl .from {
+  display: block;
 }
 #config-overlay .ctl {
   display: flex;
@@ -1589,7 +1634,8 @@ summary {
   background: var(--bg);
 }
 #config-overlay .st:focus-within {
-  border-color: var(--muted);
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px var(--acc);
 }
 #config-overlay .st button {
   background: none;
@@ -1608,17 +1654,19 @@ summary {
   background: var(--hover);
 }
 #config-overlay .st input {
-  width: 2.75rem;
+  width: 3.25rem;
   border: 0;
   background: none;
-  text-align: right;
+  text-align: center;
   padding: 0 var(--s-1);
   font-variant-numeric: tabular-nums;
   outline: none;
 }
+/* An inherited value shows as the placeholder: muted and italic. */
 #config-overlay .st input::placeholder {
   color: var(--muted);
-  opacity: .75;
+  font-style: italic;
+  opacity: 1;
 }
 #config-overlay .st .u {
   color: var(--muted);
@@ -1652,7 +1700,7 @@ summary {
   gap: var(--s-1);
   padding: var(--s-1);
   border: 1px solid var(--line);
-  border-radius: calc(var(--r) + var(--s-1));
+  border-radius: var(--r);
   corner-shape: var(--corner);
   flex-wrap: wrap;
 }
@@ -1671,7 +1719,6 @@ summary {
 }
 :is(#config-overlay, #text-view) .seg button:hover {
   color: var(--fg);
-  background: var(--hover);
 }
 #config-overlay .seg button[aria-checked="true"],
 #text-view .seg button[aria-checked="true"],
@@ -1692,45 +1739,48 @@ summary {
 #config-overlay .tog:not([aria-pressed="true"]):not(.primary):hover {
   color: var(--fg); /* a primary toggle keeps its own text on hover */
 }
-#config-overlay .tog[aria-pressed="true"] {
+#config-overlay .tog:is([aria-pressed="true"], .primary) {
   border-color: transparent;
 }
-/* switch (panel-controls.ts switchInput): a hairline track, the knob in
-   --muted; on, the track is --acc and the knob paper-white */
+/* An action that must read as a button out of context (§6.1 outline). */
+#config-overlay .tog.outline {
+  color: var(--fg);
+}
+/* switch (panel-controls.ts switchInput, §6.4): always a pill; a --line
+   track, --acc when on, a paper knob that slides */
 :is(#config-overlay, #text-view) .sw {
   appearance: none;
   position: relative;
   flex: none;
   width: 1.875rem;
-  height: 1.125rem;
+  height: 1.0625rem;
   margin: 0;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 999rem; /* a pill */
-  background: none;
+  background: var(--line);
   cursor: pointer;
-  transition: background .15s, border-color .15s;
+  transition: background var(--t-fast);
 }
 :is(#config-overlay, #text-view) .sw::before {
   content: "";
   position: absolute;
   top: var(--s-1);
   left: var(--s-1);
-  width: 0.75rem;
-  height: 0.75rem;
+  width: 0.8125rem;
+  height: 0.8125rem;
   border-radius: 50%;
-  background: var(--muted);
-  transition: transform .15s, background .15s;
-}
-:is(#config-overlay, #text-view) .sw:hover::before {
-  background: var(--fg);
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .2);
+  transition: transform var(--t-fast);
 }
 :is(#config-overlay, #text-view) .sw:checked {
   background: var(--acc);
-  border-color: var(--acc);
 }
 :is(#config-overlay, #text-view) .sw:checked::before {
-  transform: translateX(0.75rem);
-  background: var(--paper);
+  transform: translateX(0.8125rem);
+}
+:is(#config-overlay, #text-view) .sw:disabled {
+  opacity: .45;
 }
 :is(#config-overlay, #text-view) select.sel,
 #config-overlay input.txt {
@@ -1743,9 +1793,21 @@ summary {
   min-width: 0;
   max-width: 100%;
 }
+/* The native select with the sheet's chevron (mid-grey reads on both papers). */
 :is(#config-overlay, #text-view) select.sel {
-  padding-right: var(--s-2);
+  appearance: none;
+  padding-right: var(--s-7);
+  background: var(--bg) no-repeat right var(--s-3) center / 0.625rem
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.4'/%3E%3C/svg%3E");
+  color: var(--fg);
   cursor: pointer;
+}
+:is(#config-overlay, #text-view) select.sel:focus-visible,
+#config-overlay input.txt:focus-visible,
+#config-overlay details.more textarea:focus-visible {
+  outline: none;
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px var(--acc);
 }
 #text-view select.sel {
   height: var(--h-sm); /* as the bar's steppers */
@@ -1939,7 +2001,7 @@ summary {
 }
 #config-overlay details.more textarea {
   width: 100%;
-  min-height: 3.875rem;
+  min-height: 5.5rem;
   border: 1px solid var(--line);
   border-radius: var(--r);
   corner-shape: var(--corner);
@@ -2238,13 +2300,8 @@ summary {
   gap: var(--s-4);
   padding: var(--s-2) 0;
 }
-#config-overlay .tog.primary {
-  background: var(--acc-btn);
-  border-color: var(--acc-btn);
-  color: var(--on-acc);
-}
 #config-overlay .tog:disabled {
-  opacity: .5;
+  opacity: .45;
   cursor: progress;
 }
 #config-overlay .export-status {
@@ -2395,15 +2452,6 @@ summary {
 }
 .choice.primary small {
   color: var(--muted);
-}
-/* A dialog's (or the theme bar's) main button: the --acc-btn fill. */
-:is(.ask, #theme-bar) .btn.primary {
-  background: var(--acc-btn);
-  color: var(--on-acc);
-}
-:is(.ask, #theme-bar) .btn.primary:hover {
-  background: var(--acc-btn);
-  opacity: .92;
 }
 .ask .sw-err {
   display: block;

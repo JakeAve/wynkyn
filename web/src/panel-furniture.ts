@@ -34,6 +34,7 @@ import {
   textInputRaw,
 } from "./config-panel.ts";
 import {
+  applies,
   icon,
   makeView,
   moreCss,
@@ -344,7 +345,7 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
         ),
         () => !!live()?.gap,
       ),
-    ]),
+    ], applies(ctx, "numbering.pages")),
     section("Numerals", "numerals", zones),
     section("Chapter and part openers", "openers", openerRows),
     section("Type", "type", [
