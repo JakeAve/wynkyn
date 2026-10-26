@@ -49,7 +49,13 @@ rewrite themselves on the next save.
   only)
 - `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored);
   `web/src/sync.ts` is the client's save state machine (queues, retry, the one
-  place "Saved" is decided; spec §6); `web/src/backend.ts` is what the app talks
+  place "Saved" is decided; spec §6); one job each beside `app.ts`, which wires
+  them: `library.ts` (`connect`: the dev server, or the folder / browser-storage
+  choice), `switcher.ts` (the crumb and the book/edition switcher),
+  `create-book.ts` (Create a new manuscript and the title and web dialogs, plus
+  the footer's import notes), `theme-preview.ts` (`ThemePreview`: try, hold
+  pushes, Apply), `text-view.ts` (the editor's font, size, Hide markup and spell
+  check), `dom.ts` (`$`, `brief`); `web/src/backend.ts` is what the app talks
   to: `httpBackend` (the dev server) or `localBackend` (the same `BookService`
   run in the page over the author's own folder via the File System Access API,
   or the browser's private storage) — the hosted site has no server at all
