@@ -35,7 +35,7 @@ function list(
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.className = `tree-node tree-${n.kind}`;
-    btn.style.paddingLeft = `${8 + depth * 14}px`;
+    btn.style.paddingLeft = `calc(var(--s-4) + ${depth * 0.875}rem)`;
     btn.textContent = n.label;
     btn.dataset.line = String(n.line);
     btn.onclick = () => {

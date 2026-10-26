@@ -85,7 +85,7 @@ export function buildPageTab(panel: PanelContext): Node[] {
   // object on save (the whole "page" section round-trips together).
   const margins = page.margins ?? {};
 
-  const H = 138; // px, the drawn page height (matches .mpage in index.html)
+  const H = 8.625; // rem, the drawn page height (matches .mpage in app.css)
   const block = el("div", "mblock");
   const vblock = el("div", "mblock");
   const pageR = el("div", "mpage", block);
@@ -95,21 +95,21 @@ export function buildPageTab(panel: PanelContext): Node[] {
       tryParseDims(DEFAULT_SIZE)!;
     const s = H / trim.h;
     const w = H * trim.w / trim.h;
-    pageR.style.width = `${w.toFixed(1)}px`;
-    pageV.style.width = `${(w / 2.4).toFixed(1)}px`;
+    pageR.style.width = `${w.toFixed(3)}rem`;
+    pageV.style.width = `${(w / 2.4).toFixed(3)}rem`;
     const m = page.margins ?? {};
-    const px = (v: string | undefined) => `${inches(v) * s}px`;
+    const rem = (v: string | undefined) => `${inches(v) * s}rem`;
     Object.assign(block.style, {
-      top: px(m.top),
-      bottom: px(m.bottom),
-      left: px(m.inside),
-      right: px(m.outside),
+      top: rem(m.top),
+      bottom: rem(m.bottom),
+      left: rem(m.inside),
+      right: rem(m.outside),
     });
     Object.assign(vblock.style, {
-      top: px(m.top),
-      bottom: px(m.bottom),
+      top: rem(m.top),
+      bottom: rem(m.bottom),
       left: "0",
-      right: px(m.inside),
+      right: rem(m.inside),
     });
   };
   draw();

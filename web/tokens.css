@@ -155,8 +155,8 @@
   --h-footer: 1.875rem;
   --icon: 1rem;
   /* Pane widths — dragged by the gutters, persisted in localStorage. */
-  --w-tree: 230px;
-  --w-editor: clamp(380px, 36%, 600px);
+  --w-tree: 14.375rem;
+  --w-editor: clamp(23.75rem, 36%, 37.5rem);
 
   /* Shape (§5). */
   --r: 0.25rem; /* controls */

@@ -625,11 +625,11 @@ function installGutters(): void {
   const panes = $("panes");
   const root = document.documentElement; // the footer reads the widths too
   for (
-    const [id, cssVar, min] of [["gutter-tree", "--w-tree", 120], [
+    const [id, cssVar, min] of [["gutter-tree", "--w-tree", 7.5], [
       "gutter-editor",
       "--w-editor",
-      240,
-    ]] as const
+      15,
+    ]] as const // minimums in rem; a dragged width is px
   ) {
     const saved = localStorage.getItem(cssVar);
     if (saved) root.style.setProperty(cssVar, saved);
@@ -641,12 +641,13 @@ function installGutters(): void {
       const work = mode === "write" ? $("editor") : $("config-overlay");
       const left = (cssVar === "--w-tree" ? panes : work)
         .getBoundingClientRect().left;
+      const rem = parseFloat(getComputedStyle(root).fontSize);
       gutter.onpointermove = (m) => {
-        // Leave at least 200px for whatever pane sits to the right.
-        const max = panes.getBoundingClientRect().right - left - 200;
+        // Leave at least 12.5rem for whatever pane sits to the right.
+        const max = panes.getBoundingClientRect().right - left - 12.5 * rem;
         root.style.setProperty(
           cssVar,
-          `${Math.min(Math.max(m.clientX - left, min), max)}px`,
+          `${Math.min(Math.max(m.clientX - left, min * rem), max)}px`,
         );
       };
       gutter.onpointerup = () => {

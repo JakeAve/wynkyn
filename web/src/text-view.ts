@@ -90,7 +90,7 @@ export function installTextView(d: TextViewDeps): void {
   ];
   const apply = () => {
     ed.style.setProperty("--ed-font", TEXT_FONTS[prefs.font] ?? null);
-    ed.style.setProperty("--ed-fs", `${prefs.size}px`);
+    ed.style.setProperty("--ed-fs", `${prefs.size / 16}rem`); // px at the default root
     editor.requestMeasure(); // a CSS-only size change: re-align line numbers
     for (const b of fonts) {
       b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));

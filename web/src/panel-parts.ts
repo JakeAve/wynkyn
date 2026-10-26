@@ -496,7 +496,7 @@ function extrasFor(
     o.type = "text";
     o.value = getProps(meta, entry).content ?? "";
     o.setAttribute("aria-label", "Break ornament");
-    o.style.cssText = "width:80px;text-align:center";
+    o.style.cssText = "width:5rem;text-align:center";
     o.oninput = () => {
       put(meta, entry, "content", o.value || undefined);
       v.changed(entry.section);

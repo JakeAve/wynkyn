@@ -223,7 +223,7 @@ Always `--f-hivis`:
 
 Never: labels, menus, numbers, words. Context reads those.
 
-### Scale (planned)
+### Scale
 
 All sizes in rem; px at the default 16px root.
 
@@ -253,9 +253,9 @@ faster than a legibility face.
 - Hierarchy is weight, size and `--muted` first. Fell only for display; Alegreya
   only for the writing and the book's name; never a serif in a control.
 
-## 4. Units, space and size (planned)
+## 4. Units, space and size
 
-### 4.1 Units (planned)
+### 4.1 Units
 
 | What                                               | Unit                                                                                        |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -270,12 +270,15 @@ faster than a legibility face.
 | book and page geometry                             | the book's own units (in, mm, pt, em) — metadata, never chrome                              |
 | the root                                           | never set: `html` keeps the browser's size                                                  |
 
-Today `web/app.css` has 590 px values, 14 font sizes, 11 radii and about 20
-paddings. Every one maps onto a token below; values in between round to the
-nearest step (10px gaps become `--s-4` or `--s-5`, 12.5px text becomes
-`--fs-sm`).
+Ink's `web/app.css` had 590 px values, 14 font sizes, 11 radii and about 20
+paddings; each now maps onto a token below, values in between rounded to the
+nearest step (10px gaps became `--s-4` or `--s-5`, 12.5px text `--fs-sm`).
+Lengths with no token (a dialog's width, a menu's, the panel's page drawings)
+are plain rem. Pills are `999rem`. `web/design-tokens_test.ts` fails on any
+other px in `web/app.css`, except in rules for the book's own geometry: the
+preview's pages (`.pagedjs_*`) and the strokes of the sheet drawing.
 
-### 4.2 Space (planned)
+### 4.2 Space
 
 A 4px grid, in rem.
 
@@ -291,7 +294,7 @@ A 4px grid, in rem.
 | `--s-8` | 2     | 32 | dialog backdrop inset, empty states         |
 | `--s-9` | 3     | 48 | page-level spacing on the site              |
 
-### 4.3 Size (planned)
+### 4.3 Size
 
 | Token         | rem   | px | Use                                        |
 | ------------- | ----- | -- | ------------------------------------------ |
@@ -305,7 +308,7 @@ A 4px grid, in rem.
 
 24px is the smallest hit target (WCAG 2.2 AA minimum).
 
-## 5. Shape (planned)
+## 5. Shape
 
 ```css
 --r: 0.25rem; /* controls */

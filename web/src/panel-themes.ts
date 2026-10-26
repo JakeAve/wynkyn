@@ -47,7 +47,7 @@ const span = (cls: string, text: string): HTMLSpanElement => {
   return e;
 };
 
-// A theme's part style on a card: aliases resolved, pt sizes scaled to px and
+// A theme's part style on a card: aliases resolved, pt sizes scaled to rem and
 // capped, box and line-height properties skipped (they size a page, not a card).
 function specimen(
   e: HTMLElement,
@@ -61,7 +61,8 @@ function specimen(
     if (/^(margin|padding|border|display|line-height|width)/.test(k)) continue;
     if (k === "font-family") e.style.fontFamily = face(fonts[v] ?? v);
     else if (k === "font-size" && v.endsWith("pt")) {
-      e.style.fontSize = `${Math.min(cap, parseFloat(v) * 1.15).toFixed(1)}px`;
+      const px = Math.min(cap, parseFloat(v) * 1.15);
+      e.style.fontSize = `${(px / 16).toFixed(3)}rem`; // follows the root
     } else e.style.setProperty(k, v);
   }
   return e;
