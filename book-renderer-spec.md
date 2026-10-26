@@ -2223,7 +2223,7 @@ preview is that it is not an approximation.
 
 A re-render is staged over the pages on screen, which stay up but dimmed from
 the moment of the edit; each new page lands over the old one it replaces as it
-is laid out, with a "Rendering pages… N" count at the pane's foot (the first
+is laid out, with a "Setting type… N pages" count at the pane's foot (the first
 load shows the count alone). The layout keeps going in a background tab. An
 update that arrives mid-render abandons that render and starts its own, so a run
 of edits costs one render after the last, not one per edit.

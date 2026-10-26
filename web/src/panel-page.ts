@@ -180,7 +180,8 @@ export function buildPageTab(panel: PanelContext): Node[] {
       diag,
       el(
         "p",
-        "hint",
+        "tip",
+        el("span", "manicule", "☞"),
         "Inside is the spine edge. The preview shows the spread as it will fold.",
       ),
       el(

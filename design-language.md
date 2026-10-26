@@ -440,7 +440,7 @@ pill, whatever the corner shape.
   or the picker when the value is none of them, sits in `--acc-wash` inside a
   1px `--acc` frame (the wash alone is lost around a warm chip). An option
   valued `""` means unset.
-- **Tip line** (planned): a red ☞ in Fell before `--fs-sm` `--muted` text.
+- **Tip line** (`.tip`): a red ☞ in Fell before `--fs-sm` `--muted` text.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.
 
@@ -531,7 +531,9 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
 Centred: a ❦ in `--acc-ink`, the title in Fell `--fs-hero`, one `--muted`
 sentence, one large primary button (`.btn.primary.lg`). `--s-8` padding. In
 `web/app.css`: `.empty` (an `h2` and a `p`; the ❦ is drawn). A list with nothing
-in it says so in one centred `--muted` `--fs-sm` line (`.book-empty`).
+in it says so in one centred `--muted` `--fs-sm` line (`.book-empty`). The empty
+library's create dialog takes `.empty` on its heading block ("Your library is
+empty").
 
 ## 7. Layout and expanded views
 
@@ -612,23 +614,23 @@ views and expanded. Footer: chapter, word count, words this session, Go to
 style. No goals or streaks. Typewriter scrolling and writing on the book's paper
 were considered and dropped.
 
-## 9. Winks (planned)
+## 9. Winks
 
 The label is always the plain word; the wink sits beside or behind it.
 
-| Wink                    | Where                                                                  |
-| ----------------------- | ---------------------------------------------------------------------- |
-| Small-caps group labels | style nav, outline, panel sections, menu headings                      |
-| Red rubrics             | the Prose margin                                                       |
-| Fell Great Primer       | view headings, dialog titles, empty states, the site                   |
-| ☞ manicule              | notes in the margin; tip lines in the panel                            |
-| ⁂ asterism              | `{break}` in Prose                                                     |
-| ❦ fleuron               | empty states; the site's feature heads and colophon                    |
-| "Setting type… N pages" | pagination status (was "Rendering pages… N")                           |
-| Colophon                | About and the site footer: "Set in IM Fell Great Primer and Alegreya." |
-| Stet                    | tooltip on Keep mine in the changed-on-disk banner                     |
-| Out of sorts            | lead word of a missing-glyph or missing-font warning                   |
-| The sun mark            | §10                                                                    |
+| Wink                    | Where                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| Small-caps group labels | style nav, outline, panel sections, menu headings                               |
+| Red rubrics             | the Prose margin (planned)                                                      |
+| Fell Great Primer       | view headings, dialog titles, empty states, the site                            |
+| ☞ manicule              | notes in the margin; tip lines in the panel                                     |
+| ⁂ asterism              | `{break}` in Prose (planned)                                                    |
+| ❦ fleuron               | empty states; the site's feature heads and colophon                             |
+| "Setting type… N pages" | pagination status (was "Rendering pages… N")                                    |
+| Colophon                | About and the site footer: "Set in IM Fell Great Primer and Alegreya."          |
+| Stet                    | tooltip on Keep my edits in the changed-on-disk banner: "stet: let it stand"    |
+| Out of sorts            | lead word of a missing-glyph or missing-font warning (planned: none exists yet) |
+| The sun mark            | §10                                                                             |
 
 Out of scope unless asked: illustrations, woodcut empty states, blackletter.
 

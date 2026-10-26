@@ -54,7 +54,7 @@ export type UpdateMessage = Extract<ServerMessage, { type: "update" }>;
 
 // Paged.js lays out one page per tick of its queue, and ticks on
 // requestAnimationFrame — which a hidden tab never fires, so a book opened
-// and then left in the background sat at "Rendering pages…" until it was
+// and then left in the background sat at "Setting type…" until it was
 // looked at again. A message port isn't throttled in the background; the
 // browser still paints between tasks, so pages appear as they are laid out.
 const tickPort = new MessageChannel();

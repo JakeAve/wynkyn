@@ -182,7 +182,7 @@
               title="Discard your unsaved edits and load the file">Load file
               from disk</button>
             <button id="disk-keep" class="btn sm" type="button"
-              title="Save your version over the file">Keep my edits</button>
+              title="Save your version over the file (stet: let it stand)">Keep my edits</button>
           </div>
         </div>
       </div>
@@ -295,8 +295,11 @@
       <span id="lib-err" class="sw-err"></span>
     </dialog>
     <dialog id="create" class="ask" aria-labelledby="create-title">
-      <h2 id="create-title" tabindex="-1" autofocus>Create a new manuscript</h2>
-      <p id="create-sub">Your library is empty. How do you want to begin?</p>
+      <div id="create-head">
+        <h2 id="create-title" tabindex="-1"
+          autofocus>Create a new manuscript</h2>
+        <p id="create-sub">How do you want to begin?</p>
+      </div>
       <div class="choices">
         <button id="create-import" class="choice">Import a file
           <small>Word, EPUB, plain text, Markdown or HTML. From Google Docs:

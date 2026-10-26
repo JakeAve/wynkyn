@@ -1290,7 +1290,7 @@ body.typing #editor .pane-head {
   counter-increment: staged;
 }
 #preview[data-rendering]::after {
-  content: "Rendering pages… " counter(staged);
+  content: "Setting type… " counter(staged) " pages";
   color: var(--muted);
   font-size: var(--fs-xs);
   display: block;
@@ -2257,6 +2257,10 @@ body.typing #editor .pane-head {
   gap: var(--s-4);
   align-items: flex-start;
 }
+#config-overlay .tip .manicule {
+  color: var(--acc-ink);
+  font: var(--fs-h)/1 var(--f-title);
+}
 /* Page numbers' position picker: a spread, four folio slots a page. */
 #config-overlay .pospick {
   display: flex;
@@ -2618,6 +2622,15 @@ body.typing #editor .pane-head {
 .ask p {
   margin: 0 0 var(--s-5);
   color: var(--muted);
+}
+.ask .empty {
+  padding: 0 0 var(--s-5);
+}
+.ask .empty h2 {
+  font-size: var(--fs-hero);
+}
+.ask .empty p {
+  margin: 0;
 }
 /* Choice list (§6.7): full-width rows, each a 500 title over an optional
    <small> note, for a dialog that asks one question. `.primary`, the

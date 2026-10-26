@@ -67,7 +67,7 @@ function pickTip(): Node[] {
   return [el(
     "p",
     "tip",
-    icon("pointer"),
+    el("span", "manicule", "☞"),
     "Pick a part, or click anything in the preview to jump straight to its settings.",
   )];
 }
