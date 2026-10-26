@@ -33,10 +33,8 @@ import {
   replaceBuffer,
   scrollEditorToLine,
   setEditionSpans,
-  setHideMarkup,
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
-import { parseWordList, setSpeller } from "./spelling.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
 import { type ImageHost, pickImageFile } from "./editor-images.ts";
@@ -53,6 +51,7 @@ import type { Backend } from "./backend.ts";
 import { installSwitcher, type Switcher } from "./switcher.ts";
 import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
+import { installTextView } from "./text-view.ts";
 import { connect } from "./library.ts";
 import { $, brief } from "./dom.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
@@ -697,127 +696,6 @@ function installThemeToggle(): void {
   };
 }
 
-// Spell check (spec §7.3): the word list the Spelling menu picks, fetched
-// once, and the book's dictionary.json, which Add to dictionary grows.
-// Another language is one more list in vendor/ and one row here.
-const WORD_LISTS: Record<string, { name: string; url: string }> = {
-  en: { name: "English", url: "/vendor/words-en.txt" },
-};
-const wordLists = new Map<string, Promise<Set<string>>>();
-async function spellCheck(lang: string): Promise<void> {
-  const url = WORD_LISTS[lang]?.url;
-  if (!url) return setSpeller(editor, null);
-  try {
-    let list = wordLists.get(lang);
-    if (!list) {
-      wordLists.set(
-        lang,
-        list = fetch(url).then((r) =>
-          r.ok ? r.text() : Promise.reject(new Error(`word list: ${r.status}`))
-        ).then(parseWordList),
-      );
-    }
-    const [known, words] = await Promise.all([
-      list,
-      backend.dictionary(book),
-    ]);
-    const speller = (mine: Set<string>) => ({
-      has: (w: string) => known.has(w) || mine.has(w),
-      async add(w: string) {
-        try {
-          setSpeller(editor, speller(new Set(await backend.addWord(book, w))));
-        } catch (err) {
-          setStatus("error", `dictionary: ${brief(err)}`);
-        }
-      },
-    });
-    // Unless the menu moved on while the list loaded.
-    if (($("tv-spell") as HTMLSelectElement).value === lang) {
-      setSpeller(editor, speller(new Set(words)));
-    }
-  } catch (err) {
-    wordLists.delete(lang); // try the fetch again next time
-    setStatus("error", `spell check: ${brief(err)}`);
-  }
-}
-
-// The text view (the bar atop the editor): the editor's font and size, Hide markup and Spelling, a per-reader
-// preference kept in localStorage, not the book.
-const TEXT_FONTS: Record<string, string> = {
-  serif: "ui-serif, Georgia, serif",
-  sans: "system-ui, sans-serif",
-  mono: "var(--mono)",
-};
-function installTextView(): void {
-  let prefs = { font: "serif", size: 16, hide: false, spell: "en" };
-  try {
-    prefs = { ...prefs, ...JSON.parse(localStorage.getItem("text-view")!) };
-  } catch {
-    // none saved, or storage blocked: the defaults
-  }
-  const ed = $("editor");
-  const size = $("tv-size") as HTMLInputElement;
-  const hide = $("tv-hide") as HTMLInputElement;
-  const spell = $("tv-spell") as HTMLSelectElement;
-  spell.append(
-    ...Object.entries(WORD_LISTS).map(([v, l]) => new Option(l.name, v)),
-    new Option("None", "none"),
-  );
-  if (prefs.spell !== "none" && !(prefs.spell in WORD_LISTS)) {
-    prefs.spell = "en";
-  }
-  const fonts = [
-    ...$("text-view").querySelectorAll<HTMLElement>("[data-font]"),
-  ];
-  const apply = () => {
-    ed.style.setProperty("--ed-font", TEXT_FONTS[prefs.font] ?? null);
-    ed.style.setProperty("--ed-fs", `${prefs.size}px`);
-    editor.requestMeasure(); // a CSS-only size change: re-align line numbers
-    for (const b of fonts) {
-      b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));
-    }
-    size.value = String(prefs.size);
-    size.nextElementSibling!.textContent = `${prefs.size}px`;
-    hide.checked = prefs.hide;
-    spell.value = prefs.spell;
-    setHideMarkup(editor, prefs.hide);
-    try {
-      localStorage.setItem("text-view", JSON.stringify(prefs));
-    } catch {
-      // storage blocked: the view just won't survive a reload
-    }
-  };
-  for (const b of fonts) {
-    b.onclick = () => {
-      prefs.font = b.dataset.font!;
-      apply();
-    };
-  }
-  size.oninput = () => {
-    prefs.size = Number(size.value);
-    apply();
-  };
-  for (const b of $("text-view").querySelectorAll<HTMLElement>("[data-step]")) {
-    b.onclick = (e) => {
-      e.preventDefault(); // inside the label: don't also focus the slider
-      size.stepUp(Number(b.dataset.step)); // clamps to the slider's min/max
-      prefs.size = Number(size.value);
-      apply();
-    };
-  }
-  hide.onchange = () => {
-    prefs.hide = hide.checked;
-    apply();
-  };
-  spell.onchange = () => {
-    prefs.spell = spell.value;
-    apply();
-    spellCheck(prefs.spell);
-  };
-  apply();
-  spellCheck(prefs.spell);
-}
-
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 // Keyboard chords. Snippet chords insert via insertSnippet; the rest are UI.
 const SNIPPET_KEYS: Record<string, string> = {
@@ -997,7 +875,7 @@ async function main(): Promise<void> {
     images,
   });
   reparse(text);
-  installTextView();
+  installTextView({ editor, backend, book, setStatus });
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
   installShortcuts(
