@@ -550,3 +550,128 @@ Deno.test({
     }
   },
 });
+
+// The fixture book, then a blank "Other" opened from the switcher: the page
+// ends on Other, saved, with demo-book a switch away.
+async function twoBooks(page: import("playwright").Page): Promise<void> {
+  await page.locator("#library[open]").waitFor();
+  await importDemoBook(page);
+  await page.locator('#status[data-kind="saved"]').waitFor();
+  await page.locator("#book-switcher").click();
+  await page.locator("#book-new").click();
+  await page.locator("#create[open]").waitFor();
+  await page.locator("#create-blank").click();
+  await page.locator("#title-dlg[open]").waitFor();
+  await page.locator("#title-input").fill("Other");
+  await page.locator("#title-ok").click();
+  await page.waitForURL(/book=other/);
+  await page.locator('#status[data-kind="saved"]').waitFor();
+}
+
+// What the browser's storage holds for a book's manuscript ("" mid-commit).
+const storedManuscript = (page: import("playwright").Page, book: string) =>
+  page.evaluate(async (book) => {
+    const root = await navigator.storage.getDirectory();
+    const dir = await root.getDirectoryHandle(book);
+    const fh = await dir.getFileHandle("manuscript.md");
+    try {
+      return await (await fh.getFile()).text();
+    } catch (e) {
+      if ((e as DOMException).name === "NotReadableError") return "";
+      throw e;
+    }
+  }, book);
+
+async function switchToDemoBook(page: import("playwright").Page) {
+  await page.locator("#book-switcher").click();
+  await page.locator('.book-row[title="demo-book"]').dblclick();
+}
+
+Deno.test({
+  name: "local library: an edit typed just before switching book is saved",
+  ignore: !hasChrome || !siteBuilt,
+  async fn() {
+    const site = serveSite(DIST, 0);
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${site.addr.port}/app/`);
+      await twoBooks(page);
+      await page.locator("#editor .cm-content").click();
+      await page.keyboard.press("Control+End");
+      await page.keyboard.type("\nTyped just before the switch.");
+      assert(
+        !(await storedManuscript(page, "other")).includes("before the switch"),
+        "still inside the debounce, or this proves nothing",
+      );
+      await switchToDemoBook(page);
+      await page.waitForURL(/book=demo-book/);
+      assertStringIncludes(
+        await storedManuscript(page, "other"),
+        "Typed just before the switch.",
+      );
+    } finally {
+      await browser.close();
+      await site.shutdown();
+    }
+  },
+});
+
+Deno.test({
+  name: "local library: switching with a save that fails asks first; " +
+    "staying keeps the edit and the retry lands it",
+  ignore: !hasChrome || !siteBuilt,
+  async fn() {
+    const site = serveSite(DIST, 0);
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${site.addr.port}/app/`);
+      await twoBooks(page);
+      // Every write to storage fails until put back.
+      await page.evaluate(() => {
+        const p = FileSystemFileHandle.prototype;
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).realCreateWritable = p.createWritable;
+        p.createWritable = () =>
+          Promise.reject(new DOMException("disk full", "QuotaExceededError"));
+      });
+      await page.locator("#editor .cm-content").click();
+      await page.keyboard.press("Control+End");
+      await page.keyboard.type("\nTyped while saves fail.");
+      const asked = new Promise<string>((resolve) =>
+        page.once("dialog", async (d) => {
+          resolve(`${d.type()}: ${d.message()}`);
+          await d.dismiss();
+        })
+      );
+      await switchToDemoBook(page);
+      assertEquals(
+        await asked,
+        "confirm: Some changes aren't saved. Leave anyway?",
+      );
+      assert(page.url().includes("book=other"), "staying stays");
+      await page.locator('#status[data-kind="error"]').waitFor();
+      assert(
+        (await page.locator("#editor .cm-content").innerText()).includes(
+          "Typed while saves fail.",
+        ),
+        "the edit is still in the editor",
+      );
+
+      await page.evaluate(() => {
+        FileSystemFileHandle.prototype.createWritable =
+          // deno-lint-ignore no-explicit-any
+          (globalThis as any).realCreateWritable;
+      });
+      await page.locator('#status[data-kind="saved"]').waitFor();
+      assertStringIncludes(
+        await storedManuscript(page, "other"),
+        "Typed while saves fail.",
+      );
+    } finally {
+      await browser.close();
+      await site.shutdown();
+    }
+  },
+});
