@@ -563,6 +563,37 @@ function marginShows(box: Element): boolean {
     content.replace(/["\s]/g, "") !== "";
 }
 
+// Where each printed page begins in the manuscript (design-language.md §8.1
+// page turns), 1-based lines, read from the live pages of the last layout.
+export interface PageTurn {
+  line: number;
+  page: number;
+}
+export function pageTurns(container: HTMLElement): PageTurn[] {
+  const out: PageTurn[] = [];
+  let last = 0;
+  for (
+    const p of container.querySelectorAll<HTMLElement>(
+      ":scope > :not(.preview-stage) .pagedjs_page",
+    )
+  ) {
+    // The first leaf block on the page: a section's own data-line is its
+    // opening, not where this page starts. A block split across pages keeps
+    // its data-line on the continuation, so the turn lands on that block.
+    // ponytail: block granularity, not the exact line where the page breaks.
+    const line = Number(
+      p.querySelector("[data-line]:not(:has([data-line]))")
+        ?.getAttribute("data-line"),
+    );
+    const page = Number(p.dataset.pageNumber);
+    // One turn per line: the first page that begins in it.
+    if (!(line > last)) continue;
+    last = line;
+    if (page) out.push({ line, page });
+  }
+  return out;
+}
+
 // "Page 12 of 208" for the footer: the page nearest the pane's vertical
 // centre, refreshed on scroll and after each render.
 export function installPageIndicator(

@@ -19,7 +19,7 @@ import {
 } from "@codemirror/state";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { bml, ClassMarker } from "./bml-language.ts";
-import { prose } from "./prose.ts";
+import { prose, turnsField } from "./prose.ts";
 import { toCmDiagnostics } from "./diagnostics.ts";
 import { searchPanel } from "./search-panel.ts";
 import { insertExtensions } from "./editor-insert.ts";
@@ -179,6 +179,7 @@ export function createEditor(opts: {
         editionSpans,
         lintGutter(),
         writeView.of([]),
+        turnsField,
         spellExtensions(),
         opts.images ? imageExtensions(opts.images) : [],
         EditorView.lineWrapping,

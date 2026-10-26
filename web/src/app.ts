@@ -11,6 +11,7 @@ import {
   installStyleHover,
   markEdited,
   type Mode,
+  pageTurns,
   previewLink,
   renderPreview,
   restoreCachedRender,
@@ -37,6 +38,7 @@ import {
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
 import { chapterAt, wordCount } from "./prose-model.ts";
+import { setPageTurns } from "./prose.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
 import { type ImageHost, pickImageFile } from "./editor-images.ts";
@@ -963,6 +965,7 @@ async function main(): Promise<void> {
     restoreCachedRender(cached, previewEl);
     refreshPageIndicator();
     followCursor(cursorLine);
+    setPageTurns(editor, pageTurns(previewEl));
   }
   const onClose = () => {
     // `deno task dev` restarts the server when app code changes; follow it
@@ -985,6 +988,7 @@ async function main(): Promise<void> {
       refreshPageIndicator();
       configPanel?.pagesChanged();
       followCursor(cursorLine);
+      setPageTurns(editor, pageTurns(previewEl));
       textView.refresh();
     }, (err) => {
       // The old pages stay up; their problems no longer describe this book.
@@ -999,6 +1003,7 @@ async function main(): Promise<void> {
     refreshPageIndicator();
     configPanel?.pagesChanged();
     followCursor(cursorLine);
+    setPageTurns(editor, pageTurns(previewEl));
     textView.refresh();
   };
   themes.installApply();

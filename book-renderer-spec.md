@@ -2036,9 +2036,11 @@ CodeMirror 6 over plain BML text.
   and footnote and ref tags stay as markup. This replaces Hide markup. The
   **Aa** menu holds the face (Alegreya, Alegreya Sans, or the book's body face),
   the size (12–24px, default 17), dim (Off, Paragraph, Sentence) and page turns
-  (on); dim and page turns are kept but not drawn yet. The text holds a reading
-  measure of about 70 characters (36em), centred in the pane while the pages are
-  hidden or the writing expanded.
+  (on); dim is kept but not drawn yet. Page turns put a short rule and the page
+  number in the right margin beside the block each printed page begins in, from
+  the last layout; a paragraph edited since hides its turn until the next layout
+  lands. The text holds a reading measure of about 70 characters (36em), centred
+  in the pane while the pages are hidden or the writing expanded.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The footer is split by

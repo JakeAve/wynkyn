@@ -21,7 +21,7 @@ export interface TextPrefs {
   face: "alegreya" | "sans" | "book";
   size: number; // px at the default root, 12–24
   dim: "off" | "paragraph" | "sentence"; // saved; drawn from task 7
-  turns: boolean; // page turns in the margin; saved, drawn from task 5
+  turns: boolean; // page turns in the margin (prose.ts setPageTurns)
   spell: string; // a WORD_LISTS key or "none"
 }
 
@@ -193,6 +193,7 @@ export function installTextView(d: TextViewDeps): TextView {
 
   const apply = () => {
     ed.dataset.view = prefs.view;
+    ed.dataset.turns = prefs.turns ? "on" : "off"; // app.css hides them
     // Source's size follows from this one in app.css (13/17 of it).
     ed.style.setProperty("--ed-size", `${prefs.size / 16}rem`); // px at the default root
     ed.style.setProperty(

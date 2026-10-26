@@ -820,7 +820,7 @@ body.typing #editor .pane-head {
   position: relative;
 }
 #editor .cm-prose-rubric,
-#editor .cm-prose-note {
+#editor .cm-prose-side {
   position: absolute;
   top: 0;
   box-sizing: border-box;
@@ -857,15 +857,41 @@ body.typing #editor .pane-head {
   letter-spacing: 0;
   color: var(--muted);
 }
-/* a note: the ☞ alone at normal width, its text (data-note) on hover */
-#editor .cm-prose-note {
+/* the right margin: a page turn above the line's notes */
+#editor .cm-prose-side {
   left: 100%;
   width: 3rem;
   padding-left: var(--s-5);
+  display: grid;
+  justify-items: start;
+  gap: var(--s-2);
+}
+/* a page turn: a short rule and the number; "p. 12" (data-long) when the
+   margins widen. Off in the Aa menu: hidden. */
+#editor .cm-prose-turn {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+#editor .cm-prose-turn::before {
+  content: "";
+  width: var(--s-5);
+  border-top: var(--hair) solid currentColor;
+}
+#editor .cm-prose-turn::after {
+  content: attr(data-turn);
+}
+#editor[data-turns="off"] .cm-prose-turn {
+  display: none;
+}
+/* a note: the ☞ alone at normal width, its text (data-note) on hover */
+#editor .cm-prose-note {
   color: var(--acc-ink);
   font-size: var(--fs);
   line-height: 1;
-  padding-top: var(--s-3);
+  padding-top: var(--s-1);
 }
 #editor .cm-prose-note::before {
   content: "☞";

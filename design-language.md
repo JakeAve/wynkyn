@@ -573,9 +573,9 @@ stored differently.
 ### 8.1 Prose (default) (planned)
 
 The text column holds only the writing, in the writing face (Alegreya by
-default). Built: rubrics, text as text, markup at the cursor, notes at normal
-width, the margins at normal width. Page turns, images and the expanded margins
-are still to come.
+default). Built: rubrics, text as text, markup at the cursor, notes and page
+turns at normal width, the margins at normal width. Images and the expanded
+margins are still to come.
 
 - **Rubrics, left margin.** Each sentinel that opens or labels a block is a red
   small-caps rubric beside it (`--f-ui` `--fs-xs`, `--acc-ink`, right-aligned):
@@ -599,9 +599,12 @@ are still to come.
   sit behind a red ☞ as marginalia; the note reads on hover (a native title
   until §6.9's tooltip). At the cursor the `%%` line shows in place instead.
   Box-drawing `%%` rules are dropped.
-- **Page turns, right margin** (planned). Where a printed page begins: a short
-  rule and the number, from the last layout; hidden for a block edited since,
-  until the next layout lands.
+- **Page turns, right margin.** Where a printed page begins: a short rule
+  (`--s-5`, `--hair`) and the number in `--muted`, above any ☞, from the last
+  layout (the live pages' `data-page-number`). It sits on the block the page
+  begins in, not the exact line. Hidden for a paragraph edited since, until the
+  next layout lands; Aa's Page turns switch hides them all. Each carries its
+  long form, "p. 12" (`data-long`), for the expanded margins.
 - **Images** (planned). `{illustration}` draws as a block: the image at a modest
   size, its caption in italics, the rubric and slug in the margin. Plates,
   drop-cap images and missing files: case by case, later. Until then an
@@ -625,16 +628,16 @@ face), size (12–24, default 17), dim (off by default; paragraph or sentence),
 page turns (on). Spelling stays its own menu. Built: the Aa popover is a
 small-caps Face heading over three check items, each face named in itself, then
 a hairline and rows of label left, control right: Size a − n + stepper, Dim a
-seg, Page turns a switch. Dim and page turns are saved but not drawn yet.
-Spelling's popover lists the word lists and None as check items. Completions,
-the wrap bar, ⌘K, sentinel shortcuts, find and replace, image drops and the
-preview following the cursor work in both views and expanded. Footer (built):
-the writer's cell opens with "Chapter title · 41,210 words · +512 today", the
-chapter at the cursor (its slug in `--f-hivis` when it has no title; left out
-before the first chapter), the manuscript's words and the words added since the
-book was opened (never below 0), recounted with the parse; then Go to style. No
-goals or streaks. Typewriter scrolling and writing on the book's paper were
-considered and dropped.
+seg, Page turns a switch. Dim is saved but not drawn yet. Spelling's popover
+lists the word lists and None as check items. Completions, the wrap bar, ⌘K,
+sentinel shortcuts, find and replace, image drops and the preview following the
+cursor work in both views and expanded. Footer (built): the writer's cell opens
+with "Chapter title · 41,210 words · +512 today", the chapter at the cursor (its
+slug in `--f-hivis` when it has no title; left out before the first chapter),
+the manuscript's words and the words added since the book was opened (never
+below 0), recounted with the parse; then Go to style. No goals or streaks.
+Typewriter scrolling and writing on the book's paper were considered and
+dropped.
 
 ## 9. Winks
 

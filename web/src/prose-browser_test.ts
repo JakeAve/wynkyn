@@ -1,6 +1,7 @@
 // web/src/prose-browser_test.ts — the Prose view in the real app
 // (design-language.md §8.1): rubrics in the margin, markup folded outside the
-// cursor's block and revealed at it, ⁂ for a break, ☞ for a note.
+// cursor's block and revealed at it, ⁂ for a break, ☞ for a note, and page
+// turns from the last layout.
 import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
@@ -24,23 +25,37 @@ It was a bright cold day in April, and the clocks were {em}striking{/em} thirtee
 After the break.
 `;
 
+// The demo book with `manuscript` written in; the server, a page on it, and
+// a cleanup.
+async function open(manuscript: string) {
+  const root = await Deno.makeTempDir();
+  const fixture = new URL("../../server/testdata/demo-book", import.meta.url);
+  const cp = await new Deno.Command("cp", {
+    args: ["-R", fixture.pathname, root],
+  }).output();
+  assert(cp.success, "copy the fixture book");
+  await Deno.writeTextFile(`${root}/demo-book/manuscript.md`, manuscript);
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const browser = await chromium.launch({ channel: "chrome" });
+  const page = await browser.newPage();
+  await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
+  await page.locator("#editor .cm-line").first().waitFor();
+  return {
+    page,
+    close: async () => {
+      await browser.close();
+      await server.stop();
+      await Deno.remove(root, { recursive: true });
+    },
+  };
+}
+
 Deno.test({
   name: "Prose draws rubrics, ⁂ and ☞, and reveals markup at the cursor",
   ignore: !hasChrome || !appBuilt,
   fn: async () => {
-    const root = await Deno.makeTempDir();
-    const fixture = new URL("../../server/testdata/demo-book", import.meta.url);
-    const cp = await new Deno.Command("cp", {
-      args: ["-R", fixture.pathname, root],
-    }).output();
-    assert(cp.success, "copy the fixture book");
-    await Deno.writeTextFile(`${root}/demo-book/manuscript.md`, MANUSCRIPT);
-    const server = await startServer({ booksRoot: root, port: 0 });
-    const browser = await chromium.launch({ channel: "chrome" });
+    const { page, close } = await open(MANUSCRIPT);
     try {
-      const page = await browser.newPage();
-      await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-      await page.locator("#editor .cm-line").first().waitFor();
       assertEquals(
         await page.locator("#editor").getAttribute("data-view"),
         "prose",
@@ -68,9 +83,62 @@ Deno.test({
       assert(text.includes("{title}"));
       assert(!text.includes("{break}"), "other blocks stay folded");
     } finally {
-      await browser.close();
-      await server.stop();
-      await Deno.remove(root, { recursive: true });
+      await close();
+    }
+  },
+});
+
+const LONG = `{chapter: one}
+{title}
+Chapter One
+
+${
+  Array.from(
+    { length: 40 },
+    (_, i) =>
+      `Paragraph ${i + 1}. ` +
+      "The quick brown fox jumps over the lazy dog, and again. ".repeat(6),
+  ).join("\n\n")
+}
+`;
+
+Deno.test({
+  name: "Prose shows page turns from the last layout",
+  ignore: !hasChrome || !appBuilt,
+  fn: async () => {
+    const { page, close } = await open(LONG);
+    try {
+      const turn = page.locator('#editor .cm-prose-turn[data-turn="2"]');
+      await page.locator("#preview .pagedjs_page").nth(1).waitFor({
+        timeout: 30_000,
+      });
+      // CodeMirror draws only the lines near the viewport: scroll to it.
+      for (let i = 0; i < 40 && !await turn.count(); i++) {
+        await page.locator("#editor .cm-scroller").evaluate((s) =>
+          s.scrollTop += 200
+        );
+        await page.waitForTimeout(50);
+      }
+      assertEquals(await turn.getAttribute("data-long"), "p. 2");
+      const line = page.locator("#editor .cm-line", {
+        has: page.locator('.cm-prose-turn[data-turn="2"]'),
+      });
+
+      // An edit in that block hides its turn until the next layout lands.
+      await line.click({ position: { x: 40, y: 8 } });
+      await page.keyboard.type("x");
+      assertEquals(await turn.count(), 0, "edited: the turn is hidden");
+      await turn.waitFor({ timeout: 30_000 });
+
+      // Page turns off in the Aa menu hides them all.
+      await page.locator("#tv-aa").click();
+      await page.locator("#tv-turns").click();
+      assertEquals(
+        await page.locator("#editor .cm-prose-turn:visible").count(),
+        0,
+      );
+    } finally {
+      await close();
     }
   },
 });

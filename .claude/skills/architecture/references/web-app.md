@@ -24,7 +24,8 @@ Editor side: `editor.ts` (the CodeMirror pane; `setWriteView` swaps Prose and
 Source), `prose-model.ts` (pure: how Prose shows each line, folded or shown,
 its rubric, kind, stand-in and notes, plus the footer's word count and
 chapter) → `prose.ts` (`prose()`, the decorations and margin widgets that draw
-it), `bml-language.ts`,
+it; `setPageTurns` takes `preview.ts`'s `pageTurns` after each layout, and app.ts
+calls it), `bml-language.ts`,
 `editor-insert.ts` + `snippets.ts` (inserting sentinels), `editor-images.ts`
 (dropped/pasted images), `search-panel.ts`, `spelling.ts`, `diagnostics.ts`.
 Outline: `tree-data.ts` (pure) → `tree-view.ts`. Storage in the page:
