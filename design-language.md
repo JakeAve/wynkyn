@@ -579,7 +579,8 @@ margins are still to come.
 
 - **Rubrics, left margin.** Each sentinel that opens or labels a block is a red
   small-caps rubric beside it (`--f-ui` `--fs-xs`, `--acc-ink`, right-aligned):
-  `Chapter` (slug beneath in `--f-hivis` `--fs-2xs`, muted, truncated), `Title`,
+  `Chapter` (slug beneath in `--f-hivis` `--fs-2xs`, muted, right-aligned and
+  truncated within the margin, inset `--s-5` from the pane's edge), `Title`,
   `Drop cap`, `Quote`, `Poem`, `Illustration`, an `{is}` name, `Break`.
   Structural blocks (matter, part, chapter) also draw a hairline (`--line`)
   across the text column. A rubric is a widget against `.cm-content`'s padding,

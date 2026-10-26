@@ -832,11 +832,12 @@ body.typing #editor .pane-head {
   user-select: none;
   cursor: default;
 }
-/* a red small-caps rubric, the slug beneath it truncated */
+/* a red small-caps rubric, the slug beneath it right-aligned and truncated,
+   inset from the pane's edge */
 #editor .cm-prose-rubric {
   right: 100%;
   width: 6rem;
-  padding-right: var(--s-5);
+  padding-inline: var(--s-5);
   text-align: right;
   color: var(--acc-ink);
   font-variant-caps: all-small-caps;
