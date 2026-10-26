@@ -133,31 +133,74 @@
       <div id="editor">
         <div class="pane-head">
           <div id="text-view" role="toolbar" aria-label="Text view">
-            <span class="seg" role="radiogroup" aria-label="Font">
+            <span id="tv-views" class="seg" role="radiogroup"
+              aria-label="View" title="Prose or source">
               <button type="button" role="radio"
-                data-font="serif">Serif</button>
-              <button type="button" role="radio" data-font="sans">Sans</button>
-              <button type="button" role="radio" data-font="mono">Mono</button>
+                data-view="prose">Prose</button>
+              <button type="button" role="radio"
+                data-view="source">Source</button>
             </span>
-            <label class="tv-size">
-              <button type="button" class="tv-step" data-step="-1"
-                aria-label="Smaller text">−</button>
-              <input id="tv-size" type="range" min="12" max="24" step="1"
-                aria-label="Text size">
-              <button type="button" class="tv-step" data-step="1"
-                aria-label="Larger text">+</button>
-              <output for="tv-size"></output>
-            </label>
-            <label class="tv-hide"
-              title="Folds sentinel lines and {em} tags away, except in the paragraph you're in">
-            Hide markup
-            <input id="tv-hide" type="checkbox" role="switch" class="sw">
-          </label>
-            <label
-              title="Underlines words not in the word list or this book's dictionary.json; hover one for suggestions">
-            Spelling
-            <select id="tv-spell" class="sel"></select>
-          </label>
+            <div class="tv-menu">
+              <button id="tv-aa" type="button" class="btn sm"
+                aria-haspopup="dialog" aria-expanded="false"
+                aria-controls="tv-aa-pop"
+                title="Text view: face, size, dim, page turns">Aa</button>
+              <div id="tv-aa-pop" class="tvpop" role="dialog"
+                aria-label="Text view" hidden>
+                <div class="hd">Face</div>
+                <div role="radiogroup" aria-label="Face">
+                  <button type="button" role="radio" class="it"
+                    data-face="alegreya"><svg
+                      class="tico ck"><use href="#check" /></svg>Alegreya</button>
+                  <button type="button" role="radio" class="it"
+                    data-face="sans"><svg
+                      class="tico ck"><use href="#check" /></svg>Alegreya
+                    Sans</button>
+                  <button type="button" role="radio" class="it"
+                    data-face="book"><svg
+                      class="tico ck"><use href="#check" /></svg>The book's
+                    body face</button>
+                </div>
+                <hr>
+                <div class="row">
+                  <span>Size</span>
+                  <span class="tv-size">
+                    <button type="button" class="tv-step" data-step="-1"
+                      aria-label="Smaller text">−</button>
+                    <output id="tv-size" aria-label="Text size"></output>
+                    <button type="button" class="tv-step" data-step="1"
+                      aria-label="Larger text">+</button>
+                  </span>
+                </div>
+                <div class="row">
+                  <span>Dim</span>
+                  <span class="seg" role="radiogroup" aria-label="Dim">
+                    <button type="button" role="radio"
+                      data-dim="off">Off</button>
+                    <button type="button" role="radio"
+                      data-dim="paragraph">Paragraph</button>
+                    <button type="button" role="radio"
+                      data-dim="sentence">Sentence</button>
+                  </span>
+                </div>
+                <label class="row">
+                  Page turns
+                  <input id="tv-turns" type="checkbox" role="switch"
+                    class="sw">
+                </label>
+              </div>
+            </div>
+            <div class="tv-menu">
+              <button id="tv-spell" type="button" class="btn sm"
+                aria-haspopup="true" aria-expanded="false"
+                aria-controls="tv-spell-pop"
+                title="Underlines words not in the word list or this book's dictionary.json; hover one for suggestions">Spelling
+                <svg class="chev tico" viewBox="0 0 16 16">
+                  <path d="M4 6.5l4 4 4-4" />
+                </svg></button>
+              <div id="tv-spell-pop" class="tvpop" role="radiogroup"
+                aria-label="Spelling" hidden></div>
+            </div>
           </div>
           <button class="btn sm icon expand" data-pane="writing"
             aria-pressed="false" title="Expand the writing; esc returns"

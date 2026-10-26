@@ -143,7 +143,7 @@ export function setEditionSpans(
   view.dispatch({ effects: setSpans.of({ spans, token }) });
 }
 
-// ---- hide markup (the text view bar): sentinel lines beside prose and {em} tags
+// ---- Prose's markup folding, for now: sentinel lines beside prose and {em} tags
 // fold away everywhere but the cursor's paragraph (hiddenLines) ----
 
 const hide = Decoration.replace({});
@@ -191,10 +191,18 @@ const hiddenMarkup = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-const markup = new Compartment();
+// The write pane's two views of the same file (design-language.md §8). Prose
+// folds markup away outside the cursor's paragraph (hiddenMarkup, until the
+// Prose drawing lands); Source shows every mark. text-view.ts sets
+// #editor[data-view] beside this, for the faces and sizes in app.css.
+export type WriteView = "prose" | "source";
 
-export function setHideMarkup(view: EditorView, on: boolean): void {
-  view.dispatch({ effects: markup.reconfigure(on ? hiddenMarkup : []) });
+const writeView = new Compartment();
+
+export function setWriteView(view: EditorView, v: WriteView): void {
+  view.dispatch({
+    effects: writeView.reconfigure(v === "prose" ? hiddenMarkup : []),
+  });
 }
 
 export function createEditor(opts: {
@@ -217,7 +225,7 @@ export function createEditor(opts: {
         insertExtensions(opts.images ? [imageCompletions(opts.images)] : []),
         editionSpans,
         lintGutter(),
-        markup.of([]),
+        writeView.of([]),
         spellExtensions(),
         opts.images ? imageExtensions(opts.images) : [],
         EditorView.lineWrapping,

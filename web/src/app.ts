@@ -52,7 +52,7 @@ import type { Backend } from "./backend.ts";
 import { installSwitcher, type Switcher } from "./switcher.ts";
 import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
-import { installTextView } from "./text-view.ts";
+import { installTextView, type TextView } from "./text-view.ts";
 import { installPanes, type Panes } from "./panes.ts";
 import { connect } from "./library.ts";
 import { $, brief } from "./dom.ts";
@@ -704,8 +704,8 @@ function chordOf(e: KeyboardEvent): string | null {
 // Open popups esc closes first: a dialog, the find bar, completions, the
 // sentinel palette and wrap bar, menus. Not hover tooltips (spelling, lint).
 const POPUPS =
-  "dialog[open], .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop";
-function installShortcuts(panes: Panes): void {
+  "dialog[open], .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
+function installShortcuts(panes: Panes, textView: TextView): void {
   const bySnippet = new Map(
     SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((
       s,
@@ -726,6 +726,8 @@ function installShortcuts(panes: Panes): void {
     else if (chord === "Mod-\\") panes.toggleTree();
     else if (chord === "Mod-.") panes.togglePages();
     else if (chord === "Mod-Shift-Enter") panes.toggleExpand();
+    // Prose | Source; capture phase, so CodeMirror's toggle comment never sees it
+    else if (chord === "Mod-/" && mode === "write") textView.toggleView();
     else return;
     e.preventDefault();
   }, true);
@@ -736,6 +738,7 @@ function installShortcuts(panes: Panes): void {
     );
   });
   $("tree-toggle").title += ` (${chordLabel("Mod-\\")})`;
+  $("tv-views").title += ` (${chordLabel("Mod-/")})`;
   for (const b of document.querySelectorAll<HTMLElement>(".expand")) {
     b.title += ` (${chordLabel("Mod-Shift-↩")})`;
   }
@@ -869,10 +872,22 @@ async function main(): Promise<void> {
     images,
   });
   reparse(text);
-  installTextView({ editor, backend, book, setStatus });
+  const textView = installTextView({
+    editor,
+    backend,
+    book,
+    setStatus,
+    // The live pages' body text (the `body` style is `.bml`, spec §4.5).
+    bodyFace: () => {
+      const bml = $("preview").querySelector(
+        ":scope > :not(.preview-stage) .bml",
+      );
+      return bml ? getComputedStyle(bml).fontFamily : null;
+    },
+  });
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
-  installShortcuts(installPanes({ mode: () => mode }));
+  installShortcuts(installPanes({ mode: () => mode }), textView);
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
       .mode as Mode | undefined;
@@ -939,6 +954,7 @@ async function main(): Promise<void> {
       refreshPageIndicator();
       configPanel?.pagesChanged();
       followCursor(cursorLine);
+      textView.refresh();
     }, (err) => {
       // The old pages stay up; their problems no longer describe this book.
       setStatus("error", `preview: ${brief(err)}`);
@@ -952,6 +968,7 @@ async function main(): Promise<void> {
     refreshPageIndicator();
     configPanel?.pagesChanged();
     followCursor(cursorLine);
+    textView.refresh();
   };
   themes.installApply();
   const onMessage = (msg: ServerMessage) => {

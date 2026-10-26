@@ -1969,9 +1969,9 @@ them. A hidden preview still lays out (it leaves the grid, never
 `display: none`), since Paged.js paginates by measuring.
 
 Each pane carries its own controls in a header along its top: the write pane
-(Write's middle column) has the text view (§7.3), the pages pane (the right
-column in every mode) none yet. Both headers end in an expand button at the top
-right corner:
+(Write's middle column) has Prose | Source, Aa and Spelling (the text view,
+§7.3), the pages pane (the right column in every mode) none yet. Both headers
+end in an expand button at the top right corner:
 
 - **Writing expanded** (Write only): the outline and the pages leave and the
   text centres at its measure. While typing, the toolbar, footer and pane header
@@ -2019,16 +2019,20 @@ CodeMirror 6 over plain BML text.
   `{subtitle}` italic. A `%%` line of only box-drawing characters draws as a
   hairline rule, and a `%%` label between two rules as small caps.
 - The selection is a green-grey tint, distinct from the quieter active line.
-- The text view (in the write pane's header, §7.1) is a per-reader preference,
-  not part of the book: prose in Serif (default), Sans or Mono at 12–24px
-  (default 16), with sentinels always in monospace so markup reads as markup.
-  The text holds a reading measure of about 70 characters (36em), centred in the
-  pane while the pages are hidden or the writing expanded. **Hide markup** folds
+- The text view (in the write pane's header, §7.1) is a per-reader preference in
+  localStorage, not part of the book. Two views of the same file, switched by
+  **Prose | Source** or ⌘/: **Source** sets every line in the system monospace
+  at 13/17 of the reader's size; **Prose** (the default) sets the writing in the
+  chosen face, with sentinels in monospace so markup reads as markup, and folds
   away the sentinel lines of every paragraph that also has prose (`{title}`,
   `{dropcap}`, `{quote}` … `{/quote}`) and the `{em}` tags, except in the
   paragraph holding the cursor; structural lines stay as landmarks, and a
   paragraph of sentinels alone (`{illustration}`, `{break}`) stays visible so it
-  can still be reached.
+  can still be reached. The **Aa** menu holds the face (Alegreya, Alegreya Sans,
+  or the book's body face), the size (12–24px, default 17), dim (Off, Paragraph,
+  Sentence) and page turns (on); dim and page turns are kept but not drawn yet.
+  The text holds a reading measure of about 70 characters (36em), centred in the
+  pane while the pages are hidden or the writing expanded.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The footer is split by
@@ -2053,11 +2057,11 @@ CodeMirror 6 over plain BML text.
   its capital; a possessive is checked without its `'s`. Hovering an underlined
   word offers up to five suggestions and **Add to dictionary**, which writes the
   word (a possessive as its name) to `dictionary.json` through
-  `POST /api/books/:book/dictionary` with `{ word }`. **Spelling** on the text
-  view bar is a menu of the word lists, English (the default) or None, kept with
-  the reader's other text view choices; each language is one list in `vendor/`
-  and a row in `WORD_LISTS` (`app.ts`), and `dictionary.json` is the same
-  whatever the language.
+  `POST /api/books/:book/dictionary` with `{ word }`. **Spelling** in the write
+  pane's header is a menu of the word lists, English (the default) or None, kept
+  with the reader's other text view choices; each language is one list in
+  `vendor/` and a row in `WORD_LISTS` (`text-view.ts`), and `dictionary.json` is
+  the same whatever the language.
 - **EXPERIMENTAL:** `{only}` spans (§3.2.9) carry an amber mark on every line's
   gutter and a tag naming their editions; lines the open edition skips are
   dimmed.

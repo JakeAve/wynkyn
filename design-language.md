@@ -478,10 +478,10 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   hairlines bleeding to the edges. Optional small-caps heading. Used by: the
   book and edition switcher (`#switcher`), the font picker (`.fontpop`), `{`
   completions (`.cm-tooltip-autocomplete`), ⌘K (`.cm-bml-palette`), the wrap bar
-  and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling with the Prose
-  view. Fields inside a popover are §6.3 frames (focus: `--acc` border and
-  ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but its fields
-  and pressed options follow the same rules.
+  and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write
+  pane's header (`.tvpop`). Fields inside a popover are §6.3 frames (focus:
+  `--acc` border and ring). The find bar (`.cm-bml-find`) is a panel, not a
+  popover, but its fields and pressed options follow the same rules.
 - **Completion row:** a sentinel's name in `--f-mono` `--fs-sm` `--acc-ink`, a
   7rem column; description `--muted`; how it closes (`{/quote}`, "wraps", "—")
   in mono `--fs-2xs` `--muted` at the right. An image's row is a thumbnail, its
@@ -540,11 +540,10 @@ empty").
 The three-column rule stands: left is where you are, middle is what you're
 changing, right is the result.
 
-- **Pane headers.** Write pane: Prose | Source, Aa, Spelling at left; expand at
-  right (until the Prose view lands, the text view's Serif/Sans/Mono, size, Hide
-  markup and Spelling sit there). Pages pane, in every mode: expand at right
-  (room later for zoom or spread/single). The style panel keeps its view heading
-  inside.
+- **Pane headers.** Write pane: Prose | Source (a small seg), Aa and Spelling
+  (small ghost buttons opening §6.9 popovers) at left; expand at right. Pages
+  pane, in every mode: expand at right (room later for zoom or spread/single).
+  The style panel keeps its view heading inside.
 - **Expand.** The write pane and the pages pane each expand from their top-right
   corner (arrows out; arrows in, in `--acc-ink`, while expanded).
   - Expanding the **writing** hides the outline and the pages. The text keeps
@@ -601,21 +600,27 @@ default).
   (slug truncated), notes collapse to the ☞ (hover to read) and page turns show
   the number alone. Expanded, they are written out.
 
-### 8.2 Source (planned)
+### 8.2 Source
 
-Every mark as typed, all in `--f-mono`, coloured per §2.6, with today's sentinel
-treatments (structural band and hairline, rails joining explicit-close pairs,
-comment rules as hairlines).
+Every mark as typed, all in `--f-mono` at 13/17 of the reader's size (line
+numbers too), coloured per §2.6, with today's sentinel treatments (structural
+band and hairline, rails joining explicit-close pairs, comment rules as
+hairlines). `#editor[data-view="source"]`; until §8.1 is drawn, Prose folds
+markup outside the cursor's paragraph, as Hide markup did.
 
 ### 8.3 Text view (Aa), spelling, footer (planned)
 
 Aa, per reader, not per book: face (Alegreya, Alegreya Sans, or the book's body
-face), size, dim (off by default; paragraph or sentence), page turns (on).
-Spelling stays its own menu. Completions, the wrap bar, ⌘K, sentinel shortcuts,
-find and replace, image drops and the preview following the cursor work in both
-views and expanded. Footer: chapter, word count, words this session, Go to
-style. No goals or streaks. Typewriter scrolling and writing on the book's paper
-were considered and dropped.
+face), size (12–24, default 17), dim (off by default; paragraph or sentence),
+page turns (on). Spelling stays its own menu. Built: the Aa popover is a
+small-caps Face heading over three check items, each face named in itself, then
+a hairline and rows of label left, control right: Size a − n + stepper, Dim a
+seg, Page turns a switch. Dim and page turns are saved but not drawn yet.
+Spelling's popover lists the word lists and None as check items. Completions,
+the wrap bar, ⌘K, sentinel shortcuts, find and replace, image drops and the
+preview following the cursor work in both views and expanded. Footer: chapter,
+word count, words this session, Go to style. No goals or streaks. Typewriter
+scrolling and writing on the book's paper were considered and dropped.
 
 ## 9. Winks
 

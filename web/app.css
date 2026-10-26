@@ -774,49 +774,159 @@ body.typing #editor .pane-head {
   flex: 1;
   min-height: 0;
 }
-/* The text view (#text-view, app.ts installTextView): the writer's font and size on
-   #editor, a reading measure, centred once Pages is hidden. Size goes on
-   .cm-content only, so line numbers stay put, and the measure is in rem, so
-   bigger text wraps sooner instead of widening the column. */
+/* The write pane's text (text-view.ts, design-language.md §8): Prose sets the
+   writing in the reader's face and size, Source every line in the system
+   monospace at 13/17 of it. Size goes on .cm-content only, so line numbers
+   stay put, and the measure is in rem, so bigger text wraps sooner instead of
+   widening the column; it is centred once Pages is hidden. */
+#editor {
+  --ed-font: var(--ed-face, var(--f-text));
+  --ed-fs: var(--ed-size, 1.0625rem);
+}
+#editor[data-view="source"] {
+  --ed-font: var(--f-mono);
+  --ed-fs: calc(var(--ed-size, 1.0625rem) * 13 / 17);
+}
 #editor .cm-scroller {
-  font-family: var(--ed-font, var(--f-text));
+  font-family: var(--ed-font);
   line-height: 1.6;
 }
-/* numbers sit on the text's line */
+/* numbers sit on the text's line; in Source they are the text's size too */
 #editor .cm-gutters {
-  line-height: calc(var(--ed-fs, 1rem) * 1.6);
+  line-height: calc(var(--ed-fs) * 1.6);
+}
+#editor[data-view="source"] .cm-gutters {
+  font-size: var(--ed-fs);
 }
 #editor .cm-content {
-  font-size: var(--ed-fs, 1rem);
+  font-size: var(--ed-fs);
   max-width: 36rem; /* ~70 characters of 1rem serif prose */
 }
 #panes.pages-hidden #editor .cm-scroller {
   justify-content: center;
 }
-/* the text view, in the write pane's header */
+/* The write pane's header (§7): Prose | Source (a small seg), Aa, Spelling. */
 #text-view {
   flex: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-3) var(--s-6);
+  gap: var(--s-2) var(--s-3);
   padding-block: var(--s-2);
-  color: var(--muted);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
 }
-#text-view label {
+#text-view > .seg button {
+  min-height: calc(var(--h-sm) - 2 * var(--s-1) - 2 * var(--hair));
+  padding-block: 0;
+}
+#text-view .tv-menu {
+  position: relative;
+}
+#text-view .tv-menu > .btn[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--fg);
+}
+/* Aa and Spelling (§6.9): popovers under their buttons, as .fontpop. */
+#text-view .tvpop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--s-2));
+  left: 0;
+  width: max-content;
+  min-width: 15rem;
   display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-2);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+  corner-shape: var(--corner);
+  box-shadow: var(--shadow-pop);
+  color: var(--fg);
+  font-size: var(--fs);
+}
+#text-view .tvpop [role="radiogroup"]:not(.seg) {
+  display: grid;
+  gap: var(--s-1);
+}
+#text-view .tvpop .hd {
+  padding: var(--s-2) var(--s-3) var(--s-1);
+  font-size: var(--fs-sm);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  font-weight: 500;
+  color: var(--muted);
+}
+#text-view .tvpop hr {
+  margin: var(--s-1) calc(-1 * var(--s-2));
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+/* An item: a check column, then its name; the current one takes the wash. */
+#text-view .tvpop .it {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
   align-items: center;
-  gap: var(--s-4);
+  gap: var(--s-3);
+  width: 100%;
+  min-height: var(--h-md);
+  padding: 0 var(--s-4) 0 var(--s-3);
+  background: none;
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  text-align: left;
   cursor: pointer;
 }
-#text-view input[type="range"] {
-  width: 5.625rem;
-  margin: 0;
-  accent-color: var(--fg);
+#text-view .tvpop .it:hover {
+  background: var(--hover);
 }
-#text-view output {
-  min-width: 2.6em;
+#text-view .tvpop .it .ck {
+  width: 0.875rem;
+  height: 0.875rem;
+  visibility: hidden;
+}
+#text-view .tvpop .it[aria-checked="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+#text-view .tvpop .it[aria-checked="true"] .ck {
+  visibility: visible;
+}
+/* each face named in itself */
+#text-view .tvpop [data-face="alegreya"] {
+  font: var(--fs-lg) var(--f-text);
+}
+#text-view .tvpop [data-face="sans"] {
+  font: var(--fs-lg) var(--f-ui);
+}
+#text-view .tvpop .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-5);
+  min-height: var(--h-md);
+  padding-inline: var(--s-3);
+  cursor: default;
+}
+#text-view .tvpop label.row {
+  cursor: pointer;
+}
+#text-view .tvpop .row .seg {
+  flex-wrap: nowrap;
+}
+#text-view .tvpop .row .seg button {
+  font-size: var(--fs-sm);
+}
+#text-view .tv-size {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+#text-view .tv-size output {
+  min-width: 2ch;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 #text-view .tv-step {
@@ -835,9 +945,6 @@ body.typing #editor .pane-head {
 #text-view .tv-step:hover {
   background: var(--hover);
   color: var(--fg);
-}
-#text-view .tv-hide {
-  margin-left: auto;
 }
 /* Banners (§6.10): a strip across the top of the pane they concern, small
    ghost buttons at the right. Changed on disk: the buffer has unsaved edits
@@ -2026,10 +2133,6 @@ body.typing #editor .pane-head {
   outline: none;
   border-color: var(--acc);
   box-shadow: 0 0 0 1px var(--acc);
-}
-#text-view select.sel {
-  height: var(--h-sm); /* as the bar's steppers */
-  padding-left: var(--s-3);
 }
 #config-overlay input.txt {
   width: 8.75rem;

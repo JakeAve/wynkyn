@@ -196,6 +196,12 @@
     .fontpanel {
       padding-bottom: 16rem !important;
     }
+    main #text-view .tvpop {
+      position: static;
+    }
+    main .board #text-view {
+      display: contents;
+    }
     </style>
   </head>
   <body>
@@ -643,6 +649,60 @@
                 </svg><svg class="in">
                   <use href="#expand-in" />
                 </svg></button>
+            </div>
+          </div>
+        </div>
+        <p>The write pane's header: Prose | Source at left, then Aa and
+          Spelling, each opening a popover (§6.9, §8.3).</p>
+        <div class="board">
+          <div id="text-view" role="toolbar" aria-label="Text view">
+            <div class="surface" style="width: 100%">
+              <div class="pane-head">
+                <span class="seg" role="radiogroup" aria-label="View"><button
+                    type="button" role="radio" aria-checked="true">Prose</button><button
+                    type="button" role="radio" aria-checked="false">Source</button></span>
+                <button type="button" class="btn sm"
+                  aria-expanded="true">Aa</button>
+                <button type="button"
+                  class="btn sm">Spelling <svg class="chev tico" viewBox="0 0 16 16"><path d="M4 6.5l4 4 4-4" /></svg></button>
+              </div>
+            </div>
+            <div class="cell">
+              <span class="cap">Aa</span>
+              <div class="tvpop" role="dialog" aria-label="Text view">
+                <div class="hd">Face</div>
+                <div role="radiogroup" aria-label="Face">
+                  <button type="button" role="radio" class="it"
+                    data-face="alegreya"
+                    aria-checked="true"><svg class="tico ck"><use href="#check" /></svg>Alegreya</button>
+                  <button type="button" role="radio" class="it" data-face="sans"
+                    aria-checked="false"><svg class="tico ck"><use href="#check" /></svg>Alegreya Sans</button>
+                  <button type="button" role="radio" class="it" data-face="book"
+                    aria-checked="false"><svg class="tico ck"><use href="#check" /></svg>The book's body face</button>
+                </div>
+                <hr>
+                <div class="row"><span>Size</span><span class="tv-size"><button
+                      type="button" class="tv-step">−</button><output>17</output><button
+                      type="button" class="tv-step">+</button></span></div>
+                <div class="row"><span>Dim</span><span class="seg"
+                    role="radiogroup" aria-label="Dim"><button type="button"
+                      role="radio" aria-checked="true">Off</button><button
+                      type="button" role="radio"
+                      aria-checked="false">Paragraph</button><button
+                      type="button" role="radio"
+                      aria-checked="false">Sentence</button></span></div>
+                <label class="row">Page turns <input type="checkbox"
+                    role="switch" class="sw" checked></label>
+              </div>
+            </div>
+            <div class="cell">
+              <span class="cap">Spelling</span>
+              <div class="tvpop" role="radiogroup" aria-label="Spelling">
+                <button type="button" role="radio" class="it"
+                  aria-checked="true"><svg class="tico ck"><use href="#check" /></svg>English</button>
+                <button type="button" role="radio" class="it"
+                  aria-checked="false"><svg class="tico ck"><use href="#check" /></svg>None</button>
+              </div>
             </div>
           </div>
         </div>
