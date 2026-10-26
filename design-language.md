@@ -88,8 +88,8 @@ bright pigment is too light to carry small text.
 
 | Token        | Use                                  | Light                    | Dark        |
 | ------------ | ------------------------------------ | ------------------------ | ----------- |
-| `--acc`      | marks and fills: cursor, dots, rules | `#d93a24`                | `#f0705c`   |
-| `--acc-ink`  | red text, red icons                  | `#b02a17`                | `#f59384`   |
+| `--acc`      | marks and fills: cursor, dots, rules | `#db3834`                | `#ef6d62`   |
+| `--acc-ink`  | red text, red icons                  | `#b12926`                | `#f49287`   |
 | `--acc-wash` | the selected thing's background      | `--acc` 10%, transparent | `--acc` 16% |
 | `--acc-btn`  | primary button fill                  | `--acc-ink`              | `--acc`     |
 | `--on-acc`   | text on the primary button           | `#ffffff`                | `--bg`      |
@@ -640,7 +640,7 @@ Out of scope unless asked: illustrations, woodcut empty states, blackletter.
 ## 10. The mark
 
 The existing sun (`web/brand/mark.svg`), rays and disc, drawn in `--acc`: the
-SVG sets its own `color` (`#d93a24`, `#f0705c` under
+SVG sets its own `color` (`#db3834`, `#ef6d62` under
 `prefers-color-scheme:
 dark`), since an `<img>` or favicon cannot read the
 page's tokens. Favicon and app icons keep their artwork until re-exported in
