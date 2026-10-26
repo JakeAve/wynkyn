@@ -624,6 +624,7 @@ async function refreshConfigFromRemote(): Promise<void> {
     metadata = fresh.metadata;
     sync.rebaseMetadata(fresh.version);
     configPanel.refresh(metadata);
+    setPaperStock(metadata.page?.paper);
   } catch {
     // 409/network — leave the panel as-is; the user can close and reopen.
   }
@@ -700,9 +701,10 @@ function chordOf(e: KeyboardEvent): string | null {
     e.key.length === 1 ? e.key.toUpperCase() : e.key
   }`;
 }
-// Open popups esc closes first: a dialog, the find bar, completions, menus.
+// Open popups esc closes first: a dialog, the find bar, completions, the
+// sentinel palette and wrap bar, menus. Not hover tooltips (spelling, lint).
 const POPUPS =
-  "dialog[open], .cm-tooltip, .cm-bml-find, .cm-bml-palette, .fontpop";
+  "dialog[open], .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop";
 function installShortcuts(panes: Panes): void {
   const bySnippet = new Map(
     SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((

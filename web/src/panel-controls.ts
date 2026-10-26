@@ -23,7 +23,6 @@ const ICONS = {
   alignR: '<path d="M3 4h10M7 7h6M3 10h10M7 13h6"/>',
   alignJ: '<path d="M3 4h10M3 7h10M3 10h10M3 13h10"/>',
   reset: '<path d="M3.5 7.5a4.5 4.5 0 1 1 1.3 3.2"/><path d="M3.5 3.5v4h4"/>',
-  pointer: '<path d="M4 2.5 12 8l-3.6.8L10.6 13l-1.5.7-2.2-4.2L4 12z"/>',
   info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.5v3.5M8 5.2v.1"/>',
 };
 
@@ -301,7 +300,7 @@ export function swatches(
   const paint = (v: string | undefined) => {
     let own = v !== undefined;
     for (const [b, ov] of btns) {
-      const on = ov === (v ?? "");
+      const on = ov.toLowerCase() === (v ?? "").toLowerCase();
       if (on) own = false;
       b.setAttribute("aria-pressed", String(on));
     }
@@ -315,7 +314,7 @@ export function swatches(
     paint(v);
     onChange(v);
   };
-  picker.oninput = () => set(picker.value);
+  picker.onchange = () => set(picker.value); // on release: one save, not one per drag tick
   code.onchange = () => {
     const t = code.value.trim();
     if (t && !CSS.supports("color", t)) return paint(value); // not a colour

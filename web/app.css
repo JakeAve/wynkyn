@@ -694,7 +694,7 @@ kbd {
 :is(#toolbar, #footer, #editor .pane-head > :not(.expand)) {
   transition: opacity var(--t);
 }
-body.typing :is(#toolbar, #footer, #editor .pane-head > :not(.expand)) {
+body.typing :is(#toolbar, #footer, #editor .pane-head > :not(.expand)):not(:focus-within) {
   opacity: 0;
 }
 body.typing #editor .pane-head {

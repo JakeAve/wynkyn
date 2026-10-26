@@ -145,8 +145,8 @@ The pages stay paper in both themes, so their marks use fixed values.
 ### 2.5 Paper stock (per book)
 
 The preview pages take the book's paper stock, saved in `metadata.json` as
-`page.paper` (any CSS colour; absent = white), merged and upgraded like any
-other `page` key. Kept deliberately quiet:
+`page.paper` (any CSS colour; absent = the default stock, Bright white), merged
+and upgraded like any other `page` key. Kept deliberately quiet:
 
 - One row in Style → Page size & margins, "Paper stock": `swatches` (§6.5) for
   Bright white (unset, the default `--stock`), Natural `#fbf8f1`, Ivory
@@ -550,7 +550,8 @@ changing, right is the result.
   - Expanding the **writing** hides the outline and the pages. The text keeps
     its measure, the margins widen so notes are written out, and the toolbar,
     footer and pane header (except the expand button) fade while typing and
-    return when the mouse moves. (The widened margins wait for Prose, §8.1.)
+    return when the mouse moves (a control focused by Tab stays visible). (The
+    widened margins wait for Prose, §8.1.)
   - Expanding the **pages** shows the spread larger, nothing else. Same in Style
     and Publish.
   - In either, the mouse at the left edge slides the outline in over the view
@@ -561,7 +562,9 @@ changing, right is the result.
   - Expanded state is per mode and persists. A hidden preview still lays out (it
     leaves the grid, never `display: none`).
 - **Gone from the toolbar:** the Pages toggle (⌘. stays as a shortcut), focus,
-  and every Write-only control.
+  and every Write-only control. While the pages are hidden, the write pane's
+  corner button shows the return state, "Show the pages (⌘.)", and brings them
+  back.
 
 ## 8. The write pane (planned)
 

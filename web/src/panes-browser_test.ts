@@ -136,3 +136,26 @@ Deno.test({
       assert(!(await panesClass(page)).includes("pages-hidden"));
     }),
 });
+
+Deno.test({
+  name: "with the pages hidden, the writing's corner button shows them",
+  ignore: !hasChrome || !appBuilt,
+  fn: () =>
+    withApp(async (page) => {
+      const corner = page.locator('#editor .expand[data-pane="writing"]');
+      await page.keyboard.press("ControlOrMeta+Period");
+      assert((await panesClass(page)).includes("pages-hidden"));
+      assertEquals(await corner.getAttribute("aria-pressed"), "true");
+      assert(
+        (await corner.getAttribute("aria-label"))!.startsWith("Show the pages"),
+      );
+      await corner.click();
+      const cls = await panesClass(page);
+      assert(!cls.includes("pages-hidden") && !cls.includes("expand"));
+      assertEquals(await corner.getAttribute("aria-pressed"), "false");
+      assertEquals(
+        await corner.getAttribute("aria-label"),
+        "Expand the writing",
+      );
+    }),
+});

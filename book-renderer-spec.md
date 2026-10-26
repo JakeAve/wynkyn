@@ -1227,12 +1227,12 @@ in one section.
   as §7.7 step 3 does for `duplex`.
 - `reverse-backs` — with `duplex: none`, `true` writes the backs file last sheet
   first, for printers that stack face up. Default `false`.
-- `paper` — the paper stock, any CSS colour (`"#f3e9d2"`); unset is white. It
-  tints the preview's pages only, so the author sees the book on the stock it
-  will be printed on: print sheets, the PDF of the pages, `bml export` and the
-  EPUB stay white, and nothing is written into the manuscript or the colophon.
-  The panel offers Bright white (unset), Natural, Ivory, Cream and Recycled
-  grey, and a custom colour.
+- `paper` — the paper stock, any CSS colour (`"#f3e9d2"`); unset is the default
+  page stock, shown as Bright white. It tints the preview's pages only, so the
+  author sees the book on the stock it will be printed on: print sheets, the PDF
+  of the pages, `bml export` and the EPUB stay white, and nothing is written
+  into the manuscript or the colophon. The panel offers Bright white (unset),
+  Natural, Ivory, Cream and Recycled grey, and a custom colour.
 
 CLI flags (`bml export --sheet/--fold/--folios/--duplex/--flip/--reverse-backs`)
 override any of these per run.
@@ -1957,14 +1957,15 @@ and the mode persists across reloads:
 The toolbar holds only what is global: the Contents toggle at the far left
 before the crumb (⌘\), drawn as a panel icon whose side is half filled while the
 left column shows; the crumb; the modes; and the light/dark toggle alone at the
-right. The pages hide with ⌘. (no button); both choices persist. The crumb reads
-library / book / edition. The library step, muted so the title leads, is an icon
-for where the books live (a folder on this device, or this browser) and its name
-(the folder's, or "This browser"); its tooltip says where, and a click goes back
-to the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
-there the crumb starts at the book. Gutters between the columns drag to resize
-them. A hidden preview still lays out (it leaves the grid, never
-`display: none`), since Paged.js paginates by measuring.
+right. The pages hide with ⌘. (no button; while they are hidden the write pane's
+corner button reads "Show the pages" and brings them back); both choices
+persist. The crumb reads library / book / edition. The library step, muted so
+the title leads, is an icon for where the books live (a folder on this device,
+or this browser) and its name (the folder's, or "This browser"); its tooltip
+says where, and a click goes back to the Welcome (§7.9) to pick another. The dev
+server has only its `books/`, so there the crumb starts at the book. Gutters
+between the columns drag to resize them. A hidden preview still lays out (it
+leaves the grid, never `display: none`), since Paged.js paginates by measuring.
 
 Each pane carries its own controls in a header along its top: the write pane
 (Write's middle column) has the text view (§7.3), the pages pane (the right

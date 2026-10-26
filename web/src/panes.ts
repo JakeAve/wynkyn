@@ -35,8 +35,13 @@ export function installPanes(deps: { mode(): Mode }): Panes {
       : panes.classList.contains("expand-pages")
       ? "pages"
       : "";
+  const writeBtn = $("editor").querySelector<HTMLElement>(".expand")!;
+  const mod = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
+  // Pages hidden (⌘.), the writing's corner button is the way back to them.
+  const pagesBack = () =>
+    !expanded() && panes.classList.contains("pages-hidden");
   // Expanded, the Contents toggle pins the outline over the view instead.
-  const syncTreeBtn = () =>
+  const syncButtons = () => {
     treeBtn.setAttribute(
       "aria-pressed",
       String(
@@ -45,10 +50,19 @@ export function installPanes(deps: { mode(): Mode }): Panes {
           : !panes.classList.contains("tree-hidden"),
       ),
     );
+    const back = pagesBack();
+    const label = back ? `Show the pages (${mod}.)` : "Expand the writing";
+    writeBtn.setAttribute("aria-label", label);
+    writeBtn.title = back ? label : `${label}; esc returns`;
+    writeBtn.setAttribute(
+      "aria-pressed",
+      String(back || expanded() === "writing"),
+    );
+  };
   const hide = (cls: "tree-hidden" | "pages-hidden", hidden: boolean) => {
     panes.classList.toggle(cls, hidden);
     store(cls, hidden ? "1" : "");
-    syncTreeBtn();
+    syncButtons();
   };
   const show = (pane: Pane | "") => {
     panes.classList.toggle("expand-writing", pane === "writing");
@@ -58,7 +72,7 @@ export function installPanes(deps: { mode(): Mode }): Panes {
     for (const b of panes.querySelectorAll<HTMLElement>(".expand")) {
       b.setAttribute("aria-pressed", String(b.dataset.pane === pane));
     }
-    syncTreeBtn();
+    syncButtons(); // after: it may press the writing's button for the pages
   };
   const expand = (pane: Pane | "") => {
     show(pane);
@@ -73,6 +87,8 @@ export function installPanes(deps: { mode(): Mode }): Panes {
         : "",
     );
   };
+  const togglePages = () =>
+    hide("pages-hidden", !panes.classList.contains("pages-hidden"));
   hide("tree-hidden", store("tree-hidden") === "1");
   hide("pages-hidden", store("pages-hidden") === "1");
   restore();
@@ -86,6 +102,7 @@ export function installPanes(deps: { mode(): Mode }): Panes {
   for (const b of panes.querySelectorAll<HTMLElement>(".expand")) {
     b.onclick = () => {
       const pane = b.dataset.pane as Pane;
+      if (pane === "writing" && pagesBack()) return togglePages();
       expand(expanded() === pane ? "" : pane);
     };
   }
@@ -102,14 +119,13 @@ export function installPanes(deps: { mode(): Mode }): Panes {
       return hide("tree-hidden", !panes.classList.contains("tree-hidden"));
     }
     panes.classList.toggle("pin-outline");
-    syncTreeBtn();
+    syncButtons();
   };
   treeBtn.onclick = toggleTree;
 
   return {
     toggleTree,
-    togglePages: () =>
-      hide("pages-hidden", !panes.classList.contains("pages-hidden")),
+    togglePages,
     toggleExpand: () =>
       expand(expanded() ? "" : deps.mode() === "write" ? last : "pages"),
     returnFromExpand: () => {
