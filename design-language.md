@@ -648,6 +648,11 @@ same sun in the light `--acc` on the manifest's cream `#f4efe4`, filling 81%,
 86% and 62% of the square (the 512 leaves the maskable safe zone); re-export
 them from `mark.svg` whenever the red changes.
 
+The share card (`og.svg`, exported to `og.png` at 1200×630) is a black woodcut
+title page rubricated in light `--acc`: the sun and the inner hairline rule are
+red, the outer frame, hatching, stars and banner stay black. Re-export it with
+the icons.
+
 ## 11. The hosted site
 
 Same tokens, a louder register: headlines (`h1`) in Fell Great Primer at
