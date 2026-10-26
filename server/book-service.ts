@@ -161,9 +161,12 @@ export class BookService {
     return { text, version: await contentVersion(text) };
   }
 
-  image(book: string, file: string): Promise<Uint8Array<ArrayBuffer> | null> {
+  async image(
+    book: string,
+    file: string,
+  ): Promise<Uint8Array<ArrayBuffer> | null> {
     if (!safeName(book) || !safeImageName(file)) throw bad("bad path");
-    return this.store.read(`${book}/images/${file}`);
+    return await this.store.read(`${book}/images/${file}`);
   }
 
   /** The book's images in an accepted format, by slug. */
@@ -317,14 +320,14 @@ export class BookService {
   // The client debounces and sends one save at a time, so a save lands before
   // it is answered: the check against `base` and the write run in the book's
   // queue, never interleaved with another save or a rename's rewrite.
-  saveManuscript(
+  async saveManuscript(
     book: string,
     save: { text: string; clientId?: string | null; base?: string | null },
   ): Promise<SaveResult> {
     checkNames(book, null);
     const clientId = save.clientId ?? null;
     const path = `${book}/manuscript.md`;
-    return this.serialize(book, async () => {
+    return await this.serialize(book, async () => {
       const current = await this.store.readText(path);
       if (current === null) throw notFound("book not found");
       // A save based on a version that is no longer current would overwrite
@@ -363,14 +366,14 @@ export class BookService {
    * the write fails. Merged onto the file as it is now, in the file's queue,
    * so another writer's edit to another section survives and a rename or
    * delete called after this waits for it. */
-  saveMetadata(
+  async saveMetadata(
     book: string,
     edition: string | null,
     sections: object,
   ): Promise<{ version: string }> {
     checkNames(book, edition);
     const path = metadataKey(book, edition);
-    return this.serialize(path, async () => {
+    return await this.serialize(path, async () => {
       await this.requireBook(book);
       const disk = await this.readMetadata(book, edition);
       const text = serializeMeta(mergeSections(disk.metadata, sections));

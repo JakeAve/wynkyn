@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { Sync, type SyncOptions } from "./sync.ts";
-import type { SaveResult } from "../../server/book-service.ts";
+import { type SaveResult, ServiceError } from "../../server/book-service.ts";
 import type { Metadata } from "../../metadata/types.ts";
 
 // A backend whose saves wait until the test settles them, one by one.
@@ -261,5 +261,31 @@ Deno.test("sync: dropManuscript forgets the waiting text and rebases", async () 
   await wait(10);
   assertEquals(fake.texts.length, 0);
   assertEquals(sync.base, "v5");
+  assert(!sync.hasUnsaved());
+});
+
+Deno.test("sync: a refused save (404) is not retried", async () => {
+  const { fake, sync, type } = setup({ retryMs: () => 5 });
+  type("a");
+  sync.editMetadata({ fonts: {} });
+  await wait(10);
+  await fake.landText(new ServiceError(404, "book not found"));
+  await fake.landMeta(new ServiceError(404, "edition not found"));
+  await wait(30);
+  assertEquals([fake.texts.length, fake.sections.length], [1, 1]);
+  assertEquals(sync.status(), { kind: "error", detail: "book not found" });
+  assert(sync.hasUnsaved()); // kept: leaving still asks
+});
+
+Deno.test("sync: dropMetadata forgets the waiting sections", async () => {
+  const { fake, sync } = setup({ retryMs: () => 5 });
+  sync.editMetadata({ fonts: {} });
+  await wait(10);
+  sync.editMetadata({ language: "es" } as Partial<Metadata>);
+  await fake.landMeta(new Error("offline")); // waiting to retry
+  sync.dropMetadata();
+  await wait(30);
+  assertEquals(fake.sections.length, 1);
+  assertEquals(sync.status(), { kind: "saved" });
   assert(!sync.hasUnsaved());
 });

@@ -247,6 +247,20 @@ async function until(ok: () => boolean) {
   return ok();
 }
 
+Deno.test("tabs: a write reaches its own tab's watch once", async () => {
+  const store = withTabs(memoryStore(), `test-${crypto.randomUUID()}`);
+  const heard: string[][] = [];
+  const stop = store.watch((paths) => heard.push(paths));
+  try {
+    await store.write("demo-book/manuscript.md", "X\n");
+    await until(() => heard.length > 0);
+    await new Promise((r) => setTimeout(r, 50)); // an echo would be in by now
+    assertEquals(heard, [["demo-book/manuscript.md"]]);
+  } finally {
+    stop();
+  }
+});
+
 Deno.test("tabs: two services over one library each see the other's save", async () => {
   const [a, b] = tabs();
   try {

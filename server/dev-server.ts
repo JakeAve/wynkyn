@@ -84,7 +84,8 @@ export async function startServer(
     `${booksRoot}/${book}/export${edition === null ? "" : `/${edition}`}`;
 
   // The Publish tab's e-book export (spec §7.8): `bml epub` behind an
-  // endpoint. The file lands in the book's export folder, served by
+  // endpoint, through the service so a style save under way lands first. The
+  // file lands in the book's export folder, served by
   // GET /api/books/<book>/export/<file>.
   async function handleEpub(
     book: string,
@@ -96,12 +97,11 @@ export async function startServer(
     }
     exporting.add(key);
     try {
-      const { exportEpub } = await import("./epub-export.ts");
-      const s = await exportEpub(booksRoot, book, { edition });
-      return Response.json({
-        file: s.file.slice(s.file.lastIndexOf("/") + 1),
-        documents: s.documents,
-      });
+      const { epub, documents } = await service.exportEpub(book, edition);
+      const dir = exportDir(book, edition);
+      await Deno.mkdir(dir, { recursive: true });
+      await Deno.writeFile(`${dir}/book.epub`, epub);
+      return Response.json({ file: "book.epub", documents });
     } catch (err) {
       return new Response((err as Error).message, { status: 500 });
     } finally {

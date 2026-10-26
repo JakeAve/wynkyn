@@ -60,18 +60,19 @@ rewrite themselves on the next save.
   `#preview`, or `#style-nav` | `#config-overlay` | `#sheet-view`;
   `preview.ts`'s `installPreviewClicks` routes a page click to the source line
   or the style by mode. `config-panel.ts` is the panel shell (nav, routing,
-  debounced `queueSave`); `panel-page.ts` (Page + Publish views),
-  `panel-fonts.ts`, `panel-parts.ts` (Book parts list and detail views) build
-  the views from `panel-controls.ts` primitives; `style-catalog.ts` maps preview
-  clicks and book parts to metadata keys. The Publish view is grouped Binding /
-  PDF / E-book: the binding setup, whose first signature it draws with
-  `server/imposition.ts` and whose Print sheets button (`print.ts`) imposes the
-  live preview's pages onto sheet-sized print layers and opens the browser's
-  print dialog; Print pages (the preview's pages at the page size); and Export
-  EPUB (`POST /api/books/<book>/epub`, the same `exportEpub` as `bml epub`). No
-  print export runs on the server; sheet PDFs and proofs on disk are
-  `bml export`'s. Paper's "Change in Style" leaves a history entry (`toStyle` in
-  `app.ts`, like Write's Go to style), so Back returns to Publish.
+  `queueSave`, which hands each edited section to Sync's debounce);
+  `panel-page.ts` (Page + Publish views), `panel-fonts.ts`, `panel-parts.ts`
+  (Book parts list and detail views) build the views from `panel-controls.ts`
+  primitives; `style-catalog.ts` maps preview clicks and book parts to metadata
+  keys. The Publish view is grouped Binding / PDF / E-book: the binding setup,
+  whose first signature it draws with `server/imposition.ts` and whose Print
+  sheets button (`print.ts`) imposes the live preview's pages onto sheet-sized
+  print layers and opens the browser's print dialog; Print pages (the preview's
+  pages at the page size); and Export EPUB (`POST /api/books/<book>/epub`, the
+  same `exportEpub` as `bml epub`). No print export runs on the server; sheet
+  PDFs and proofs on disk are `bml export`'s. Paper's "Change in Style" leaves a
+  history entry (`toStyle` in `app.ts`, like Write's Go to style), so Back
+  returns to Publish.
 
 Paged.js 0.4.3 is vendored at `vendor/pagedjs/`; upgrading = replace the file +
 update the checksum in `server/vendor_test.ts`, then read the golden page-map

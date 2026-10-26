@@ -10,6 +10,7 @@ import {
   libraryId,
   type MetadataResult,
   type SaveResult,
+  ServiceError,
   themedTemplate,
 } from "../../server/book-service.ts";
 import { type BookStore, withTabs } from "../../server/store.ts";
@@ -100,11 +101,14 @@ const query = (book: string, edition: string | null) =>
   `?book=${encodeURIComponent(book)}` +
   (edition === null ? "" : `&edition=${encodeURIComponent(edition)}`);
 
-async function call<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  if (!res.ok) throw new Error(await res.text());
+// A refusal carries its status, as the in-page service's do: Sync retries
+// only what might go through next time.
+async function answer<T>(res: Response): Promise<T> {
+  if (!res.ok) throw new ServiceError(res.status, await res.text());
   return res.status === 204 ? (undefined as T) : await res.json();
 }
+const call = async <T>(url: string, init?: RequestInit): Promise<T> =>
+  answer<T>(await fetch(url, init));
 const post = <T>(url: string, body: unknown) =>
   call<T>(url, {
     method: "POST",
@@ -112,19 +116,27 @@ const post = <T>(url: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-// A save outlives a tab closed right after it: keepalive, which the browser
-// allows only for bodies under 64 KB. Longer ones rely on the leave prompt.
-function saveInit(body: unknown): RequestInit {
-  const json = JSON.stringify(body);
-  return {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: json,
-    keepalive: new TextEncoder().encode(json).length < 65536,
-  };
-}
-
 export function httpBackend(): Backend {
+  // A save outlives a tab closed right after it: keepalive, which the browser
+  // allows only while every keepalive body in flight totals under 64 KB.
+  // Past that a save goes plain and relies on the leave prompt.
+  let keptAlive = 0; // keepalive body bytes in flight
+  async function send(url: string, body: unknown): Promise<Response> {
+    const json = JSON.stringify(body);
+    const size = new TextEncoder().encode(json).length;
+    const keepalive = keptAlive + size < 65536;
+    if (keepalive) keptAlive += size;
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: json,
+        keepalive,
+      });
+    } finally {
+      if (keepalive) keptAlive -= size;
+    }
+  }
   return {
     kind: "http",
     listBooks: () => call("/api/books"),
@@ -151,12 +163,11 @@ export function httpBackend(): Backend {
       return await res.json();
     },
     async saveManuscript(book, save) {
-      const res = await fetch(
+      const res = await send(
         `/api/books/${encodeURIComponent(book)}/manuscript`,
-        saveInit(save),
+        save,
       );
-      if (res.status !== 409 && !res.ok) throw new Error(await res.text());
-      return await res.json();
+      return res.status === 409 ? await res.json() : await answer(res);
     },
     async metadata(book, edition) {
       const res = await fetch(metadataUrl(book, edition));
@@ -167,8 +178,8 @@ export function httpBackend(): Backend {
       }
       return await res.json();
     },
-    saveMetadata: (book, edition, sections) =>
-      call(metadataUrl(book, edition), saveInit({ sections })),
+    saveMetadata: async (book, edition, sections) =>
+      answer(await send(metadataUrl(book, edition), { sections })),
     async tryBuild(book, edition, metadata) {
       const res = await fetch(
         `/api/books/${encodeURIComponent(book)}/try`,

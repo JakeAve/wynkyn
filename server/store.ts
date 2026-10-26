@@ -145,10 +145,13 @@ export function diskStore(root: string): BookStore {
  * too — the dev server's fs watcher, between tabs. */
 export function withTabs(store: BookStore, channel: string): BookStore {
   // A channel per post: delivery is queued when posted, so closing at once
-  // loses nothing, and there is nothing left open to close.
+  // loses nothing, and there is nothing left open to close. Posts carry this
+  // store's id: every other channel of the name hears them, this tab's watch
+  // included, and the store already reports its own writes.
+  const from = crypto.randomUUID();
   const post = (...paths: string[]) => {
     const c = new BroadcastChannel(channel);
-    c.postMessage(paths);
+    c.postMessage({ from, paths });
     c.close();
   };
   return {
@@ -174,10 +177,12 @@ export function withTabs(store: BookStore, channel: string): BookStore {
     },
     watch(onChange) {
       const stop = store.watch(onChange);
-      // A channel never hears its own posts, so this is only other tabs.
       const c = new BroadcastChannel(channel);
       c.onmessage = (e: MessageEvent) => {
-        if (Array.isArray(e.data)) onChange(e.data.map(String));
+        const { from: sender, paths } = e.data ?? {};
+        if (sender !== from && Array.isArray(paths)) {
+          onChange(paths.map(String));
+        }
       };
       return () => {
         stop();

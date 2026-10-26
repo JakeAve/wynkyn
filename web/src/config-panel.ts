@@ -167,7 +167,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       );
     }
     opts.saveSections(sections as Partial<Metadata>);
-    renderNav(); // the "N set" counts follow the edit
+    renderNav(true); // the "N set" counts follow the edit
   }
   let onPages: (() => void) | null = null; // the open view's redraw, if any
 
@@ -198,8 +198,15 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     render();
   }
 
-  function renderNav(): void {
+  let navShown = ""; // what renderNav last drew, so an edit redraws on change
+  function renderNav(ifChanged = false): void {
     const groups = route.tab === "publish" ? PUBLISH_NAV : styleNav(meta);
+    const shown = JSON.stringify([
+      current,
+      groups.map(([t, rows]) => [t, rows.map((r) => [r.id, r.label, r.count])]),
+    ]);
+    if (ifChanged && shown === navShown) return;
+    navShown = shown;
     opts.nav.setAttribute(
       "aria-label",
       route.tab === "publish" ? "Publish sections" : "Style sections",

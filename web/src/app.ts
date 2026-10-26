@@ -515,6 +515,8 @@ function renderEditions(): void {
             } edition? The manuscript is untouched.`,
           )
         ) return;
+        // Style edits waiting for the open edition go with it.
+        if (selBook === book && slug === edition) sync.dropMetadata();
         await backend.deleteEdition(selBook, slug);
         await deleteCachedRender(cacheId(selBook, slug));
         if (selBook === book && slug === edition) {
@@ -564,6 +566,8 @@ async function renameEdition(e: EditionInfo, value: string): Promise<void> {
     const next = slugify(value);
     if (!next) throw new Error("the name needs a letter or digit");
     if (next !== e.slug) {
+      // Style edits waiting for the open edition land first, and move with it.
+      if (selBook === book && e.slug === edition) await sync.flush();
       const done = backend.renameEdition(selBook, e.slug, next)
         .then(() => selBook === book ? rebaseAfterRename() : undefined);
       renaming = done.catch(() => {});
@@ -770,8 +774,9 @@ function syncChanged(s: SyncStatus): void {
 
 function saveMetadataSections(sections: Partial<Metadata>): void {
   if ("page" in sections) setCrumbSize(sections.page?.size);
-  // Saves replace whole sections, so this keeps `metadata` what the panel shows.
-  if (metadata) metadata = { ...metadata, ...structuredClone(sections) };
+  // Saves replace whole sections, so this keeps `metadata` what the panel
+  // shows: its own sections, uncopied (Sync copies what it sends).
+  if (metadata) metadata = { ...metadata, ...sections };
   sync.editMetadata(sections);
 }
 

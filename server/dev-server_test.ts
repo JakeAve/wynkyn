@@ -118,6 +118,24 @@ function nextMessageWhere(
   });
 }
 
+Deno.test("epub: the export lands in the edition's export folder", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const base = `http://localhost:${server.port}/api/books/demo-book`;
+  try {
+    const res = await fetch(`${base}/epub?edition=pocket`, { method: "POST" });
+    assertEquals(res.status, 200);
+    assertEquals((await res.json()).file, "book.epub");
+    const epub = await fetch(`${base}/export/book.epub?edition=pocket`);
+    assertEquals(epub.status, 200);
+    assertEquals(epub.headers.get("content-type"), "application/epub+zip");
+    await epub.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
 Deno.test("websocket: initial build on connect, rebuild pushed on file change", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });

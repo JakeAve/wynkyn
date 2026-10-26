@@ -33,6 +33,14 @@ export type SyncStatus =
 const backoff = (attempt: number) => Math.min(2000 * 2 ** attempt, 30_000);
 const why = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
+// A refusal (a 4xx: bad name, no such book or edition) fails the same way
+// every time; a network error, a 5xx or anything unknown may not. A refused
+// save stays `error` until the next edit or flush sends it again.
+const retryable = (error: unknown) => {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status !== "number" || status < 400 || status >= 500 ||
+    status === 408 || status === 429;
+};
 
 // One save in flight per channel: a second save while one is pending would
 // race the first over the network, and whichever body the service sees last
@@ -151,6 +159,16 @@ export class Sync {
     this.#pendingText = this.#o.current();
     this.#sendPendingText();
   }
+  /** The edition is going away: drop the sections waiting to be saved to
+   * it (a save in flight still settles). */
+  dropMetadata(): void {
+    clearTimeout(this.#metaTimer);
+    clearTimeout(this.#metaRetry);
+    this.#pendingMeta = this.#queuedMeta = null;
+    this.#metaFailed = null;
+    this.#metaTries = 0;
+    this.#changed();
+  }
   /** Reload: the disk wins — drop the unsaved edits and anything waiting. */
   dropManuscript(version: string): void {
     clearTimeout(this.#timer);
@@ -220,10 +238,12 @@ export class Sync {
       this.#queuedText = null;
       this.#failed = why(error);
       clearTimeout(this.#retry);
-      this.#retry = setTimeout(
-        () => this.#sendPendingText(),
-        this.#retryMs(this.#tries++),
-      );
+      if (retryable(error)) {
+        this.#retry = setTimeout(
+          () => this.#sendPendingText(),
+          this.#retryMs(this.#tries++),
+        );
+      }
     } finally {
       this.#sending = null;
       const next = this.#queuedText;
@@ -268,10 +288,12 @@ export class Sync {
       this.#queuedMeta = null;
       this.#metaFailed = why(error);
       clearTimeout(this.#metaRetry);
-      this.#metaRetry = setTimeout(
-        () => this.#sendPendingMeta(),
-        this.#retryMs(this.#metaTries++),
-      );
+      if (retryable(error)) {
+        this.#metaRetry = setTimeout(
+          () => this.#sendPendingMeta(),
+          this.#retryMs(this.#metaTries++),
+        );
+      }
     } finally {
       this.#metaSending = null;
       const next = this.#queuedMeta;
