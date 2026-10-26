@@ -6,6 +6,8 @@ import {
   EditorView,
   gutterLineClass,
   type GutterMarker,
+  ViewPlugin,
+  type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
 import {
@@ -19,7 +21,7 @@ import {
 } from "@codemirror/state";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { bml, ClassMarker } from "./bml-language.ts";
-import { prose, turnsField } from "./prose.ts";
+import { paragraphAt, prose, turnsField } from "./prose.ts";
 import { toCmDiagnostics } from "./diagnostics.ts";
 import { searchPanel } from "./search-panel.ts";
 import { insertExtensions } from "./editor-insert.ts";
@@ -162,6 +164,79 @@ export function setWriteView(view: EditorView, v: WriteView): void {
   });
 }
 
+// Dim (design-language.md §8.3): every line's text is a mark, so it fades
+// apart from its margin marks; a line outside the cursor's paragraph takes
+// cm-dim, and in Sentence the paragraph's other sentences take cm-off. The
+// marks stay put as the cursor moves, so app.css can ease the opacity.
+export type Dim = "off" | "paragraph" | "sentence";
+
+const dimming = new Compartment();
+const textMark = Decoration.mark({ class: "cm-text" });
+const offMark = Decoration.mark({ class: "cm-text cm-off" });
+const dimLine = Decoration.line({ class: "cm-dim" });
+// ponytail: naive sentence split, abbreviations dim early.
+const SENTENCE_END = /[.?!]['"’”)\]]*(?=\s|$)/g;
+
+// The cursor's sentence as document positions within its paragraph.
+function sentenceAt(doc: Text, head: number, a: number, b: number) {
+  const from = doc.line(a).from, to = doc.line(b).to;
+  const text = doc.sliceString(from, to);
+  let start = 0, end = text.length;
+  for (const m of text.matchAll(SENTENCE_END)) {
+    const e = m.index + m[0].length;
+    if (e >= head - from) {
+      end = e;
+      break;
+    }
+    start = e;
+  }
+  return [from + start, from + end];
+}
+
+function dimDecos(view: EditorView, d: Dim): DecorationSet {
+  const { doc, selection } = view.state;
+  const head = selection.main.head;
+  const [a, b] = paragraphAt(doc, head);
+  const [s0, s1] = d === "sentence" && a ? sentenceAt(doc, head, a, b) : [];
+  const out: Range<Decoration>[] = [];
+  const mark = (m: Decoration, x: number, y: number) => {
+    if (x < y) out.push(m.range(x, y));
+  };
+  for (const { from, to } of view.visibleRanges) {
+    for (let pos = from; pos <= to;) {
+      const l = doc.lineAt(pos);
+      pos = l.to + 1;
+      if (l.number < a || l.number > b || !a) {
+        out.push(dimLine.range(l.from));
+        mark(textMark, l.from, l.to);
+      } else if (s0 === undefined || s1 === undefined) {
+        mark(textMark, l.from, l.to);
+      } else {
+        mark(offMark, l.from, Math.min(l.to, s0));
+        mark(textMark, Math.max(l.from, s0), Math.min(l.to, s1));
+        mark(offMark, Math.max(l.from, s1), l.to);
+      }
+    }
+  }
+  return Decoration.set(out, true);
+}
+
+const dimmed = (d: Dim) =>
+  ViewPlugin.define((view) => ({
+    decos: dimDecos(view, d),
+    update(u: ViewUpdate) {
+      if (u.docChanged || u.viewportChanged || u.selectionSet) {
+        this.decos = dimDecos(u.view, d);
+      }
+    },
+  }), { decorations: (v) => v.decos });
+
+export function setDim(view: EditorView, d: Dim): void {
+  view.dispatch({
+    effects: dimming.reconfigure(d === "off" ? [] : dimmed(d)),
+  });
+}
+
 export function createEditor(opts: {
   parent: HTMLElement;
   text: string;
@@ -183,6 +258,7 @@ export function createEditor(opts: {
         editionSpans,
         lintGutter(),
         writeView.of([]),
+        dimming.of([]),
         turnsField,
         spellExtensions(),
         opts.images ? imageExtensions(opts.images) : [],

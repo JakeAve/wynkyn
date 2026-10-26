@@ -21,7 +21,7 @@ it are in `SKILL.md`, The web app; this is the map.
 | `dom.ts` | `$`, `brief` — the helpers every module shares |
 
 Editor side: `editor.ts` (the CodeMirror pane; `setWriteView` swaps Prose and
-Source), `prose-model.ts` (pure: how Prose shows each line, folded or shown,
+Source, `setDim` fades all but the cursor's paragraph or sentence), `prose-model.ts` (pure: how Prose shows each line, folded or shown,
 its rubric, kind, stand-in and notes, plus the footer's word count and
 chapter) → `prose.ts` (`prose()`, the decorations and margin widgets that draw
 it; `setPageTurns` takes `preview.ts`'s `pageTurns` after each layout, and app.ts

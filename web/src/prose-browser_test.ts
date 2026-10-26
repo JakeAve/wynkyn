@@ -1,7 +1,7 @@
 // web/src/prose-browser_test.ts — the Prose view in the real app
 // (design-language.md §8.1): rubrics in the margin, markup folded outside the
-// cursor's block and revealed at it, ⁂ for a break, ☞ for a note, and page
-// turns from the last layout.
+// cursor's block and revealed at it, ⁂ for a break, ☞ for a note, page
+// turns from the last layout, the expanded margins and Dim.
 import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
@@ -178,11 +178,125 @@ Deno.test({
       assert(!text.includes("{illustration: ornament}"), "folded");
       assert(text.includes("{illustration: lost}"), "missing: markup");
 
+      // A turn on the caption's line goes beside the image, since the
+      // folded illustration line covers the caption's start. A layout puts
+      // the turn on the illustration's own line, so the test sets one with
+      // the app's own page-turn effect, caught from its dispatches.
+      await page.evaluate(() => {
+        type Effect = { type: unknown; value: unknown };
+        // deno-lint-ignore no-explicit-any
+        const g = globalThis as any;
+        const view = g.document.querySelector("#editor .cm-content").cmTile
+          .root.view;
+        const dispatch = view.dispatch.bind(view);
+        view.dispatch = (...specs: { effects?: Effect | Effect[] }[]) => {
+          for (const e of specs.flatMap((s) => [s?.effects ?? []].flat())) {
+            const v = e.value;
+            if (Array.isArray(v) && v.length && "page" in v[0]) {
+              g.turns = e.type;
+            }
+          }
+          return dispatch(...specs);
+        };
+        g.setTurn = (line: number, page: number) =>
+          dispatch({ effects: g.turns.of([{ line, page }]) });
+      });
+      await page.locator("#editor .cm-line", { hasText: "Opening words" })
+        .click();
+      await page.keyboard.type("x"); // a new layout, and its turns
+      await page.waitForFunction(() => "turns" in globalThis, null, {
+        timeout: 30_000,
+      });
+      await page.evaluate(() =>
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).setTurn(4, 7)
+      );
+      assertEquals(
+        await figure.locator('.cm-prose-turn[data-turn="7"]').count(),
+        1,
+        "the caption's turn beside the image",
+      );
+
       // A click on the image reveals its markup; the image stays.
       await img.click();
       text = await shown();
       assert(text.includes("{illustration: ornament}"), "revealed");
       assertEquals(await img.count(), 1);
+    } finally {
+      await close();
+    }
+  },
+});
+
+Deno.test({
+  name: "Expanded, the margins widen and notes and turns are written out",
+  ignore: !hasChrome || !appBuilt,
+  fn: async () => {
+    const { page, close } = await open(MANUSCRIPT);
+    try {
+      const content = page.locator("#editor .cm-content");
+      const padding = () =>
+        content.evaluate((e) => parseFloat(getComputedStyle(e).paddingLeft));
+      const note = page.locator("#editor .cm-prose-note");
+      const noteText = () =>
+        note.evaluate((e) => getComputedStyle(e, "::after").content);
+      const narrow = await padding();
+      assertEquals(await noteText(), "none", "the ☞ alone");
+
+      await page.locator("#editor .expand").click();
+      assertEquals(
+        await page.locator("#panes").getAttribute("class"),
+        "expand-writing",
+      );
+      assert(await padding() > narrow, "the left margin widens");
+      assertEquals(
+        await noteText(),
+        '"check: thirteen, as in the source."',
+        "the note written out",
+      );
+      assert((await note.boundingBox())!.width > 100, "and shown");
+    } finally {
+      await close();
+    }
+  },
+});
+
+Deno.test({
+  name: "Dim fades all but the cursor's paragraph or sentence",
+  ignore: !hasChrome || !appBuilt,
+  fn: async () => {
+    const { page, close } = await open(
+      "First sentence here. Second sentence here.\n\nAnother paragraph.\n",
+    );
+    try {
+      const line = (t: string) =>
+        page.locator("#editor .cm-line", { hasText: t });
+      const opacity = (t: string) =>
+        page.locator("#editor .cm-text", { hasText: t }).evaluate((e) =>
+          Number(getComputedStyle(e).opacity)
+        );
+      // the Aa menu's Dim seg; a lint tooltip may cover the menu's button
+      const dim = (d: string) =>
+        page.locator(`[data-dim="${d}"]`).evaluate((b) =>
+          (b as HTMLElement).click()
+        );
+      assertEquals(
+        await page.locator("#editor .cm-text").count(),
+        0,
+        "off by default",
+      );
+      await dim("paragraph");
+      await line("Second sentence").click();
+      await page.waitForTimeout(400); // the fade
+      assert(await opacity("Another paragraph") < 1, "another paragraph fades");
+      assertEquals(await opacity("Second sentence"), 1);
+
+      await dim("sentence");
+      await line("Second sentence").click();
+      await page.keyboard.press("End");
+      await page.waitForTimeout(400);
+      assert(await opacity("First sentence") < 1, "another sentence fades");
+      assertEquals(await opacity("Second sentence"), 1);
     } finally {
       await close();
     }

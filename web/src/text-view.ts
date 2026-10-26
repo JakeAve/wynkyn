@@ -4,7 +4,7 @@
 // localStorage under `text-view`, never in the book.
 import type { EditorView } from "@codemirror/view";
 import type { Backend } from "./backend.ts";
-import { setWriteView, type WriteView } from "./editor.ts";
+import { type Dim, setDim, setWriteView, type WriteView } from "./editor.ts";
 import { parseWordList, setSpeller } from "./spelling.ts";
 import { $, brief } from "./dom.ts";
 
@@ -20,7 +20,7 @@ export interface TextPrefs {
   view: WriteView;
   face: "alegreya" | "sans" | "book";
   size: number; // px at the default root, 12–24
-  dim: "off" | "paragraph" | "sentence"; // saved; drawn from task 7
+  dim: Dim; // fade all but the cursor's paragraph or sentence
   turns: boolean; // page turns in the margin (prose.ts setPageTurns)
   spell: string; // a WORD_LISTS key or "none"
 }
@@ -79,7 +79,7 @@ async function spellCheck(
 }
 
 const FACES = { alegreya: "var(--f-text)", sans: "var(--f-ui)" };
-const DIMS = ["off", "paragraph", "sentence"] as const;
+const DIMS: readonly Dim[] = ["off", "paragraph", "sentence"];
 const DEFAULTS: TextPrefs = {
   view: "prose",
   face: "alegreya",
@@ -210,6 +210,7 @@ export function installTextView(d: TextViewDeps): TextView {
     size.textContent = String(prefs.size);
     turns.checked = prefs.turns;
     setWriteView(editor, prefs.view);
+    setDim(editor, prefs.dim);
     try {
       localStorage.setItem("text-view", JSON.stringify(prefs));
     } catch {
@@ -227,7 +228,7 @@ export function installTextView(d: TextViewDeps): TextView {
     b.onclick = () => set({ face: b.dataset.face as TextPrefs["face"] });
   }
   for (const b of dims) {
-    b.onclick = () => set({ dim: b.dataset.dim as TextPrefs["dim"] });
+    b.onclick = () => set({ dim: b.dataset.dim as Dim });
   }
   for (const b of all("[data-step]")) {
     b.onclick = () =>

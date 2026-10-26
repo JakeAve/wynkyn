@@ -452,6 +452,11 @@ kbd {
   min-width: 0;
   overflow: hidden;
 }
+/* the writer's stats (app.ts showStats): the session's gain in red once
+   there is one */
+#write-stats .gain {
+  color: var(--acc-ink);
+}
 .foot-gutter {
   background: linear-gradient(var(--line), var(--line)) 50% 0 / 1px 100%
     no-repeat;
@@ -778,14 +783,18 @@ body.typing #editor .pane-head {
    writing in the reader's face and size, Source every line in the system
    monospace at 13/17 of it. Size goes on .cm-content only, so line numbers
    stay put, and the measure is in rem, so bigger text wraps sooner instead of
-   widening the column; it is centred once Pages is hidden. */
+   widening the column; it is centred once Pages is hidden. Expanded, the
+   writing grows by 19/17 and the measure with it (§7). */
 #editor {
   --ed-font: var(--ed-face, var(--f-text));
-  --ed-fs: var(--ed-size, 1.0625rem);
+  --ed-fs: calc(var(--ed-size, 1.0625rem) * var(--ed-grow, 1));
+}
+#panes.expand-writing #editor {
+  --ed-grow: calc(19 / 17);
 }
 #editor[data-view="source"] {
   --ed-font: var(--f-mono);
-  --ed-fs: calc(var(--ed-size, 1.0625rem) * 13 / 17);
+  --ed-fs: calc(var(--ed-size, 1.0625rem) * var(--ed-grow, 1) * 13 / 17);
 }
 #editor .cm-scroller {
   font-family: var(--ed-font);
@@ -800,21 +809,31 @@ body.typing #editor .pane-head {
 }
 #editor .cm-content {
   font-size: var(--ed-fs);
-  max-width: 36rem; /* ~70 characters of 1rem serif prose */
+  max-width: calc(36rem * var(--ed-grow,
+    1)); /* ~70 characters of 1rem serif prose */
 }
 #panes.pages-hidden #editor .cm-scroller {
   justify-content: center;
 }
 /* Prose (prose.ts, design-language.md §8.1): the margins are .cm-content's
    padding, and the marks in them are widgets placed against their line. No
-   line numbers: folded markup would make them jump. */
+   line numbers: folded markup would make them jump. Expanded, the margins
+   widen (--ml, --mr) and notes, page turns and slugs are written out. */
 #editor[data-view="prose"] .cm-gutters {
   display: none;
 }
+#editor[data-view="prose"] {
+  --ml: 6rem;
+  --mr: 3rem;
+}
+#panes.expand-writing #editor[data-view="prose"] {
+  --ml: 9.5rem;
+  --mr: 10.5rem;
+}
 #editor[data-view="prose"] .cm-content {
-  max-width: calc(36rem + 9rem);
-  padding-left: 6rem;
-  padding-right: 3rem;
+  max-width: calc(36rem * var(--ed-grow, 1) + var(--ml) + var(--mr));
+  padding-left: var(--ml);
+  padding-right: var(--mr);
 }
 #editor[data-view="prose"] .cm-line {
   position: relative;
@@ -836,7 +855,7 @@ body.typing #editor .pane-head {
    inset from the pane's edge */
 #editor .cm-prose-rubric {
   right: 100%;
-  width: 6rem;
+  width: var(--ml);
   padding-inline: var(--s-5);
   text-align: right;
   color: var(--acc-ink);
@@ -858,10 +877,21 @@ body.typing #editor .pane-head {
   letter-spacing: 0;
   color: var(--muted);
 }
+/* expanded, the slug is written out on up to two lines, and its row makes
+   room for them */
+#panes.expand-writing #editor .cm-prose-rubric[data-slug]::after {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+#panes.expand-writing #editor .cm-line.cm-prose-slugged {
+  min-height: calc(var(--s-2) + (var(--fs-xs) + 2 * var(--fs-2xs)) * var(--lh));
+}
 /* the right margin: a page turn above the line's notes */
 #editor .cm-prose-side {
   left: 100%;
-  width: 3rem;
+  width: var(--mr);
   padding-left: var(--s-5);
   display: grid;
   justify-items: start;
@@ -884,6 +914,20 @@ body.typing #editor .pane-head {
 #editor .cm-prose-turn::after {
   content: attr(data-turn);
 }
+/* Expanded, a note is written out, so the right margin floats instead: the
+   line grows to hold it and the next line's notes start below it. */
+#panes.expand-writing #editor[data-view="prose"] :is(.cm-line, .cm-prose-illustration) {
+  display: flow-root;
+}
+#panes.expand-writing #editor .cm-prose-side {
+  position: static;
+  float: right;
+  clear: right;
+  margin-right: calc(var(--mr) * -1);
+}
+#panes.expand-writing #editor .cm-prose-turn::after {
+  content: attr(data-long);
+}
 #editor[data-turns="off"] .cm-prose-turn {
   display: none;
 }
@@ -897,6 +941,16 @@ body.typing #editor .pane-head {
 #editor .cm-prose-note::before {
   content: "☞";
 }
+#panes.expand-writing #editor .cm-prose-note {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-3);
+}
+#panes.expand-writing #editor .cm-prose-note::after {
+  content: attr(data-note);
+  font: var(--fs-xs) / var(--lh) var(--f-ui);
+  color: var(--muted);
+}
 /* a folded row is as tall as its rubric and slug, so the next rubric clears it */
 #editor .cm-line.cm-prose-slugged {
   min-height: calc(var(--s-2) + (var(--fs-xs) + var(--fs-2xs)) * var(--lh));
@@ -907,7 +961,7 @@ body.typing #editor .pane-head {
 }
 #editor .cm-line.cm-prose-title {
   font-family: var(--f-title);
-  font-size: 2rem;
+  font-size: calc(2rem * var(--ed-grow, 1));
   line-height: var(--lh-tight);
   padding-block: var(--s-4) var(--s-2);
 }
@@ -952,6 +1006,21 @@ body.typing #editor .pane-head {
 #editor[data-view="prose"] .cm-bml-wrap {
   font-size: .75em;
   color: var(--muted);
+}
+/* Dim (editor.ts setDim, §8.3): the text outside the cursor's paragraph or
+   sentence fades; the margins stay. */
+#editor :is(.cm-text, .cm-prose-illustration img) {
+  transition: opacity var(--t);
+}
+#editor .cm-line.cm-dim .cm-text,
+#editor .cm-text.cm-off,
+#editor .cm-prose-illustration:has(+ .cm-line.cm-dim) img {
+  opacity: .28;
+}
+@media (prefers-reduced-motion: reduce) {
+  #editor :is(.cm-text, .cm-prose-illustration img) {
+    transition: none;
+  }
 }
 /* The write pane's header (§7): Prose | Source (a small seg), Aa, Spelling. */
 #text-view {

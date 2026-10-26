@@ -158,8 +158,8 @@ const LINES = {
 };
 
 // The cursor's paragraph as 1-based [first, last] lines; [0, 0] on a blank
-// line, where nothing is revealed.
-function paragraphAt(doc: Text, pos: number): [number, number] {
+// line, where nothing is revealed. Dim (editor.ts) keeps the same paragraph.
+export function paragraphAt(doc: Text, pos: number): [number, number] {
   const n = doc.lineAt(pos).number;
   const full = (i: number) => doc.line(i).text.trim() !== "";
   if (!full(n)) return [0, 0];
@@ -228,17 +228,22 @@ function draw(state: EditorState): Drawn {
   const turns = state.field(turnsField, false);
   const decos: Range<Decoration>[] = [];
   let carried: number | undefined; // a turn on a line folded into the next
+  let taken = -1; // a caption's line whose turn went beside its image
   model.forEach((p, i) => {
     const l = doc.line(i + 1);
-    const turn = turns?.get(l.from) ?? carried;
+    const turn = l.from === taken ? carried : turns?.get(l.from) ?? carried;
     carried = undefined;
     const url = p.standIn === "illustration" && images?.get(p.slug ?? "");
     if (url) {
       // The image above the line; folded, the line goes into the caption
-      // below (the last line keeps an empty row).
+      // below (the last line keeps an empty row), and a turn on the caption
+      // goes beside the image, since the fold would cover it.
+      const cap = p.fold && i + 1 < doc.lines ? doc.line(i + 2).from : -1;
+      const capTurn = cap < 0 ? undefined : turns?.get(cap);
+      if (capTurn !== undefined) taken = cap;
       decos.push(
         Decoration.widget({
-          widget: new Picture(url, new Marks(p, turn)),
+          widget: new Picture(url, new Marks(p, turn ?? capTurn)),
           block: true,
           side: -1,
         }).range(l.from),

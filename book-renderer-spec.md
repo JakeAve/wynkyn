@@ -2038,24 +2038,30 @@ CodeMirror 6 over plain BML text.
   drop-cap images, illustrations whose file is missing, and footnote and ref
   tags stay as markup. This replaces Hide markup. The **Aa** menu holds the face
   (Alegreya, Alegreya Sans, or the book's body face), the size (12–24px, default
-  17), dim (Off, Paragraph, Sentence) and page turns (on); dim is kept but not
-  drawn yet. Page turns put a short rule and the page number in the right margin
-  beside the block each printed page begins in, from the last layout; a
-  paragraph edited since hides its turn until the next layout lands. The text
-  holds a reading measure of about 70 characters (36em), centred in the pane
-  while the pages are hidden or the writing expanded.
+  17), dim (Off, Paragraph, Sentence) and page turns (on). Dim, in either view,
+  fades all the text but the cursor's paragraph, or but its sentence (one ends
+  at `.`, `?` or `!`, with any closing quotes, before a space or the line's
+  end); the margins stay. Page turns put a short rule and the page number in the
+  right margin beside the block each printed page begins in, from the last
+  layout; a paragraph edited since hides its turn until the next layout lands.
+  The text holds a reading measure of about 70 characters (36em), centred in the
+  pane while the pages are hidden or the writing expanded. Expanded, the writing
+  grows by 19/17 and the measure with it, and Prose's margins widen so notes are
+  written out beside their line (which grows to hold them), page turns read "p.
+  12" and slugs show in full on up to two lines.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The footer is split by
   column: under the editor, the writer's cell (the chapter at the cursor, the
   word count and the words added this session — "Marley's Ghost · 41,210 words ·
-  +512 today" — then parse warnings, import notes, and "Go to style:" naming the
-  style that block belongs to — "Chapter · Title", "Body text · Paragraph", a
-  custom `{is}` name); under the pages, the page count and page problems. Go to
-  style opens that style in Style mode, the way a preview click does (§7.4), and
-  leaves a history entry, so Back returns to Write with the cursor where it was.
-  The style is read from the enclosing matter type, part or chapter, the
-  enclosing block, and the field sentinel whose text runs on to the line.
+  +512 today", the last in red once it is above 0 — then parse warnings, import
+  notes, and "Go to style:" naming the style that block belongs to — "Chapter ·
+  Title", "Body text · Paragraph", a custom `{is}` name); under the pages, the
+  page count and page problems. Go to style opens that style in Style mode, the
+  way a preview click does (§7.4), and leaves a history entry, so Back returns
+  to Write with the cursor where it was. The style is read from the enclosing
+  matter type, part or chapter, the enclosing block, and the field sentinel
+  whose text runs on to the line.
 - Find and replace is a bar pinned to the top of the editor, in the chrome's
   colors: find and replace fields, match case / whole word / regex toggles, an
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"

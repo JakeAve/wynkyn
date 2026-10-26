@@ -258,10 +258,12 @@ function showStats(lines: string[], line: number): void {
     parts.push(name, " · ");
   }
   const added = Math.max(0, words - wordsAtOpen);
+  const gain = document.createElement("span");
+  gain.textContent = `+${added.toLocaleString()} today`;
+  if (added) gain.className = "gain";
   parts.push(
-    `${words.toLocaleString()} ${
-      words === 1 ? "word" : "words"
-    } · +${added.toLocaleString()} today`,
+    `${words.toLocaleString()} ${words === 1 ? "word" : "words"} · `,
+    gain,
   );
   $("write-stats").replaceChildren(...parts);
 }

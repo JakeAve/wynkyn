@@ -523,8 +523,8 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   controls wrap. A hairline below; the pages pane's header sits on `--desk` with
   none.
 - **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; the writer's
-  cell opens with the stats line (§8.3), then Go to style with a dotted
-  underline.
+  cell opens with the stats line (§8.3), the session count in `--acc-ink` once
+  non-zero, then Go to style with a dotted underline.
 
 ### 6.12 Empty state
 
@@ -549,8 +549,8 @@ changing, right is the result.
   - Expanding the **writing** hides the outline and the pages. The text keeps
     its measure, the margins widen so notes are written out, and the toolbar,
     footer and pane header (except the expand button) fade while typing and
-    return when the mouse moves (a control focused by Tab stays visible). (The
-    widened margins wait for Prose, §8.1.)
+    return when the mouse moves (a control focused by Tab stays visible). The
+    writing grows to 19 (§3) with its measure; the margins are §8.1's.
   - Expanding the **pages** shows the spread larger, nothing else. Same in Style
     and Publish.
   - In either, the mouse at the left edge slides the outline in over the view
@@ -565,17 +565,15 @@ changing, right is the result.
   corner button shows the return state, "Show the pages (⌘.)", and brings them
   back. The pages hide in Write only; Style and Publish always show them.
 
-## 8. The write pane (planned)
+## 8. The write pane
 
 Two views of the same file, switched in the pane header or with `⌘/`. Nothing is
 stored differently.
 
-### 8.1 Prose (default) (planned)
+### 8.1 Prose (default)
 
 The text column holds only the writing, in the writing face (Alegreya by
-default). Built: rubrics, text as text, markup at the cursor, notes and page
-turns at normal width, images, the margins at normal width. The expanded margins
-are still to come.
+default).
 
 - **Rubrics, left margin.** Each sentinel that opens or labels a block is a red
   small-caps rubric beside it (`--f-ui` `--fs-xs`, `--acc-ink`, right-aligned):
@@ -616,10 +614,12 @@ are still to come.
   outside the cursor's paragraph, so an unresolved one is seen).
 - **`{only}`** (experimental) is a rubric `Only` with its editions beneath, the
   way `{is}` shows its name (decided 2026-10-26).
-- **Margins.** Left 6–9.5rem, right 3–10.5rem. At normal width (built: 6rem and
-  3rem) rubrics stay (slug truncated), notes collapse to the ☞ (hover to read)
-  and page turns show the number alone. Expanded, they are written out
-  (planned).
+- **Margins.** Left 6rem and right 3rem at normal width, 9.5rem and 10.5rem
+  expanded. At normal width rubrics stay (slug truncated), notes collapse to the
+  ☞ (hover to read) and page turns show the number alone. Expanded, they are
+  written out: the note beside its ☞ in `--fs-xs` `--muted`, the turn as "p.
+  12", the slug on up to two lines. The right margin floats there, so a line
+  grows to hold its notes and the next line's notes start below them.
 
 ### 8.2 Source
 
@@ -628,23 +628,27 @@ numbers too), coloured per §2.6, with today's sentinel treatments (structural
 band and hairline, rails joining explicit-close pairs, comment rules as
 hairlines), scoped to `#editor[data-view="source"]`; Prose has its own (§8.1).
 
-### 8.3 Text view (Aa), spelling, footer (planned)
+### 8.3 Text view (Aa), spelling, footer
 
 Aa, per reader, not per book: face (Alegreya, Alegreya Sans, or the book's body
 face), size (12–24, default 17), dim (off by default; paragraph or sentence),
 page turns (on). Spelling stays its own menu. Built: the Aa popover is a
 small-caps Face heading over three check items, each face named in itself, then
 a hairline and rows of label left, control right: Size a − n + stepper, Dim a
-seg, Page turns a switch. Dim is saved but not drawn yet. Spelling's popover
-lists the word lists and None as check items. Completions, the wrap bar, ⌘K,
-sentinel shortcuts, find and replace, image drops and the preview following the
-cursor work in both views and expanded. Footer (built): the writer's cell opens
-with "Chapter title · 41,210 words · +512 today", the chapter at the cursor (its
-slug in `--f-hivis` when it has no title; left out before the first chapter),
-the manuscript's words and the words added since the book was opened (never
-below 0), recounted with the parse; then Go to style. No goals or streaks.
-Typewriter scrolling and writing on the book's paper were considered and
-dropped.
+seg, Page turns a switch. Dim fades the text outside the cursor's paragraph, or
+outside its sentence, to opacity .28 over `--t` (instant under
+`prefers-reduced-motion`), in both views; the margins, rubrics and notes stay,
+and an illustration's image fades with its caption. A sentence ends at `.`, `?`
+or `!` (and any closing quotes) before a space or the line's end, so an
+abbreviation ends one early. Spelling's popover lists the word lists and None as
+check items. Completions, the wrap bar, ⌘K, sentinel shortcuts, find and
+replace, image drops and the preview following the cursor work in both views and
+expanded. Footer (built): the writer's cell opens with "Chapter title · 41,210
+words · +512 today", the chapter at the cursor (its slug in `--f-hivis` when it
+has no title; left out before the first chapter), the manuscript's words and the
+words added since the book was opened (never below 0, in `--acc-ink` once above
+it), recounted with the parse; then Go to style. No goals or streaks. Typewriter
+scrolling and writing on the book's paper were considered and dropped.
 
 ## 9. Winks
 
