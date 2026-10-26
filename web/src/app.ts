@@ -21,9 +21,7 @@ import type { ServerMessage } from "../../server/pipeline.ts";
 import {
   type CachedRender,
   cacheId,
-  deleteCachedRender,
   loadCachedRender,
-  renderHash,
 } from "./preview-cache.ts";
 import {
   formatProblem,
@@ -35,10 +33,8 @@ import {
   replaceBuffer,
   scrollEditorToLine,
   setEditionSpans,
-  setHideMarkup,
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
-import { parseWordList, setSpeller } from "./spelling.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
 import { type ImageHost, pickImageFile } from "./editor-images.ts";
@@ -48,45 +44,16 @@ import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
 import { isNewerSpec, SPEC_VERSION } from "../../metadata/upgrade.ts";
-import {
-  appHref,
-  editionHref,
-  type EditionInfo,
-  editionLabel,
-  firstSpanLine,
-  freeSlug,
-  lineFromHash,
-  passagesLabel,
-  prettySize,
-  slugify,
-} from "./editions.ts";
-import { editionToken, titleCase } from "../../server/editions.ts";
-import { zipBook } from "./book-zip.ts";
+import { appHref, type EditionInfo, lineFromHash } from "./editions.ts";
+import { editionToken } from "../../server/editions.ts";
 import { Sync, type SyncStatus } from "./sync.ts";
-import {
-  type Backend,
-  hasServer,
-  httpBackend,
-  localAssets,
-  localBackend,
-} from "./backend.ts";
-import {
-  browserFolder,
-  createBooksFolder,
-  importBooks,
-  pickFolder,
-  rememberedFolder,
-  reopenFolder,
-} from "./fs-store.ts";
-import { importSource } from "../../server/import/mod.ts";
-import { arrowKeys, themeCard } from "./panel-themes.ts";
-import { applyTheme, THEMES } from "../../metadata/themes.ts";
-import {
-  fetchSource,
-  openUrl,
-  pasteSource,
-  type WebSource,
-} from "./web-source.ts";
+import type { Backend } from "./backend.ts";
+import { installSwitcher, type Switcher } from "./switcher.ts";
+import { installCreateBook, renderImportNotes } from "./create-book.ts";
+import { ThemePreview } from "./theme-preview.ts";
+import { installTextView } from "./text-view.ts";
+import { connect } from "./library.ts";
+import { $, brief } from "./dom.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 // folios.js is a classic script (toHtml inlines it), so its helpers hang off
@@ -133,7 +100,6 @@ function toStyle(next: string): void {
   setMode("style");
   history.pushState(null, "", here());
 }
-const $ = (id: string) => document.getElementById(id)!;
 
 // Author-facing status in the toolbar: a short phrase, so it clears the mode
 // switch; the detail goes in the tooltip. "Saved" draws as a muted check (the
@@ -237,11 +203,6 @@ function fillPlaceholder(host: ImageHost, slug: string, file?: File): void {
   else pickImageFile().then((picked) => picked && save(picked));
 }
 
-// Short, readable tail of an error for the footer; full text stays in the title.
-function brief(err: unknown): string {
-  return String(err).replace(/^Error:\s*/, "").split("\n")[0]!.slice(0, 80);
-}
-
 let editor: EditorView;
 let backend: Backend; // the dev server, or the service in-page over a folder
 let book: string;
@@ -253,12 +214,13 @@ let parseTimer: ReturnType<typeof setTimeout> | undefined;
 // main once the book, edition and manuscript version are known.
 let sync: Sync;
 let remoteFetchGen = 0;
-let renaming: Promise<unknown> = Promise.resolve(); // this tab's edition rename
 // The disk text the changed-on-disk banner is offering, while it is up.
 let diskOffer: { text: string; version: string } | null = null;
 let metaStale = false; // metadata changed while the panel had unsaved edits
 let metaFetchGen = 0;
 let configPanel: ConfigPanel | null = null;
+let books: string[] = []; // the library's, as last listed
+let switcher: Switcher; // the crumb and the book/edition switcher, from main
 
 function onDocChanged(text: string): void {
   $("preview").dataset.stale = ""; // dimmed until the render catches up
@@ -276,7 +238,7 @@ function reparse(text: string): void {
     return t?.name === "is" && !t.closing && t.slug ? [t.slug] : [];
   });
   applyDiagnostics(editor, doc.diagnostics);
-  renderImportNotes(text);
+  renderImportNotes(text, editor);
   setEditionSpans(editor, doc.onlySpans, editionToken(edition));
   const diag = $("diagnostics");
   const first = doc.diagnostics[0];
@@ -358,379 +320,6 @@ function highlightTreeNode(line: number): void {
 const fetchEditions = (name: string): Promise<EditionInfo[]> =>
   backend.editions(name);
 
-// The crumb: Book / Edition, then what sets the edition apart — its page size.
-function setCrumb(editions: EditionInfo[]): void {
-  const cur = editions.find((e) => e.slug === edition);
-  const name = cur ? editionLabel(cur) : "";
-  $("book-name").textContent = titleCase(book);
-  $("edition-name").textContent = name;
-  document.title = `Wynkyn — ${book} · ${name}`;
-}
-function setCrumbSize(size: string | undefined): void {
-  $("edition-size").textContent = size ? prettySize(size) : "";
-}
-
-// The switcher: books (with search) on the left, the selected book's editions
-// on the right. Every open re-fetches, so summaries follow page-size edits.
-let books: string[] = [];
-let selBook = ""; // the book whose editions the right side lists
-let selEditions: EditionInfo[] = [];
-let selGen = 0;
-const switcher = () => $("switcher") as HTMLDialogElement;
-const bookSearch = () => $("book-search") as HTMLInputElement;
-const newForm = () => $("edition-new-form") as HTMLFormElement;
-
-function bookHits(): string[] {
-  const q = bookSearch().value.trim().toLowerCase();
-  return books.filter((b) =>
-    !q || b.includes(q) || titleCase(b).toLowerCase().includes(q)
-  );
-}
-
-function renderBooks(): void {
-  const hits = bookHits();
-  const rows: HTMLElement[] = hits.map((b) => {
-    const row = document.createElement("button");
-    row.className = "book-row";
-    row.tabIndex = -1; // the search box's arrows walk these
-    row.setAttribute("role", "option");
-    row.setAttribute("aria-selected", String(b === selBook));
-    row.textContent = titleCase(b);
-    row.title = b;
-    row.onclick = () => selectBook(b);
-    row.ondblclick = () => openEdition(b, b === book ? edition : null);
-    return row;
-  });
-  if (!hits.length) {
-    const empty = document.createElement("div");
-    empty.className = "book-empty";
-    empty.textContent = "No books match";
-    rows.push(empty);
-  }
-  $("book-list").replaceChildren(...rows);
-  $("book-list").querySelector('[aria-selected="true"]')?.scrollIntoView({
-    block: "nearest",
-  });
-}
-
-async function selectBook(b: string): Promise<void> {
-  selBook = b;
-  renderBooks();
-  hideNewForm();
-  const gen = ++selGen;
-  try {
-    const eds = await fetchEditions(b);
-    if (gen !== selGen) return;
-    selEditions = eds;
-    if (b === book) setCrumb(eds);
-  } catch (err) {
-    if (gen !== selGen) return;
-    selEditions = [];
-    const msg = document.createElement("div");
-    msg.className = "sw-err";
-    msg.textContent = `editions: ${brief(err)}`;
-    $("edition-list").replaceChildren(msg);
-    return;
-  }
-  renderEditions();
-}
-
-// Full navigation, not in-place teardown: clean WS/editor/tree state. A line
-// rides along in the hash for main() to jump the editor to.
-function openEdition(b: string, slug: string | null, line?: number): void {
-  if (b === book && slug === edition) {
-    switcher().close();
-    if (line) {
-      setMode("write");
-      scrollEditorToLine(editor, line);
-    }
-    return;
-  }
-  void leave(editionHref(b, slug) + (line ? `#line=${line}` : ""));
-}
-
-function renderEditions(): void {
-  const current = selBook === book ? edition : undefined;
-  $("edition-list").replaceChildren(...selEditions.map((e) => {
-    const row = document.createElement("div");
-    row.className = "ed-row";
-    row.setAttribute("role", "button");
-    row.tabIndex = 0;
-    const ck = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    ck.setAttribute("class", "tico ck");
-    if (e.slug === current) {
-      row.setAttribute("aria-current", "true");
-      const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-      use.setAttribute("href", "#check");
-      ck.append(use);
-    }
-    const nm = document.createElement("span");
-    nm.className = "nm";
-    nm.textContent = editionLabel(e);
-    const err = document.createElement("span");
-    err.className = "sw-err";
-    const acts = document.createElement("span");
-    acts.className = "acts";
-    const act = (label: string, fn: () => void | Promise<void>) => {
-      const b = document.createElement("button");
-      b.textContent = label;
-      b.onclick = async (ev) => {
-        ev.stopPropagation();
-        err.textContent = "";
-        try {
-          await fn();
-        } catch (x) {
-          err.textContent = brief(x);
-        }
-      };
-      acts.append(b);
-    };
-    act("Rename", () => {
-      const input = document.createElement("input");
-      input.value = editionLabel(e);
-      input.setAttribute("aria-label", "Edition name");
-      input.onclick = (ev) => ev.stopPropagation();
-      input.onkeydown = (ev) => {
-        if (ev.key === "Escape") {
-          ev.preventDefault(); // cancel the rename, not the switcher
-          renderEditions();
-        } else if (ev.key === "Enter") {
-          ev.preventDefault();
-          err.textContent = "";
-          renameEdition(e, input.value).catch((x) =>
-            err.textContent = brief(x)
-          );
-        }
-      };
-      nm.replaceChildren(input);
-      input.select();
-    });
-    const slug = e.slug;
-    if (slug !== null) {
-      act("Delete", async () => {
-        if (
-          !confirm(
-            `Delete the ${
-              editionLabel(e)
-            } edition? The manuscript is untouched.`,
-          )
-        ) return;
-        // Style edits waiting for the open edition go with it.
-        if (selBook === book && slug === edition) sync.dropMetadata();
-        await backend.deleteEdition(selBook, slug);
-        await deleteCachedRender(cacheId(selBook, slug));
-        if (selBook === book && slug === edition) {
-          await leave(editionHref(book, null));
-        } else await selectBook(selBook);
-      });
-    }
-    const setup = document.createElement("span");
-    setup.className = "setup";
-    setup.textContent = e.summary;
-    row.append(ck, nm, acts, setup);
-    if (e.passages > 0) {
-      const diff = document.createElement("button");
-      diff.className = "diff";
-      diff.textContent = passagesLabel(e.passages);
-      diff.title = "Open this edition at its first passage";
-      diff.onclick = (ev) => {
-        ev.stopPropagation();
-        jumpToPassages(e.slug).catch((x) => err.textContent = brief(x));
-      };
-      row.append(diff);
-    }
-    row.append(err);
-    row.onclick = () => openEdition(selBook, e.slug);
-    row.onkeydown = (ev) => {
-      if (ev.target !== row) return;
-      if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault(); // don't let Space scroll the list
-        openEdition(selBook, e.slug);
-      } else if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
-        ev.preventDefault();
-        ((ev.key === "ArrowDown"
-          ? row.nextElementSibling
-          : row.previousElementSibling) as HTMLElement | null)?.focus();
-      }
-    };
-    return row;
-  }));
-}
-
-// Named editions rename by slug (the server rewrites their {only} tokens);
-// the default edition only has a display name to change.
-async function renameEdition(e: EditionInfo, value: string): Promise<void> {
-  if (e.slug === null) {
-    await backend.renameDefault(selBook, value);
-  } else {
-    const next = slugify(value);
-    if (!next) throw new Error("the name needs a letter or digit");
-    if (next !== e.slug) {
-      // Style edits waiting for the open edition land first, and move with it.
-      if (selBook === book && e.slug === edition) await sync.flush();
-      const done = backend.renameEdition(selBook, e.slug, next)
-        .then(() => selBook === book ? rebaseAfterRename() : undefined);
-      renaming = done.catch(() => {});
-      await done;
-      await deleteCachedRender(cacheId(selBook, e.slug));
-      if (selBook === book && e.slug === edition) {
-        await leave(editionHref(book, next));
-        return;
-      }
-    }
-  }
-  await selectBook(selBook);
-}
-
-async function jumpToPassages(slug: string | null): Promise<void> {
-  const text = selBook === book
-    ? editor.state.doc.toString()
-    : (await fetchManuscript(selBook)).text;
-  openEdition(
-    selBook,
-    slug,
-    firstSpanLine(parse(text).onlySpans, slug) ?? undefined,
-  );
-}
-
-function hideNewForm(): void {
-  newForm().hidden = true;
-  $("edition-new").hidden = false;
-}
-
-function installSwitcher(): void {
-  const dialog = switcher();
-  const search = bookSearch();
-  const form = newForm();
-  const nameInput = form.elements.namedItem("name") as HTMLInputElement;
-  const from = form.elements.namedItem("from") as HTMLSelectElement;
-  const formErr = form.querySelector(".sw-err")!;
-  const crumbs = [$("book-switcher"), $("edition-switcher")];
-
-  search.oninput = () => {
-    const hits = bookHits();
-    if (!hits.includes(selBook) && hits[0]) selectBook(hits[0]);
-    else renderBooks();
-  };
-  search.onkeydown = (e) => {
-    const hits = bookHits();
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      const i = hits.indexOf(selBook) + (e.key === "ArrowDown" ? 1 : -1);
-      const next = hits[Math.min(Math.max(i, 0), hits.length - 1)];
-      if (next && next !== selBook) selectBook(next);
-    } else if (e.key === "Enter" && hits.includes(selBook)) {
-      e.preventDefault();
-      openEdition(selBook, selBook === book ? edition : null);
-    }
-  };
-  for (const b of crumbs) {
-    b.onclick = () => {
-      search.value = "";
-      dialog.style.left = `${
-        $("book-switcher").getBoundingClientRect().left
-      }px`;
-      dialog.showModal();
-      for (const c of crumbs) c.setAttribute("aria-expanded", "true");
-      search.focus();
-      selectBook(book);
-    };
-  }
-  dialog.onclose = () => {
-    for (const c of crumbs) c.setAttribute("aria-expanded", "false");
-  };
-  dialog.onclick = (e) => {
-    if (e.target === dialog) dialog.close(); // a click outside closes
-  };
-
-  $("book-new").onclick = () => {
-    dialog.close();
-    createManuscript(true);
-  };
-  // The selected book's folder as a zip: the way out of browser storage.
-  const download = $("book-download");
-  download.hidden = !backend.store;
-  download.onclick = async () => {
-    try {
-      const zip = await zipBook(backend.store!, selBook);
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(
-        new Blob([zip], { type: "application/zip" }),
-      );
-      a.download = `${selBook}.zip`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch (err) {
-      $("book-err").textContent = brief(err);
-    }
-  };
-  // Where the library lives, in the switcher's foot and as the crumb's first
-  // step, which is the way to a different one: forget the choice and pick
-  // again on the next load. The dev server's books/ has no other to pick.
-  const note = $("library-note");
-  const lib = $("library-open");
-  const pref = localStorage.getItem("library");
-  note.hidden =
-    lib.hidden =
-    $("library-slash").hidden =
-      backend.kind !== "local";
-  const where = (icon: string, name: string, about: string, title: string) => {
-    $("library-icon").setAttribute("href", `#${icon}`);
-    $("library-name").textContent = name;
-    lib.title = title;
-    lib.ariaLabel = `Library: ${name}. Change library`;
-    note.textContent = about;
-  };
-  if (pref === "browser") {
-    const about = "Kept in this browser only. Browsers clear site storage " +
-      "without asking, so download a book to keep it.";
-    where("where-browser", "This browser", about, about);
-  } else if (pref === "folder") {
-    note.textContent = "Loading…";
-    rememberedFolder().then((dir) => {
-      const about = `Books in the “${dir?.name}” folder on this device.`;
-      where(
-        "where-folder",
-        dir?.name ?? "",
-        about,
-        `${about} Click to change.`,
-      );
-    });
-  }
-  lib.onclick = () => {
-    localStorage.removeItem("library");
-    void leave(location.pathname);
-  };
-
-  $("edition-new").onclick = () => {
-    from.replaceChildren(
-      ...selEditions.map((e) =>
-        new Option(editionLabel(e), e.slug ?? "default")
-      ),
-    );
-    from.value = (selBook === book ? edition : null) ?? "default";
-    nameInput.value = "";
-    formErr.textContent = "";
-    $("edition-new").hidden = true;
-    form.hidden = false;
-    nameInput.focus();
-  };
-  (form.elements.namedItem("cancel") as HTMLButtonElement).onclick =
-    hideNewForm;
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const slug = slugify(nameInput.value);
-    formErr.textContent = slug ? "" : "the name needs a letter or digit";
-    if (!slug) return;
-    try {
-      await backend.createEdition(selBook, slug, from.value);
-      await leave(editionHref(selBook, slug));
-    } catch (err) {
-      formErr.textContent = brief(err);
-    }
-  };
-}
-
 // Every page switch: send what is waiting first, and ask before dropping an
 // edit whose save failed or that a conflict still holds.
 let leaving = false; // the author chose to go: beforeunload asks nothing more
@@ -773,7 +362,7 @@ function syncChanged(s: SyncStatus): void {
 }
 
 function saveMetadataSections(sections: Partial<Metadata>): void {
-  if ("page" in sections) setCrumbSize(sections.page?.size);
+  if ("page" in sections) switcher.setCrumbSize(sections.page?.size);
   // Saves replace whole sections, so this keeps `metadata` what the panel
   // shows: its own sections, uncopied (Sync copies what it sends).
   if (metadata) metadata = { ...metadata, ...sections };
@@ -820,8 +409,8 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         isNames: () => isNames,
         exportEpub,
         toStyle,
-        tryTheme: (slug) => void tryTheme(slug),
-        applyTheme: askApplyTheme,
+        tryTheme: (slug) => void themes.try(slug),
+        applyTheme: (slug) => themes.askApply(slug),
         view,
         onRoute: (id) => {
           view = id;
@@ -836,21 +425,10 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
   })();
 }
 
-// ---- Theme preview and Apply (spec §7.5) ----
-// A previewed theme's build is on screen and nothing is saved. Pushed builds
-// are held meanwhile; ending the preview shows the newest one.
-// A null cacheKey paints without touching the book's cached render.
-let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {}; // set in main
-let restore: (cached: CachedRender) => void = () => {}; // set in main
-let previewSlug: string | null = null; // the theme on screen, or null
-let previewGen = 0; // bumped by every try and by the end, so a stale build drops
-let previewFrom: string | null = null; // the manuscript version it was built from
-let previewShown: UpdateMessage | null = null; // the theme's build on screen
-let heldMsg: UpdateMessage | null = null; // newest push held while previewing
-let lastShown: UpdateMessage | null = null; // the last real build painted
-
-const themeName = (slug: string) =>
-  THEMES.find((t) => t.slug === slug)?.name ?? slug;
+// The live pages, both set in main. A null cacheKey paints without touching
+// the book's cached render.
+let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {};
+let restore: (cached: CachedRender) => void = () => {};
 
 // The edition's metadata with every style edit landed, so a theme goes over
 // what the author sees. The held copy is current unless another writer changed
@@ -861,139 +439,21 @@ async function settledMetadata(): Promise<Metadata> {
   return (await fetchMetadata()).metadata;
 }
 
-async function tryTheme(slug: string | null): Promise<void> {
-  if (slug === null) return endPreview();
-  const gen = ++previewGen;
-  previewSlug = slug;
-  $("preview").dataset.stale = "";
-  configPanel?.themeTried(slug);
-  try {
-    const meta = applyTheme(await settledMetadata(), slug);
-    const built = await backend.tryBuild(book, edition, meta);
-    if (gen !== previewGen) return; // another card, or Discard, since
-    previewFrom = built.manuscriptVersion;
-    previewShown = { ...built, type: "update" };
-    // Not cached: a reload must not open on a look never applied.
-    paint(previewShown, null);
-  } catch (err) {
-    if (gen !== previewGen) return;
-    endPreview(); // a held push must not stay held behind a bar for good
-    setStatus("error", `preview: ${brief(err)}`);
-  }
-}
-
-// Back to the book's own look: the newest held push, else the last build.
-// `applied`: the previewed look is now the book's, so keep it on screen.
-function endPreview(applied = false): void {
-  if (previewSlug === null) return;
-  previewSlug = null;
-  const gen = ++previewGen;
-  configPanel?.themeTried(null);
-  if (applied && previewShown) lastShown = previewShown;
-  const next = heldMsg ?? lastShown;
-  heldMsg = previewShown = null;
-  if (!applied) void showBookPages(next, gen);
-}
-
-// The book's cached render when it is what should show (no Paged.js pass),
-// else a fresh render of `next`. With neither, the pages clear: the book's
-// first build paints when it lands.
-async function showBookPages(
-  next: UpdateMessage | null,
-  gen: number,
-): Promise<void> {
-  const cached = await loadCachedRender(cacheId(book, edition));
-  if (gen !== previewGen) return; // a new preview since
-  if (next && cached?.hash !== renderHash(next)) {
-    lastShown = next;
-    return paint(next);
-  }
-  restore(
-    cached ??
-      {
-        hash: "",
-        pages: "",
-        styles: [],
-        fontLinks: "",
-        seed: {},
-        problems: [],
-      },
-  );
-}
-
-// A push while previewing: held, and a manuscript change rebuilds the theme.
-function holdForPreview(msg: UpdateMessage): boolean {
-  if (previewSlug === null) return false;
-  heldMsg = msg;
-  if (msg.manuscriptVersion !== previewFrom) void tryTheme(previewSlug);
-  return true;
-}
-
-// Apply always asks (spec §7.5): a new edition (the safe choice), or replace
-// this edition's style. Cancel keeps the preview.
-let applying: string | null = null; // the theme the dialog is asking about
-function askApplyTheme(slug: string): void {
-  const dlg = $("theme-dlg") as HTMLDialogElement;
-  applying = slug;
-  for (const el of dlg.querySelectorAll(".t-name")) {
-    el.textContent = themeName(slug);
-  }
-  for (const el of dlg.querySelectorAll(".e-name")) {
-    el.textContent = $("edition-name").textContent;
-  }
-  $("theme-err").textContent = "";
-  if (!dlg.open) dlg.showModal();
-}
-
-// What a theme owns (spec §4.13), as the sections a save replaces.
-const themeSections = (m: Metadata): Partial<Metadata> => ({
-  fonts: m.fonts,
-  elements: m.elements,
-  numbering: m.numbering,
-  running: m.running,
+// Theme preview and Apply (spec §7.5).
+const themes = new ThemePreview({
+  backend: () => backend,
+  book: () => book,
+  edition: () => edition,
+  sync: () => sync,
+  configPanel: () => configPanel,
+  settledMetadata,
+  setMetadata: (m) => metadata = m,
+  saveSections: saveMetadataSections,
+  paint: (msg, cacheKey) => paint(msg, cacheKey),
+  restore: (cached) => restore(cached),
+  leave,
+  setStatus,
 });
-
-function installThemeApply(): void {
-  const dlg = $("theme-dlg") as HTMLDialogElement;
-  const buttons = [...dlg.querySelectorAll("button")];
-  $("theme-cancel").onclick = () => dlg.close();
-  const run = (act: (slug: string) => Promise<void>) => async () => {
-    if (!applying) return;
-    for (const b of buttons) b.disabled = true;
-    try {
-      await act(applying);
-    } catch (err) {
-      $("theme-err").textContent = brief(err);
-    } finally {
-      for (const b of buttons) b.disabled = false;
-    }
-  };
-  $("theme-new").onclick = run(async (slug) => {
-    const applied = applyTheme(await settledMetadata(), slug);
-    const taken = (await backend.editions(book)).flatMap((e) =>
-      e.slug === null ? [] : [e.slug]
-    );
-    const next = freeSlug(slug, taken);
-    await backend.createEdition(book, next, edition ?? "default");
-    try {
-      await backend.saveMetadata(book, next, themeSections(applied));
-    } catch (err) {
-      // An edition named for the theme but holding the old style misleads.
-      await backend.deleteEdition(book, next).catch(() => {});
-      throw err;
-    }
-    await leave(editionHref(book, next));
-  });
-  $("theme-replace").onclick = run(async (slug) => {
-    const applied = applyTheme(await settledMetadata(), slug);
-    metadata = applied;
-    saveMetadataSections(themeSections(applied));
-    void sync.flush(); // no debounce: the author chose this
-    configPanel?.refresh(applied);
-    endPreview(true);
-    dlg.close();
-  });
-}
 
 const MODES: Mode[] = ["write", "style", "publish"];
 let mode: Mode = "write";
@@ -1014,7 +474,7 @@ function setMode(next: Mode): void {
   }
   syncUrl();
   followCursor(cursorLine);
-  if (next !== "style") endPreview(); // the panel ends it on Publish too
+  if (next !== "style") themes.end(); // the panel ends it on Publish too
   if (next === "write") return;
   ensureConfigPanel().then((panel) => {
     if (mode !== "write") panel?.setMode(mode); // the latest, if it changed meanwhile
@@ -1055,82 +515,6 @@ const fetchManuscript = (
   name: string,
 ): Promise<{ text: string; version: string }> => backend.manuscript(name);
 
-// Without a server the app needs a folder: the author's own books/ (the File
-// System Access API, Chromium), or this browser's private storage. The choice
-// is remembered; "Change library…" in the switcher forgets it. The folder buttons
-// show in every browser: one without the API (Firefox, Safari, Brave until its
-// flag is on) fails the click with its own error rather than hiding the
-// options.
-async function chooseLibrary(): Promise<FileSystemDirectoryHandle> {
-  const remembered = await rememberedFolder();
-  const pref = localStorage.getItem("library");
-  if (
-    pref === "folder" && remembered && await reopenFolder(remembered, false)
-  ) return remembered;
-  if (pref === "browser") return await browserFolder();
-  return new Promise((resolve) => {
-    const dlg = $("library") as HTMLDialogElement;
-    const err = $("lib-err");
-    // Persisted storage is evicted last; the browser may still say no.
-    const persist = () => navigator.storage.persist?.().catch(() => false);
-    const done = (
-      dir: FileSystemDirectoryHandle,
-      kind: "folder" | "browser",
-    ) => {
-      localStorage.setItem("library", kind);
-      if (kind === "browser") persist();
-      dlg.close();
-      resolve(dir);
-    };
-    const fail = (e: unknown) => {
-      if ((e as Error).name !== "AbortError") err.textContent = brief(e);
-    };
-    const reopen = $("lib-reopen");
-    reopen.hidden = !remembered;
-    if (remembered) {
-      reopen.textContent = `Open “${remembered.name}” again`;
-      reopen.onclick = async () => {
-        if (await reopenFolder(remembered, true)) {
-          done(remembered, "folder");
-        } else err.textContent = "The folder wasn't allowed.";
-      };
-    }
-    // Without the File System Access API (Firefox, Safari, Brave until its
-    // flag is on) the folder buttons stay live and are tagged: a click fails
-    // with the browser's own error, which tells the author whose limit it is.
-    const tagged = !("showDirectoryPicker" in globalThis);
-    for (const id of ["lib-new", "lib-pick"]) {
-      ($(id).querySelector(".pill") as HTMLElement).hidden = !tagged;
-    }
-    $("lib-new").onclick = () =>
-      createBooksFolder().then((d) => done(d, "folder"), fail);
-    $("lib-pick").onclick = () =>
-      pickFolder().then((d) => done(d, "folder"), fail);
-    $("lib-browser").onclick = () =>
-      browserFolder().then((d) => done(d, "browser"), fail);
-    dlg.showModal();
-  });
-}
-
-// Without the File System Access API (Firefox, Safari, Brave by default) the
-// app can't open the author's folder: say so once, before the Welcome, and
-// point at the browsers that can. The Welcome itself is the same everywhere.
-function browserNotice(): Promise<void> {
-  if (
-    "showDirectoryPicker" in globalThis ||
-    localStorage.getItem("browser-notice") === "1"
-  ) return Promise.resolve();
-  const dlg = $("browser-notice") as HTMLDialogElement;
-  return new Promise((resolve) => {
-    dlg.onclose = () => {
-      localStorage.setItem("browser-notice", "1");
-      resolve();
-    };
-    $("browser-notice-close").onclick = () => dlg.close();
-    dlg.showModal();
-  });
-}
-
 // metadata.json written by a newer Wynkyn than this one: say so, keep going.
 // Unknown keys fall through to the renderer's defaults, nothing is dropped.
 function showSpecBanner(spec: string | undefined): void {
@@ -1140,13 +524,6 @@ function showSpecBanner(spec: string | undefined): void {
     el.querySelector("span")!.textContent =
       `This book's metadata.json follows spec ${spec}, newer than this app's ${SPEC_VERSION}. Settings it doesn't know are kept but not shown.`;
   }
-}
-
-async function connect(): Promise<Backend> {
-  if (await hasServer()) return httpBackend();
-  const assets = localAssets();
-  await browserNotice();
-  return await localBackend(await chooseLibrary(), await assets);
 }
 
 // An update built from a version the buffer isn't based on: fetch the current
@@ -1319,127 +696,6 @@ function installThemeToggle(): void {
   };
 }
 
-// Spell check (spec §7.3): the word list the Spelling menu picks, fetched
-// once, and the book's dictionary.json, which Add to dictionary grows.
-// Another language is one more list in vendor/ and one row here.
-const WORD_LISTS: Record<string, { name: string; url: string }> = {
-  en: { name: "English", url: "/vendor/words-en.txt" },
-};
-const wordLists = new Map<string, Promise<Set<string>>>();
-async function spellCheck(lang: string): Promise<void> {
-  const url = WORD_LISTS[lang]?.url;
-  if (!url) return setSpeller(editor, null);
-  try {
-    let list = wordLists.get(lang);
-    if (!list) {
-      wordLists.set(
-        lang,
-        list = fetch(url).then((r) =>
-          r.ok ? r.text() : Promise.reject(new Error(`word list: ${r.status}`))
-        ).then(parseWordList),
-      );
-    }
-    const [known, words] = await Promise.all([
-      list,
-      backend.dictionary(book),
-    ]);
-    const speller = (mine: Set<string>) => ({
-      has: (w: string) => known.has(w) || mine.has(w),
-      async add(w: string) {
-        try {
-          setSpeller(editor, speller(new Set(await backend.addWord(book, w))));
-        } catch (err) {
-          setStatus("error", `dictionary: ${brief(err)}`);
-        }
-      },
-    });
-    // Unless the menu moved on while the list loaded.
-    if (($("tv-spell") as HTMLSelectElement).value === lang) {
-      setSpeller(editor, speller(new Set(words)));
-    }
-  } catch (err) {
-    wordLists.delete(lang); // try the fetch again next time
-    setStatus("error", `spell check: ${brief(err)}`);
-  }
-}
-
-// The text view (the bar atop the editor): the editor's font and size, Hide markup and Spelling, a per-reader
-// preference kept in localStorage, not the book.
-const TEXT_FONTS: Record<string, string> = {
-  serif: "ui-serif, Georgia, serif",
-  sans: "system-ui, sans-serif",
-  mono: "var(--mono)",
-};
-function installTextView(): void {
-  let prefs = { font: "serif", size: 16, hide: false, spell: "en" };
-  try {
-    prefs = { ...prefs, ...JSON.parse(localStorage.getItem("text-view")!) };
-  } catch {
-    // none saved, or storage blocked: the defaults
-  }
-  const ed = $("editor");
-  const size = $("tv-size") as HTMLInputElement;
-  const hide = $("tv-hide") as HTMLInputElement;
-  const spell = $("tv-spell") as HTMLSelectElement;
-  spell.append(
-    ...Object.entries(WORD_LISTS).map(([v, l]) => new Option(l.name, v)),
-    new Option("None", "none"),
-  );
-  if (prefs.spell !== "none" && !(prefs.spell in WORD_LISTS)) {
-    prefs.spell = "en";
-  }
-  const fonts = [
-    ...$("text-view").querySelectorAll<HTMLElement>("[data-font]"),
-  ];
-  const apply = () => {
-    ed.style.setProperty("--ed-font", TEXT_FONTS[prefs.font] ?? null);
-    ed.style.setProperty("--ed-fs", `${prefs.size}px`);
-    editor.requestMeasure(); // a CSS-only size change: re-align line numbers
-    for (const b of fonts) {
-      b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));
-    }
-    size.value = String(prefs.size);
-    size.nextElementSibling!.textContent = `${prefs.size}px`;
-    hide.checked = prefs.hide;
-    spell.value = prefs.spell;
-    setHideMarkup(editor, prefs.hide);
-    try {
-      localStorage.setItem("text-view", JSON.stringify(prefs));
-    } catch {
-      // storage blocked: the view just won't survive a reload
-    }
-  };
-  for (const b of fonts) {
-    b.onclick = () => {
-      prefs.font = b.dataset.font!;
-      apply();
-    };
-  }
-  size.oninput = () => {
-    prefs.size = Number(size.value);
-    apply();
-  };
-  for (const b of $("text-view").querySelectorAll<HTMLElement>("[data-step]")) {
-    b.onclick = (e) => {
-      e.preventDefault(); // inside the label: don't also focus the slider
-      size.stepUp(Number(b.dataset.step)); // clamps to the slider's min/max
-      prefs.size = Number(size.value);
-      apply();
-    };
-  }
-  hide.onchange = () => {
-    prefs.hide = hide.checked;
-    apply();
-  };
-  spell.onchange = () => {
-    prefs.spell = spell.value;
-    apply();
-    spellCheck(prefs.spell);
-  };
-  apply();
-  spellCheck(prefs.spell);
-}
-
 const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 // Keyboard chords. Snippet chords insert via insertSnippet; the rest are UI.
 const SNIPPET_KEYS: Record<string, string> = {
@@ -1492,320 +748,16 @@ function installShortcuts(
   $("pages-toggle").title += ` (${chordLabel("Mod-.")})`;
 }
 
-// ---- Create a new manuscript (spec §7.9) ------------------------------------
-// Import a file or a web page, or start blank; all ask for a title, then open
-// the book.
-// `cancelable` is false for an empty library; there Back returns to the
-// Welcome (no server only: with one, the library is the server's folder).
-function createManuscript(cancelable: boolean): void {
-  const dlg = $("create") as HTMLDialogElement;
-  const err = $("create-err");
-  err.textContent = "";
-  $("create-sub").textContent = cancelable
-    ? "Add another book to this library."
-    : "Your library is empty. How do you want to begin?";
-  const cancel = $("create-cancel");
-  cancel.hidden = !cancelable;
-  cancel.onclick = () => dlg.close();
-  const back = $("create-back");
-  back.hidden = cancelable || backend.kind !== "local";
-  back.onclick = () => {
-    dlg.close();
-    localStorage.removeItem("library");
-    main();
-  };
-  dlg.oncancel = (e) => {
-    e.preventDefault();
-    if (!back.hidden) back.click();
-    else if (cancelable) cancel.click();
-  };
-  const input = $("create-file") as HTMLInputElement;
-  input.value = "";
-  $("create-import").onclick = () => input.click();
-  input.onchange = async () => {
-    const file = input.files?.[0];
-    if (!file) return;
-    err.textContent = "Reading…";
-    await importPicked(
-      {
-        name: file.name,
-        bytes: file.arrayBuffer().then((b) => new Uint8Array(b)),
-      },
-      `${file.name} · ${sizeLabel(file.size)}`,
-      cancelable,
-    );
-  };
-  $("create-web").onclick = async () => {
-    dlg.close();
-    const src = await askWebSource();
-    if (!src) return createManuscript(cancelable);
-    await importPicked(src, src.label, cancelable);
-  };
-  // A browser-storage library can copy books in from a Wynkyn folder on
-  // disk: the way in for a browser that can't open the folder itself.
-  const folder = $("create-folder");
-  folder.hidden = localStorage.getItem("library") !== "browser";
-  const dir = $("create-dir") as HTMLInputElement;
-  dir.value = "";
-  folder.onclick = () => dir.click();
-  dir.onchange = async () => {
-    if (!dir.files?.length) return;
-    try {
-      err.textContent = "Copying…";
-      const { written, skipped } = await importBooks(
-        backend.store!,
-        dir.files,
-      );
-      const first = written[0];
-      // Nothing skipped, or nowhere else to go: open the first book copied.
-      if (first && (!skipped.length || !cancelable)) {
-        await leave(editionHref(first, null));
-        return;
-      }
-      if (!skipped.length) {
-        err.textContent =
-          "No book found: a book is a folder with a manuscript.md.";
-        return;
-      }
-      err.textContent = `Already in the library: ${skipped.join(", ")}.` +
-        (first ? ` Copied ${written.map(titleCase).join(", ")}.` : "");
-      if (first) books = (await backend.listBooks()).books;
-    } catch (e) {
-      err.textContent = brief(e);
-    }
-  };
-  $("create-blank").onclick = async () => {
-    dlg.close();
-    try {
-      const got = await askTitle("", null, "Create book");
-      if (!got) return createManuscript(cancelable);
-      await backend.createBook(got.slug, got.title, got.theme);
-      await leave(editionHref(got.slug, null));
-    } catch (e) {
-      err.textContent = brief(e);
-      dlg.showModal();
-    }
-  };
-  dlg.showModal();
-}
-
-/** The one import step for a file, a fetched page or a pasted one: read it,
- *  ask for a title under `label`, write the book and open it. Errors go back
- *  to the create dialog. */
-async function importPicked(
-  src: { name: string; bytes: Uint8Array | Promise<Uint8Array>; from?: string },
-  label: string,
-  cancelable: boolean,
-): Promise<void> {
-  const dlg = $("create") as HTMLDialogElement;
-  const err = $("create-err");
-  try {
-    const bytes = await src.bytes;
-    const r = importSource(src.name, bytes, { from: src.from });
-    err.textContent = "";
-    dlg.close();
-    const got = await askTitle(r.title, label, "Import");
-    if (!got) return createManuscript(cancelable);
-    const book = got.title === r.title
-      ? r
-      : importSource(src.name, bytes, { from: src.from, title: got.title });
-    await backend.importBook(got.slug, book, got.theme);
-    await leave(editionHref(got.slug, null));
-  } catch (e) {
-    err.textContent = brief(e);
-    if (!dlg.open) dlg.showModal();
-  }
-}
-
-const sizeLabel = (bytes: number) =>
-  bytes < 1024 * 1024
-    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-    : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-
-// The title dialog's theme cards, built once; each opening starts on House.
-let titleTheme = "house";
-function themePicker(): void {
-  const grid = $("title-themes");
-  const sub = $("title-theme-sub");
-  const pick = (slug: string) => {
-    titleTheme = slug;
-    for (const c of grid.querySelectorAll<HTMLElement>(".tcard")) {
-      c.setAttribute("aria-pressed", String(c.dataset.slug === slug));
-    }
-    const t = THEMES.find((t) => t.slug === slug)!;
-    sub.textContent = `${t.name}: ${t.description}`;
-  };
-  if (!grid.childElementCount) {
-    for (const t of THEMES) {
-      const card = themeCard(t, "small");
-      card.onclick = () => pick(t.slug);
-      grid.append(card);
-    }
-    arrowKeys(grid);
-  }
-  pick("house");
-}
-
-/** The title dialog: the title, its slug and the picked theme, or null for
- *  Back. */
-function askTitle(
-  title: string,
-  source: string | null,
-  cta: string,
-): Promise<{ slug: string; title: string; theme: string } | null> {
-  const dlg = $("title-dlg") as HTMLDialogElement;
-  const input = $("title-input") as HTMLInputElement;
-  const slugEl = $("title-slug");
-  const err = $("title-err");
-  const src = $("title-source");
-  src.hidden = source === null;
-  src.textContent = source ?? "";
-  $("title-ok").textContent = cta;
-  err.textContent = "";
-  input.value = title;
-  const show = () => {
-    slugEl.textContent = `${slugify(input.value) || "untitled"}/`;
-  };
-  input.oninput = show;
-  show();
-  themePicker();
-  return new Promise((resolve) => {
-    const finish = (
-      v: { slug: string; title: string; theme: string } | null,
-    ) => {
-      dlg.close();
-      resolve(v);
-    };
-    $("title-back").onclick = () => finish(null);
-    ($("title-form") as HTMLFormElement).onsubmit = (e) => {
-      e.preventDefault();
-      const slug = slugify(input.value) || "untitled";
-      if (books.includes(slug)) {
-        err.textContent = `“${slug}” is taken; pick another title.`;
-        return;
-      }
-      finish({ slug, title: input.value, theme: titleTheme });
-    };
-    dlg.oncancel = (e) => {
-      e.preventDefault();
-      finish(null);
-    };
-    dlg.showModal();
-    input.focus();
-    input.select();
-  });
-}
-
-/** The web dialog: an address to fetch, or, when the site blocks that, the
- *  page pasted from a new tab. The source plus its title-dialog line, or null
- *  for Back. */
-function askWebSource(): Promise<(WebSource & { label: string }) | null> {
-  const dlg = $("web-dlg") as HTMLDialogElement;
-  const url = $("web-url") as HTMLInputElement;
-  const box = $("web-paste-box");
-  const open = $("web-open") as HTMLAnchorElement;
-  const paste = $("web-paste") as HTMLTextAreaElement;
-  const err = $("web-err");
-  $("web-paste-hint").textContent =
-    `That site doesn’t let a web page read it. Open it in a new tab, select all (${
-      chordLabel("Mod-A")
-    }), copy (${chordLabel("Mod-C")}), and paste it here.`;
-  box.hidden = true;
-  err.textContent = "";
-  url.oninput = () => {
-    box.hidden = true;
-  };
-  return new Promise((resolve) => {
-    const finish = (src: WebSource | null, label = "") => {
-      dlg.close();
-      resolve(
-        src && { ...src, label: `${label} · ${sizeLabel(src.bytes.length)}` },
-      );
-    };
-    $("web-back").onclick = () => finish(null);
-    dlg.oncancel = (e) => {
-      e.preventDefault();
-      finish(null);
-    };
-    ($("web-form") as HTMLFormElement).onsubmit = async (e) => {
-      e.preventDefault();
-      const addr = url.value.trim();
-      url.value = addr.includes("://") ? addr : `https://${addr}`;
-      const fetchBtn = $("web-fetch") as HTMLButtonElement;
-      fetchBtn.disabled = true; // Enter does nothing while the default button is off
-      err.textContent = "Fetching…";
-      try {
-        finish(await fetchSource(url.value), url.value);
-      } catch (e) {
-        if (!(e instanceof TypeError)) { // not CORS, offline or a bad host
-          err.textContent = brief(e);
-          return;
-        }
-        err.textContent = "";
-        open.href = openUrl(url.value);
-        box.hidden = false;
-        paste.focus();
-      } finally {
-        fetchBtn.disabled = false;
-      }
-    };
-    paste.onpaste = (e) => {
-      e.preventDefault();
-      const src = e.clipboardData && pasteSource(e.clipboardData, url.value);
-      if (!src) {
-        err.textContent = "Nothing to paste: copy the page first.";
-        return;
-      }
-      finish(src, `Pasted from ${src.from}`);
-    };
-    dlg.showModal();
-  });
-}
-
-// ---- Import notes (spec §7.9): the `%% check:` lines, listed in the footer --
-function renderImportNotes(text: string): void {
-  const btn = $("import-notes");
-  const list = $("import-notes-list");
-  const notes = text.split("\n").flatMap((l, i) =>
-    l.startsWith("%% check:") ? [{ line: i + 1, text: l.slice(9).trim() }] : []
-  );
-  btn.hidden = !notes.length;
-  if (!notes.length) {
-    list.hidden = true;
-    btn.setAttribute("aria-expanded", "false");
-    return;
-  }
-  btn.textContent = `${notes.length} import note${
-    notes.length > 1 ? "s" : ""
-  } to check`;
-  list.replaceChildren();
-  const h = document.createElement("div");
-  h.className = "h";
-  h.textContent =
-    "Places the importer guessed. Click one to go there; delete the %% check: line when you’re happy with it.";
-  list.append(h);
-  for (const n of notes) {
-    const b = document.createElement("button");
-    b.type = "button";
-    const l = document.createElement("span");
-    l.className = "l";
-    l.textContent = `line ${n.line}`;
-    const t = document.createElement("span");
-    t.textContent = n.text;
-    b.append(l, t);
-    b.onclick = () => {
-      list.hidden = true;
-      btn.setAttribute("aria-expanded", "false");
-      scrollEditorToLine(editor, n.line);
-      editor.focus();
-    };
-    list.append(b);
-  }
-  btn.onclick = () => {
-    list.hidden = !list.hidden;
-    btn.setAttribute("aria-expanded", String(!list.hidden));
-  };
-}
+// Create a new manuscript (spec §7.9): the empty library's first step, and
+// the switcher's New book.
+const createManuscript = installCreateBook({
+  backend: () => backend,
+  books: () => books,
+  setBooks: (b) => books = b,
+  leave,
+  restart: main,
+  chordLabel,
+});
 
 async function main(): Promise<void> {
   backend = await connect();
@@ -1851,10 +803,21 @@ async function main(): Promise<void> {
   }
   const wanted = params.get("edition");
   edition = wanted && editions.some((e) => e.slug === wanted) ? wanted : null;
-  setCrumb(editions);
-  installSwitcher();
+  switcher = installSwitcher({
+    backend,
+    book,
+    edition,
+    editions,
+    books: () => books,
+    sync: () => sync,
+    editor: () => editor,
+    leave,
+    setMode,
+    createManuscript,
+    rebaseAfterRename,
+  });
   fetchMetadata().then((m) => {
-    setCrumbSize(m.metadata.page?.size);
+    switcher.setCrumbSize(m.metadata.page?.size);
     showSpecBanner(m.metadata.spec);
   }, () => {
     // no size in the crumb; the Style panel reports the load error
@@ -1869,7 +832,7 @@ async function main(): Promise<void> {
     base: version,
     metaBase: null, // until the Style panel loads it
     current: () => editor.state.doc.toString(),
-    before: () => renaming,
+    before: () => switcher.renaming(),
     onConflict: showDiskBanner, // the status follows from sync
     onRewrite: (rewritten) => {
       replaceBuffer(editor, rewritten);
@@ -1912,7 +875,7 @@ async function main(): Promise<void> {
     images,
   });
   reparse(text);
-  installTextView();
+  installTextView({ editor, backend, book, setStatus });
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
   installShortcuts(
@@ -1999,15 +962,15 @@ async function main(): Promise<void> {
     configPanel?.pagesChanged();
     followCursor(cursorLine);
   };
-  installThemeApply();
+  themes.installApply();
   const onMessage = (msg: ServerMessage) => {
     if (msg.type === "error") {
       setStatus("error", `build: ${brief(msg.message)}`);
       return;
     }
     showSync(sync.status()); // clears a build or preview error; Sync says if saved
-    if (!holdForPreview(msg)) {
-      lastShown = msg;
+    if (!themes.hold(msg)) {
+      themes.lastShown = msg;
       paint(msg);
     }
     // Versions this client already reflects need nothing (spec §6).
