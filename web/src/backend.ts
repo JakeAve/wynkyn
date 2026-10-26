@@ -7,11 +7,13 @@ import type { Metadata } from "../../metadata/types.ts";
 import type { EditionInfo } from "../../server/editions.ts";
 import {
   BookService,
+  libraryId,
   type MetadataResult,
   type SaveResult,
   themedTemplate,
 } from "../../server/book-service.ts";
-import type { BookStore } from "../../server/store.ts";
+import { type BookStore, withTabs } from "../../server/store.ts";
+import { handleStore } from "./fs-store.ts";
 import type { ImageFile } from "../../server/images.ts";
 import type { EpubResult } from "./style-catalog.ts";
 
@@ -247,11 +249,17 @@ const IMAGE_TYPES: Record<string, string> = {
 };
 
 /** The service in-page over the author's folder; `template` is a new book's
- * metadata.json, `baseCss` renderer/base.css (both fetched as static files). */
-export function localBackend(
-  store: BookStore,
+ * metadata.json, `baseCss` renderer/base.css (both fetched as static files).
+ * Other tabs over the same library are other services on the same files:
+ * named for its id, the tab channel carries each one's writes to the others
+ * and the locks make a save's check + write atomic across them. */
+export async function localBackend(
+  root: FileSystemDirectoryHandle,
   assets: { baseCss: string; template: string },
-): Backend {
+): Promise<Backend> {
+  const id = await libraryId(handleStore(root));
+  // Kept as backend.store too, so the app's imports reach the other tabs.
+  const store = withTabs(handleStore(root), `wynkyn:${id}`);
   const urls = new Map<string, string>(); // image path → object URL
   async function imageUrl(book: string, name: string): Promise<string> {
     const path = `${book}/images/${name}`;
@@ -274,6 +282,7 @@ export function localBackend(
     store,
     baseCss: assets.baseCss,
     imageUrl,
+    lock: (key, fn) => navigator.locks.request(`${id}:${key}`, fn),
   });
   return {
     kind: "local",

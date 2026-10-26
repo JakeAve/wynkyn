@@ -138,3 +138,51 @@ export function diskStore(root: string): BookStore {
   };
   return store;
 }
+
+/** The store for one tab of several over one library (the browser, where a
+ * store sees only its own writes): what it writes is posted on a
+ * BroadcastChannel named `channel`, and its watch hears the other tabs' posts
+ * too — the dev server's fs watcher, between tabs. */
+export function withTabs(store: BookStore, channel: string): BookStore {
+  // A channel per post: delivery is queued when posted, so closing at once
+  // loses nothing, and there is nothing left open to close.
+  const post = (...paths: string[]) => {
+    const c = new BroadcastChannel(channel);
+    c.postMessage(paths);
+    c.close();
+  };
+  return {
+    ...store,
+    async write(path, data) {
+      await store.write(path, data);
+      post(path);
+    },
+    async create(path, data) {
+      const made = await store.create(path, data);
+      if (made) post(path);
+      return made;
+    },
+    async rename(from, to) {
+      const moved = await store.rename(from, to);
+      if (moved) post(from, to);
+      return moved;
+    },
+    async remove(path) {
+      const removed = await store.remove(path);
+      if (removed) post(path);
+      return removed;
+    },
+    watch(onChange) {
+      const stop = store.watch(onChange);
+      // A channel never hears its own posts, so this is only other tabs.
+      const c = new BroadcastChannel(channel);
+      c.onmessage = (e: MessageEvent) => {
+        if (Array.isArray(e.data)) onChange(e.data.map(String));
+      };
+      return () => {
+        stop();
+        c.close();
+      };
+    },
+  };
+}

@@ -72,13 +72,11 @@ import {
 import {
   browserFolder,
   createBooksFolder,
-  handleStore,
   importBooks,
   pickFolder,
   rememberedFolder,
   reopenFolder,
 } from "./fs-store.ts";
-import type { BookStore } from "../../server/store.ts";
 import { importSource } from "../../server/import/mod.ts";
 import { arrowKeys, themeCard } from "./panel-themes.ts";
 import { applyTheme, THEMES } from "../../metadata/themes.ts";
@@ -1121,23 +1119,26 @@ const fetchManuscript = (
 // show in every browser: one without the API (Firefox, Safari, Brave until its
 // flag is on) fails the click with its own error rather than hiding the
 // options.
-async function chooseLibrary(): Promise<BookStore> {
+async function chooseLibrary(): Promise<FileSystemDirectoryHandle> {
   const remembered = await rememberedFolder();
   const pref = localStorage.getItem("library");
   if (
     pref === "folder" && remembered && await reopenFolder(remembered, false)
-  ) return handleStore(remembered);
-  if (pref === "browser") return handleStore(await browserFolder());
+  ) return remembered;
+  if (pref === "browser") return await browserFolder();
   return new Promise((resolve) => {
     const dlg = $("library") as HTMLDialogElement;
     const err = $("lib-err");
     // Persisted storage is evicted last; the browser may still say no.
     const persist = () => navigator.storage.persist?.().catch(() => false);
-    const done = (store: BookStore, kind: "folder" | "browser") => {
+    const done = (
+      dir: FileSystemDirectoryHandle,
+      kind: "folder" | "browser",
+    ) => {
       localStorage.setItem("library", kind);
       if (kind === "browser") persist();
       dlg.close();
-      resolve(store);
+      resolve(dir);
     };
     const fail = (e: unknown) => {
       if ((e as Error).name !== "AbortError") err.textContent = brief(e);
@@ -1148,7 +1149,7 @@ async function chooseLibrary(): Promise<BookStore> {
       reopen.textContent = `Open “${remembered.name}” again`;
       reopen.onclick = async () => {
         if (await reopenFolder(remembered, true)) {
-          done(handleStore(remembered), "folder");
+          done(remembered, "folder");
         } else err.textContent = "The folder wasn't allowed.";
       };
     }
@@ -1160,11 +1161,11 @@ async function chooseLibrary(): Promise<BookStore> {
       ($(id).querySelector(".pill") as HTMLElement).hidden = !tagged;
     }
     $("lib-new").onclick = () =>
-      createBooksFolder().then((d) => done(handleStore(d), "folder"), fail);
+      createBooksFolder().then((d) => done(d, "folder"), fail);
     $("lib-pick").onclick = () =>
-      pickFolder().then((d) => done(handleStore(d), "folder"), fail);
+      pickFolder().then((d) => done(d, "folder"), fail);
     $("lib-browser").onclick = () =>
-      browserFolder().then((d) => done(handleStore(d), "browser"), fail);
+      browserFolder().then((d) => done(d, "browser"), fail);
     dlg.showModal();
   });
 }
@@ -1203,7 +1204,7 @@ async function connect(): Promise<Backend> {
   if (await hasServer()) return httpBackend();
   const assets = localAssets();
   await browserNotice();
-  return localBackend(await chooseLibrary(), await assets);
+  return await localBackend(await chooseLibrary(), await assets);
 }
 
 // An update built from a version the buffer isn't based on: fetch the current

@@ -1,9 +1,9 @@
 // server/book-service_test.ts
 import { assertEquals, assertRejects } from "@std/assert";
 import { BookService, ServiceError } from "./book-service.ts";
-import { diskStore } from "./store.ts";
+import { diskStore, withTabs } from "./store.ts";
 import { memoryStore } from "../testing/memory-store.ts";
-import { contentVersion, imageFiles } from "./pipeline.ts";
+import { contentVersion, imageFiles, type ServerMessage } from "./pipeline.ts";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
 
@@ -218,5 +218,82 @@ Deno.test("list: a folder named Old Drafts is skipped and named", async () => {
     });
   } finally {
     await service.stop();
+  }
+});
+
+// Two tabs over one library: two services, each over its own withTabs store
+// on one shared Map (memoryStore reports only its own writes, so the other
+// tab hears of a write only through the channel), sharing one lock — the
+// test's stand-in for navigator.locks.
+function tabs() {
+  const files = new Map([
+    ["demo-book/manuscript.md", bytes("{title}\nX\n")],
+  ]);
+  const tails = new Map<string, Promise<unknown>>();
+  const lock = <T>(key: string, fn: () => Promise<T>): Promise<T> => {
+    const run = (tails.get(key) ?? Promise.resolve()).then(fn);
+    tails.set(key, run.catch(() => {}));
+    return run;
+  };
+  const channel = `test-${crypto.randomUUID()}`;
+  const tab = () =>
+    new BookService({ store: withTabs(memoryStore(files), channel), lock });
+  return [tab(), tab()] as const;
+}
+async function until(ok: () => boolean) {
+  for (let i = 0; i < 200 && !ok(); i++) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  return ok();
+}
+
+Deno.test("tabs: two services over one library each see the other's save", async () => {
+  const [a, b] = tabs();
+  try {
+    for (const [from, to, text] of [[a, b, "Y"], [b, a, "Z"]] as const) {
+      const seen: ServerMessage[] = [];
+      const unsubscribe = to.subscribe("demo-book", null, "c", (m) => {
+        seen.push(m);
+      });
+      const saved = await from.saveManuscript("demo-book", {
+        text: `{title}\n${text}\n`,
+      });
+      assertEquals("ok" in saved, true);
+      const version = "version" in saved ? saved.version : "";
+      assertEquals(
+        await until(() =>
+          seen.some((m) =>
+            m.type === "update" && m.manuscriptVersion === version
+          )
+        ),
+        true,
+        `${text} reached the other tab`,
+      );
+      unsubscribe();
+    }
+  } finally {
+    await a.stop();
+    await b.stop();
+  }
+});
+
+Deno.test("tabs: concurrent saves from one base across services — one lands, one 409", async () => {
+  const [a, b] = tabs();
+  try {
+    const base = (await a.manuscript("demo-book")).version;
+    const results = await Promise.all([
+      a.saveManuscript("demo-book", { text: "{title}\nA\n", base }),
+      b.saveManuscript("demo-book", { text: "{title}\nB\n", base }),
+    ]);
+    const landed = results.filter((r) => "ok" in r);
+    const refused = results.filter((r) => "conflict" in r);
+    assertEquals([landed.length, refused.length], [1, 1]);
+    // The refused one is handed what landed.
+    const current = await b.manuscript("demo-book");
+    assertEquals(refused[0]?.text, current.text);
+    assertEquals(landed[0]?.version, current.version);
+  } finally {
+    await a.stop();
+    await b.stop();
   }
 });

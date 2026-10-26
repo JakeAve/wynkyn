@@ -48,6 +48,10 @@ export interface ServiceOptions {
   store: BookStore;
   baseCss?: string; // renderer/base.css; required in the browser
   imageUrl?: BuildOptions["imageUrl"];
+  /** Runs a serialized check + write holding `key` against other services
+   * over the same files (tabs: navigator.locks); none is just this one's
+   * queue, enough when it is the only writer (the dev server). */
+  lock?: <T>(key: string, fn: () => Promise<T>) => Promise<T>;
 }
 
 export type SaveResult =
@@ -69,6 +73,7 @@ interface Client {
 export class BookService {
   readonly store: BookStore;
   private readonly buildOpts: Pick<BuildOptions, "baseCss" | "imageUrl">;
+  private readonly lock: NonNullable<ServiceOptions["lock"]>;
   private readonly clients = new Set<Client>();
   // key → the tail of its work queue. Keys are a book (its manuscript: a
   // save's check + write, a rename's token rewrite), a metadata path (its
@@ -93,6 +98,7 @@ export class BookService {
   constructor(opts: ServiceOptions) {
     this.store = opts.store;
     this.buildOpts = { baseCss: opts.baseCss, imageUrl: opts.imageUrl };
+    this.lock = opts.lock ?? ((_key, fn) => fn());
     // The store reports every change, the service's own writes included.
     this.stopWatch = this.store.watch((paths) => this.onChanged(paths));
   }
@@ -116,21 +122,9 @@ export class BookService {
     };
   }
 
-  /** The library's id (`library.json`), minted on first ask. It lives with
-   * the books, so it is the same from any browser or machine that opens this
-   * folder; the app writes it into its URLs so a link from another library
-   * can be told apart from one of ours. Random: it identifies, not protects. */
-  async libraryId(): Promise<string> {
-    const path = "library.json";
-    try {
-      const id = JSON.parse(await this.store.readText(path) ?? "{}").id;
-      if (typeof id === "string" && id) return id;
-    } catch {
-      // unreadable file: replaced below
-    }
-    const fresh = crypto.randomUUID().slice(0, 8);
-    await this.store.write(path, JSON.stringify({ id: fresh }) + "\n");
-    return fresh; // ponytail: two tabs minting at once leaves one stale URL once
+  /** The library's id (libraryId below). */
+  libraryId(): Promise<string> {
+    return libraryId(this.store);
   }
 
   editions(book: string): Promise<EditionInfo[]> {
@@ -502,7 +496,10 @@ export class BookService {
   // ---- internals --------------------------------------------------------
 
   private serialize<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    const run = (this.chains.get(key) ?? Promise.resolve()).then(fn);
+    // This service's queue first, then the lock held across services.
+    const run = (this.chains.get(key) ?? Promise.resolve()).then(() =>
+      this.lock(key, fn)
+    );
     const tail = run.then(() => {}, () => {});
     this.chains.set(key, tail);
     tail.then(() => {
@@ -616,6 +613,24 @@ export class BookService {
       if (this.clients.has(c)) c.send(messages.get(c.edition)!);
     }
   }
+}
+
+/** The library's id (`library.json`), minted on first ask. It lives with
+ * the books, so it is the same from any browser or machine that opens this
+ * folder; the app writes it into its URLs so a link from another library
+ * can be told apart from one of ours, and names its tab channel and locks
+ * for it. Random: it identifies, not protects. */
+export async function libraryId(store: BookStore): Promise<string> {
+  const path = "library.json";
+  try {
+    const id = JSON.parse(await store.readText(path) ?? "{}").id;
+    if (typeof id === "string" && id) return id;
+  } catch {
+    // unreadable file: replaced below
+  }
+  const fresh = crypto.randomUUID().slice(0, 8);
+  await store.write(path, JSON.stringify({ id: fresh }) + "\n");
+  return fresh; // ponytail: two tabs minting at once leaves one stale URL once
 }
 
 // Longer than the editor's save debounce (600ms in app.ts) plus the watcher's.
