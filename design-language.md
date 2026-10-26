@@ -227,7 +227,7 @@ Always `--f-hivis`:
 - image slugs and filenames (completions, "Added to the book's images as …");
 - chapter and part slugs (the outline's fallback label, the Prose margin);
 - `{is}` style names in the style nav and panel;
-- book folder names wherever they stand in for a title;
+- a book folder name shown as typed (the title dialog's folder);
 - typed codes: the web-address field, a hex colour field, More CSS.
 
 Never: labels, menus, numbers, words. Context reads those.
@@ -235,10 +235,10 @@ Never: labels, menus, numbers, words. Context reads those.
 In `web/app.css` the `.hivis` class sets it (`--f-hivis` at `--fs-sm`) on a slug
 standing in for a title in the outline (`tree-view.ts`), an `{is}` name in the
 style nav (`config-panel.ts`) and the filenames in the footer's "Added to the
-book's images as …" (`app.ts`). Image completions, switcher book rows, the
-web-address field (`#web-url`) and the title dialog's folder (`#title-slug`) set
-it in their own rules; More CSS already did. Switcher rows show the folder name
-title-cased (`titleCase`), still in `--f-hivis`.
+book's images as …" (`app.ts`). Image completions, the web-address field
+(`#web-url`) and the title dialog's folder (`#title-slug`) set it in their own
+rules; More CSS already did. Switcher book rows stay in `--f-ui`: they show the
+folder title-cased (`titleCase`), which reads as a title, not a code.
 
 ### Scale
 

@@ -282,8 +282,6 @@ kbd {
   display: block;
   width: 100%;
   padding: var(--s-2) var(--s-4);
-  font: var(--fs-sm)
-    var(--f-hivis); /* a folder standing in for a title (§3.1) */
   background: none;
   border: none;
   border-radius: var(--r);
