@@ -9,6 +9,7 @@ import type {
   MatterBlock,
   Part,
 } from "../../parser/types.ts";
+import { matterIds } from "../../renderer/render.ts";
 
 export interface TreeNode {
   label: string;
@@ -20,10 +21,11 @@ export interface TreeNode {
 }
 
 export function buildTree(doc: BmlDocument): TreeNode[] {
+  const ids = matterIds(doc);
   return [
-    ...doc.frontMatter.map((m) => matterNode(m, "front")),
+    ...doc.frontMatter.map((m) => matterNode(m, "front", ids.get(m)!)),
     ...doc.body.map((b) => (b.kind === "part" ? partNode(b) : chapterNode(b))),
-    ...doc.backMatter.map((m) => matterNode(m, "back")),
+    ...doc.backMatter.map((m) => matterNode(m, "back", ids.get(m)!)),
   ];
 }
 
@@ -59,13 +61,16 @@ function titleOf(children: (ContentNode | Chapter)[]): string | null {
 // Their {title} is the book's, so it would name them all alike.
 const BOOK_TITLED = new Set(["half-title", "title-page"]);
 
-function matterNode(m: MatterBlock, group: "front" | "back"): TreeNode {
+function matterNode(
+  m: MatterBlock,
+  group: "front" | "back",
+  anchorId: string,
+): TreeNode {
   const type = m.label ? `${humanize(m.type)} ${m.label}` : humanize(m.type);
   return {
     label: (!BOOK_TITLED.has(m.type) && titleOf(m.children)) || type,
     line: m.line,
-    // must match renderMatter() in renderer/render.ts
-    anchorId: `matter-${m.type}${m.label ? `-${m.label.toLowerCase()}` : ""}`,
+    anchorId,
     kind: "matter",
     group,
     children: [],

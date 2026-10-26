@@ -15,6 +15,7 @@ import type {
   NotesConfig,
   Numbering,
   NumberingStyle,
+  StructureNumbering,
   TocConfig,
 } from "../metadata/types.ts";
 
@@ -141,13 +142,16 @@ const dl = (n: { line: number }) => ` data-line="${n.line}"`;
 interface NoteCtx {
   placement: "footnote" | "endnote";
   notes: Map<string, Note>;
-  used: string[]; // slugs in anchor order
+  // slug → its number, in first-anchor order: a repeated anchor reuses it.
+  numbers: Map<string, number>;
 }
 
 function collectNotes(nodes: ContentNode[], map: Map<string, Note>): void {
   for (const n of nodes) {
-    if (n.kind === "note") map.set(n.slug, n);
-    else if ("children" in n && Array.isArray(n.children)) {
+    // §3.2.4: a duplicated slug resolves to the first occurrence.
+    if (n.kind === "note") {
+      if (!map.has(n.slug)) map.set(n.slug, n);
+    } else if ("children" in n && Array.isArray(n.children)) {
       collectNotes(n.children as ContentNode[], map);
     } else if (n.kind === "columns") {
       for (const col of n.columns) collectNotes(col, map);
@@ -173,21 +177,28 @@ function renderInlines(inlines: Inline[], ctx: NoteCtx): string {
         out += `<a class="ref" href="#${escapeHtml(i.slug)}"></a>`;
         break;
       case "footnote": {
-        ctx.used.push(i.slug);
-        const n = ctx.used.length;
+        // An anchor with no note is left out; the parser diagnoses it.
         const note = ctx.notes.get(i.slug);
-        if (ctx.placement === "footnote" && note) {
+        if (!note) break;
+        const slug = escapeHtml(i.slug);
+        const seen = ctx.numbers.get(i.slug);
+        if (seen !== undefined) { // a repeat: the number again, no second id
           out +=
-            `<sup class="footnote-anchor" id="fnref-${
-              escapeHtml(i.slug)
-            }">${n}</sup>` +
-            `<span class="note" id="note-${escapeHtml(i.slug)}">${
+            `<sup class="footnote-anchor"><a href="#note-${slug}">${seen}</a></sup>`;
+          break;
+        }
+        // Numbered before the note's own inlines render, so a note that
+        // footnotes itself (or a→b→a) meets itself as a repeat and stops.
+        const n = ctx.numbers.size + 1;
+        ctx.numbers.set(i.slug, n);
+        if (ctx.placement === "footnote") {
+          out += `<sup class="footnote-anchor" id="fnref-${slug}">${n}</sup>` +
+            `<span class="note" id="note-${slug}">${
               renderInlines(note.inlines, ctx)
             }</span>`;
         } else {
-          out += `<sup class="footnote-anchor" id="fnref-${
-            escapeHtml(i.slug)
-          }"><a href="#note-${escapeHtml(i.slug)}">${n}</a></sup>`;
+          out +=
+            `<sup class="footnote-anchor" id="fnref-${slug}"><a href="#note-${slug}">${n}</a></sup>`;
         }
         break;
       }
@@ -214,16 +225,15 @@ function dropcapHtml(
   prefix = "",
 ): string {
   const src = node.image ? opts.images?.[node.image] : undefined;
+  // §3.5.4: the initial stands for the paragraph's first letter, image or not.
+  const { head, rest } = splitFirstChar(node.inlines);
   const initial = src
-    ? `<img class="dropcap" src="${src}" alt="">${
-      renderInlines(node.inlines, ctx)
-    }`
-    : (() => {
-      const { head, rest } = splitFirstChar(node.inlines);
-      return `<span class="dropcap">${escapeHtml(head)}</span>${
-        renderInlines(rest, ctx)
-      }`;
-    })();
+    ? `<img class="dropcap" src="${escapeHtml(src)}" alt="${
+      escapeHtml(head)
+    }">${renderInlines(rest, ctx)}`
+    : `<span class="dropcap">${escapeHtml(head)}</span>${
+      renderInlines(rest, ctx)
+    }`;
   return `<p class="has-dropcap${extraClass}"${
     dl(node)
   }>${prefix}${initial}</p>`;
@@ -399,7 +409,7 @@ function renderContent(
       const captionText = node.caption ? inlinePlainText(node.caption) : "";
       const src = opts.images?.[node.slug];
       const media = src
-        ? `<img src="${src}" alt="${escapeHtml(captionText)}">`
+        ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(captionText)}">`
         : `<div class="illustration-placeholder" data-slug="${
           escapeHtml(node.slug)
         }"><span>No image named ${
@@ -450,41 +460,32 @@ function renderBlockWithNotes(
   const ctx: NoteCtx = {
     placement: opts.notes?.placement ?? "endnote",
     notes: new Map(),
-    used: [],
+    numbers: new Map(),
   };
   collectNotes(children, ctx.notes);
   let html = body(ctx);
-  if (ctx.placement === "endnote") {
-    const slugs = [
-      ...ctx.used,
-      ...[...ctx.notes.keys()].filter((s) => !ctx.used.includes(s)),
-    ];
-    if (slugs.length && ctx.notes.size) {
-      const rendered = slugs
-        .filter((s, i) => slugs.indexOf(s) === i && ctx.notes.has(s))
-        .map((s, i) =>
-          `<div class="note" id="note-${escapeHtml(s)}"${
-            dl(ctx.notes.get(s)!)
-          }><sup>${i + 1}</sup> ${
-            renderInlines(ctx.notes.get(s)!.inlines, ctx)
-          }</div>`
-        ).join("");
-      if (rendered) {
-        html += `<aside class="notes${zoneClass(zone)}">${rendered}</aside>`;
-      }
+  if (ctx.placement === "endnote" && ctx.notes.size) {
+    // Unanchored notes follow the anchored ones (the parser diagnoses them).
+    for (const s of ctx.notes.keys()) {
+      if (!ctx.numbers.has(s)) ctx.numbers.set(s, ctx.numbers.size + 1);
     }
+    // A Map visits entries added while iterating, so a note first anchored
+    // inside another note is listed too.
+    let rendered = "";
+    for (const [s, n] of ctx.numbers) {
+      const note = ctx.notes.get(s)!;
+      rendered += `<div class="note" id="note-${escapeHtml(s)}"${
+        dl(note)
+      }><sup>${n}</sup> ${renderInlines(note.inlines, ctx)}</div>`;
+    }
+    html += `<aside class="notes${zoneClass(zone)}">${rendered}</aside>`;
   }
   return html;
 }
 
 function numberText(
   n: number,
-  cfg: {
-    style?: NumberingStyle;
-    show?: boolean;
-    prefix?: string;
-    suffix?: string;
-  } | undefined,
+  cfg: StructureNumbering | undefined,
 ): string {
   if (!cfg || cfg.show === false || !cfg.style || cfg.style === "none") {
     return "";
@@ -494,12 +495,7 @@ function numberText(
 
 function numberDiv(
   n: number,
-  cfg: {
-    style?: NumberingStyle;
-    show?: boolean;
-    prefix?: string;
-    suffix?: string;
-  } | undefined,
+  cfg: StructureNumbering | undefined,
 ): string {
   const t = numberText(n, cfg);
   return t ? `<div class="number">${escapeHtml(t)}</div>` : "";
@@ -532,10 +528,23 @@ function renderChapter(
   }, zone);
 }
 
-// Raw (unescaped) id — callers escape once at their own interpolation site
-// (renderMatter into id="…", tocRow into href="#…") so it isn't double-escaped.
-function matterId(m: MatterBlock): string {
-  return `matter-${m.type}${m.label ? `-${m.label.toLowerCase()}` : ""}`;
+// Raw (unescaped) ids — callers escape once at their own interpolation site
+// (renderMatter into id="…", tocRow into href="#…") so they aren't
+// double-escaped. "matter-<type>[-<label>]", the label slugified, and a
+// repeat numbered (-2, -3) so each block's TOC row and folio find it.
+export function matterIds(doc: BmlDocument): Map<MatterBlock, string> {
+  const ids = new Map<MatterBlock, string>();
+  const taken = new Set<string>();
+  for (const m of [...doc.frontMatter, ...doc.backMatter]) {
+    const label = (m.label ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    const base = `matter-${m.type}${label ? `-${label}` : ""}`;
+    let id = base;
+    for (let k = 2; taken.has(id); k++) id = `${base}-${k}`;
+    taken.add(id);
+    ids.set(m, id);
+  }
+  return ids;
 }
 
 // A title page's publisher, place and year form one imprint block, set after
@@ -547,8 +556,9 @@ function renderMatter(
   doc: BmlDocument,
   opts: RenderOptions,
   zone: Zone,
+  rawId: string,
 ): string {
-  const id = escapeHtml(matterId(m));
+  const id = escapeHtml(rawId);
   const open = `<section class="matter matter-${escapeHtml(m.type)}${
     zoneClass(zone)
   }" id="${id}"${dl(m)}>`;
@@ -604,11 +614,12 @@ function tocRow(r: TocRow): string {
  * document (server/epub-export.ts) are both set from them. */
 export function tocRows(doc: BmlDocument, opts: RenderOptions): TocRow[] {
   const rows: TocRow[] = [];
+  const ids = matterIds(doc);
   const matterRows = (blocks: MatterBlock[], cls: string) => {
     for (const m of blocks) {
       if (DISPLAY_MATTER.has(m.type)) continue;
       const label = titleOf(m.children);
-      if (label) rows.push({ cls, href: matterId(m), label });
+      if (label) rows.push({ cls, href: ids.get(m)!, label });
     }
   };
   matterRows(doc.frontMatter, "toc-front");
@@ -689,8 +700,9 @@ function renderPart(
 export function render(doc: BmlDocument, opts: RenderOptions = {}): string {
   const lang = opts.language ? ` lang="${escapeHtml(opts.language)}"` : "";
   const out: string[] = [`<article class="bml"${lang}>`];
+  const ids = matterIds(doc);
   for (const m of doc.frontMatter) {
-    out.push(renderMatter(m, doc, opts, "front"));
+    out.push(renderMatter(m, doc, opts, "front", ids.get(m)!));
   }
   let partNo = 0;
   const chapterNo = { n: 0 };
@@ -701,7 +713,9 @@ export function render(doc: BmlDocument, opts: RenderOptions = {}): string {
       out.push(renderPart(b, ++partNo, chapterNo, opts, "body", i === 0));
     } else out.push(renderChapter(b, ++chapterNo.n, opts, "body", i === 0));
   });
-  for (const m of doc.backMatter) out.push(renderMatter(m, doc, opts, "back"));
+  for (const m of doc.backMatter) {
+    out.push(renderMatter(m, doc, opts, "back", ids.get(m)!));
+  }
   out.push(`</article>`);
   return out.join("");
 }

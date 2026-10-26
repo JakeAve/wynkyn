@@ -13,7 +13,7 @@ export interface BmlDocument {
   onlySpans: OnlySpan[]; // EXPERIMENTAL: every {only} span, kept or dropped
 }
 
-// EXPERIMENTAL (spec §2.9): `{only: a | b}` … `{/only}` gates whole blocks to
+// EXPERIMENTAL (spec §3.2.9): `{only: a | b}` … `{/only}` gates whole blocks to
 // the named editions. `line`/`endLine` are the tag lines (endLine = last line
 // when unclosed).
 export interface OnlySpan {
@@ -236,6 +236,10 @@ export interface LineBreakInline {
 // Matter types the generated contents never lists — display pages that carry
 // no entry of their own (spec §3.4.6). Shared with the renderer so the parser
 // can warn about a block that would silently vanish from the contents.
+// An `{is:}` name becomes a CSS class and selector (`.is-<name>`), so it is
+// held to the slug rule (§3.2.4).
+export const CLASS_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export const DISPLAY_MATTER: ReadonlySet<string> = new Set([
   "half-title",
   "title-page",

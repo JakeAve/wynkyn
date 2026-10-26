@@ -774,3 +774,64 @@ Deno.test("checkOnlySpans: unknown edition tokens are named on the opening line"
     message: '{only} names unknown edition "large-print"',
   }]);
 });
+
+const messages = (src: string) =>
+  parse(src).diagnostics.map((d) => `${d.line}: ${d.message}`);
+
+Deno.test("poem and verses hold only stanzas: a dash line stays a stanza, a block is refused", () => {
+  const src = [
+    "{chapter: a}",
+    "{verses: v}",
+    "- one",
+    "- two",
+    "",
+    "{quote}",
+    "dropped",
+    "{/quote}",
+    "{/verses}",
+  ].join("\n");
+  const verses = (parse(src).body[0] as Chapter).children[0]!;
+  assert(verses.kind === "verses");
+  assertEquals(verses.verses.map((v) => v.kind), ["paragraph"]);
+  assertEquals(messages(src), ["6: {quote} is not allowed inside {verses}"]);
+});
+
+Deno.test("an {is:} name must be a slug", () => {
+  assertEquals(
+    messages("{chapter: a}\n{is: Pull quote}\nx\n{/is: Pull quote}"),
+    [
+      "2: {is: Pull quote} — a class name is lowercase letters, digits and hyphens (§3.2.4)",
+    ],
+  );
+  assertEquals(
+    messages("{chapter: a}\n{is: pull-quote-2}\nx\n{/is: pull-quote-2}"),
+    [],
+  );
+});
+
+Deno.test("footnotes and notes pair within their section (§3.6.8)", () => {
+  assertEquals(
+    messages([
+      "{chapter: a}",
+      "A{footnote: x} B{footnote: y}",
+      "",
+      "{note: x}",
+      "ex",
+      "{chapter: b}",
+      "C",
+      "",
+      "{note: y}",
+      "why",
+    ].join("\n")),
+    [
+      "2: {footnote: y} has no {note: y} in this section",
+      "9: {note: y} has no {footnote: y} pointing at it",
+    ],
+  );
+});
+
+Deno.test("an unbalanced {em} is diagnosed at its paragraph", () => {
+  assertEquals(messages("{chapter: a}\n\nfine\n\nan {em}open\nspan"), [
+    "5: {em} is never closed in its paragraph",
+  ]);
+});

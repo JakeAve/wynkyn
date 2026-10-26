@@ -3,6 +3,7 @@
 // inlines the vendored Paged.js and the renderer's handlers from disk.
 import type { BuildResult } from "./pipeline.ts";
 import type { Seed } from "../renderer/page-map-types.ts";
+import { escapeHtml } from "../renderer/render.ts";
 
 // Paged.js 0.4.3, vendored (see server/vendor_test.ts). Shared by toHtml and
 // the browser tests so nothing loads it from a CDN.
@@ -60,9 +61,17 @@ const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
 /** `seed`: the page map's starting folios (default {}); print export passes the last one. */
 export function toHtml(b: BuildResult, opts: { seed?: Seed } = {}): string {
   const json = (v: unknown) => JSON.stringify(v).replaceAll("<", "\\u003c");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${b.bookTitle}</title>
+  // Metadata values reach the CSS as written; `<\/` is the same text to CSS
+  // and can't end the <style> element.
+  const css = `${b.baseCss}\n${b.domCss}\n${b.pagedCss}`.replaceAll(
+    "</",
+    "<\\/",
+  );
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${
+    escapeHtml(b.bookTitle)
+  }</title>
 ${b.fontLinks}
-<style id="book-css">${b.baseCss}\n${b.domCss}\n${b.pagedCss}</style>
+<style id="book-css">${css}</style>
 <script>const BOOK_NUMBERING = ${json(b.pageNumbering)};
 const BOOK_SEED = ${json(opts.seed ?? {})};</script>
 <script>${PAGED_JS}</script>

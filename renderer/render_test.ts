@@ -216,7 +216,7 @@ Deno.test("footnote placement inlines the note at the anchor", () => {
   assert(!html.includes("<aside"));
 });
 
-Deno.test("ref renders as an empty anchor for target-counter (§3.8)", () => {
+Deno.test("ref renders as an empty anchor the page map fills (§3.8, §4.10 item 9)", () => {
   const html = render(
     parse(
       "{chapter: thaw}\nx\n{chapter: b}\nAs discussed in {ref: thaw}, it turned.",
@@ -343,7 +343,7 @@ Deno.test("toc: untitled chapter with no numbering falls back to its slug; flat 
   );
 });
 
-Deno.test("toc: back-matter label with an HTML-special character escapes once; id and href match", () => {
+Deno.test("toc: a matter label is slugified into the id; id and href match", () => {
   const html = render(parse([
     "{matter: toc}",
     "{title}",
@@ -352,8 +352,25 @@ Deno.test("toc: back-matter label with an HTML-special character escapes once; i
     "{title}",
     "Family Tree",
   ].join("\n")));
-  assertStringIncludes(html, 'id="matter-appendix-a &amp; b"');
-  assertStringIncludes(html, 'href="#matter-appendix-a &amp; b"');
+  assertStringIncludes(html, 'id="matter-appendix-a-b"');
+  assertStringIncludes(html, 'href="#matter-appendix-a-b"');
+});
+
+Deno.test("toc: repeated matter ids are numbered so each row finds its own block", () => {
+  const html = render(parse([
+    "{matter: toc}",
+    "{title}",
+    "Contents",
+    "{matter: appendix}",
+    "{title}",
+    "One",
+    "{matter: appendix}",
+    "{title}",
+    "Two",
+  ].join("\n")));
+  assertStringIncludes(html, 'id="matter-appendix"');
+  assertStringIncludes(html, 'id="matter-appendix-2"');
+  assertStringIncludes(html, 'href="#matter-appendix-2">Two</a>');
 });
 
 Deno.test("toc: manual content renders verbatim, no generated nav", () => {
@@ -364,7 +381,7 @@ Deno.test("toc: manual content renders verbatim, no generated nav", () => {
   assertStringIncludes(html, "Chapter One .... 1");
 });
 
-Deno.test("illustration: resolved image vs visible placeholder (§4.11)", () => {
+Deno.test("illustration: resolved image vs visible placeholder (§4.10 item 8)", () => {
   const src =
     "{chapter: a}\n{illustration: orchard | placement: full-page}\nThe Orchard";
   const withImg = render(parse(src), {
@@ -505,7 +522,7 @@ const HEADINGS_BOOK = [
   "p",
 ].join("\n");
 
-Deno.test("toc: level-1 slugged headings listed only when toc.headings is true (§4.12)", () => {
+Deno.test("toc: level-1 slugged headings listed only when toc.headings is true (§4.11)", () => {
   const on = render(parse(HEADINGS_BOOK), { toc: { headings: true } });
   assertStringIncludes(
     on,
@@ -566,4 +583,75 @@ Deno.test("language lands on the article as lang; absent by default", () => {
     '<article class="bml" lang="es">',
   );
   assertStringIncludes(render(doc), '<article class="bml">');
+});
+
+Deno.test("notes: a repeated anchor reuses its number; an unresolved one is left out", () => {
+  const html = render(parse([
+    "{chapter: a}",
+    "A{footnote: a} B{footnote: missing} C{footnote: a} D{footnote: b}",
+    "",
+    "{note: a}",
+    "first a",
+    "",
+    "{note: a}",
+    "second a",
+    "",
+    "{note: b}",
+    "bee",
+  ].join("\n")));
+  assertStringIncludes(
+    html,
+    'A<sup class="footnote-anchor" id="fnref-a"><a href="#note-a">1</a></sup> B C<sup class="footnote-anchor"><a href="#note-a">1</a></sup> D<sup class="footnote-anchor" id="fnref-b"><a href="#note-b">2</a></sup>',
+  );
+  // §3.2.4: the first of two notes with one slug wins.
+  assertStringIncludes(
+    html,
+    '<div class="note" id="note-a"><sup>1</sup> first a</div>',
+  );
+  assertStringIncludes(
+    html,
+    '<div class="note" id="note-b"><sup>2</sup> bee</div>',
+  );
+  assert(!html.includes("second a"));
+});
+
+Deno.test("notes: a note that footnotes itself, or a cycle, renders without recursing", () => {
+  const src = [
+    "{chapter: a}",
+    "X{footnote: s} Y{footnote: p}",
+    "",
+    "{note: s}",
+    "loop{footnote: s}",
+    "",
+    "{note: p}",
+    "to q{footnote: q}",
+    "",
+    "{note: q}",
+    "back to p{footnote: p}",
+  ].join("\n");
+  for (const placement of ["footnote", "endnote"] as const) {
+    const html = render(parse(src), { notes: { placement } });
+    assertStringIncludes(html, "loop");
+    assertStringIncludes(html, "back to p");
+  }
+});
+
+Deno.test("images: the src is escaped into its attribute", () => {
+  const html = render(
+    parse("{chapter: a}\n{illustration: x}\n\n{dropcap | image: t}\nThe end."),
+    { images: { x: 'a".png" onerror="alert(1)', t: 'b".png' } },
+  );
+  assertStringIncludes(html, 'src="a&quot;.png&quot; onerror=&quot;alert(1)"');
+  assertStringIncludes(html, 'src="b&quot;.png"');
+});
+
+Deno.test("dropcap image stands for the first letter (§3.5.4)", () => {
+  const html = render(
+    parse("{chapter: a}\n{dropcap | image: initial-t}\nThe morning came."),
+    { images: { "initial-t": "images/initial-t.png" } },
+  );
+  assertStringIncludes(
+    html,
+    '<img class="dropcap" src="images/initial-t.png" alt="T">he morning came.',
+  );
 });

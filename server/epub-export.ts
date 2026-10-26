@@ -97,7 +97,7 @@ export function toXhtml(html: string): string {
   return html
     .replace(/<(br|img|hr|wbr)\b([^>]*?)\s*\/?>/g, "<$1$2/>")
     .replace(
-      /(<sup class="footnote-anchor" id="[^"]*"><a )href="/g,
+      /(<sup class="footnote-anchor"[^>]*><a )href="/g,
       '$1epub:type="noteref" href="',
     )
     .replace(

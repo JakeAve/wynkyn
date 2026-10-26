@@ -169,7 +169,7 @@
   font-size: 0.85em;
   color: #999;
 }
-/* TOC rows (spec §3.4.6 / §4.11 item 10). Row = .entry so existing
+/* TOC rows (spec §3.4.6 / §4.10 item 10). Row = .entry so existing
    toc.entry styles keep applying to the whole line. Folio sits on the last
    line of a wrapped title (align-items: flex-end). Leaders: the spacer's
    ::before repeats --leader (set by css-generator from toc.leader.content);

@@ -325,7 +325,7 @@ export function generatePagedCSS(
     }\n}\n`,
   );
 
-  // 4. Footnote placement (§4.10)
+  // 4. Footnote placement (§4.9)
   if (metadata.notes?.placement === "footnote") {
     out.push(`.note { float: footnote; }\n`);
   }

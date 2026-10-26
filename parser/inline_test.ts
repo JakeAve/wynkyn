@@ -83,3 +83,14 @@ Deno.test("nested em is tolerated", () => {
     },
   ]);
 });
+
+Deno.test("unbalanced em is reported (§3.2.7)", () => {
+  const problems: string[] = [];
+  parseInlines(["a {em}b c"], (m) => problems.push(m));
+  parseInlines(["stray{/em} here"], (m) => problems.push(m));
+  parseInlines(["{em}ok{/em}"], (m) => problems.push(m));
+  assertEquals(problems, [
+    "{em} is never closed in its paragraph",
+    "stray {/em} with no {em} open",
+  ]);
+});

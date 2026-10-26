@@ -515,7 +515,7 @@ dedication, epigraph, and the contents itself), every part and chapter with its
 number when `numbering` shows one and its `{subtitle}` if present, level-1
 headings that carry a slug when metadata `toc.headings` is `true` (§4.11), and
 back matter that has a `{title}`. An untitled chapter lists as its number alone,
-or its slug if numbers are off. Page numbers come from `target-counter()`;
+or its slug if numbers are off. Page numbers come from the page map (§4.7);
 front- and back-matter rows use their zone's page-number style (§4.7), so a
 preface shows `v`.
 
@@ -1788,8 +1788,8 @@ implements the print-export half.
 - `css-generator.ts` exports three functions, all consumed by both preview and
   export since Paged.js is the single pagination engine (§6):
   - `generatePagedCSS(metadata, { bookTitle }): string` — `@page`, numbering,
-    and running-header rules targeting Paged.js (`string-set`/`string()`,
-    `target-counter()`).
+    and margin-box rules targeting Paged.js, reading the page map's CSS
+    variables for folios and running heads (§4.7, §4.8).
   - `generateDomCSS(metadata): string` — plain per-element selector rules
     (fonts, sizes, colors); ordinary page CSS.
   - `generateFontLinks(metadata): string` — `<link>` tags for Google Fonts,

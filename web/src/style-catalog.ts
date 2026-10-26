@@ -3,6 +3,7 @@
 // one, and how entries group into the style panel's book parts and tabs.
 // Pure: the DOM adapter lives in preview.ts, so this is unit-tested in Deno.
 import { folioAreas, selectorFor } from "../../metadata/css-generator.ts";
+import { CLASS_NAME_RE } from "../../parser/types.ts";
 import type {
   CssProps,
   FolioPosition,
@@ -199,7 +200,12 @@ export function addIsNames(metadata: Metadata, names: Iterable<string>): void {
 }
 
 export function catalogFor(metadata: Metadata): StyleEntry[] {
-  const is = Object.keys(metadata.is ?? {}).map((name): StyleEntry => ({
+  // A name the parser rejects would be a selector that throws in every
+  // closest()/querySelectorAll() the preview runs; it isn't offered.
+  const names = Object.keys(metadata.is ?? {}).filter((n) =>
+    CLASS_NAME_RE.test(n)
+  );
+  const is = names.map((name): StyleEntry => ({
     key: `is.${name}`,
     group: "Custom (is:)",
     label: name,
