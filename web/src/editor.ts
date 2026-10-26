@@ -151,10 +151,14 @@ export function setEditionSpans(
 export type WriteView = "prose" | "source";
 
 const writeView = new Compartment();
+// Each editor's image host, for Prose to draw illustrations with.
+const imageHosts = new WeakMap<EditorView, ImageHost>();
 
 export function setWriteView(view: EditorView, v: WriteView): void {
   view.dispatch({
-    effects: writeView.reconfigure(v === "prose" ? prose() : []),
+    effects: writeView.reconfigure(
+      v === "prose" ? prose({ images: imageHosts.get(view) }) : [],
+    ),
   });
 }
 
@@ -166,7 +170,7 @@ export function createEditor(opts: {
   images?: ImageHost; // image files dropped, pasted or picked go in the book
 }): EditorView {
   let lastLine = 0;
-  return new EditorView({
+  const view = new EditorView({
     parent: opts.parent,
     state: EditorState.create({
       doc: opts.text,
@@ -198,6 +202,8 @@ export function createEditor(opts: {
       ],
     }),
   });
+  if (opts.images) imageHosts.set(view, opts.images);
+  return view;
 }
 
 export function applyDiagnostics(view: EditorView, diags: Diagnostic[]): void {

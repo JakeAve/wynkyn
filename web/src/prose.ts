@@ -4,11 +4,13 @@
 // .cm-content's padding (app.css, `.cm-prose-*`), so they wrap with their line.
 // The cursor's paragraph shows its markup in place; every other paragraph
 // folds it. Page turns from the last layout sit in the right margin too
-// (setPageTurns). Nothing changes in the document.
+// (setPageTurns). An illustration whose file exists draws its image as a
+// block above its line, its rubric beside it. Nothing changes in the document.
 import {
   Decoration,
   type DecorationSet,
   EditorView,
+  ViewPlugin,
   WidgetType,
 } from "@codemirror/view";
 import {
@@ -23,6 +25,7 @@ import { parseSentinelLine } from "../../parser/sentinel.ts";
 import { wrapRanges } from "./bml-language.ts";
 import { type ProseLine, proseLines } from "./prose-model.ts";
 import type { ImageHost } from "./editor-images.ts";
+import { IMAGE_EXTS, type ImageFile } from "../../server/images.ts";
 import type { PageTurn } from "./preview.ts";
 
 // A line's margin marks: its rubric (label, slug beneath), on a folded row
@@ -80,6 +83,67 @@ class Marks extends WidgetType {
   }
 }
 
+// An illustration's image, a block above its line, with the line's marks
+// beside it. A click puts the cursor on its line, which reveals the markup.
+class Picture extends WidgetType {
+  constructor(readonly url: string, readonly marks: Marks) {
+    super();
+  }
+  override eq(o: Picture): boolean {
+    return this.url === o.url && this.marks.eq(o.marks);
+  }
+  toDOM(): HTMLElement {
+    const el = document.createElement("div");
+    el.className = "cm-prose-illustration";
+    const img = document.createElement("img");
+    img.src = this.url;
+    img.alt = "";
+    el.append(this.marks.toDOM(), img);
+    return el;
+  }
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+// The book's images by slug (an image URL each), as the app last listed
+// them; null until listed, when no illustration counts as missing.
+const imagesEffect = StateEffect.define<Map<string, string>>();
+const imagesField = StateField.define<Map<string, string> | null>({
+  create: () => null,
+  update: (v, tr) =>
+    tr.effects.reduce((m, e) => e.is(imagesEffect) ? e.value : m, v),
+});
+
+// Lists the book's images now and after each edit: host.images() fetches
+// at most every few seconds and again after an add (a drop, a paste, a
+// pick), as the completions do.
+function imageLister(host: ImageHost) {
+  return ViewPlugin.define((view) => {
+    let last: ImageFile[] | null = null;
+    const list = () =>
+      host.images().then(async (files) => {
+        if (files === last) return;
+        last = files;
+        const rank = (f: ImageFile) =>
+          IMAGE_EXTS.indexOf(f.name.slice(f.slug.length + 1).toLowerCase());
+        // the resolver's order when two files share a slug (spec §4.11)
+        const sorted = [...files].sort((a, b) => rank(a) - rank(b));
+        const map = new Map<string, string>();
+        for (const f of sorted) {
+          if (!map.has(f.slug)) map.set(f.slug, await host.url(f.name));
+        }
+        view.dispatch({ effects: imagesEffect.of(map) });
+      }, () => {});
+    list();
+    return {
+      update(u) {
+        if (u.docChanged) list();
+      },
+    };
+  });
+}
+
 const hide = Decoration.replace({});
 const lineClass = (c: string) => Decoration.line({ class: c });
 const LINES = {
@@ -88,6 +152,7 @@ const LINES = {
   block: lineClass("cm-prose-block"),
   rule: lineClass("cm-prose-rule"),
   break: lineClass("cm-prose-break"),
+  caption: lineClass("cm-prose-caption"),
   src: lineClass("cm-prose-src"),
   slugged: lineClass("cm-prose-slugged"),
 };
@@ -154,7 +219,12 @@ function draw(state: EditorState): Drawn {
   const doc = state.doc;
   const lines = doc.toString().split("\n");
   const para = paragraphAt(doc, state.selection.main.head);
-  const model = proseLines(lines, para[0] - 1);
+  const images = state.field(imagesField, false) ?? null;
+  const model = proseLines(
+    lines,
+    para[0] - 1,
+    images ? (slug) => images.has(slug) : undefined,
+  );
   const turns = state.field(turnsField, false);
   const decos: Range<Decoration>[] = [];
   let carried: number | undefined; // a turn on a line folded into the next
@@ -162,6 +232,27 @@ function draw(state: EditorState): Drawn {
     const l = doc.line(i + 1);
     const turn = turns?.get(l.from) ?? carried;
     carried = undefined;
+    const url = p.standIn === "illustration" && images?.get(p.slug ?? "");
+    if (url) {
+      // The image above the line; folded, the line goes into the caption
+      // below (the last line keeps an empty row).
+      decos.push(
+        Decoration.widget({
+          widget: new Picture(url, new Marks(p, turn)),
+          block: true,
+          side: -1,
+        }).range(l.from),
+      );
+      const next = model[i + 1]?.kind;
+      if (!p.fold) decos.push(LINES.src.range(l.from));
+      else if (i + 1 === doc.lines) decos.push(hide.range(l.from, l.to));
+      else {
+        // The caption's row starts here now, so its class goes here too.
+        decos.push(hide.range(l.from, l.to + 1));
+        if (next) decos.push(LINES[next].range(l.from));
+      }
+      return;
+    }
     const row = !!p.rubric || p.standIn === "break";
     if (p.fold && !row) {
       // Fold into the line above, so the text line below keeps its own
@@ -207,7 +298,10 @@ function draw(state: EditorState): Drawn {
 const prosed = StateField.define<Drawn>({
   create: draw,
   update(v, tr) {
-    if (tr.docChanged || tr.effects.some((e) => e.is(turnsEffect))) {
+    if (
+      tr.docChanged ||
+      tr.effects.some((e) => e.is(turnsEffect) || e.is(imagesEffect))
+    ) {
       return draw(tr.state);
     }
     if (!tr.selection) return v;
@@ -217,7 +311,10 @@ const prosed = StateField.define<Drawn>({
   provide: (f) => EditorView.decorations.from(f, (v) => v.decos),
 });
 
-// `opts.images` is for drawing illustrations (planned, §8.1 Images).
-export function prose(_opts?: { images?: ImageHost }): Extension {
-  return prosed;
+// `opts.images`: the book's images, for drawing illustrations. Without it
+// an illustration is its rubric alone.
+export function prose(opts?: { images?: ImageHost }): Extension {
+  return opts?.images
+    ? [imagesField, prosed, imageLister(opts.images)]
+    : prosed;
 }

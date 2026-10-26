@@ -23,17 +23,18 @@ export interface Rubric {
 export interface ProseLine {
   fold: boolean;
   rubric?: Rubric;
-  kind?: "title" | "subtitle" | "block";
+  kind?: "title" | "subtitle" | "block" | "caption";
   standIn?: "break" | "illustration";
   note?: string; // folded `%%` lines beside this one, joined by "\n"
   slug?: string; // the stand-in's slug: the image, the kind of break
 }
 
-const NEXT_KIND: Record<string, "title" | "subtitle"> = {
+const NEXT_KIND: Record<string, "title" | "subtitle" | "caption"> = {
   title: "title",
   heading: "title",
   subheading: "title",
   subtitle: "subtitle",
+  illustration: "caption",
 };
 const INDENT = new Set(["quote", "epigraph", "poem", "pullquote"]);
 // Explicit-close sentinels: their first text line may sit past a nested tag.
@@ -46,9 +47,12 @@ const WRAPS = new Set([
   "only",
 ]);
 
-// Plates and drop-cap images stay as plain markup (decided 2026-10-26).
-const plain = (t: SentinelTag) =>
-  (t.name === "illustration" && t.params.placement === "full-page") ||
+// Plates, drop-cap images and illustrations whose file is missing stay as
+// plain markup (decided 2026-10-26). `hasImage` unknown: none is missing.
+const plain = (t: SentinelTag, hasImage?: (slug: string) => boolean) =>
+  (t.name === "illustration" &&
+    (t.params.placement === "full-page" ||
+      (!!hasImage && !hasImage(t.slug ?? "")))) ||
   (t.name === "dropcap" && "image" in t.params);
 
 function rubricOf(t: SentinelTag): Rubric {
@@ -65,8 +69,13 @@ function rubricOf(t: SentinelTag): Rubric {
   return r;
 }
 
-// `cursor` is a 0-based line; its paragraph reveals its markup.
-export function proseLines(lines: string[], cursor: number): ProseLine[] {
+// `cursor` is a 0-based line; its paragraph reveals its markup. `hasImage`
+// says whether an illustration's file exists, once the book's images are known.
+export function proseLines(
+  lines: string[],
+  cursor: number,
+  hasImage?: (slug: string) => boolean,
+): ProseLine[] {
   const tags = lines.map((l) => parseSentinelLine(l));
   const blank = (i: number) => lines[i]!.trim() === "";
   const comment = (i: number) => lines[i]!.startsWith("%%");
@@ -114,18 +123,19 @@ export function proseLines(lines: string[], cursor: number): ProseLine[] {
       if (comment(i)) at(i).fold = !revealed(i);
       return;
     }
-    if (plain(t)) return;
+    if (plain(t, hasImage)) return;
     at(i).fold = !revealed(i);
     if (t.closing) return;
     if (t.name === "break" || t.name === "illustration") {
       at(i).standIn = t.name;
       if (t.slug) at(i).slug = t.slug;
     }
-    // The rubric sits on the text it opens; a structural line, a break, a
-    // column mark, or a sentinel with no text of its own (or whose text an
-    // outer sentinel already labels) carries its own.
+    // The rubric sits on the text it opens; a structural line, a break, an
+    // illustration (beside its image), a column mark, or a sentinel with no
+    // text of its own (or whose text an outer sentinel already labels)
+    // carries its own.
     const own = STRUCTURAL.has(t.name) || t.name === "break" ||
-      t.name === "col";
+      t.name === "illustration" || t.name === "col";
     const j = own ? -1 : firstText(i, t);
     at(j === -1 || at(j).rubric ? i : j).rubric = rubricOf(t);
 

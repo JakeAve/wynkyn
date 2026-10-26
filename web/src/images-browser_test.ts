@@ -122,6 +122,10 @@ Deno.test({
       );
       await page.waitForTimeout(2000); // any second push would land by now
       assertEquals(updates, 1, "one rebuild push per drop");
+      // Prose lists the images again after the drop and draws the new one.
+      await page.locator(
+        '#editor .cm-prose-illustration img[src$="night-sky.png"]',
+      ).waitFor();
 
       // A drop with no files is CodeMirror's: it inserts the dragged text.
       assert(!await drop(page, "bright cold day", { text: "MOVED" }));

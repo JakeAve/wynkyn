@@ -574,8 +574,8 @@ stored differently.
 
 The text column holds only the writing, in the writing face (Alegreya by
 default). Built: rubrics, text as text, markup at the cursor, notes and page
-turns at normal width, the margins at normal width. Images and the expanded
-margins are still to come.
+turns at normal width, images, the margins at normal width. The expanded margins
+are still to come.
 
 - **Rubrics, left margin.** Each sentinel that opens or labels a block is a red
   small-caps rubric beside it (`--f-ui` `--fs-xs`, `--acc-ink`, right-aligned):
@@ -594,8 +594,8 @@ margins are still to come.
   everything stays editable as plain text. Leaving it folds them away: a
   sentinel line folds into the line above, or into its rubric row or stand-in.
   Clicking or arrowing onto a rubric row or ⁂ puts the cursor in that block,
-  which reveals it. This replaces Hide markup. Plates, drop-cap images and
-  footnote and ref tags stay as markup.
+  which reveals it. This replaces Hide markup. Plates, drop-cap images,
+  illustrations whose file is missing, and footnote and ref tags stay as markup.
 - **Notes, right margin.** `%%` comments, including import's `%% check:` notes,
   sit behind a red ☞ as marginalia; the note reads on hover (a native title
   until §6.9's tooltip). At the cursor the `%%` line shows in place instead.
@@ -606,10 +606,16 @@ margins are still to come.
   begins in, not the exact line. Hidden for a paragraph edited since, until the
   next layout lands; Aa's Page turns switch hides them all. Each carries its
   long form, "p. 12" (`data-long`), for the expanded margins.
-- **Images** (planned). `{illustration}` draws as a block: the image at a modest
-  size, its caption in italics, the rubric and slug in the margin. Plates,
-  drop-cap images and missing files: case by case, later. Until then an
-  illustration is its rubric alone.
+- **Images.** An `{illustration}` whose file is in `images/` draws as a block
+  above its line: the image at most 12rem tall and no wider than the text column
+  (corners `--r`), its caption beneath in italics at .85em, `--muted`, and the
+  `Illustration` rubric with its slug in the margin beside the image. At the
+  cursor the markup shows under the image, which stays drawn; a click on the
+  image puts the cursor there. Decided 2026-10-26: plates, drop-cap images and
+  illustrations whose file is missing stay plain markup lines (shown even
+  outside the cursor's paragraph, so an unresolved one is seen).
+- **`{only}`** (experimental) is a rubric `Only` with its editions beneath, the
+  way `{is}` shows its name (decided 2026-10-26).
 - **Margins.** Left 6–9.5rem, right 3–10.5rem. At normal width (built: 6rem and
   3rem) rubrics stay (slug truncated), notes collapse to the ☞ (hover to read)
   and page turns show the number alone. Expanded, they are written out
@@ -731,7 +737,5 @@ Everything scales with the browser's text size.
 
 ## 15. Open
 
-- Image blocks in Prose: plates, drop-cap images, missing files.
-- How `{only}` (experimental) spans show in Prose.
 - Whether the UI paper ever becomes a setting.
 - Favicon and app icons re-exported in minium.

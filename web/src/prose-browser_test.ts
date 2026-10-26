@@ -142,3 +142,49 @@ Deno.test({
     }
   },
 });
+
+// The demo book has images/ornament.svg; nothing is called "lost".
+const ILLUSTRATIONS = `Opening words, where the cursor starts.
+
+{illustration: ornament}
+An ornament.
+
+{illustration: lost}
+Nowhere to be found.
+`;
+
+Deno.test({
+  name: "Prose draws an illustration's image, and a missing one as markup",
+  ignore: !hasChrome || !appBuilt,
+  fn: async () => {
+    const { page, close } = await open(ILLUSTRATIONS);
+    try {
+      const img = page.locator("#editor .cm-prose-illustration img");
+      await img.waitFor();
+      assertEquals(await img.count(), 1);
+      assert(
+        (await img.getAttribute("src"))!.endsWith("/ornament.svg"),
+        "the present file's image",
+      );
+      const figure = page.locator("#editor .cm-prose-illustration");
+      assertEquals(
+        await figure.locator(".cm-prose-rubric").getAttribute("data-slug"),
+        "ornament",
+      );
+      const caption = page.locator("#editor .cm-line.cm-prose-caption");
+      assertEquals(await caption.innerText(), "An ornament.");
+      const shown = () => page.locator("#editor .cm-content").innerText();
+      let text = await shown();
+      assert(!text.includes("{illustration: ornament}"), "folded");
+      assert(text.includes("{illustration: lost}"), "missing: markup");
+
+      // A click on the image reveals its markup; the image stays.
+      await img.click();
+      text = await shown();
+      assert(text.includes("{illustration: ornament}"), "revealed");
+      assertEquals(await img.count(), 1);
+    } finally {
+      await close();
+    }
+  },
+});

@@ -121,11 +121,13 @@ Deno.test("proseLines: {illustration} with and without a caption", () => {
     "{illustration: map}",
   ];
   const p = proseLines(lines, -1);
-  assertEquals(p[0], { fold: true, standIn: "illustration", slug: "door" });
-  assertEquals(p[1], {
-    fold: false,
+  assertEquals(p[0], {
+    fold: true,
+    standIn: "illustration",
+    slug: "door",
     rubric: { label: "Illustration", slug: "door" },
   });
+  assertEquals(p[1], { fold: false, kind: "caption" });
   assertEquals(p[3], {
     fold: true,
     standIn: "illustration",
@@ -134,6 +136,18 @@ Deno.test("proseLines: {illustration} with and without a caption", () => {
   });
   assertEquals(folded(lines, 1), [3]);
   assertEquals(folded(lines, 3), [0]);
+});
+
+Deno.test("proseLines: an illustration whose file is missing stays plain", () => {
+  const lines = [
+    "{illustration: door}",
+    "The door.",
+    "",
+    "{illustration: map}",
+  ];
+  const p = proseLines(lines, -1, (slug) => slug === "map");
+  assertEquals(p.slice(0, 2), [{ fold: false }, { fold: false }]);
+  assertEquals(p[3]!.standIn, "illustration");
 });
 
 Deno.test("proseLines: plates and drop-cap images stay plain markup", () => {

@@ -923,6 +923,26 @@ body.typing #editor .pane-head {
   color: var(--muted);
   font-size: 1.35em;
 }
+/* an illustration's image at a modest size, its rubric beside it, and its
+   caption in italics beneath */
+#editor .cm-prose-illustration {
+  position: relative;
+  min-height: calc(var(--s-2) + (var(--fs-xs) + var(--fs-2xs)) * var(--lh));
+  padding: var(--s-2) 0;
+  cursor: text;
+}
+#editor .cm-prose-illustration img {
+  display: block;
+  max-width: 100%;
+  max-height: 12rem;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+}
+#editor .cm-line.cm-prose-caption {
+  font-style: italic;
+  font-size: .85em;
+  color: var(--muted);
+}
 /* markup at the cursor: monospace, muted, sentinel names red (bmlHighlight) */
 #editor .cm-line.cm-prose-src {
   font-family: var(--f-mono);
