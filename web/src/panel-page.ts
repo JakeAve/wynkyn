@@ -28,6 +28,7 @@ import {
   seg,
   select,
   stepper,
+  swatches,
   switchInput,
 } from "./panel-controls.ts";
 import type { PanelContext } from "./style-catalog.ts";
@@ -52,6 +53,15 @@ const FOLD_LABELS: Record<Fold, string> = {
   cut: "Cut, then fold",
   leaves: "Loose leaves",
 };
+
+// The preview's paper (design-language.md §2.5); print and EPUB stay white.
+const PAPER_STOCKS = [
+  { value: "", label: "Bright white" },
+  { value: "#fbf8f1", label: "Natural" },
+  { value: "#f8f2e3", label: "Ivory" },
+  { value: "#f3e9d2", label: "Cream" },
+  { value: "#f1f0ec", label: "Recycled grey" },
+];
 
 const MARGINS = [
   ["top", "Top"],
@@ -153,6 +163,17 @@ export function buildPageTab(panel: PanelContext): Node[] {
           }),
         ),
         () => !!page.size,
+      ),
+      v.mark(
+        row(
+          "Paper stock",
+          swatches(PAPER_STOCKS, page.paper, (paper) => {
+            if (paper) page.paper = paper;
+            else delete page.paper;
+            ctx.queueSave("page");
+          }, "Paper stock"),
+        ),
+        () => !!page.paper,
       ),
     ]),
     section("Margins", "margins", [

@@ -142,16 +142,21 @@ The pages stay paper in both themes, so their marks use fixed values.
 - `--sheet-*`: the imposed sheet in Print (paper, edge, slot, blank, ink, fold,
   cut), unchanged, except `--sheet-cut` becomes the light `--acc`.
 
-### 2.5 Paper stock (per book) (planned)
+### 2.5 Paper stock (per book)
 
 The preview pages take the book's paper stock, saved in `metadata.json` as
 `page.paper` (any CSS colour; absent = white), merged and upgraded like any
 other `page` key. Kept deliberately quiet:
 
-- One row in Style → Page size & margins: swatches (Bright white, Natural
-  `#fbf8f1`, Ivory `#f8f2e3`, Cream `#f3e9d2`, Recycled grey `#f1f0ec`) and a
-  custom colour. No prompt, banner or first-run question.
-- Preview only. Print sheets, Print pages, `bml export` and EPUB stay white.
+- One row in Style → Page size & margins, "Paper stock": `swatches` (§6.5) for
+  Bright white (unset, the default `--stock`), Natural `#fbf8f1`, Ivory
+  `#f8f2e3`, Cream `#f3e9d2`, Recycled grey `#f1f0ec`, then a custom colour. No
+  prompt, banner or first-run question.
+- `setPaperStock` (`preview.ts`) sets `--stock` on `#preview`, so only the live
+  pages change. The pages are paper in both themes, so the stock is the same in
+  dark: the five are all near-white, never a mood.
+- Preview only. Print sheets and Print pages clear the page background, and
+  `generatePagedCSS`, `bml export` and EPUB never read the key: all stay white.
 - Never touches the manuscript; the colophon's `{paper}` line is the author's
   text.
 
@@ -429,6 +434,12 @@ pill, whatever the corner shape.
   `--h-md` minimum, `--s-4` gap. A 0.375rem `--acc` dot before the label marks a
   value this view set; an inherited value's label carries "from Body text" in
   `--fs-xs` `--muted` beneath.
+- **Swatches** (`swatches`): `--h-md` colour chips with a hairline edge, each
+  named in its tooltip, then a native colour picker the same size and its code
+  in a text field in `--f-hivis`; any CSS colour can be typed. The chosen chip,
+  or the picker when the value is none of them, sits in `--acc-wash` inside a
+  1px `--acc` frame (the wash alone is lost around a warm chip). An option
+  valued `""` means unset.
 - **Tip line** (planned): a red ☞ in Fell before `--fs-sm` `--muted` text.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.

@@ -531,3 +531,12 @@ Deno.test("page and running values are checked too; an unknown area is dropped",
   assert(!css.includes("color: red"));
   assert(!css.includes("} x {"));
 });
+
+Deno.test("the paper stock never reaches the printed CSS", () => {
+  // page.paper tints the preview only; print and EPUB stay white (§4.3).
+  const page = { size: "A5" };
+  assertEquals(
+    generatePagedCSS({ page: { ...page, paper: "#f3e9d2" } }),
+    generatePagedCSS({ page }),
+  );
+});

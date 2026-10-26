@@ -1227,6 +1227,12 @@ in one section.
   as §7.7 step 3 does for `duplex`.
 - `reverse-backs` — with `duplex: none`, `true` writes the backs file last sheet
   first, for printers that stack face up. Default `false`.
+- `paper` — the paper stock, any CSS colour (`"#f3e9d2"`); unset is white. It
+  tints the preview's pages only, so the author sees the book on the stock it
+  will be printed on: print sheets, the PDF of the pages, `bml export` and the
+  EPUB stay white, and nothing is written into the manuscript or the colophon.
+  The panel offers Bright white (unset), Natural, Ivory, Cream and Recycled
+  grey, and a custom colour.
 
 CLI flags (`bml export --sheet/--fold/--folios/--duplex/--flip/--reverse-backs`)
 override any of these per run.

@@ -1910,6 +1910,58 @@ body.typing #editor .pane-head {
 #config-overlay .tog.outline {
   color: var(--fg);
 }
+/* swatches (panel-controls.ts swatches, §6.5): colour chips, then a picker
+   beside its code; the chosen one sits in the red wash */
+#config-overlay .colours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1);
+}
+#config-overlay .colour,
+#config-overlay .colours input[type="color"] {
+  width: var(--h-md);
+  height: var(--h-md);
+  padding: var(--s-1);
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  cursor: pointer;
+}
+#config-overlay .colour i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: var(--stock); /* the unset option: the default stock */
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+#config-overlay .colour[aria-pressed="true"],
+#config-overlay .colours input[type="color"].on {
+  background: var(--acc-wash);
+  box-shadow: inset 0 0 0 1px var(--acc);
+}
+#config-overlay .colours input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+#config-overlay .colours input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+#config-overlay .colours input[type="color"]::-moz-color-swatch {
+  border: 0;
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+#config-overlay .colours input.txt {
+  width: 6.5rem;
+  margin-left: var(--s-2);
+  font-family: var(--f-hivis); /* a typed code (§3.1) */
+  font-size: var(--fs-sm);
+}
 /* switch (panel-controls.ts switchInput, §6.4): always a pill; a --line
    track, --acc when on, a paper knob that slides */
 :is(#config-overlay, #text-view) .sw {

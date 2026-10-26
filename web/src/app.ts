@@ -15,6 +15,7 @@ import {
   renderPreview,
   restoreCachedRender,
   scrollPreviewTo,
+  setPaperStock,
   type UpdateMessage,
 } from "./preview.ts";
 import type { ServerMessage } from "../../server/pipeline.ts";
@@ -368,7 +369,10 @@ function syncChanged(s: SyncStatus): void {
 }
 
 function saveMetadataSections(sections: Partial<Metadata>): void {
-  if ("page" in sections) switcher.setCrumbSize(sections.page?.size);
+  if ("page" in sections) {
+    switcher.setCrumbSize(sections.page?.size);
+    setPaperStock(sections.page?.paper);
+  }
   // Saves replace whole sections, so this keeps `metadata` what the panel
   // shows: its own sections, uncopied (Sync copies what it sends).
   if (metadata) metadata = { ...metadata, ...sections };
@@ -805,6 +809,7 @@ async function main(): Promise<void> {
   });
   fetchMetadata().then((m) => {
     switcher.setCrumbSize(m.metadata.page?.size);
+    setPaperStock(m.metadata.page?.paper);
     showSpecBanner(m.metadata.spec);
   }, () => {
     // no size in the crumb; the Style panel reports the load error

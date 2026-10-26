@@ -1,6 +1,7 @@
 // web/src/panel-controls.ts — DOM controls for the style panel (rows, steppers,
-// segments, toggles, selects, sections). Styled by the `#config-overlay` rules
-// in index.html. DOM assembly only; length maths lives in config-data.ts.
+// segments, toggles, swatches, selects, sections). Styled by the
+// `#config-overlay` rules in index.html. DOM assembly only; length maths lives
+// in config-data.ts.
 import type { CssProps, Metadata } from "../../metadata/types.ts";
 import {
   bumpLength,
@@ -261,6 +262,73 @@ export function switchInput(
   input.checked = on;
   input.onchange = () => onChange(input.checked);
   return input;
+}
+
+// Colour swatches, then a custom colour: a picker beside its code (any CSS
+// colour can be typed). An option whose value is "" means unset; its chip
+// shows the default `--stock` (app.css). The chosen chip takes the red wash,
+// or the picker does when the value is none of the options.
+export function swatches(
+  options: Array<{ value: string; label: string }>,
+  value: string | undefined,
+  onChange: (v: string | undefined) => void,
+  label: string,
+): HTMLElement {
+  const picker = h("input", {
+    type: "color",
+    "aria-label": `Custom ${label.toLowerCase()}`,
+    title: "Custom colour",
+  });
+  const code = h("input", {
+    type: "text",
+    class: "txt",
+    "aria-label": `${label} colour code`,
+    spellcheck: "false",
+    autocomplete: "off",
+  });
+  const btns = options.map((o) => {
+    const chip = h("i");
+    chip.style.background = o.value;
+    const b = h("button", {
+      type: "button",
+      class: "colour",
+      "aria-label": o.label,
+      title: o.label,
+    }, chip);
+    b.onclick = () => set(o.value || undefined);
+    return [b, o.value] as const;
+  });
+  const paint = (v: string | undefined) => {
+    let own = v !== undefined;
+    for (const [b, ov] of btns) {
+      const on = ov === (v ?? "");
+      if (on) own = false;
+      b.setAttribute("aria-pressed", String(on));
+    }
+    picker.classList.toggle("on", own);
+    code.value = v ?? "";
+    // The picker only takes #rrggbb; unset is the white it means.
+    picker.value = /^#[0-9a-f]{6}$/i.test(v ?? "") ? v! : "#ffffff";
+  };
+  const set = (v: string | undefined) => {
+    value = v;
+    paint(v);
+    onChange(v);
+  };
+  picker.oninput = () => set(picker.value);
+  code.onchange = () => {
+    const t = code.value.trim();
+    if (t && !CSS.supports("color", t)) return paint(value); // not a colour
+    set(t || undefined);
+  };
+  paint(value);
+  return h(
+    "span",
+    { class: "colours", role: "group", "aria-label": label },
+    ...btns.map(([b]) => b),
+    picker,
+    code,
+  );
 }
 
 export function select(
