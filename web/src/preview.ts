@@ -11,12 +11,18 @@ import {
 import {
   type CachedRender,
   renderHash,
+  restoredPageMap,
   saveCachedRender,
 } from "./preview-cache.ts";
 import { scopeSheet } from "./scope-css.ts";
-import type { PageProblem, Seed } from "../../renderer/page-map-types.ts";
+import type {
+  PageEntry,
+  PageProblem,
+  Seed,
+} from "../../renderer/page-map-types.ts";
 
 interface RenderResult {
+  map: PageEntry[];
   seed: Seed;
   problems: PageProblem[];
 }
@@ -114,6 +120,18 @@ let restoredStyles: Element[] = [];
 // settles in one pass.
 let seed: Seed = {};
 let problems: PageProblem[] = [];
+// The on-screen render's page map, for Inspect; [] when unknown.
+let map: PageEntry[] = [];
+
+/** The page map of the pages on screen: index = physical page − 1. */
+export function pageMap(): PageEntry[] {
+  return map;
+}
+
+/** Anchor id → refText of the pages on screen (cross-references). */
+export function pageSeed(): Seed {
+  return seed;
+}
 // The render for targetHash (in flight, queued or done); null after a restore.
 let pending: Promise<PageProblem[]> | null = null;
 let queuedUpdate: {
@@ -232,7 +250,7 @@ async function runRender(
     fitPreview(container);
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
-    ({ seed, problems } = result);
+    ({ seed, problems, map } = result);
     if (cacheKey !== null) {
       const { styleEl, inserted } = livePreviewer.polisher;
       // Head order is cascade order: the base sheet, styleEl, then the book CSS.
@@ -248,6 +266,7 @@ async function runRender(
         fontLinks: update.fontLinks,
         seed,
         problems,
+        map,
       }); // fire-and-forget: never throws, and the render shouldn't wait on it
     }
     return problems;
@@ -293,8 +312,7 @@ export function restoreCachedRender(
   container.innerHTML = cached.pages;
   targetHash = cached.hash;
   pending = null;
-  seed = cached.seed ?? {};
-  problems = cached.problems ?? [];
+  ({ seed, problems, map } = restoredPageMap(cached));
   fitPreview(container);
   dropped?.done.resolve(problems);
 }
