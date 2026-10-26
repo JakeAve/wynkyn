@@ -196,6 +196,13 @@
     .fontpanel {
       padding-bottom: 16rem !important;
     }
+    .prose-board {
+      width: 100%;
+      padding-block: var(--s-6);
+    }
+    .prose-board .syn-k {
+      color: var(--syn-k); /* bmlHighlight's sentinel name */
+    }
     main #text-view .tvpop {
       position: static;
     }
@@ -706,8 +713,48 @@
             </div>
           </div>
         </div>
-        <p class="planned">Planned: the footer's session count and the Prose
-          view's marks. Until they are built, the app itself is their
+        <p>Prose (§8.1): rubrics in the left margin, a hairline under a
+          structural block, the title in Fell, ⁂ for a break, a ☞ note in the
+          right margin (hover to read). The paragraph at the cursor shows its
+          markup in monospace.</p>
+        <div class="board">
+          <div class="surface prose-board">
+            <div id="editor" data-view="prose">
+              <div class="cm-scroller">
+                <div class="cm-content">
+                  <div class="cm-line cm-prose-rule cm-prose-slugged"><span
+                    class="cm-prose-marks"><span class="cm-prose-rubric"
+                      data-label="Chapter" data-slug="stave-1"
+                      title="stave-1"></span></span></div>
+                  <div class="cm-line cm-prose-title"><span
+                    class="cm-prose-marks"><span class="cm-prose-rubric" data-label="Title"></span></span>Marley's Ghost</div>
+                  <div class="cm-line"><br></div>
+                  <div class="cm-line cm-prose-src">{<span
+                    class="syn-k">dropcap</span>}</div>
+                  <div class="cm-line"><span class="cm-prose-marks"><span
+                      class="cm-prose-rubric" data-label="Drop cap"></span></span>MARLEY was
+                  dead: to begin with. There is no doubt whatever about
+                  that.</div>
+                  <div class="cm-line"><br></div>
+                  <div class="cm-line"><span class="cm-prose-marks"><span
+                      class="cm-prose-note"
+                      data-note="check: Humbug is not in italics in the 1843 text."
+                      title="check: Humbug is not in italics in the 1843 text."></span></span>"Bah!"
+                  said Scrooge, "<span class="cm-bml-it">Humbug!</span>"</div>
+                  <div class="cm-line"><br></div>
+                  <div class="cm-line cm-prose-break"><span
+                    class="cm-prose-marks"><span class="cm-prose-rubric" data-label="Break"></span>⁂</span></div>
+                  <div class="cm-line"><br></div>
+                  <div class="cm-line cm-prose-block"><span
+                    class="cm-prose-marks"><span class="cm-prose-rubric" data-label="Quote"></span></span>A
+                  quote, indented.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="planned">Planned: Prose's page turns, illustration blocks
+          and expanded margins. Until they are built, the app itself is their
           sheet.</p>
       </section>
     </main>

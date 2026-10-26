@@ -42,7 +42,8 @@ async function withApp(
 
 const view = (page: Page) => page.locator("#editor").getAttribute("data-view");
 const lineFont = (page: Page) =>
-  page.locator("#editor .cm-line").first().evaluate((el) =>
+  // a line of writing: in Prose the cursor's paragraph shows its markup in mono
+  page.locator("#editor .cm-line:not(.cm-prose-src)").first().evaluate((el) =>
     getComputedStyle(el).fontFamily
   );
 

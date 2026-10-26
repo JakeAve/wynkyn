@@ -20,7 +20,11 @@ it are in `SKILL.md`, The web app; this is the map.
 | `panes.ts` | `installPanes`: the Contents toggle (pins the outline while expanded), Pages hidden by ⌘., and each pane's expand (`#panes.expand-writing` / `expand-pages`, localStorage `expanded:<mode>`); returns what the shortcuts call |
 | `dom.ts` | `$`, `brief` — the helpers every module shares |
 
-Editor side: `editor.ts` (the CodeMirror pane), `bml-language.ts`,
+Editor side: `editor.ts` (the CodeMirror pane; `setWriteView` swaps Prose and
+Source), `prose-model.ts` (pure: how Prose shows each line, folded or shown,
+its rubric, kind, stand-in and notes, plus the footer's word count and
+chapter) → `prose.ts` (`prose()`, the decorations and margin widgets that draw
+it), `bml-language.ts`,
 `editor-insert.ts` + `snippets.ts` (inserting sentinels), `editor-images.ts`
 (dropped/pasted images), `search-panel.ts`, `spelling.ts`, `diagnostics.ts`.
 Outline: `tree-data.ts` (pure) → `tree-view.ts`. Storage in the page:

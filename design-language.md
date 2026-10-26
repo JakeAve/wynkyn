@@ -573,40 +573,50 @@ stored differently.
 ### 8.1 Prose (default) (planned)
 
 The text column holds only the writing, in the writing face (Alegreya by
-default).
+default). Built: rubrics, text as text, markup at the cursor, notes at normal
+width, the margins at normal width. Page turns, images and the expanded margins
+are still to come.
 
 - **Rubrics, left margin.** Each sentinel that opens or labels a block is a red
-  small-caps rubric beside it: `Chapter` (slug beneath in `--f-hivis`, muted),
-  `Title`, `Drop cap`, `Quote`, `Poem`, `Illustration`, an `{is}` name, `Break`.
-  Structural blocks (matter, part, chapter) also draw a hairline across the text
-  column.
+  small-caps rubric beside it (`--f-ui` `--fs-xs`, `--acc-ink`, right-aligned):
+  `Chapter` (slug beneath in `--f-hivis` `--fs-2xs`, muted, truncated), `Title`,
+  `Drop cap`, `Quote`, `Poem`, `Illustration`, an `{is}` name, `Break`.
+  Structural blocks (matter, part, chapter) also draw a hairline (`--line`)
+  across the text column. A rubric is a widget against `.cm-content`'s padding,
+  not a gutter; Prose has no line numbers. A click on it goes to its line.
 - **Text as text.** The line after `{title}` / `{heading}` is set large in Fell
-  (2rem at normal width); `{em}` is italic; `{break}` is ⁂; quotes and poems
-  indent. Not a page preview: no page size, no book styles.
-- **Markup at the cursor.** The block the cursor is in shows its sentinel lines
-  and inline tags in place (`--f-mono`, muted, names in red), so everything
-  stays editable as plain text. Leaving the block folds them away. This replaces
-  Hide markup.
+  (2rem at normal width); `{subtitle}`'s line is italic; `{em}` is italic;
+  `{break}` is ⁂, centred and muted; quotes, epigraphs, poems and pullquotes
+  indent 2em. Not a page preview: no page size, no book styles.
+- **Markup at the cursor.** The paragraph the cursor is in shows its sentinel
+  lines and inline tags in place (`--f-mono` at .75em, muted, names in red), so
+  everything stays editable as plain text. Leaving it folds them away: a
+  sentinel line folds into the line above, or into its rubric row or stand-in.
+  Clicking or arrowing onto a rubric row or ⁂ puts the cursor in that block,
+  which reveals it. This replaces Hide markup. Plates, drop-cap images and
+  footnote and ref tags stay as markup.
 - **Notes, right margin.** `%%` comments, including import's `%% check:` notes,
-  sit behind a red ☞ as marginalia; at the cursor the `%%` line shows in place
-  instead.
-- **Page turns, right margin.** Where a printed page begins: a short rule and
-  the number, from the last layout; hidden for a block edited since, until the
-  next layout lands.
-- **Images.** `{illustration}` draws as a block: the image at a modest size, its
-  caption in italics, the rubric and slug in the margin. Plates, drop-cap images
-  and missing files: case by case, later.
-- **Margins.** Left 6–9.5rem, right 3–10.5rem. At normal width rubrics stay
-  (slug truncated), notes collapse to the ☞ (hover to read) and page turns show
-  the number alone. Expanded, they are written out.
+  sit behind a red ☞ as marginalia; the note reads on hover (a native title
+  until §6.9's tooltip). At the cursor the `%%` line shows in place instead.
+  Box-drawing `%%` rules are dropped.
+- **Page turns, right margin** (planned). Where a printed page begins: a short
+  rule and the number, from the last layout; hidden for a block edited since,
+  until the next layout lands.
+- **Images** (planned). `{illustration}` draws as a block: the image at a modest
+  size, its caption in italics, the rubric and slug in the margin. Plates,
+  drop-cap images and missing files: case by case, later. Until then an
+  illustration is its rubric alone.
+- **Margins.** Left 6–9.5rem, right 3–10.5rem. At normal width (built: 6rem and
+  3rem) rubrics stay (slug truncated), notes collapse to the ☞ (hover to read)
+  and page turns show the number alone. Expanded, they are written out
+  (planned).
 
 ### 8.2 Source
 
 Every mark as typed, all in `--f-mono` at 13/17 of the reader's size (line
 numbers too), coloured per §2.6, with today's sentinel treatments (structural
 band and hairline, rails joining explicit-close pairs, comment rules as
-hairlines). `#editor[data-view="source"]`; until §8.1 is drawn, Prose folds
-markup outside the cursor's paragraph, as Hide markup did.
+hairlines), scoped to `#editor[data-view="source"]`; Prose has its own (§8.1).
 
 ### 8.3 Text view (Aa), spelling, footer (planned)
 
@@ -633,10 +643,10 @@ The label is always the plain word; the wink sits beside or behind it.
 | Wink                    | Where                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------- |
 | Small-caps group labels | style nav, outline, panel sections, menu headings                               |
-| Red rubrics             | the Prose margin (planned)                                                      |
+| Red rubrics             | the Prose margin                                                                |
 | Fell Great Primer       | view headings, dialog titles, empty states, the site                            |
 | ☞ manicule              | notes in the margin; tip lines in the panel                                     |
-| ⁂ asterism              | `{break}` in Prose (planned)                                                    |
+| ⁂ asterism              | `{break}` in Prose                                                              |
 | ❦ fleuron               | empty states; the site's feature heads and colophon                             |
 | "Setting type… N pages" | pagination status (was "Rendering pages… N")                                    |
 | Colophon                | About and the site footer: "Set in IM Fell Great Primer and Alegreya."          |

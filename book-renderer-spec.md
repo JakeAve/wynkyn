@@ -2022,17 +2022,23 @@ CodeMirror 6 over plain BML text.
 - The text view (in the write pane's header, §7.1) is a per-reader preference in
   localStorage, not part of the book. Two views of the same file, switched by
   **Prose | Source** or ⌘/: **Source** sets every line in the system monospace
-  at 13/17 of the reader's size; **Prose** (the default) sets the writing in the
-  chosen face, with sentinels in monospace so markup reads as markup, and folds
-  away the sentinel lines of every paragraph that also has prose (`{title}`,
-  `{dropcap}`, `{quote}` … `{/quote}`) and the `{em}` tags, except in the
-  paragraph holding the cursor; structural lines stay as landmarks, and a
-  paragraph of sentinels alone (`{illustration}`, `{break}`) stays visible so it
-  can still be reached. The **Aa** menu holds the face (Alegreya, Alegreya Sans,
-  or the book's body face), the size (12–24px, default 17), dim (Off, Paragraph,
-  Sentence) and page turns (on); dim and page turns are kept but not drawn yet.
-  The text holds a reading measure of about 70 characters (36em), centred in the
-  pane while the pages are hidden or the writing expanded.
+  at 13/17 of the reader's size, with the sentinel treatments above; **Prose**
+  (the default, `web/src/prose.ts`, design-language.md §8.1) sets the writing in
+  the chosen face and draws the markup instead of showing it: each sentinel is a
+  red small-caps rubric in the left margin (a structural one with its slug
+  beneath and a hairline across the text), the line after `{title}` or
+  `{heading}` is large, after `{subtitle}` italic, `{em}` text italic, quotes
+  and poems indented, `{break}` a ⁂, and `%%` notes a ☞ in the right margin that
+  reads on hover. Outside the paragraph holding the cursor the sentinel lines,
+  `%%` lines and `{em}` tags fold away; in it they show in place, in monospace,
+  so everything stays editable. Clicking or arrowing onto a rubric row or a ⁂
+  moves the cursor into that block and so reveals it. Plates, drop-cap images
+  and footnote and ref tags stay as markup. This replaces Hide markup. The
+  **Aa** menu holds the face (Alegreya, Alegreya Sans, or the book's body face),
+  the size (12–24px, default 17), dim (Off, Paragraph, Sentence) and page turns
+  (on); dim and page turns are kept but not drawn yet. The text holds a reading
+  measure of about 70 characters (36em), centred in the pane while the pages are
+  hidden or the writing expanded.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The footer is split by

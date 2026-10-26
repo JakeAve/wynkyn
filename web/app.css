@@ -805,6 +805,107 @@ body.typing #editor .pane-head {
 #panes.pages-hidden #editor .cm-scroller {
   justify-content: center;
 }
+/* Prose (prose.ts, design-language.md §8.1): the margins are .cm-content's
+   padding, and the marks in them are widgets placed against their line. No
+   line numbers: folded markup would make them jump. */
+#editor[data-view="prose"] .cm-gutters {
+  display: none;
+}
+#editor[data-view="prose"] .cm-content {
+  max-width: calc(36rem + 9rem);
+  padding-left: 6rem;
+  padding-right: 3rem;
+}
+#editor[data-view="prose"] .cm-line {
+  position: relative;
+}
+#editor .cm-prose-rubric,
+#editor .cm-prose-note {
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+  padding-top: var(--s-2);
+  font: var(--fs-2xs) / var(--lh) var(--f-ui);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  user-select: none;
+  cursor: default;
+}
+/* a red small-caps rubric, the slug beneath it truncated */
+#editor .cm-prose-rubric {
+  right: 100%;
+  width: 6rem;
+  padding-right: var(--s-5);
+  text-align: right;
+  color: var(--acc-ink);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  font-size: var(--fs-xs);
+}
+#editor .cm-prose-rubric::before {
+  content: attr(data-label);
+}
+#editor .cm-prose-rubric[data-slug]::after {
+  content: attr(data-slug);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fs-2xs) / var(--lh) var(--f-hivis);
+  font-variant-caps: normal;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+/* a note: the ☞ alone at normal width, its text (data-note) on hover */
+#editor .cm-prose-note {
+  left: 100%;
+  width: 3rem;
+  padding-left: var(--s-5);
+  color: var(--acc-ink);
+  font-size: var(--fs);
+  line-height: 1;
+  padding-top: var(--s-3);
+}
+#editor .cm-prose-note::before {
+  content: "☞";
+}
+/* a folded row is as tall as its rubric and slug, so the next rubric clears it */
+#editor .cm-line.cm-prose-slugged {
+  min-height: calc(var(--s-2) + (var(--fs-xs) + var(--fs-2xs)) * var(--lh));
+}
+/* a structural block's hairline across the text column */
+#editor .cm-line.cm-prose-rule {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+#editor .cm-line.cm-prose-title {
+  font-family: var(--f-title);
+  font-size: 2rem;
+  line-height: var(--lh-tight);
+  padding-block: var(--s-4) var(--s-2);
+}
+#editor .cm-line.cm-prose-subtitle {
+  font-style: italic;
+}
+#editor .cm-line.cm-prose-block {
+  padding-left: 2em;
+}
+/* {break} as ⁂ (the widget's text) */
+#editor .cm-line.cm-prose-break {
+  text-align: center;
+  color: var(--muted);
+  font-size: 1.35em;
+}
+/* markup at the cursor: monospace, muted, sentinel names red (bmlHighlight) */
+#editor .cm-line.cm-prose-src {
+  font-family: var(--f-mono);
+  font-size: .75em;
+  color: var(--muted);
+}
+#editor[data-view="prose"] .cm-bml-wrap {
+  font-size: .75em;
+  color: var(--muted);
+}
 /* The write pane's header (§7): Prose | Source (a small seg), Aa, Spelling. */
 #text-view {
   flex: 1;
@@ -1030,31 +1131,31 @@ body.typing #editor .pane-head {
 #editor .cm-lineNumbers .cm-gutterElement.cm-bml-cond {
   box-shadow: inset -1px 0 0 var(--warn);
 }
-#editor .cm-line.cm-bml-struct {
+#editor[data-view="source"] .cm-line.cm-bml-struct {
   background-color: var(--struct);
   box-shadow: inset 0 1px 0 var(--line);
 }
-#editor .cm-line.cm-bml-field,
-#editor .cm-line.cm-bml-field * {
+#editor[data-view="source"] .cm-line.cm-bml-field,
+#editor[data-view="source"] .cm-line.cm-bml-field * {
   color: var(--muted);
   font-weight: 400;
   letter-spacing: .02em;
 }
-#editor .cm-line.cm-bml-field {
+#editor[data-view="source"] .cm-line.cm-bml-field {
   font-size: .75em; /* follows the writer's size */
 }
-#editor .cm-line.cm-bml-rail {
+#editor[data-view="source"] .cm-line.cm-bml-rail {
   box-shadow: inset 1px 0 0 var(--syn-p);
 }
-#editor .cm-line.cm-bml-strong {
+#editor[data-view="source"] .cm-line.cm-bml-strong {
   color: var(--fg);
   font-weight: 600;
 }
-#editor .cm-line.cm-bml-italic {
+#editor[data-view="source"] .cm-line.cm-bml-italic {
   font-style: italic;
 }
-#editor .cm-bml-wrap,
-#editor .cm-bml-wrap * {
+#editor[data-view="source"] .cm-bml-wrap,
+#editor[data-view="source"] .cm-bml-wrap * {
   color: var(--syn-p);
   font-weight: 400;
   opacity: .8;
@@ -1064,21 +1165,21 @@ body.typing #editor .pane-head {
   font-style: italic;
 }
 /* %% ──── draws as a hairline rule (its text shows while the cursor is on it) */
-#editor .cm-line.cm-bml-rule {
+#editor[data-view="source"] .cm-line.cm-bml-rule {
   font-family: var(--f-mono); /* box-drawing runs are line-wide in mono only */
 }
-#editor .cm-line.cm-bml-rule:not(.cm-activeLine) {
+#editor[data-view="source"] .cm-line.cm-bml-rule:not(.cm-activeLine) {
   white-space: pre;
   contain: inline-size; /* its long dash run must not widen the editor */
   overflow: hidden;
   background: linear-gradient(var(--line), var(--line)) center / 100% 1px
     no-repeat;
 }
-#editor .cm-line.cm-bml-rule:not(.cm-activeLine) * {
+#editor[data-view="source"] .cm-line.cm-bml-rule:not(.cm-activeLine) * {
   color: transparent;
 }
-#editor .cm-line.cm-bml-label,
-#editor .cm-line.cm-bml-label * {
+#editor[data-view="source"] .cm-line.cm-bml-label,
+#editor[data-view="source"] .cm-line.cm-bml-label * {
   font-variant: small-caps;
   font-style: normal;
   letter-spacing: .08em;

@@ -206,38 +206,6 @@ export function wrapRanges(
   return out.sort((x, y) => x.at[0] - y.at[0]);
 }
 
-// `{em}…{/em}` pairs on one line: [tagStart, textStart, textEnd, tagEnd].
-export function emRanges(line: string): [number, number, number, number][] {
-  return wrapRanges(line).filter((r) => r.name === "em").map((r) => r.at);
-}
-
-// Hide markup (the editor's text view bar): which sentinel-only lines to hide
-// (0-based). Only those in a paragraph that also has prose, so a lone
-// {illustration} or {break} stays and there is always text to click; never a
-// structural line, the writer's landmarks; never in the paragraph holding
-// `cursor` (0-based), so the markup being edited is always in view.
-export function hiddenLines(lines: string[], cursor: number): number[] {
-  const out: number[] = [];
-  let start = 0;
-  for (let i = 0; i <= lines.length; i++) {
-    if (i < lines.length && lines[i]!.trim() !== "") continue;
-    // lines[start, i) is one paragraph
-    if (cursor < start || cursor >= i) {
-      const para = lines.slice(start, i).map((l) => parseSentinelLine(l));
-      const prose = para.some((t, j) =>
-        !t && !lines[start + j]!.startsWith("%%")
-      );
-      para.forEach((t, j) => {
-        if (prose && t && !(STRUCTURAL.has(t.name) && !t.closing)) {
-          out.push(start + j);
-        }
-      });
-    }
-    start = i + 1;
-  }
-  return out;
-}
-
 // The structural block holding `line` (1-based): from the nearest
 // {matter}/{part}/{chapter} at or above it to the line before the next.
 export function structuralBlock(
@@ -356,7 +324,8 @@ function buildKinds(doc: Text): KindDecos {
   text.forEach((line, i) => {
     for (const k of kinds[i] ?? []) decos.push(LINE_DECOS[k].range(pos));
     if (kinds[i]?.includes("struct")) marks.push(structGutter.range(pos));
-    for (const [a, b, c, d] of emRanges(line)) {
+    for (const { name, at: [a, b, c, d] } of wrapRanges(line)) {
+      if (name !== "em") continue;
       decos.push(emTag.range(pos + a, pos + b));
       if (c > b) decos.push(emText.range(pos + b, pos + c));
       decos.push(emTag.range(pos + c, pos + d));
