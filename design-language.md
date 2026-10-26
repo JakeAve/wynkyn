@@ -643,8 +643,10 @@ The existing sun (`web/brand/mark.svg`), rays and disc, drawn in `--acc`: the
 SVG sets its own `color` (`#db3834`, `#ef6d62` under
 `prefers-color-scheme:
 dark`), since an `<img>` or favicon cannot read the
-page's tokens. Favicon and app icons keep their artwork until re-exported in
-minium.
+page's tokens. The PNG icons (`icon-32`, `apple-touch-icon`, `icon-512`) are the
+same sun in the light `--acc` on the manifest's cream `#f4efe4`, filling 81%,
+86% and 62% of the square (the 512 leaves the maskable safe zone); re-export
+them from `mark.svg` whenever the red changes.
 
 ## 11. The hosted site
 
@@ -711,4 +713,3 @@ Everything scales with the browser's text size.
 - Image blocks in Prose: plates, drop-cap images, missing files.
 - How `{only}` (experimental) spans show in Prose.
 - Whether the UI paper ever becomes a setting.
-- Favicon and app icons re-exported in minium.
