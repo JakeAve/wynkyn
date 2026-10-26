@@ -8,6 +8,7 @@ import {
   hiddenLines,
   structuralBlock,
   styleKeysAt,
+  wrapRanges,
 } from "./bml-language.ts";
 
 // Run the tokenizer over one line, collecting [style, consumedText] pairs.
@@ -217,4 +218,12 @@ Deno.test("hiddenLines: field lines beside prose, not landmarks or the cursor's 
   assertEquals(hiddenLines(lines, 2), [6, 8, 10]);
   // On a blank line nothing is revealed.
   assertEquals(hiddenLines(lines, 3), [1, 6, 8, 10]);
+});
+
+Deno.test("wrapRanges: em, footnote and ref tags in order", () => {
+  assertEquals(wrapRanges("a {em}b{/em}.{footnote: n-1} {ref:x} \\{ref: y}"), [
+    { name: "em", at: [2, 6, 7, 12] },
+    { name: "footnote", at: [13, 24, 27, 28] },
+    { name: "ref", at: [29, 34, 35, 36] },
+  ]);
 });
