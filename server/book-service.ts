@@ -47,7 +47,6 @@ const notFound = (message: string) => new ServiceError(404, message);
 export interface ServiceOptions {
   store: BookStore;
   baseCss?: string; // renderer/base.css; required in the browser
-  saveDebounceMs?: number; // metadata saves; default 250
   imageUrl?: BuildOptions["imageUrl"];
 }
 
@@ -67,19 +66,8 @@ interface Client {
   clientId: string;
 }
 
-interface PendingMetaSave {
-  metadata: Record<string, unknown>;
-  text: string; // metadata serialized: what the write lands, unless...
-  sections: object; // every section POSTed in this window, merged
-  diskText: string | null; // ...the file moved on from this, its base
-  timer: ReturnType<typeof setTimeout> | undefined;
-  cancelled?: boolean;
-  write(): Promise<void>; // the debounced write; also run early by an export
-}
-
 export class BookService {
   readonly store: BookStore;
-  private readonly saveDebounceMs: number;
   private readonly buildOpts: Pick<BuildOptions, "baseCss" | "imageUrl">;
   private readonly clients = new Set<Client>();
   // key → the tail of its work queue. Keys are a book (its manuscript: a
@@ -87,7 +75,6 @@ export class BookService {
   // writes) or "<book>/images" (adds); safeName keeps a book apart from the
   // others, a path always has a "/".
   private readonly chains = new Map<string, Promise<void>>();
-  private readonly pendingMetaSaves = new Map<string, PendingMetaSave>();
   // EXPERIMENTAL (§3.2.9): book → edition renames whose {only} token a stale
   // save may still carry (another tab, a debounced save not yet sent). Each
   // lasts until every client connected at the rename has sent a save without
@@ -105,7 +92,6 @@ export class BookService {
 
   constructor(opts: ServiceOptions) {
     this.store = opts.store;
-    this.saveDebounceMs = opts.saveDebounceMs ?? 250;
     this.buildOpts = { baseCss: opts.baseCss, imageUrl: opts.imageUrl };
     // A store with other writers (a folder on disk) reports their changes;
     // the service's own writes are reported by itself when it has none.
@@ -114,7 +100,6 @@ export class BookService {
 
   async stop(): Promise<void> {
     this.stopWatch?.();
-    for (const p of this.pendingMetaSaves.values()) clearTimeout(p.timer);
     for (const t of this.heldImages.values()) clearTimeout(t);
     await Promise.all(this.chains.values()); // writes under way land
     this.clients.clear();
@@ -207,7 +192,8 @@ export class BookService {
   ): Promise<MetadataResult> {
     checkNames(book, edition);
     await this.requireBook(book);
-    const current = await this.currentMetadata(book, edition);
+    await this.chains.get(metadataKey(book, edition)); // a save under way lands first
+    const current = await this.readMetadata(book, edition);
     return {
       metadata: current.metadata as Metadata,
       version: current.text === null
@@ -377,33 +363,40 @@ export class BookService {
     });
   }
 
-  /** Shallow-merges the sections into the edition's metadata (debounced). */
-  async saveMetadata(
+  /** Shallow-merges the sections into the edition's metadata file; resolves
+   * with the version of what landed once it is written, rejects (500) when
+   * the write fails. Merged onto the file as it is now, in the file's queue,
+   * so another writer's edit to another section survives and a rename or
+   * delete called after this waits for it. */
+  saveMetadata(
     book: string,
     edition: string | null,
     sections: object,
   ): Promise<{ version: string }> {
     checkNames(book, edition);
-    await this.requireBook(book);
-    const base = await this.currentMetadata(book, edition);
-    const save = this.queueMetaSave(book, edition, base, sections);
-    return { version: await contentVersion(save.text) };
+    const path = metadataKey(book, edition);
+    return this.serialize(path, async () => {
+      await this.requireBook(book);
+      const disk = await this.readMetadata(book, edition);
+      const text = serializeMeta(mergeSections(disk.metadata, sections));
+      try {
+        await this.store.write(path, text);
+      } catch (err) {
+        throw new ServiceError(500, `save failed: ${String(err)}`);
+      }
+      this.notify([path]);
+      return { version: await contentVersion(text) };
+    });
   }
 
   /** The e-book (spec §7.8), built from the current files. */
   async exportEpub(book: string, edition: string | null): Promise<EpubBytes> {
     checkNames(book, edition);
-    await this.flushMetadata(book, edition);
+    await this.chains.get(metadataKey(book, edition)); // a save under way lands
     return epubBytes(this.store, book, {
       edition,
       baseCss: this.buildOpts.baseCss,
     });
-  }
-
-  /** Lands a debounced metadata save now (an export reads the file). */
-  async flushMetadata(book: string, edition: string | null): Promise<void> {
-    await this.pendingMetaSaves.get(metaKey(book, edition))?.write();
-    await this.chains.get(metadataKey(book, edition));
   }
 
   async createEdition(
@@ -415,7 +408,8 @@ export class BookService {
     if (!safeName(slug) || slug === "default") throw bad("bad edition slug");
     if (from !== null && !safeName(from)) throw bad("bad source edition");
     await this.requireBook(book);
-    const source = await this.currentMetadata(book, from);
+    await this.chains.get(metadataKey(book, from)); // a save under way lands first
+    const source = await this.readMetadata(book, from);
     if (!await createEdition(this.store, book, slug, source.metadata)) {
       throw new ServiceError(409, "edition already exists");
     }
@@ -435,13 +429,8 @@ export class BookService {
     if (await this.store.exists(to)) {
       throw new ServiceError(409, "edition already exists");
     }
-    const pending = this.pendingMetaSaves.get(metaKey(book, edition));
-    if (pending) {
-      pending.cancelled = true;
-      clearTimeout(pending.timer); // any unflushed edit dies with the old name
-      this.pendingMetaSaves.delete(metaKey(book, edition));
-    }
-    // In the file's queue: a write already under way lands, then moves.
+    // In the file's queue: a save already under way lands, then moves, so
+    // the edit keeps under the new name.
     const from = metadataKey(book, edition);
     const moved = await this.serialize(from, () => this.store.rename(from, to));
     if (!moved) throw notFound("edition not found");
@@ -476,25 +465,14 @@ export class BookService {
   }
 
   // The default edition has no slug to rename, only a display name, kept as
-  // metadata.json's `name` and written through the pending-save path.
+  // metadata.json's `name` and written as a metadata save.
   async renameDefault(book: string, name: string): Promise<void> {
-    checkNames(book, null);
-    await this.requireBook(book);
-    const base = await this.currentMetadata(book, null);
     // Blank clears it, so the edition falls back to "Standard".
-    const trimmed = name.trim();
-    await this.queueMetaSave(book, null, base, { name: trimmed || null })
-      .write();
+    await this.saveMetadata(book, null, { name: name.trim() || null });
   }
 
   async deleteEdition(book: string, edition: string): Promise<void> {
     checkNames(book, edition);
-    const pending = this.pendingMetaSaves.get(metaKey(book, edition));
-    if (pending) {
-      pending.cancelled = true;
-      clearTimeout(pending.timer);
-      this.pendingMetaSaves.delete(metaKey(book, edition));
-    }
     const path = metadataKey(book, edition);
     const removed = await this.serialize(path, () => this.store.remove(path));
     if (!removed) throw notFound("edition not found");
@@ -551,27 +529,10 @@ export class BookService {
     }
   }
 
-  // The authoritative current metadata for serving and merging: a pending
-  // debounced save wins over the stored copy. `text` is what it was read from
-  // (the pending save's serialization or the raw file; null when there is no
-  // metadata.json). Throws 409 when the file exists but is corrupt JSON and
-  // 404 when a *named* edition's file is missing; a missing metadata.json is
-  // {} because metadata is optional (spec §4).
-  private currentMetadata(
-    book: string,
-    edition: string | null,
-  ): Promise<{ metadata: Record<string, unknown>; text: string | null }> {
-    const pending = this.pendingMetaSaves.get(metaKey(book, edition));
-    if (pending) {
-      return Promise.resolve({
-        metadata: pending.metadata,
-        text: pending.text,
-      });
-    }
-    return this.readMetadata(book, edition);
-  }
-
-  // currentMetadata's stored half, same results.
+  // The edition's stored metadata, and the text it was read from (null when
+  // there is no metadata.json). Throws 409 when the file exists but is
+  // corrupt JSON and 404 when a *named* edition's file is missing; a missing
+  // metadata.json is {} because metadata is optional (spec §4).
   private async readMetadata(
     book: string,
     edition: string | null,
@@ -591,70 +552,6 @@ export class BookService {
         409,
         "metadata is not a valid JSON object — fix it on disk first",
       );
-    }
-  }
-
-  // Debounces a metadata write: `sections` shallow-merged onto `base` (the
-  // edition's currentMetadata), replacing any save already pending for it.
-  private queueMetaSave(
-    book: string,
-    edition: string | null,
-    base: { metadata: Record<string, unknown>; text: string | null },
-    sections: object,
-  ): PendingMetaSave {
-    const merged = mergeSections(base.metadata, sections);
-    const key = metaKey(book, edition);
-    const path = metadataKey(book, edition);
-    const existing = this.pendingMetaSaves.get(key);
-    if (existing) clearTimeout(existing.timer);
-    const save: PendingMetaSave = {
-      metadata: merged,
-      text: serializeMeta(merged),
-      sections: { ...existing?.sections, ...sections },
-      diskText: existing ? existing.diskText : base.text,
-      timer: undefined,
-      write: () => {
-        clearTimeout(save.timer);
-        if (this.pendingMetaSaves.get(key) !== save) {
-          return this.chains.get(path) ?? Promise.resolve(); // already under way
-        }
-        this.pendingMetaSaves.delete(key);
-        // One write per file at a time; a rename or delete waits its turn.
-        return this.serialize(path, async () => {
-          if (save.cancelled) return;
-          try {
-            // The file changed during the window (another writer, or the
-            // previous write): merge this window's sections onto it instead,
-            // so another section's edit survives.
-            let text = save.text;
-            const disk = await this.readMetadata(book, edition);
-            if (disk.text !== save.diskText) {
-              text = serializeMeta(mergeSections(disk.metadata, save.sections));
-            }
-            await this.store.write(path, text);
-            this.notify([path]);
-          } catch (err) {
-            // A debounced write fails after its {ok} went out, so there is
-            // no response left to report on: tell the edition's editors.
-            this.sendMetaError(book, edition, `save failed: ${String(err)}`);
-          }
-        });
-      },
-    };
-    save.timer = setTimeout(save.write, this.saveDebounceMs);
-    this.pendingMetaSaves.set(key, save);
-    return save;
-  }
-
-  private sendMetaError(
-    book: string,
-    edition: string | null,
-    message: string,
-  ) {
-    console.error(`${book}: ${message}`);
-    for (const c of this.clients) {
-      if (c.book !== book || c.edition !== edition) continue;
-      c.send({ type: "error", book, edition, message, save: "metadata" });
     }
   }
 
@@ -732,10 +629,6 @@ export class BookService {
 
 // Longer than the editor's save debounce (600ms in app.ts) plus the watcher's.
 const IMAGE_HOLD_MS = 1200;
-
-// Metadata state is per edition; the manuscript's is per book.
-const metaKey = (book: string, edition: string | null) =>
-  edition === null ? book : `${book}/editions/${edition}`;
 
 function checkNames(book: string, edition: string | null): void {
   if (!safeName(book) || (edition !== null && !safeName(edition))) {

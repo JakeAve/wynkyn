@@ -1038,7 +1038,6 @@ function installThemeApply(): void {
     await backend.createEdition(book, next, edition ?? "default");
     try {
       await backend.saveMetadata(book, next, themeSections(applied));
-      await backend.flushMetadata(book, next); // the page is about to go
     } catch (err) {
       // An edition named for the theme but holding the old style misleads.
       await backend.deleteEdition(book, next).catch(() => {});
@@ -2017,9 +2016,7 @@ async function main(): Promise<void> {
   installThemeApply();
   const onMessage = (msg: ServerMessage) => {
     if (msg.type === "error") {
-      if (msg.save === "metadata") { // accepted, then the write failed
-        setStatus("error", `config not saved — ${brief(msg.message)}`);
-      } else setStatus("error", `build: ${brief(msg.message)}`);
+      setStatus("error", `build: ${brief(msg.message)}`);
       return;
     }
     if (

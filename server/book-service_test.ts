@@ -2,9 +2,103 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { BookService, ServiceError } from "./book-service.ts";
 import { diskStore } from "./store.ts";
-import { imageFiles } from "./pipeline.ts";
+import { contentVersion, imageFiles } from "./pipeline.ts";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
+
+// A library with one book, demo-book, and its pocket edition.
+async function library(): Promise<string> {
+  const root = await Deno.makeTempDir();
+  await Deno.mkdir(`${root}/demo-book/editions`, { recursive: true });
+  await Deno.writeTextFile(`${root}/demo-book/manuscript.md`, "{title}\nX\n");
+  await Deno.writeTextFile(`${root}/demo-book/metadata.json`, "{}\n");
+  await Deno.writeTextFile(`${root}/demo-book/editions/pocket.json`, "{}\n");
+  return root;
+}
+const readJson = async (path: string) =>
+  JSON.parse(await Deno.readTextFile(path));
+
+Deno.test("metadata: a save resolves after the file is written", async () => {
+  const root = await library();
+  const path = `${root}/demo-book/metadata.json`;
+  const service = new BookService({ store: diskStore(root) });
+  try {
+    const { version } = await service.saveMetadata("demo-book", null, {
+      notes: { placement: "footnote" },
+    });
+    assertEquals(version, await contentVersion(await Deno.readTextFile(path)));
+    assertEquals((await readJson(path)).notes, { placement: "footnote" });
+
+    // A failed write rejects, and the file is as it was.
+    const before = await Deno.readTextFile(path);
+    const failing = new BookService({
+      store: {
+        ...diskStore(root),
+        write: () => Promise.reject(new Error("disk full")),
+      },
+    });
+    const err = await assertRejects(
+      () => failing.saveMetadata("demo-book", null, { toc: {} }),
+      ServiceError,
+    );
+    assertEquals(err.status, 500);
+    assertEquals(await Deno.readTextFile(path), before);
+    await failing.stop();
+  } finally {
+    await service.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("editions: rename right after a style edit keeps the edit", async () => {
+  const root = await library();
+  const service = new BookService({ store: diskStore(root) });
+  try {
+    // Not awaited: the rename is asked for while the save is under way.
+    const saved = service.saveMetadata("demo-book", "pocket", {
+      page: { size: "A6" },
+    });
+    await service.renameEdition("demo-book", "pocket", "travel");
+    await saved;
+    assertEquals(
+      (await readJson(`${root}/demo-book/editions/travel.json`)).page,
+      { size: "A6" },
+    );
+    assertEquals(
+      await service.metadata("demo-book", "travel").then((m) =>
+        m.metadata.page
+      ),
+      { size: "A6" },
+    );
+  } finally {
+    await service.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("stop: nothing pending is lost", async () => {
+  const root = await library();
+  const service = new BookService({ store: diskStore(root) });
+  try {
+    // Neither awaited before stop.
+    const meta = service.saveMetadata("demo-book", null, {
+      toc: { title: "C" },
+    });
+    const text = service.saveManuscript("demo-book", { text: "{title}\nY\n" });
+    await service.stop();
+    assertEquals(
+      (await readJson(`${root}/demo-book/metadata.json`)).toc,
+      { title: "C" },
+    );
+    assertEquals(
+      await Deno.readTextFile(`${root}/demo-book/manuscript.md`),
+      "{title}\nY\n",
+    );
+    await Promise.all([meta, text]);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
 
 Deno.test("images: list by slug; add names from the file, never overwrites", async () => {
   const root = await Deno.makeTempDir();

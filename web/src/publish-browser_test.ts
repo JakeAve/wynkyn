@@ -31,7 +31,6 @@ Deno.test({
     const server = await startServer({
       booksRoot: root,
       port: 0,
-      saveDebounceMs: 0,
     });
     const browser = await chromium.launch({ channel: "chrome" });
     const saved = async () =>
