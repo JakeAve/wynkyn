@@ -78,8 +78,8 @@
   --hover: color-mix(in oklab, var(--fg) 5%, var(--bg));
   --muted: color-mix(in oklab, var(--fg) 62%, var(--bg));
   /* The one red, minium (§2.2). */
-  --acc: #e2582b;
-  --acc-ink: #b53e18;
+  --acc: #db3834;
+  --acc-ink: #b12926;
   --acc-wash: color-mix(in srgb, var(--acc) 10%, transparent);
   --acc-btn: var(--acc-ink);
   --on-acc: #ffffff;
@@ -97,7 +97,7 @@
 
   /* Drawn on the pages, which stay paper in both themes (§2.4). */
   --stock: #fffefc; /* the book's paper stock */
-  --pick: #e2582b; /* the light --acc */
+  --pick: #db3834; /* the light --acc */
   --hover-ring: rgb(22 22 22 / .32);
   --hl: rgb(22 22 22 / .07);
   --sheet-paper: #fff;
@@ -106,7 +106,7 @@
   --sheet-blank: #ededea;
   --sheet-ink: #161616;
   --sheet-fold: #8f8f8a;
-  --sheet-cut: #e2582b; /* the light --acc */
+  --sheet-cut: #db3834; /* the light --acc */
 
   /* The Source view (§2.6). */
   --syn-k: var(--acc-ink);
@@ -180,8 +180,8 @@
   --line: color-mix(in oklab, var(--fg) 13%, var(--bg));
   --hover: color-mix(in oklab, var(--fg) 8%, var(--bg));
   --muted: color-mix(in oklab, var(--fg) 62%, var(--bg));
-  --acc: #f58a5f;
-  --acc-ink: #f8a07a;
+  --acc: #ef6d62;
+  --acc-ink: #f49287;
   --acc-wash: color-mix(in srgb, var(--acc) 16%, transparent);
   --acc-btn: var(--acc);
   --on-acc: var(--bg);
@@ -203,8 +203,8 @@
     --line: color-mix(in oklab, var(--fg) 13%, var(--bg));
     --hover: color-mix(in oklab, var(--fg) 8%, var(--bg));
     --muted: color-mix(in oklab, var(--fg) 62%, var(--bg));
-    --acc: #f58a5f;
-    --acc-ink: #f8a07a;
+    --acc: #ef6d62;
+    --acc-ink: #f49287;
     --acc-wash: color-mix(in srgb, var(--acc) 16%, transparent);
     --acc-btn: var(--acc);
     --on-acc: var(--bg);
