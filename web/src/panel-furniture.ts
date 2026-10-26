@@ -13,13 +13,13 @@ import type {
 import {
   DEFAULT_FOLIO_GAP,
   DEFAULT_HEAD_GAP,
+  MARGIN_AREAS,
 } from "../../metadata/css-generator.ts";
 import {
   formatCssLines,
   HEAD_AREAS,
   headPosition,
   makeRunningEntry,
-  MARGIN_AREAS,
   parseCssLines,
   RUNNING_CONTENT_CHOICES,
   runningSummary,

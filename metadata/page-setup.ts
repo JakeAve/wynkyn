@@ -43,14 +43,11 @@ const NAMED: Record<string, NamedSheet> = {
   tabloid: { dims: { w: 11, h: 17 }, unit: "in" },
 };
 
-export function namedSizes(): string[] {
-  return Object.keys(NAMED);
-}
-
 /** "legal" | "5.25in 8in" | "148mm 210mm" → inches; null if it isn't a size (§4.3). */
 export function tryParseDims(size: string): Dims | null {
   const trimmed = size.trim();
-  const named = NAMED[trimmed.toLowerCase()];
+  const key = trimmed.toLowerCase();
+  const named = Object.hasOwn(NAMED, key) ? NAMED[key] : undefined;
   if (named) return named.dims;
   const parts = trimmed.split(/\s+/);
   if (parts.length !== 2) return null;
@@ -76,8 +73,9 @@ export function isValidSize(value: string): boolean {
 }
 
 /** The unit a size reads back in — metric for named metric sheets and mm values. */
-export function unitOf(size: string): Unit {
-  const named = NAMED[size.trim().toLowerCase()];
+function unitOf(size: string): Unit {
+  const key = size.trim().toLowerCase();
+  const named = Object.hasOwn(NAMED, key) ? NAMED[key] : undefined;
   if (named) return named.unit;
   return /\d\s*(mm|cm)\b/.test(size) ? "mm" : "in";
 }
@@ -99,10 +97,6 @@ function floorLength(inches: number, unit: Unit): string {
   const scale = 10 ** PLACES[unit];
   const value = unit === "mm" ? inches * 25.4 : inches;
   return `${Math.floor(value * scale + 1e-6) / scale}${unit}`;
-}
-
-export function fmtSize(d: Dims, unit: Unit = "in"): string {
-  return `${fmtLength(d.w, unit)} ${fmtLength(d.h, unit)}`;
 }
 
 export function fmtDims(d: Dims): string {
@@ -246,11 +240,11 @@ export function foldedSize(sheet: string, cols: number, rows: number): string {
 // ---------- resolving a setup ----------
 
 export const DEFAULT_SIZE = "5.5in 8.5in";
-export const DEFAULT_SHEET = "letter";
-export const DEFAULT_FOLIOS = 4;
-export const DEFAULT_DUPLEX: Duplex = "short-edge";
+const DEFAULT_SHEET = "letter";
+const DEFAULT_FOLIOS = 4;
+const DEFAULT_DUPLEX: Duplex = "short-edge";
 
-export const DUPLEX_VALUES: readonly Duplex[] = [
+const DUPLEX_VALUES: readonly Duplex[] = [
   "short-edge",
   "long-edge",
   "none",

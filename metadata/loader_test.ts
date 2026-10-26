@@ -1,5 +1,5 @@
-import { assertEquals, assertRejects } from "@std/assert";
-import { loadMetadata } from "./loader.ts";
+import { assertEquals, assertRejects, assertThrows } from "@std/assert";
+import { loadMetadata, parseMetadataText } from "./loader.ts";
 
 Deno.test("loads a valid metadata file", async () => {
   const meta = await loadMetadata("metadata/testdata/valid/metadata.json");
@@ -26,4 +26,14 @@ Deno.test("throws a descriptive error on malformed JSON", async () => {
     Error,
     "metadata/testdata/invalid/metadata.json",
   );
+});
+
+Deno.test("JSON that isn't an object is a metadata error, not a TypeError", () => {
+  for (const text of ["null", "[]", "3"]) {
+    assertThrows(
+      () => parseMetadataText(text, "m.json"),
+      Error,
+      "Invalid metadata in m.json: not a JSON object",
+    );
+  }
 });

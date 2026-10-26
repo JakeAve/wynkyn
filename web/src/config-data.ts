@@ -88,26 +88,6 @@ export const PAGE_NUMBERING_STYLES: NumberingStyle[] = NUMBERING_STYLES.filter((
   s,
 ) => s !== "words");
 
-// The 16 CSS Paged Media margin boxes, in §4.8's order.
-export const MARGIN_AREAS = [
-  "top-left-corner",
-  "top-left",
-  "top-center",
-  "top-right",
-  "top-right-corner",
-  "right-top",
-  "right-middle",
-  "right-bottom",
-  "bottom-right-corner",
-  "bottom-right",
-  "bottom-center",
-  "bottom-left",
-  "bottom-left-corner",
-  "left-bottom",
-  "left-middle",
-  "left-top",
-] as const;
-
 export const RUNNING_CONTENT_CHOICES = [
   "book-title",
   "chapter-title",

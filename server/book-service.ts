@@ -13,7 +13,7 @@ import {
   NotFoundError,
   type ServerMessage,
 } from "./pipeline.ts";
-import { upgradeMetadata } from "../metadata/upgrade.ts";
+import { parseMetadataText } from "../metadata/loader.ts";
 import type { Metadata } from "../metadata/types.ts";
 import { applyTheme } from "../metadata/themes.ts";
 import {
@@ -584,12 +584,12 @@ export class BookService {
     try {
       // Upgraded on the way out, so the panel edits (and then saves back) the
       // current shape — that is what retires a legacy `print` section on disk.
-      const metadata = upgradeMetadata(JSON.parse(text) as Metadata);
-      return { metadata: metadata as Record<string, unknown>, text };
+      const { meta } = parseMetadataText(text, metadataKey(book, edition));
+      return { metadata: meta as Record<string, unknown>, text };
     } catch {
       throw new ServiceError(
         409,
-        "metadata is not valid JSON — fix it on disk first",
+        "metadata is not a valid JSON object — fix it on disk first",
       );
     }
   }

@@ -3,7 +3,12 @@ import type { Inline } from "./types.ts";
 
 const POINT_RE = /^(footnote|ref):\s*(.+)$/;
 
-export function parseInlines(lines: string[]): Inline[] {
+// `problem` hears about markup the tree can't keep (§3.2.7: an {em} opens and
+// closes within its paragraph); the tree still recovers as before.
+export function parseInlines(
+  lines: string[],
+  problem: (message: string) => void = () => {},
+): Inline[] {
   // Resolve per-line end-of-line escapes first.
   const parts: { text: string; hardBreak: boolean }[] = [];
   for (const raw of lines) {
@@ -62,6 +67,7 @@ export function parseInlines(lines: string[]): Inline[] {
           if (tag === "/em") {
             flush();
             if (stack.length > 1) stack.pop();
+            else problem("stray {/em} with no {em} open");
             i = close + 1;
             continue;
           }
@@ -82,5 +88,6 @@ export function parseInlines(lines: string[]): Inline[] {
     }
   });
   flush();
+  if (stack.length > 1) problem("{em} is never closed in its paragraph");
   return root;
 }

@@ -100,7 +100,7 @@ export interface Running {
 }
 
 // Pre-merge shape of the print settings, read only by the upgrade in
-// metadata/loader.ts. Nothing else may consume it; the live keys are on `page`.
+// metadata/upgrade.ts. Nothing else may consume it; the live keys are on `page`.
 export interface LegacyPrintConfig {
   "sheet-size"?: string;
   "folios-per-signature"?: number;
@@ -112,7 +112,7 @@ export interface NotesConfig {
 }
 
 // Which structure the generated contents lists beyond parts, chapters and
-// titled matter (spec §4.12). Everything visual about the TOC is CSS (§4.5).
+// titled matter (spec §4.11). Everything visual about the TOC is CSS (§4.5).
 export interface TocConfig {
   headings?: boolean; // list level-1 {heading: slug}s under their chapter
 }

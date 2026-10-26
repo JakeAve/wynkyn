@@ -1,7 +1,7 @@
 // parser/parser.ts — parse(source): BmlDocument (spec §5.1). Line-based, never throws.
 import { parseSentinelLine, type SentinelTag } from "./sentinel.ts";
 import { parseInlines } from "./inline.ts";
-import { DISPLAY_MATTER } from "./types.ts";
+import { CLASS_NAME_RE, matterType } from "./types.ts";
 import type {
   BmlDocument,
   Break,
@@ -189,6 +189,9 @@ export function parse(
       case "sidebar":
       case "is":
         return n.children;
+      // Only paragraphs (and a verse's dropcap) reach these: flushParagraph
+      // makes no list there, and openBlock, finalizePending and {break}
+      // refuse everything else inside a poem or verses.
       case "poem":
         return n.stanzas as ContentNode[];
       case "verses":
@@ -200,9 +203,17 @@ export function parse(
     }
   };
 
+  const inlinesAt = (rawLines: string[], line: number) =>
+    parseInlines(rawLines, (m) => diag(line, m));
+
+  const inVerse = () => {
+    const k = blockStack.at(-1)?.node.kind;
+    return k === "poem" || k === "verses";
+  };
+
   const flushParagraph = () => {
     if (pending) {
-      const inlines = paraLines.length ? parseInlines(paraLines) : [];
+      const inlines = paraLines.length ? inlinesAt(paraLines, paraStart) : [];
       const p = pending;
       pending = null;
       paraLines = [];
@@ -210,9 +221,10 @@ export function parse(
       return;
     }
     if (!paraLines.length) return;
-    const node: ContentNode = tryList(paraLines, paraStart) ?? {
+    // A stanza whose lines all start "- " is still a stanza.
+    const node: ContentNode = (!inVerse() && tryList(paraLines, paraStart)) || {
       kind: "paragraph",
-      inlines: parseInlines(paraLines),
+      inlines: inlinesAt(paraLines, paraStart),
       line: paraStart,
     };
     container(paraStart).push(node);
@@ -224,7 +236,9 @@ export function parse(
       return {
         kind: "list",
         ordered: false,
-        items: rawLines.map((l) => parseInlines([l.match(UL_RE)![1]!])),
+        items: rawLines.map((l, i) =>
+          inlinesAt([l.match(UL_RE)![1]!], line + i)
+        ),
         line,
       };
     }
@@ -233,7 +247,9 @@ export function parse(
         kind: "list",
         ordered: true,
         start: parseInt(rawLines[0]!.match(OL_RE)![1]!, 10),
-        items: rawLines.map((l) => parseInlines([l.match(OL_RE)![2]!])),
+        items: rawLines.map((l, i) =>
+          inlinesAt([l.match(OL_RE)![2]!], line + i)
+        ),
         line,
       };
     }
@@ -397,9 +413,22 @@ export function parse(
       }
       default: // is
         if (!tag.slug) diag(line, "{is:} requires a class name");
+        else if (!CLASS_NAME_RE.test(tag.slug)) {
+          diag(
+            line,
+            `{is: ${tag.slug}} — a class name is lowercase letters, digits and hyphens (§3.2.4)`,
+          );
+        }
         node = { kind: "is", className: tag.slug ?? "", children: [], line };
     }
-    container(line).push(node);
+    // A poem or verses holds only its stanzas: the block is diagnosed and its
+    // content dropped, but it stays on the stack so its {/close} still pairs.
+    if (inVerse()) {
+      diag(
+        line,
+        `{${tag.name}} is not allowed inside {${blockStack.at(-1)!.name}}`,
+      );
+    } else container(line).push(node);
     const ob: OpenBlock = { name: tag.name, node, explicit };
     if (tag.slug && tag.name === "is") ob.className = tag.slug;
     blockStack.push(ob);
@@ -492,7 +521,6 @@ export function parse(
     else doc.body.push(curChapter);
   };
 
-  // Task 6 extends this dispatch.
   const handleTag = (tag: SentinelTag, line: number) => {
     if (!tag.closing && STRUCTURAL.has(tag.name)) {
       openStructural(tag, line);
@@ -578,9 +606,8 @@ export function parse(
   popImplicitBlocks(lines.length);
 
   // §3.4.6/§3.4.7/§3.7: the generated contents lists only matter blocks that
-  // carry a {title}, so a block written without one silently disappears from
-  // it. A colophon is exempt — it is back matter but carries no heading by
-  // convention, and is not listed.
+  // carry a {title}, so a listed block written without one silently
+  // disappears from it. Unlisted types (the colophon among them) need none.
   const hasTitle = (m: MatterBlock) =>
     m.children.some((c) => c.kind === "component" && c.name === "title");
   for (const m of [...doc.frontMatter, ...doc.backMatter]) {
@@ -590,12 +617,94 @@ export function parse(
         m.line,
         "{matter: toc} has no {title} — the contents page will render without a heading",
       );
-    } else if (!DISPLAY_MATTER.has(m.type) && m.type !== "colophon") {
+    } else if (matterType(m.type).listed) {
       diag(
         m.line,
         `{matter: ${m.type}} has no {title} — it will not appear in the table of contents`,
       );
     }
   }
+
+  // §3.6.8: a {footnote:} pairs with a {note:} in the same chapter, matter
+  // block or part opening — the scope the renderer collects notes over.
+  const scopes: ContentNode[][] = [
+    ...[...doc.frontMatter, ...doc.backMatter].map((m) => m.children),
+  ];
+  for (const b of doc.body) {
+    if (b.kind === "chapter") scopes.push(b.children);
+    else {
+      scopes.push(b.children.filter((c) => c.kind !== "chapter"));
+      for (const c of b.children) {
+        if (c.kind === "chapter") scopes.push(c.children);
+      }
+    }
+  }
+  for (const scope of scopes) {
+    const notes = new Set<string>();
+    const anchors: { slug: string; line: number }[] = [];
+    walkScope(scope, (n) => {
+      if (n.kind === "note" && n.slug) notes.add(n.slug);
+    }, (i, line) => {
+      if (i.kind === "footnote") anchors.push({ slug: i.slug, line });
+    });
+    const used = new Set(anchors.map((a) => a.slug));
+    for (const a of anchors) {
+      if (!notes.has(a.slug)) {
+        diag(
+          a.line,
+          `{footnote: ${a.slug}} has no {note: ${a.slug}} in this section`,
+        );
+      }
+    }
+    walkScope(scope, (n) => {
+      if (n.kind === "note" && n.slug && !used.has(n.slug)) {
+        diag(
+          n.line,
+          `{note: ${n.slug}} has no {footnote: ${n.slug}} pointing at it`,
+        );
+        used.add(n.slug); // once per slug
+      }
+    }, () => {});
+  }
   return doc;
+}
+
+// Every content node in a scope, and every inline with its node's line.
+function walkScope(
+  nodes: ContentNode[],
+  onNode: (n: ContentNode) => void,
+  onInline: (i: Inline, line: number) => void,
+): void {
+  const inl = (xs: Inline[], line: number) => {
+    for (const i of xs) {
+      onInline(i, line);
+      if (i.kind === "em") inl(i.children, line);
+    }
+  };
+  for (const n of nodes) {
+    onNode(n);
+    if ("inlines" in n) inl(n.inlines, n.line);
+    if ("attribution" in n && n.attribution) {
+      inl(n.attribution.inlines, n.attribution.line);
+    }
+    switch (n.kind) {
+      case "list":
+        n.items.forEach((it, k) => inl(it, n.line + k));
+        break;
+      case "illustration":
+        if (n.caption) inl(n.caption, n.line);
+        break;
+      case "poem":
+        walkScope(n.stanzas, onNode, onInline);
+        break;
+      case "verses":
+        walkScope(n.verses, onNode, onInline);
+        break;
+      case "columns":
+        for (const col of n.columns) walkScope(col, onNode, onInline);
+        break;
+      default:
+        if ("children" in n) walkScope(n.children, onNode, onInline);
+    }
+  }
 }

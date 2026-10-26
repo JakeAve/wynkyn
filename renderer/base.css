@@ -169,7 +169,7 @@
   font-size: 0.85em;
   color: #999;
 }
-/* TOC rows (spec §3.4.6 / §4.11 item 10). Row = .entry so existing
+/* TOC rows (spec §3.4.6 / §4.10 item 10). Row = .entry so existing
    toc.entry styles keep applying to the whole line. Folio sits on the last
    line of a wrapped title (align-items: flex-end). Leaders: the spacer's
    ::before repeats --leader (set by css-generator from toc.leader.content);
@@ -240,25 +240,16 @@
   text-align-last: auto;
 }
 /* Display matter carries no running head or folio (named page "display",
-   blanked in css-generator). */
-.bml .matter-half-title,
-.bml .matter-title-page,
-.bml .matter-copyright,
-.bml .matter-dedication,
-.bml .matter-epigraph,
-.bml .matter-colophon {
+   blanked in css-generator). Which types are display is MATTER_TYPES in
+   parser/types.ts; the renderer classes them `matter-display`. */
+.bml .matter-display {
   page: display;
 }
 /* Display matter sets lines, not prose: its paragraphs take their indent from
    the section (none by default), so centred lines centre and a book can still
    say `dedication: { "text-indent": "1.5em" }`. Two classes outrank the
    metadata's `.bml p`; after `.lead` above so the section decides there too. */
-.bml .matter-half-title p,
-.bml .matter-title-page p,
-.bml .matter-copyright p,
-.bml .matter-dedication p,
-.bml .matter-epigraph p,
-.bml .matter-colophon p {
+.bml .matter-display p {
   text-indent: inherit;
 }
 /* A title page is centred unless the book says otherwise. :where() keeps this
