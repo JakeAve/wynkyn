@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <style>
   svg {
-    color: #161616;
+    color: #e2582b;
   }
   @media (prefers-color-scheme:dark) {
     svg {
-      color: #fbfbfa;
+      color: #f58a5f;
     }
   }
   </style>

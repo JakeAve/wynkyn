@@ -66,6 +66,17 @@ Deno.test("upgradePageSetup preserves every other section", () => {
   assertEquals(upgraded.print, undefined);
 });
 
+Deno.test("page.paper survives load and save", () => {
+  // The fold rebuilds `page`; the stock must come through it and a JSON trip.
+  const loaded = upgradeMetadata({
+    page: { paper: "#f3e9d2" },
+    print: { duplex: "none" },
+  });
+  assertEquals(loaded.page?.paper, "#f3e9d2");
+  const saved = JSON.parse(JSON.stringify(loaded));
+  assertEquals(upgradeMetadata(saved).page?.paper, "#f3e9d2");
+});
+
 Deno.test("upgradeMetadata stamps spec on an unversioned file only", () => {
   assertEquals(upgradeMetadata({ page: { size: "A5" } }), {
     spec: SPEC_VERSION,

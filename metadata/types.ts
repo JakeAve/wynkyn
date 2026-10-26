@@ -36,6 +36,7 @@ export interface PageConfig {
   duplex?: Duplex;
   flip?: Flip; // which edge the stack turns over on for its backs, duplex "none"
   "reverse-backs"?: boolean; // backs file in reverse sheet order, duplex "none"
+  paper?: string; // the paper stock, any CSS colour; tints the preview only (§4.3)
 }
 
 export type NumberingStyle =

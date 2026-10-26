@@ -15,6 +15,7 @@ import {
   renderPreview,
   restoreCachedRender,
   scrollPreviewTo,
+  setPaperStock,
   type UpdateMessage,
 } from "./preview.ts";
 import type { ServerMessage } from "../../server/pipeline.ts";
@@ -52,8 +53,10 @@ import { installSwitcher, type Switcher } from "./switcher.ts";
 import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
 import { installTextView } from "./text-view.ts";
+import { installPanes, type Panes } from "./panes.ts";
 import { connect } from "./library.ts";
 import { $, brief } from "./dom.ts";
+import { h } from "./panel-controls.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 // folios.js is a classic script (toHtml inlines it), so its helpers hang off
@@ -152,7 +155,11 @@ let imageNoteTimer: ReturnType<typeof setTimeout> | undefined;
 let cursorNote = { text: "", warn: false };
 function showImageNote({ text, warn }: typeof cursorNote): void {
   const el = $("image-note");
-  el.textContent = text;
+  // the filenames read as identifiers (§3.1)
+  const m = text.match(/^(Added to the book's images as )(.+)/);
+  el.replaceChildren(
+    ...m ? [m[1]!, h("span", { class: "hivis" }, m[2]!)] : [text],
+  );
   el.classList.toggle("warn", warn);
 }
 function imageNote(text: string, warn = false): void {
@@ -362,7 +369,10 @@ function syncChanged(s: SyncStatus): void {
 }
 
 function saveMetadataSections(sections: Partial<Metadata>): void {
-  if ("page" in sections) switcher.setCrumbSize(sections.page?.size);
+  if ("page" in sections) {
+    switcher.setCrumbSize(sections.page?.size);
+    setPaperStock(sections.page?.paper);
+  }
   // Saves replace whole sections, so this keeps `metadata` what the panel
   // shows: its own sections, uncopied (Sync copies what it sends).
   if (metadata) metadata = { ...metadata, ...sections };
@@ -614,6 +624,7 @@ async function refreshConfigFromRemote(): Promise<void> {
     metadata = fresh.metadata;
     sync.rebaseMetadata(fresh.version);
     configPanel.refresh(metadata);
+    setPaperStock(metadata.page?.paper);
   } catch {
     // 409/network — leave the panel as-is; the user can close and reopen.
   }
@@ -625,11 +636,11 @@ function installGutters(): void {
   const panes = $("panes");
   const root = document.documentElement; // the footer reads the widths too
   for (
-    const [id, cssVar, min] of [["gutter-tree", "--w-tree", 120], [
+    const [id, cssVar, min] of [["gutter-tree", "--w-tree", 7.5], [
       "gutter-editor",
       "--w-editor",
-      240,
-    ]] as const
+      15,
+    ]] as const // minimums in rem; a dragged width is px
   ) {
     const saved = localStorage.getItem(cssVar);
     if (saved) root.style.setProperty(cssVar, saved);
@@ -641,12 +652,13 @@ function installGutters(): void {
       const work = mode === "write" ? $("editor") : $("config-overlay");
       const left = (cssVar === "--w-tree" ? panes : work)
         .getBoundingClientRect().left;
+      const rem = parseFloat(getComputedStyle(root).fontSize);
       gutter.onpointermove = (m) => {
-        // Leave at least 200px for whatever pane sits to the right.
-        const max = panes.getBoundingClientRect().right - left - 200;
+        // Leave at least 12.5rem for whatever pane sits to the right.
+        const max = panes.getBoundingClientRect().right - left - 12.5 * rem;
         root.style.setProperty(
           cssVar,
-          `${Math.min(Math.max(m.clientX - left, min), max)}px`,
+          `${Math.min(Math.max(m.clientX - left, min * rem), max)}px`,
         );
       };
       gutter.onpointerup = () => {
@@ -656,32 +668,6 @@ function installGutters(): void {
       };
     };
   }
-}
-
-// A side column's toolbar toggle: hides the column, persisted across reloads.
-// Returns the toggle for its shortcut.
-function installColumnToggle(id: string, hiddenClass: string): () => void {
-  const btn = $(id);
-  const panes = $("panes");
-  const set = (hidden: boolean) => {
-    panes.classList.toggle(hiddenClass, hidden);
-    btn.setAttribute("aria-pressed", String(!hidden));
-    try {
-      localStorage.setItem(hiddenClass, hidden ? "1" : "");
-    } catch {
-      // storage blocked: the toggle just won't survive a reload
-    }
-  };
-  let saved = false;
-  try {
-    saved = localStorage.getItem(hiddenClass) === "1";
-  } catch {
-    // as above
-  }
-  set(saved);
-  const toggle = () => set(!panes.classList.contains(hiddenClass));
-  btn.onclick = toggle;
-  return toggle;
 }
 
 // Light/dark toggle; an explicit choice persists, first load follows the
@@ -715,16 +701,20 @@ function chordOf(e: KeyboardEvent): string | null {
     e.key.length === 1 ? e.key.toUpperCase() : e.key
   }`;
 }
-function installShortcuts(
-  toggleContents: () => void,
-  togglePages: () => void,
-): void {
+// Open popups esc closes first: a dialog, the find bar, completions, the
+// sentinel palette and wrap bar, menus. Not hover tooltips (spelling, lint).
+const POPUPS =
+  "dialog[open], .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop";
+function installShortcuts(panes: Panes): void {
   const bySnippet = new Map(
     SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((
       s,
     ) => [SNIPPET_KEYS[s.label], s]),
   );
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.querySelector(POPUPS)) {
+      if (panes.returnFromExpand()) e.preventDefault();
+    }
     const chord = chordOf(e);
     if (!chord) return;
     const snippet = bySnippet.get(chord);
@@ -733,8 +723,9 @@ function installShortcuts(
       insertSnippet(editor, snippet);
     } else if (m) setMode(m);
     else if (chord === "Mod-,") setMode("style");
-    else if (chord === "Mod-\\") toggleContents();
-    else if (chord === "Mod-.") togglePages();
+    else if (chord === "Mod-\\") panes.toggleTree();
+    else if (chord === "Mod-.") panes.togglePages();
+    else if (chord === "Mod-Shift-Enter") panes.toggleExpand();
     else return;
     e.preventDefault();
   }, true);
@@ -745,7 +736,9 @@ function installShortcuts(
     );
   });
   $("tree-toggle").title += ` (${chordLabel("Mod-\\")})`;
-  $("pages-toggle").title += ` (${chordLabel("Mod-.")})`;
+  for (const b of document.querySelectorAll<HTMLElement>(".expand")) {
+    b.title += ` (${chordLabel("Mod-Shift-↩")})`;
+  }
 }
 
 // Create a new manuscript (spec §7.9): the empty library's first step, and
@@ -818,6 +811,7 @@ async function main(): Promise<void> {
   });
   fetchMetadata().then((m) => {
     switcher.setCrumbSize(m.metadata.page?.size);
+    setPaperStock(m.metadata.page?.paper);
     showSpecBanner(m.metadata.spec);
   }, () => {
     // no size in the crumb; the Style panel reports the load error
@@ -878,10 +872,7 @@ async function main(): Promise<void> {
   installTextView({ editor, backend, book, setStatus });
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
-  installShortcuts(
-    installColumnToggle("tree-toggle", "tree-hidden"),
-    installColumnToggle("pages-toggle", "pages-hidden"),
-  );
+  installShortcuts(installPanes({ mode: () => mode }));
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
       .mode as Mode | undefined;

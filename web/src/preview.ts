@@ -89,7 +89,7 @@ export type UpdateMessage = Extract<ServerMessage, { type: "update" }>;
 
 // Paged.js lays out one page per tick of its queue, and ticks on
 // requestAnimationFrame — which a hidden tab never fires, so a book opened
-// and then left in the background sat at "Rendering pages…" until it was
+// and then left in the background sat at "Setting type…" until it was
 // looked at again. A message port isn't throttled in the background; the
 // browser still paints between tasks, so pages appear as they are laid out.
 const tickPort = new MessageChannel();
@@ -617,4 +617,14 @@ export function fitPreview(container: HTMLElement): void {
   // zoom survives re-renders and pages don't flash at 1:1 mid-render. app.css
   // applies it to the live pages, and to each finished page of a staged render.
   container.style.setProperty("--preview-fit", k.toFixed(3));
+}
+
+// The book's paper stock (`page.paper`, design-language.md §2.5) on the live
+// pages only: print clears the page background, so sheets and PDFs stay white.
+// A value that isn't a colour leaves the default stock, not a see-through page.
+export function setPaperStock(colour: string | undefined): void {
+  const preview = document.getElementById("preview")!;
+  if (colour && CSS.supports("color", colour)) {
+    preview.style.setProperty("--stock", colour);
+  } else preview.style.removeProperty("--stock");
 }

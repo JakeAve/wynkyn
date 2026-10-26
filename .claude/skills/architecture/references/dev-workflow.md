@@ -32,7 +32,7 @@ never leaks into main.
 | --- | --- |
 | `books/<slug>/manuscript.md`, `metadata.json`, `editions/*.json`, images | the server rebuilds and pushes over the WebSocket; the preview re-paginates in place, no page reload |
 | `web/src/*.ts` | `deno bundle --watch` rewrites `web/app.js`; the server restarts on that; every open client reloads itself once the server is back |
-| `web/index.html`, `web/app.css`, `renderer/*` (incl. `base.css`, `plates.js`, `folios.js`), `vendor/` | server restart, client reload — the server reads these once at startup, which is why a plain restart used to be needed |
+| `web/index.html`, `web/tokens.css`, `web/app.css`, `renderer/*` (incl. `base.css`, `plates.js`, `folios.js`), `vendor/` | server restart, client reload — the server reads these once at startup, which is why a plain restart used to be needed |
 | `server/*.ts`, `metadata/*.ts`, `parser/*.ts` | `deno run --watch` restarts the server; clients reload |
 | `deno.json` import map | stop and rerun `deno task dev` |
 

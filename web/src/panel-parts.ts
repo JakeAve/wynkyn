@@ -10,6 +10,7 @@ import type {
 import { parseLength } from "./config-data.ts";
 import { buildFurniture } from "./panel-furniture.ts";
 import {
+  applies,
   icon,
   makeView,
   moreCss,
@@ -66,7 +67,7 @@ function pickTip(): Node[] {
   return [el(
     "p",
     "tip",
-    icon("pointer"),
+    el("span", "manicule", "☞"),
     "Pick a part, or click anything in the preview to jump straight to its settings.",
   )];
 }
@@ -128,19 +129,6 @@ function footer(
   const reset = el("button", "ghost", icon("reset"), "Reset to inherited");
   reset.onclick = onReset;
   return el("div", "foot", count, reset);
-}
-
-function where(ctx: PanelContext, key: string): HTMLElement | undefined {
-  const n = ctx.preview.pagesFor(key);
-  if (n <= 0) return undefined;
-  const b = el("button", "where", icon("eye"), `On ${plural(n, "page")}`);
-  const hl = (on: boolean) => () => ctx.preview.highlight(key, on);
-  b.onmouseenter = hl(true);
-  b.onmouseleave = hl(false);
-  b.onfocus = hl(true);
-  b.onblur = hl(false);
-  b.onclick = () => ctx.preview.reveal(key);
-  return b;
 }
 
 // ---- detail ----
@@ -395,7 +383,7 @@ function block(
       },
       controlled,
     ),
-  ], where(ctx, entry.key));
+  ], applies(ctx, entry.key));
 }
 
 // ---- extras: numbering, ornament, note placement ----
@@ -496,7 +484,7 @@ function extrasFor(
     o.type = "text";
     o.value = getProps(meta, entry).content ?? "";
     o.setAttribute("aria-label", "Break ornament");
-    o.style.cssText = "width:80px;text-align:center";
+    o.style.cssText = "width:5rem;text-align:center";
     o.oninput = () => {
       put(meta, entry, "content", o.value || undefined);
       v.changed(entry.section);
@@ -817,7 +805,7 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
       replaceOthers(meta, para, paraControlled, next);
       save();
     }, paraControlled),
-  ], where(ctx, "paragraph"));
+  ], applies(ctx, "paragraph"));
 
   // Emphasis
   const ep = getProps(meta, em);

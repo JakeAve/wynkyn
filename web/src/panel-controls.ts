@@ -1,6 +1,7 @@
 // web/src/panel-controls.ts — DOM controls for the style panel (rows, steppers,
-// segments, toggles, selects, sections). Styled by the `#config-overlay` rules
-// in index.html. DOM assembly only; length maths lives in config-data.ts.
+// segments, toggles, swatches, selects, sections). Styled by the
+// `#config-overlay` rules in index.html. DOM assembly only; length maths lives
+// in config-data.ts.
 import type { CssProps, Metadata } from "../../metadata/types.ts";
 import {
   bumpLength,
@@ -22,9 +23,6 @@ const ICONS = {
   alignR: '<path d="M3 4h10M7 7h6M3 10h10M7 13h6"/>',
   alignJ: '<path d="M3 4h10M3 7h10M3 10h10M3 13h10"/>',
   reset: '<path d="M3.5 7.5a4.5 4.5 0 1 1 1.3 3.2"/><path d="M3.5 3.5v4h4"/>',
-  eye:
-    '<path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.8"/>',
-  pointer: '<path d="M4 2.5 12 8l-3.6.8L10.6 13l-1.5.7-2.2-4.2L4 12z"/>',
   info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.5v3.5M8 5.2v.1"/>',
 };
 
@@ -247,7 +245,7 @@ export function toggle(
   return b;
 }
 
-// A switch: a checkbox drawn as a track and knob (app.css `.sw`). Its row
+// A switch: a checkbox drawn as a pill track and knob (app.css `.sw`). Its row
 // label names it, so the input itself carries only the aria-label.
 export function switchInput(
   label: string,
@@ -265,6 +263,73 @@ export function switchInput(
   return input;
 }
 
+// Colour swatches, then a custom colour: a picker beside its code (any CSS
+// colour can be typed). An option whose value is "" means unset; its chip
+// shows the default `--stock` (app.css). The chosen chip takes the red wash,
+// or the picker does when the value is none of the options.
+export function swatches(
+  options: Array<{ value: string; label: string }>,
+  value: string | undefined,
+  onChange: (v: string | undefined) => void,
+  label: string,
+): HTMLElement {
+  const picker = h("input", {
+    type: "color",
+    "aria-label": `Custom ${label.toLowerCase()}`,
+    title: "Custom colour",
+  });
+  const code = h("input", {
+    type: "text",
+    class: "txt",
+    "aria-label": `${label} colour code`,
+    spellcheck: "false",
+    autocomplete: "off",
+  });
+  const btns = options.map((o) => {
+    const chip = h("i");
+    chip.style.background = o.value;
+    const b = h("button", {
+      type: "button",
+      class: "colour",
+      "aria-label": o.label,
+      title: o.label,
+    }, chip);
+    b.onclick = () => set(o.value || undefined);
+    return [b, o.value] as const;
+  });
+  const paint = (v: string | undefined) => {
+    let own = v !== undefined;
+    for (const [b, ov] of btns) {
+      const on = ov.toLowerCase() === (v ?? "").toLowerCase();
+      if (on) own = false;
+      b.setAttribute("aria-pressed", String(on));
+    }
+    picker.classList.toggle("on", own);
+    code.value = v ?? "";
+    // The picker only takes #rrggbb; unset is the white it means.
+    picker.value = /^#[0-9a-f]{6}$/i.test(v ?? "") ? v! : "#ffffff";
+  };
+  const set = (v: string | undefined) => {
+    value = v;
+    paint(v);
+    onChange(v);
+  };
+  picker.onchange = () => set(picker.value); // on release: one save, not one per drag tick
+  code.onchange = () => {
+    const t = code.value.trim();
+    if (t && !CSS.supports("color", t)) return paint(value); // not a colour
+    set(t || undefined);
+  };
+  paint(value);
+  return h(
+    "span",
+    { class: "colours", role: "group", "aria-label": label },
+    ...btns.map(([b]) => b),
+    picker,
+    code,
+  );
+}
+
 export function select(
   options: Array<{ label: string; value: string }>,
   value: string,
@@ -279,23 +344,46 @@ export function select(
   return s;
 }
 
-// `set` puts the "set here" dot on the label; `note` is the muted "from" text.
+// `set` puts the "set here" dot on the label; `note` is the muted "from" text
+// under it.
 export function row(
   label: string,
   control: Node,
   opts: { set?: boolean; note?: string; hidden?: boolean } = {},
 ): HTMLElement {
+  const lbl = h("span", { class: "lbl" }, label);
+  if (opts.note) lbl.append(h("span", { class: "from" }, opts.note));
   const r = h(
     "div",
     { class: opts.set ? "row set" : "row" },
-    h("span", { class: "lbl" }, label),
+    lbl,
     h("div", { class: "ctl" }, control),
   );
-  if (opts.note) {
-    r.lastElementChild!.append(h("span", { class: "from" }, opts.note));
-  }
   r.hidden = !!opts.hidden;
   return r;
+}
+
+// "On N pages" for a style key: hover outlines every match, a click steps
+// through them. None while the key is on no page. A view with only one of
+// these shows it in its heading (config-panel.ts).
+export function applies(
+  ctx: PanelContext,
+  key: string,
+): HTMLElement | undefined {
+  const n = ctx.preview.pagesFor(key);
+  if (n <= 0) return undefined;
+  const b = h(
+    "button",
+    { type: "button", class: "applies", title: "Hover to outline every match" },
+    `On ${n} page${n === 1 ? "" : "s"}`,
+  );
+  const hl = (on: boolean) => () => ctx.preview.highlight(key, on);
+  b.onmouseenter = hl(true);
+  b.onmouseleave = hl(false);
+  b.onfocus = hl(true);
+  b.onblur = hl(false);
+  b.onclick = () => ctx.preview.reveal(key);
+  return b;
 }
 
 export function section(

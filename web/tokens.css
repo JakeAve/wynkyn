@@ -1,0 +1,220 @@
+/* Rubric tokens (design-language.md), shared by the app (web/app.css) and the
+   site pages (web/site/site.css): the faces, then the tokens, then dark mode.
+   The app sets html[data-theme] before first paint; the site pages have no
+   data-theme and follow the system through prefers-color-scheme. */
+
+/* Latin subsets from Google Fonts, vendored with their OFL licences. */
+@font-face {
+  font-family: "Alegreya Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/vendor/fonts/alegreya-sans/alegreya-sans-400.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Alegreya Sans";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/vendor/fonts/alegreya-sans/alegreya-sans-400i.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Alegreya Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/vendor/fonts/alegreya-sans/alegreya-sans-500.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Alegreya Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/vendor/fonts/alegreya-sans/alegreya-sans-700.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Alegreya"; /* variable: one file for 400 and 500 */
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url("/vendor/fonts/alegreya/alegreya.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Alegreya";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/vendor/fonts/alegreya/alegreya-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IM Fell Great Primer";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/vendor/fonts/im-fell-great-primer/im-fell-great-primer.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "IM Fell Great Primer";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/vendor/fonts/im-fell-great-primer/im-fell-great-primer-italic.woff2")
+    format("woff2");
+}
+
+:root {
+  color-scheme: light;
+  /* Colour: one UI paper and one ink, every grey mixed from them (§2.1). */
+  --paper: #fafafa;
+  --bg: var(--paper);
+  --fg: color-mix(in oklab, var(--paper) 6%, #101010);
+  --desk: color-mix(in oklab, var(--fg) 6%, var(--bg));
+  --line: color-mix(in oklab, var(--fg) 11%, var(--bg));
+  --hover: color-mix(in oklab, var(--fg) 5%, var(--bg));
+  --muted: color-mix(in oklab, var(--fg) 62%, var(--bg));
+  /* The one red, minium (§2.2). */
+  --acc: #e2582b;
+  --acc-ink: #b53e18;
+  --acc-wash: color-mix(in srgb, var(--acc) 10%, transparent);
+  --acc-btn: var(--acc-ink);
+  --on-acc: #ffffff;
+  /* Status (§2.3). */
+  --err: #a4233f;
+  --warn: #80651a;
+  --ok: #3d7350;
+  --warn-wash: color-mix(in srgb, var(--warn) 9%, transparent);
+  --err-wash: color-mix(in srgb, var(--err) 8%, transparent);
+  /* Depth (§5). */
+  --shadow-pop: 0 0.125rem 0.5rem rgb(0 0 0 / .08), 0 0.5rem 1.5rem rgb(0 0 0 / .08);
+  --shadow-dlg: 0 0.5rem 2rem rgb(0 0 0 / .18);
+  --backdrop: rgb(0 0 0 / .22);
+  --page-shadow: 0 1px 2px rgb(0 0 0 / .07), 0 8px 22px rgb(0 0 0 / .09);
+
+  /* Drawn on the pages, which stay paper in both themes (§2.4). */
+  --stock: #fffefc; /* the book's paper stock */
+  --pick: #e2582b; /* the light --acc */
+  --hover-ring: rgb(22 22 22 / .32);
+  --hl: rgb(22 22 22 / .07);
+  --sheet-paper: #fff;
+  --sheet-edge: #b9b9b4;
+  --sheet-slot: #e2e2de;
+  --sheet-blank: #ededea;
+  --sheet-ink: #161616;
+  --sheet-fold: #8f8f8a;
+  --sheet-cut: #e2582b; /* the light --acc */
+
+  /* The Source view (§2.6). */
+  --syn-k: var(--acc-ink);
+  --syn-p: var(--muted);
+  --syn-c: var(--muted);
+  --syn-t: var(--fg);
+  --sel: var(--acc-wash);
+  --active: color-mix(in srgb, var(--fg) 2.5%, transparent);
+  --match: color-mix(in srgb, var(--warn) 30%, transparent);
+  --match-cur: color-mix(in srgb, var(--warn) 60%, transparent);
+  --struct: rgb(122 106 79 / .07);
+  --off: .38; /* opacity of text the open edition skips */
+
+  /* Type (§3). */
+  --f-ui: "Alegreya Sans", system-ui, sans-serif;
+  --f-title: "IM Fell Great Primer", "Iowan Old Style", Georgia, serif;
+  --f-text: "Alegreya", Georgia, serif;
+  --f-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --f-hivis: var(--f-mono); /* identifiers and typed codes (§3.1) */
+  --fs-2xs: 0.75rem; /* 12 counts, kbd */
+  --fs-xs: 0.8125rem; /* 13 notes, footer, hints */
+  --fs-sm: 0.875rem; /* 14 dense rows, small controls, small-caps labels */
+  --fs: 0.9375rem; /* 15 everything by default */
+  --fs-lg: 1.0625rem; /* 17 book name (Alegreya), dialog lead */
+  --fs-h: 1.375rem; /* 22 view headings, dialog titles (Fell) */
+  --fs-hero: 1.75rem; /* 28 empty states (Fell) */
+  --lh: 1.45;
+  --lh-tight: 1.2;
+  --track-caps: 0.08em;
+
+  /* Space and size (§4). */
+  --s-1: 0.125rem; /*  2 */
+  --s-2: 0.25rem; /*  4 */
+  --s-3: 0.375rem; /*  6 */
+  --s-4: 0.5rem; /*  8 */
+  --s-5: 0.75rem; /* 12 */
+  --s-6: 1rem; /* 16 */
+  --s-7: 1.5rem; /* 24 */
+  --s-8: 2rem; /* 32 */
+  --s-9: 3rem; /* 48 */
+  --h-sm: 1.5rem; /* 24 small controls, pane-header buttons */
+  --h-md: 1.75rem; /* 28 default control */
+  --h-lg: 2.25rem; /* 36 dialog actions, site */
+  --h-toolbar: 2.875rem;
+  --h-pane: 2.375rem;
+  --h-footer: 1.875rem;
+  --icon: 1rem;
+  /* Pane widths — dragged by the gutters, persisted in localStorage. */
+  --w-tree: 14.375rem;
+  --w-editor: clamp(23.75rem, 36%, 37.5rem);
+
+  /* Shape (§5). */
+  --r: 0.25rem; /* controls */
+  --r-pop: 0.375rem; /* menus, popovers, tooltips */
+  --r-dlg: 0.5rem; /* dialogs */
+  --corner: superellipse(-1.4);
+  --hair: 1px;
+  --ring: 2px;
+
+  /* Motion (§12). */
+  --t-fast: 120ms;
+  --t: 200ms;
+}
+
+/* Dark, twice: chosen in the app, or the system's on the site pages. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: color-mix(in oklab, var(--paper) 4%, #0e0e0e);
+  --fg: color-mix(in oklab, var(--paper) 94%, #000000);
+  --desk: color-mix(in oklab, #000000 45%, var(--bg));
+  --line: color-mix(in oklab, var(--fg) 13%, var(--bg));
+  --hover: color-mix(in oklab, var(--fg) 8%, var(--bg));
+  --muted: color-mix(in oklab, var(--fg) 62%, var(--bg));
+  --acc: #f58a5f;
+  --acc-ink: #f8a07a;
+  --acc-wash: color-mix(in srgb, var(--acc) 16%, transparent);
+  --acc-btn: var(--acc);
+  --on-acc: var(--bg);
+  --err: #f0899b;
+  --warn: #d9b768;
+  --ok: #93c4a0;
+  --shadow-pop: 0 0.125rem 0.5rem rgb(0 0 0 / .4), 0 0.5rem 1.5rem rgb(0 0 0 / .4);
+  --shadow-dlg: 0 0.5rem 2rem rgb(0 0 0 / .6);
+  --backdrop: rgb(0 0 0 / .55);
+  --page-shadow: 0 2px 4px rgb(0 0 0 / .5), 0 12px 30px rgb(0 0 0 / .6);
+  --struct: rgb(194 173 131 / .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: color-mix(in oklab, var(--paper) 4%, #0e0e0e);
+    --fg: color-mix(in oklab, var(--paper) 94%, #000000);
+    --desk: color-mix(in oklab, #000000 45%, var(--bg));
+    --line: color-mix(in oklab, var(--fg) 13%, var(--bg));
+    --hover: color-mix(in oklab, var(--fg) 8%, var(--bg));
+    --muted: color-mix(in oklab, var(--fg) 62%, var(--bg));
+    --acc: #f58a5f;
+    --acc-ink: #f8a07a;
+    --acc-wash: color-mix(in srgb, var(--acc) 16%, transparent);
+    --acc-btn: var(--acc);
+    --on-acc: var(--bg);
+    --err: #f0899b;
+    --warn: #d9b768;
+    --ok: #93c4a0;
+    --shadow-pop: 0 0.125rem 0.5rem rgb(0 0 0 / .4), 0 0.5rem 1.5rem rgb(0 0 0 / .4);
+    --shadow-dlg: 0 0.5rem 2rem rgb(0 0 0 / .6);
+    --backdrop: rgb(0 0 0 / .55);
+    --page-shadow: 0 2px 4px rgb(0 0 0 / .5), 0 12px 30px rgb(0 0 0 / .6);
+    --struct: rgb(194 173 131 / .06);
+  }
+}

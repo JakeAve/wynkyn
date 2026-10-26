@@ -36,9 +36,12 @@ picks all three, and the mode persists across reloads:
 | Style | book settings and parts | the chosen part's styles | preview |
 | Publish | print and e-book rows | page setup and exports | the first signature as it prints |
 
-Tabs and lists are for what you cannot click on. Side columns toggle at their
-own edge (Contents ⌘\, Pages ⌘.) and persist; gutters drag. A hidden preview
-still lays out, since Paged.js paginates by measuring.
+Tabs and lists are for what you cannot click on. Contents toggles from the
+toolbar (⌘\); in Write the pages hide with ⌘. alone, no button (Style and
+Publish always show them); both persist; gutters
+drag. The write pane and the pages pane each expand from their header's
+top-right corner (⌘⇧↩, esc returns), per mode. A hidden preview still lays out,
+since Paged.js paginates by measuring.
 
 ## The file stays the truth
 
@@ -63,7 +66,10 @@ still lays out, since Paged.js paginates by measuring.
 - Don't copy Vellum or Atticus; they only toggle things on and off. The
   differentiators here are typographic control (TOC leaders, numbering styles,
   furniture placement) presented in plain words.
-- Keep the Ink look (`ink-design` skill); the panel never covers the preview.
+- Controls live with what they control: a pane carries its own controls in its
+  own header; the toolbar holds only what is global.
+- Follow the Rubric look (`rubric-design` skill, `design-language.md`); the
+  panel never covers the preview.
 
 ## Read next
 

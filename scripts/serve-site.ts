@@ -12,6 +12,7 @@ const TYPES: Record<string, string> = {
   png: "image/png",
   webmanifest: "application/manifest+json",
   xml: "application/xml",
+  woff2: "font/woff2",
 };
 
 export function serveSite(

@@ -2,8 +2,8 @@
 
 `web/` is the browser app. `web/src/app.ts` bundles to `web/app.js`
 (gitignored, built per checkout); `web/index.html` holds the DOM;
-`web/app.css` is the chrome's stylesheet and holds the Ink tokens
-(`ink-design` skill). Paged.js paginates the preview. The rules for adding to
+`web/app.css` is the chrome's stylesheet; its tokens live in `web/tokens.css`
+(`rubric-design` skill, `design-language.md`). Paged.js paginates the preview. The rules for adding to
 it are in `SKILL.md`, The web app; this is the map.
 
 ## Wiring
@@ -16,7 +16,8 @@ it are in `SKILL.md`, The web app; this is the map.
 | `switcher.ts` | `installSwitcher`: the crumb (Book / Edition · size) and the book/edition switcher — search, Rename, Delete, New edition, download as zip, Change library |
 | `create-book.ts` | `installCreateBook`: Create a new manuscript (import a file or web page, copy in from a folder, start blank), the title and web dialogs; `renderImportNotes` for the footer's import notes |
 | `theme-preview.ts` | `ThemePreview`: try a theme with nothing saved, hold pushed builds meanwhile, Apply |
-| `text-view.ts` | `installTextView`: the editor's font, size, Hide markup and spell check (a reader preference, localStorage, not the book) |
+| `text-view.ts` | `installTextView`: the editor's font, size, Hide markup and spell check (a reader preference, localStorage, not the book), in the write pane's header |
+| `panes.ts` | `installPanes`: the Contents toggle (pins the outline while expanded), Pages hidden by ⌘., and each pane's expand (`#panes.expand-writing` / `expand-pages`, localStorage `expanded:<mode>`); returns what the shortcuts call |
 | `dom.ts` | `$`, `brief` — the helpers every module shares |
 
 Editor side: `editor.ts` (the CodeMirror pane), `bml-language.ts`,
@@ -51,6 +52,8 @@ three columns in `#panes`:
 | Write | `#tree` | `#editor` | `#preview` |
 | Style | `#style-nav` | `#config-overlay` | `#preview` |
 | Publish | `#style-nav` | `#config-overlay` | `#sheet-view` |
+
+The right column is `#pages`: its header, then `#preview` or `#sheet-view`.
 
 `preview.ts`'s `installPreviewClicks` routes a page click to the source line
 (Write) or the style (Style), by mode. `style-catalog.ts` maps preview clicks

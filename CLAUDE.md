@@ -5,7 +5,8 @@ with `manuscript.md` (BML — semantic markup, spec §3), `metadata.json` (all
 styling, spec §4), and `images/`. `books/` is gitignored.
 
 `book-renderer-spec.md` is the source of truth; when code and spec disagree,
-ask.
+ask. `design-language.md` is the source of truth for how the app and the site
+look; when code and it disagree, ask.
 
 ## How work happens
 
@@ -22,6 +23,8 @@ ask.
 - Edits made in the wrong checkout move with a tagged stash, never a bare one
   (the stash stack is shared across worktrees): `git stash push -u -m <tag>`,
   `git stash apply <sha>` in the worktree, then `git stash drop` it.
+- A visible change to the chrome or the site updates `design-language.md` in the
+  same diff (`rubric-design` skill).
 - Commit messages: `feat:|fix:|test:|style:|chore:` prefix, present tense.
 - `docs/` is local scratch (gitignored): specs, plans, todos. Never `git add`
   it; durable knowledge goes in the spec, a code comment or a skill reference.
@@ -53,6 +56,6 @@ Skills live in `.claude/skills/`; read the one that fits before the first edit.
 | Metadata keys, the `spec` version, upgrades of old books                   | `architecture` (Where a change goes, Standing rules)  |
 | Printing, binding, the `page` section, imposition, folios, proofs          | `bookbinding`                                         |
 | UI behaviour, modes, panels, wording, status messages                      | `ux-principles`                                       |
-| Chrome visuals: tokens, colours, buttons, dark mode                        | `ink-design`                                          |
+| Chrome and site visuals: tokens, type, colours, components, dark mode      | `rubric-design` (then `design-language.md`)           |
 | Source text (Gutenberg, pasted, OCR) → BML `manuscript.md`                 | `convert-manuscript`                                  |
 | The `bml` CLI: adding, importing, checking, exporting a book, editions     | `bml`                                                 |

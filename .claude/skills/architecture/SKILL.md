@@ -106,7 +106,8 @@ pure sibling with a test. `dev-server.ts` is the HTTP surface and only routes;
   together.
 - `docs/` is local scratch and gitignored. Durable knowledge goes in the spec,
   a code comment, or a skill reference — never a committed doc.
-- Every chrome colour is a token in `web/app.css`; see the `ink-design` skill.
+- Every chrome colour, size and face is a token in `web/tokens.css`, named in
+  `design-language.md`; see the `rubric-design` skill.
 
 ## Paged.js
 

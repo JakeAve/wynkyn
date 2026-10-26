@@ -1,5 +1,5 @@
 // web/src/search-panel.ts — the find/replace bar pinned to the top of the
-// editor: CodeMirror's search state and commands under Ink-styled DOM.
+// editor: CodeMirror's search state and commands under chrome-styled DOM.
 import {
   closeSearchPanel,
   findNext,

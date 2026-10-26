@@ -40,9 +40,13 @@ export function installCreateBook(
     const dlg = $("create") as HTMLDialogElement;
     const err = $("create-err");
     err.textContent = "";
+    $("create-head").classList.toggle("empty", !cancelable);
+    $("create-title").textContent = cancelable
+      ? "Create a new manuscript"
+      : "Your library is empty";
     $("create-sub").textContent = cancelable
       ? "Add another book to this library."
-      : "Your library is empty. How do you want to begin?";
+      : "How do you want to begin?";
     const cancel = $("create-cancel");
     cancel.hidden = !cancelable;
     cancel.onclick = () => dlg.close();

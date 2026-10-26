@@ -35,9 +35,9 @@ import type { Diagnostic, OnlySpan } from "../../parser/types.ts";
 let suppressChanges = false;
 
 // Chrome-matched editor theme: every color is a CSS variable from
-// index.html's Ink palette, so light/dark switching needs no CodeMirror
+// the chrome's tokens, so light/dark switching needs no CodeMirror
 // reconfigure — the vars flip and the editor follows.
-const inkTheme = EditorView.theme({
+const chromeTheme = EditorView.theme({
   "&": { height: "100%", backgroundColor: "transparent", color: "var(--fg)" },
   ".cm-scroller": { overflow: "auto" },
   ".cm-gutters": {
@@ -50,7 +50,7 @@ const inkTheme = EditorView.theme({
     backgroundColor: "var(--active)",
     color: "var(--fg)",
   },
-  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--fg)" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--acc)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
     { backgroundColor: "var(--sel)" },
   ".cm-panels, .cm-tooltip": {
@@ -211,7 +211,7 @@ export function createEditor(opts: {
       doc: opts.text,
       extensions: [
         basicSetup,
-        inkTheme,
+        chromeTheme,
         bml(),
         searchPanel(),
         insertExtensions(opts.images ? [imageCompletions(opts.images)] : []),

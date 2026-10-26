@@ -28,6 +28,7 @@ import {
   seg,
   select,
   stepper,
+  swatches,
   switchInput,
 } from "./panel-controls.ts";
 import type { PanelContext } from "./style-catalog.ts";
@@ -52,6 +53,15 @@ const FOLD_LABELS: Record<Fold, string> = {
   cut: "Cut, then fold",
   leaves: "Loose leaves",
 };
+
+// The preview's paper (design-language.md §2.5); print and EPUB stay white.
+const PAPER_STOCKS = [
+  { value: "", label: "Bright white" },
+  { value: "#fbf8f1", label: "Natural" },
+  { value: "#f8f2e3", label: "Ivory" },
+  { value: "#f3e9d2", label: "Cream" },
+  { value: "#f1f0ec", label: "Recycled grey" },
+];
 
 const MARGINS = [
   ["top", "Top"],
@@ -85,7 +95,7 @@ export function buildPageTab(panel: PanelContext): Node[] {
   // object on save (the whole "page" section round-trips together).
   const margins = page.margins ?? {};
 
-  const H = 138; // px, the drawn page height (matches .mpage in index.html)
+  const H = 8.625; // rem, the drawn page height (matches .mpage in app.css)
   const block = el("div", "mblock");
   const vblock = el("div", "mblock");
   const pageR = el("div", "mpage", block);
@@ -95,21 +105,21 @@ export function buildPageTab(panel: PanelContext): Node[] {
       tryParseDims(DEFAULT_SIZE)!;
     const s = H / trim.h;
     const w = H * trim.w / trim.h;
-    pageR.style.width = `${w.toFixed(1)}px`;
-    pageV.style.width = `${(w / 2.4).toFixed(1)}px`;
+    pageR.style.width = `${w.toFixed(3)}rem`;
+    pageV.style.width = `${(w / 2.4).toFixed(3)}rem`;
     const m = page.margins ?? {};
-    const px = (v: string | undefined) => `${inches(v) * s}px`;
+    const rem = (v: string | undefined) => `${inches(v) * s}rem`;
     Object.assign(block.style, {
-      top: px(m.top),
-      bottom: px(m.bottom),
-      left: px(m.inside),
-      right: px(m.outside),
+      top: rem(m.top),
+      bottom: rem(m.bottom),
+      left: rem(m.inside),
+      right: rem(m.outside),
     });
     Object.assign(vblock.style, {
-      top: px(m.top),
-      bottom: px(m.bottom),
+      top: rem(m.top),
+      bottom: rem(m.bottom),
       left: "0",
-      right: px(m.inside),
+      right: rem(m.inside),
     });
   };
   draw();
@@ -154,12 +164,24 @@ export function buildPageTab(panel: PanelContext): Node[] {
         ),
         () => !!page.size,
       ),
+      v.mark(
+        row(
+          "Paper stock",
+          swatches(PAPER_STOCKS, page.paper, (paper) => {
+            if (paper) page.paper = paper;
+            else delete page.paper;
+            ctx.queueSave("page");
+          }, "Paper stock"),
+        ),
+        () => !!page.paper,
+      ),
     ]),
     section("Margins", "margins", [
       diag,
       el(
         "p",
-        "hint",
+        "tip",
+        el("span", "manicule", "☞"),
         "Inside is the spine edge. The preview shows the spread as it will fold.",
       ),
       el(
@@ -403,7 +425,12 @@ function printSection(
     });
   };
   const btn = (label: string, mode: "duplex" | "fronts" | "backs") => {
-    const b = el("button", "tog primary", label);
+    // One primary on a screen: Print sheets.
+    const b = el(
+      "button",
+      mode === "duplex" ? "tog primary" : "tog outline",
+      label,
+    );
     b.type = "button";
     b.onclick = () => run(mode);
     return b;
@@ -469,7 +496,7 @@ function pageSizeRow(ctx: PanelContext, page: PageConfig): HTMLElement {
 function pagesSection(ctx: PanelContext): HTMLElement {
   const status = el("div", "export-status");
   status.setAttribute("aria-live", "polite");
-  const btn = el("button", "tog primary", "Print pages");
+  const btn = el("button", "tog outline", "Print pages");
   btn.type = "button";
   btn.onclick = () => {
     status.replaceChildren();
@@ -499,7 +526,7 @@ function pagesSection(ctx: PanelContext): HTMLElement {
 function ebookSection(ctx: PanelContext): HTMLElement {
   const status = el("div", "export-status");
   status.setAttribute("aria-live", "polite");
-  const btn = el("button", "tog primary", "Export EPUB");
+  const btn = el("button", "tog outline", "Export EPUB");
   btn.type = "button";
   btn.onclick = async () => {
     btn.disabled = true;

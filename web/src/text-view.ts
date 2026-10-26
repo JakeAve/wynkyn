@@ -62,9 +62,9 @@ async function spellCheck(d: TextViewDeps, lang: string): Promise<void> {
 // The text view (the bar atop the editor): the editor's font and size, Hide markup and Spelling, a per-reader
 // preference kept in localStorage, not the book.
 const TEXT_FONTS: Record<string, string> = {
-  serif: "ui-serif, Georgia, serif",
-  sans: "system-ui, sans-serif",
-  mono: "var(--mono)",
+  serif: "var(--f-text)",
+  sans: "var(--f-ui)",
+  mono: "var(--f-mono)",
 };
 export function installTextView(d: TextViewDeps): void {
   const { editor } = d;
@@ -90,13 +90,14 @@ export function installTextView(d: TextViewDeps): void {
   ];
   const apply = () => {
     ed.style.setProperty("--ed-font", TEXT_FONTS[prefs.font] ?? null);
-    ed.style.setProperty("--ed-fs", `${prefs.size}px`);
+    ed.style.setProperty("--ed-fs", `${prefs.size / 16}rem`); // px at the default root
     editor.requestMeasure(); // a CSS-only size change: re-align line numbers
     for (const b of fonts) {
       b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));
     }
     size.value = String(prefs.size);
-    size.nextElementSibling!.textContent = `${prefs.size}px`;
+    size.parentElement!.querySelector("output")!.textContent =
+      `${prefs.size}px`;
     hide.checked = prefs.hide;
     spell.value = prefs.spell;
     setHideMarkup(editor, prefs.hide);

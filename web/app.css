@@ -1,86 +1,12 @@
-/* ---- Ink: one flat plane, hairlines and type carry the hierarchy ---- */
-:root {
-  color-scheme: light;
-  --bg: #fbfbfa; /* the single chrome surface */
-  --desk: #f1f1ef; /* the desk the pages sit on */
-  --line: #e7e7e4; /* hairlines */
-  --soft: #f3f3f1; /* row separators inside lists */
-  --hover: #efefec;
-  /* editor: selection tinted from --syn-key, a quieter active line,
-     search hits from --warn, a faint band on structural sentinels */
-  --sel: rgba(85, 101, 85, .22);
-  --active: rgba(22, 22, 22, .028);
-  --match: rgba(201, 168, 106, .34);
-  --match-cur: rgba(201, 168, 106, .7);
-  --struct: rgba(122, 106, 79, .07);
-  --off: .38; /* opacity of text the open edition skips */
-  --fg: #161616;
-  /* Outlines drawn on the pages, which are paper-white in both themes:
-     fixed dark ink, so dark mode does not override them. */
-  --pick: rgba(22, 22, 22, 0.9);
-  --hover-ring: rgba(22, 22, 22, 0.32);
-  --hl: rgba(22, 22, 22, 0.07);
-  /* The imposed sheet is paper-white in both themes too. */
-  --sheet-paper: #fff;
-  --paper: #fffefc; /* book pages and page drawings */
-  --sheet-edge: #b9b9b4;
-  --sheet-slot: #e2e2de;
-  --sheet-blank: #ededea;
-  --sheet-ink: #161616;
-  --sheet-fold: #8f8f8a;
-  --sheet-cut: #a04545;
-  --muted: #71716c;
-  --inv-bg: #161616; /* inverted pill: active nav/segment */
-  --inv-fg: #fbfbfa;
-  --syn-k: #111111; /* {sentinel} names */
-  --syn-c: #a3a39e; /* %% comments */
-  --syn-t: #4c4c48; /* prose */
-  --syn-p: #9c9c98; /* brackets, punctuation */
-  --syn-slug: #7a6a4f;
-  --syn-key: #556555;
-  --ok: #4d7a4d;
-  --warn: #8a6d3b;
-  --err: #a04545;
-  --page-shadow: 0 1px 2px rgba(0, 0, 0, .07), 0 8px 22px rgba(0, 0, 0, .09);
-  --backdrop: rgba(0, 0, 0, .22);
-  --radius: 6px;
-  --fs: 13.5px;
-  --fs-sm: 11px;
-  --mono: ui-monospace, Menlo, monospace;
-  /* Pane widths — dragged by the gutters, persisted in localStorage. */
-  --w-tree: 230px;
-  --w-editor: clamp(380px, 36%, 600px);
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #111111;
-  --desk: #0a0a0a;
-  --line: #262626;
-  --soft: #1a1a1a;
-  --hover: #1d1d1d;
-  --sel: rgba(157, 184, 157, .24);
-  --active: rgba(255, 255, 255, .025);
-  --match: rgba(201, 168, 106, .24);
-  --match-cur: rgba(201, 168, 106, .55);
-  --struct: rgba(194, 173, 131, .06);
-  --fg: #ececea;
-  --muted: #93938d;
-  --inv-bg: #ececea;
-  --inv-fg: #111111;
-  --syn-k: #ececea;
-  --syn-c: #6e6e6a;
-  --syn-t: #b3b3af;
-  --syn-p: #767672;
-  --syn-slug: #c2ad83;
-  --syn-key: #9db89d;
-  --ok: #94b894;
-  --warn: #c9a86a;
-  --err: #d98a8a;
-  --page-shadow: 0 2px 4px rgba(0, 0, 0, .5), 0 12px 30px rgba(0, 0, 0, .6);
-  --backdrop: rgba(0, 0, 0, .55);
-}
+/* ---- Rubric (design-language.md): one flat plane of UI paper, hairlines and
+   type carry the hierarchy, one red (minium) marks the selected thing. The
+   tokens and faces live in web/tokens.css, loaded first. ---- */
 * {
   box-sizing: border-box;
+}
+/* `hidden` wins over any class that sets display (.btn is inline-flex). */
+[hidden] {
+  display: none !important;
 }
 html,
 body {
@@ -88,12 +14,13 @@ body {
 }
 body {
   margin: 0;
-  font: var(--fs)/1.45 system-ui, sans-serif;
+  font: var(--fs)/var(--lh) var(--f-ui);
+  font-variant-numeric: lining-nums;
   color: var(--fg);
   background: var(--bg);
   display: grid;
   /* toolbar · spec banner (0 while hidden) · panes · footer */
-  grid-template-rows: 46px auto minmax(0, 1fr) 30px;
+  grid-template-rows: var(--h-toolbar) auto minmax(0, 1fr) var(--h-footer);
   overflow: hidden;
 }
 #spec-banner {
@@ -114,23 +41,33 @@ summary {
   color: inherit;
 }
 :focus-visible {
-  outline: 2px solid var(--fg);
+  outline: 2px solid var(--acc);
   outline-offset: 1px;
 }
 .cm-editor.cm-focused {
   outline: none;
 }
 
-/* ---- shared control look: borderless ghosts ---- */
+/* ---- shared control look: borderless ghosts (design-language.md §6.1) ---- */
 .btn,
 #config-overlay button {
   background: none;
   color: var(--muted);
   border: none;
-  border-radius: var(--radius);
-  padding: 6px 10px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: var(--s-3) var(--s-4);
   cursor: pointer;
   white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: var(--h-md);
+  padding-block: 0;
 }
 .btn:hover,
 #config-overlay button:hover {
@@ -140,46 +77,85 @@ summary {
 .btn[aria-pressed="true"] {
   color: var(--fg);
 }
+.btn:disabled {
+  opacity: .45;
+  pointer-events: none;
+}
+/* The one primary action on a screen: the --acc-btn fill. */
+.btn.primary,
+#config-overlay :is(.btn, .tog).primary {
+  background: var(--acc-btn);
+  color: var(--on-acc);
+  font-weight: 600;
+  padding-inline: var(--s-5);
+}
+.btn.primary:hover,
+#config-overlay :is(.btn, .tog).primary:hover {
+  background: color-mix(in oklab, var(--acc-btn) 88%, var(--fg));
+  color: var(--on-acc);
+}
+/* Small (§6.1): banners, pane headers. Large: empty states, the site. */
+.btn.sm {
+  min-height: var(--h-sm);
+  padding-inline: var(--s-3);
+  font-size: var(--fs-sm);
+}
+.btn.lg {
+  min-height: var(--h-lg);
+  padding-inline: var(--s-6);
+}
+/* Icon (§6.1): square at its height. */
+.btn.icon {
+  width: var(--h-md);
+  padding: 0;
+}
+.btn.sm.icon {
+  width: var(--h-sm);
+}
 .btn svg,
 .tico {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: var(--icon);
+  height: var(--icon);
   stroke: currentColor;
   fill: none;
   stroke-width: 1.4;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.caption {
+/* kbd (§6.10): a key cap. */
+kbd {
+  font: var(--fs-2xs) var(--f-ui);
+  font-variant-numeric: lining-nums;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: var(--muted);
-  text-transform: uppercase;
-  font-size: var(--fs-sm);
-  letter-spacing: .1em;
-  font-weight: 600;
 }
 
 /* ---- toolbar ---- */
 #toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 10px;
+  gap: var(--s-2);
+  padding: 0 var(--s-4);
   border-bottom: 1px solid var(--line);
 }
 /* Crumb: Book / Edition 5.25 × 8 in — either half opens #switcher. */
 #crumb {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--s-1);
   min-width: 0;
 }
 #crumb .btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-3);
   color: var(--fg);
-  padding: 5px 8px;
+  padding: var(--s-2) var(--s-4);
 }
 #crumb .btn[aria-expanded="true"] {
   background: var(--hover);
@@ -192,24 +168,23 @@ summary {
   display: none;
 }
 #library-name {
-  max-width: 140px;
+  max-width: 8.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 #book-name {
-  font-weight: 600;
-  letter-spacing: -.01em;
+  font: 500 var(--fs-lg) var(--f-text);
 }
 #crumb .slash {
   color: var(--syn-p);
 }
 #edition-size {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 #crumb .chev {
-  width: 12px;
-  height: 12px;
+  width: 0.75rem;
+  height: 0.75rem;
   color: var(--muted);
 }
 #toolbar .spacer {
@@ -221,29 +196,30 @@ summary {
 }
 #modes {
   display: inline-flex;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--s-1);
+  padding: var(--s-1);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
 }
 #modes .btn {
-  padding: 3px 14px;
-  min-height: 26px;
+  padding: 0 var(--s-5);
+  min-height: calc(var(--h-md) - 2 * var(--s-1) - 2 * var(--hair));
 }
 #modes .btn[aria-pressed="true"] {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
-@media (max-width: 1000px) {
+@media (max-width: 62.5rem) {
   #modes {
     position: static;
     transform: none;
   }
 }
-/* Column toggles: the panel icon's side is half filled while it shows. */
+/* Contents toggle: the panel icon's side is half filled while it shows. */
 .toggle[aria-pressed="true"] {
   --pf: .35;
 }
@@ -258,38 +234,41 @@ summary {
 /* ---- book / edition switcher: books left, that book's editions right ---- */
 #switcher {
   position: fixed;
-  inset: 44px auto auto 10px; /* left follows the crumb, set on open */
+  inset: var(--h-toolbar) auto auto
+    var(--s-4); /* left follows the crumb, set on open */
   margin: 0;
   padding: 0;
-  width: 620px;
-  max-width: calc(100vw - 20px);
+  width: 38.75rem;
+  max-width: calc(100vw - var(--s-7));
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-pop);
+  corner-shape: var(--corner);
   background: var(--bg);
   color: var(--fg);
-  box-shadow: 0 14px 36px var(--backdrop);
+  box-shadow: var(--shadow-pop);
   overflow: hidden;
 }
 #switcher[open] {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 13.75rem minmax(0, 1fr);
 }
 #switcher::backdrop {
   background: none;
 }
 .sw-books {
   border-right: 1px solid var(--line);
-  background: var(--soft);
-  padding: 8px;
+  background: var(--desk);
+  padding: var(--s-4);
 }
 #book-search {
   width: 100%;
-  height: 28px;
+  height: var(--h-md);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
-  padding: 0 8px;
-  margin-bottom: 6px;
+  padding: 0 var(--s-4);
+  margin-bottom: var(--s-3);
 }
 #book-search::placeholder {
   color: var(--muted);
@@ -302,10 +281,11 @@ summary {
 .book-row {
   display: block;
   width: 100%;
-  padding: 4px 8px;
+  padding: var(--s-2) var(--s-4);
   background: none;
   border: none;
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   text-align: left;
   cursor: pointer;
   overflow: hidden;
@@ -316,50 +296,78 @@ summary {
   background: var(--hover);
 }
 .book-row[aria-selected="true"] {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
-.book-empty {
-  padding: 4px 8px;
+/* Empty state (§6.12): a ❦, a Fell title, one sentence, one primary. */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-3);
+  padding: var(--s-8);
+  text-align: center;
+}
+.empty::before {
+  content: "❦";
+  color: var(--acc-ink);
+  font: 1.5rem/1 var(--f-title);
+}
+.empty h2 {
+  margin: 0;
+  font: 400 var(--fs-hero)/var(--lh-tight) var(--f-title);
+}
+.empty p {
+  margin: 0 0 var(--s-3);
   color: var(--muted);
 }
+.book-empty {
+  padding: var(--s-4);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
 .sw-eds {
-  padding: 8px;
+  padding: var(--s-4);
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 .ed-row {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  gap: 2px 10px;
+  grid-template-columns: var(--icon) minmax(0, 1fr) auto;
+  gap: var(--s-1) var(--s-4);
   align-items: baseline;
-  padding: 8px;
-  border-radius: var(--radius);
+  padding: var(--s-4);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   cursor: pointer;
 }
-.ed-row:hover,
-.ed-row[aria-current="true"] {
+.ed-row:hover {
   background: var(--hover);
 }
+/* The open edition: the menu's current item, a red wash and a red check. */
+.ed-row[aria-current="true"] {
+  background: var(--acc-wash);
+}
 .ed-row .ck {
-  width: 14px;
-  height: 14px;
+  width: 0.875rem;
+  height: 0.875rem;
   align-self: center;
+  color: var(--acc-ink);
 }
 .ed-row .nm {
   font-weight: 500;
 }
 .ed-row .acts {
   display: flex;
-  gap: 2px;
+  gap: var(--s-1);
 }
 .ed-row .acts button,
 .ed-row .diff {
   background: none;
   border: none;
-  padding: 0 4px;
-  font-size: 12px;
+  padding: 0 var(--s-2);
+  font-size: var(--fs-xs);
   color: var(--muted);
   cursor: pointer;
 }
@@ -374,7 +382,7 @@ summary {
   grid-column: 2 / -1;
 }
 .ed-row .setup {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 .ed-row .diff {
@@ -384,7 +392,7 @@ summary {
   text-align: left;
 }
 .sw-err {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--err);
 }
 .sw-err:empty {
@@ -392,20 +400,29 @@ summary {
 }
 #switcher input:not(#book-search),
 #switcher select {
+  height: var(--h-md);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
-  padding: 2px 6px;
+  padding: 0 var(--s-3);
   min-width: 0;
+}
+/* Fields (§6.3) outside the panel: focus turns the border red. */
+:is(#switcher, .ask .field, #editor .cm-bml-palette, #config-overlay .fontpop) :is(input, select, textarea):focus-visible,
+.cm-bml-find .field:focus-within {
+  outline: none;
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px var(--acc);
 }
 .eds-foot {
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: var(--s-4);
   border-top: 1px solid var(--line);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-3);
 }
 .eds-foot form {
   display: contents;
@@ -422,15 +439,16 @@ summary {
   color: var(--muted);
   border-top: 1px solid var(--line);
   display: grid;
-  font-size: 12px;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
 }
 #footer .foot {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 0 14px;
+  gap: var(--s-6);
+  padding: 0 var(--s-5);
   min-width: 0;
   overflow: hidden;
 }
@@ -444,13 +462,16 @@ summary {
   color: inherit;
   background: none;
   border: 0;
-  border-radius: var(--radius);
-  padding: 2px 6px;
-  margin-inline: -6px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: var(--s-1) var(--s-3);
+  margin-inline: calc(var(--s-3) * -1);
   cursor: pointer;
 }
 #style-here span:last-child {
   color: var(--fg);
+  text-decoration: underline dotted;
+  text-underline-offset: 0.1875rem;
 }
 #style-here:hover {
   color: var(--fg);
@@ -476,7 +497,7 @@ summary {
 }
 #page-problems {
   display: flex;
-  gap: 12px;
+  gap: var(--s-5);
   overflow: hidden;
 }
 #page-problems button {
@@ -491,9 +512,9 @@ summary {
   cursor: default;
 }
 #status {
-  margin-left: 12px;
+  margin-left: var(--s-5);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
   display: flex;
   align-items: center;
@@ -504,8 +525,8 @@ summary {
 }
 #status[data-kind="saved"]::before {
   content: "";
-  width: 14px;
-  height: 14px;
+  width: 0.875rem;
+  height: 0.875rem;
   background: currentColor;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E")
     center / contain no-repeat;
@@ -517,7 +538,7 @@ summary {
 }
 
 /* ---- panes ---- */
-/* One flat plane: panes share the chrome background; 5px gutters render a
+/* One flat plane: panes share the chrome background; narrow gutters render a
    centred 1px hairline and are the drag handles. The preview is the hero:
    the editor holds a fixed reading measure, the preview takes the rest. */
 #panes {
@@ -528,7 +549,8 @@ summary {
 /* The footer mirrors these columns (below), so each column has its cell. */
 #panes,
 #footer {
-  grid-template-columns: var(--w-tree) 5px var(--w-editor) 5px minmax(0, 1fr);
+  grid-template-columns: var(--w-tree) 0.3125rem var(--w-editor) 0.3125rem
+    minmax(0, 1fr);
 }
 .gutter {
   cursor: col-resize;
@@ -537,7 +559,7 @@ summary {
 }
 .gutter:hover,
 .gutter.dragging {
-  background: linear-gradient(var(--muted), var(--muted)) 50% 0 / 3px 100%
+  background: linear-gradient(var(--muted), var(--muted)) 50% 0 / 0.1875rem 100%
     no-repeat;
 }
 /* The columns (spec §7.1): left is where you are, middle is what you're
@@ -546,11 +568,11 @@ summary {
    a column and its gutter. */
 #panes.tree-hidden,
 #panes.tree-hidden ~ #footer {
-  grid-template-columns: var(--w-editor) 5px minmax(0, 1fr);
+  grid-template-columns: var(--w-editor) 0.3125rem minmax(0, 1fr);
 }
 #panes.pages-hidden,
 #panes.pages-hidden ~ #footer {
-  grid-template-columns: var(--w-tree) 5px minmax(0, 1fr);
+  grid-template-columns: var(--w-tree) 0.3125rem minmax(0, 1fr);
 }
 #panes.tree-hidden.pages-hidden,
 #panes.tree-hidden.pages-hidden ~ #footer {
@@ -560,7 +582,7 @@ summary {
 :root[data-mode="style"] :is(#tree, #editor, #sheet-view),
 :root[data-mode="publish"] :is(#tree, #editor),
 #panes.tree-hidden :is(#tree, #style-nav, #gutter-tree),
-#panes.pages-hidden :is(#sheet-view, #gutter-editor),
+#panes.pages-hidden #gutter-editor,
 #panes.tree-hidden ~ #footer :is(#foot-tree, #foot-gutter-tree),
 #panes.pages-hidden ~ #footer :is(#page-foot, #foot-gutter-pages) {
   display: none;
@@ -568,28 +590,148 @@ summary {
 /* Hidden pages still lay out: Paged.js paginates by measuring, so the
    preview leaves the grid but never goes display:none. */
 :root[data-mode="publish"] #preview,
-#panes.pages-hidden #preview {
+#panes.pages-hidden #pages {
   position: absolute;
   inset: 0;
   visibility: hidden;
 }
+/* The pages pane (§7): its header on the desk, then the preview, or in
+   Publish the sheet view. */
+#pages {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--desk);
+}
+#pages .pane-head {
+  justify-content: flex-end;
+  border-bottom-color: transparent;
+}
+/* Pane header (§6.11): the pane's own controls at left, expand at right. */
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-pane);
+  padding: 0 var(--s-3) 0 var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+/* the top-right corner, even when the controls wrap */
+.expand {
+  align-self: start;
+  margin: calc((var(--h-pane) - var(--h-sm)) / 2) 0 0 auto;
+}
+.expand .in,
+.expand[aria-pressed="true"] .out {
+  display: none;
+}
+.expand[aria-pressed="true"] .in {
+  display: block;
+}
+.expand[aria-pressed="true"] {
+  color: var(--acc-ink);
+}
+/* Expanded views (§7, panes.ts): one pane takes #panes; :root outranks the
+   hidden-column rules above. Writing: the outline and pages leave. Pages:
+   the outline and the middle pane leave. What leaves keeps laying out. */
+:root #panes:is(.expand-writing, .expand-pages),
+:root #panes:is(.expand-writing, .expand-pages) ~ #footer {
+  grid-template-columns: minmax(0, 1fr);
+}
+#panes:is(.expand-writing, .expand-pages) .gutter,
+#panes.expand-writing ~ #footer > :not(#writer-foot),
+#panes.expand-pages ~ #footer > :not(#page-foot) {
+  display: none;
+}
+:root #panes.expand-pages ~ #footer > #page-foot {
+  display: flex;
+}
+:root #panes.expand-pages #pages {
+  position: relative;
+  visibility: visible;
+}
+#panes.expand-writing #pages,
+#panes.expand-pages :is(#editor, #config-overlay) {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+#panes.expand-writing #editor .cm-scroller {
+  justify-content: center;
+}
+/* Expanded, the outline slides in over the view from the left edge; the
+   Contents toggle pins it (pin-outline). */
+#outline-edge {
+  display: none;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--s-4);
+  z-index: 2;
+}
+#panes:is(.expand-writing, .expand-pages) #outline-edge {
+  display: block;
+}
+:root[data-mode="write"] #panes:is(.expand-writing, .expand-pages) #tree,
+:root:not([data-mode="write"]) #panes:is(.expand-writing, .expand-pages) #style-nav {
+  display: block;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--w-tree);
+  z-index: 3;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform var(--t), visibility var(--t);
+}
+#panes:is(.expand-writing, .expand-pages) :is(#outline-edge:hover ~ :is(#tree, #style-nav), #tree:hover, #style-nav:hover),
+:root #panes.pin-outline:is(.expand-writing, .expand-pages) :is(#tree, #style-nav) {
+  transform: none;
+  visibility: visible;
+  box-shadow: var(--shadow-pop);
+}
+/* Writing expanded: the chrome fades while typing, back on a mouse move. */
+:is(#toolbar, #footer, #editor .pane-head > :not(.expand)) {
+  transition: opacity var(--t);
+}
+body.typing :is(#toolbar, #footer, #editor .pane-head > :not(.expand)):not(:focus-within) {
+  opacity: 0;
+}
+body.typing #editor .pane-head {
+  border-bottom-color: transparent;
+}
 #tree {
   overflow-y: auto;
-  padding: 10px 8px;
+  padding: var(--s-4);
 }
+/* Lists (§6.6): a small-caps group label, then rows --s-1 apart. */
 :is(#tree, #style-nav) .nh {
   font-size: var(--fs-sm);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
   font-weight: 500;
   color: var(--muted);
-  padding: 10px 8px 4px;
+  padding: var(--s-5) var(--s-4) var(--s-1);
 }
 :is(#tree, #style-nav) .nh:first-child {
-  padding-top: 2px;
+  padding-top: 0;
 }
-#tree ul.tree-list {
+#tree :is(ul.tree-list, li) {
+  display: grid;
+  gap: var(--s-1);
   list-style: none;
   margin: 0;
   padding: 0;
+}
+#style-nav .ni + .ni {
+  margin-top: var(--s-1);
+}
+/* An identifier standing in for a name (§3.1): a slug, an {is} name. */
+.hivis {
+  font-family: var(--f-hivis);
+  font-size: var(--fs-sm);
 }
 #tree button.tree-node {
   display: block;
@@ -597,9 +739,10 @@ summary {
   text-align: left;
   background: none;
   border: none;
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: inherit;
-  padding: 5px 10px;
+  padding: var(--s-2) var(--s-4);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -609,14 +752,14 @@ summary {
   background: var(--hover);
 }
 #tree button.tree-node[aria-current="true"] {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
 #tree .tree-matter {
   color: var(--muted);
 }
 #tree button.tree-node[aria-current="true"].tree-matter {
-  color: var(--inv-fg);
+  color: var(--acc-ink);
 }
 #tree .tree-part {
   font-weight: 600;
@@ -636,39 +779,39 @@ summary {
    .cm-content only, so line numbers stay put, and the measure is in rem, so
    bigger text wraps sooner instead of widening the column. */
 #editor .cm-scroller {
-  font-family: var(--ed-font, ui-serif, Georgia, serif);
+  font-family: var(--ed-font, var(--f-text));
   line-height: 1.6;
 }
 /* numbers sit on the text's line */
 #editor .cm-gutters {
-  line-height: calc(var(--ed-fs, 16px) * 1.6);
+  line-height: calc(var(--ed-fs, 1rem) * 1.6);
 }
 #editor .cm-content {
-  font-size: var(--ed-fs, 16px);
-  max-width: 36rem; /* ~70 characters of 16px serif prose */
+  font-size: var(--ed-fs, 1rem);
+  max-width: 36rem; /* ~70 characters of 1rem serif prose */
 }
 #panes.pages-hidden #editor .cm-scroller {
   justify-content: center;
 }
-/* the text view bar along the top of the editor */
+/* the text view, in the write pane's header */
 #text-view {
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 18px;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--line);
+  gap: var(--s-3) var(--s-6);
+  padding-block: var(--s-2);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 #text-view label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-4);
   cursor: pointer;
 }
 #text-view input[type="range"] {
-  width: 90px;
+  width: 5.625rem;
   margin: 0;
   accent-color: var(--fg);
 }
@@ -677,13 +820,14 @@ summary {
   font-variant-numeric: tabular-nums;
 }
 #text-view .tv-step {
-  width: 20px;
-  height: 20px;
+  width: var(--h-sm);
+  height: var(--h-sm);
   padding: 0;
   background: none;
   color: var(--muted);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   font: inherit;
   line-height: 1;
   cursor: pointer;
@@ -695,24 +839,23 @@ summary {
 #text-view .tv-hide {
   margin-left: auto;
 }
-/* Changed-on-disk banner: the buffer has unsaved edits and the file moved
-   under it. Rare and it blocks saving, so it is the one loud thing in the
-   chrome: an err-tinted block with a bar, and bordered buttons. */
-#disk-banner {
+/* Banners (§6.10): a strip across the top of the pane they concern, small
+   ghost buttons at the right. Changed on disk: the buffer has unsaved edits
+   and the file moved under it, so saving stops; its lead says so in --err. */
+:is(#disk-banner, #spec-banner) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 12px;
-  padding: 12px 12px 12px 14px;
+  gap: var(--s-3) var(--s-4);
+  padding: var(--s-3) var(--s-5);
   border-bottom: 1px solid var(--line);
-  border-left: 3px solid var(--err);
-  background: color-mix(in srgb, var(--err) 10%, var(--bg));
+  font-size: var(--fs-sm);
 }
-#disk-banner[hidden] {
+:is(#disk-banner, #spec-banner)[hidden] {
   display: none;
 }
 #disk-banner .msg {
-  flex: 1 1 240px;
+  flex: 1 1 15rem;
 }
 #disk-banner strong {
   display: block;
@@ -720,19 +863,10 @@ summary {
 }
 #disk-banner .msg span {
   color: var(--muted);
-  font-size: var(--fs-sm);
 }
 #disk-banner .acts {
   display: flex;
-  gap: 6px;
-}
-#disk-banner .btn {
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--sheet-edge);
-}
-#disk-banner .btn:hover {
-  background: var(--hover);
+  gap: var(--s-1);
 }
 /* ---- editor: search hits, sentinels by kind, {only} spans ---- */
 #editor .cm-searchMatch {
@@ -752,16 +886,18 @@ summary {
   box-shadow: none;
 }
 #editor .cm-textfield {
-  background: var(--soft);
+  background: var(--hover);
   color: var(--fg);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
 }
 #editor .cm-button {
   background: none;
   color: var(--muted);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
 }
 #editor .cm-button:hover {
   background: var(--hover);
@@ -769,20 +905,20 @@ summary {
 }
 #editor .cm-lineNumbers .cm-gutterElement {
   position: relative;
-  padding-left: 12px;
+  padding-left: var(--s-5);
 }
 #editor .cm-lineNumbers .cm-gutterElement.cm-bml-struct {
-  color: var(--syn-slug);
+  color: var(--muted);
 }
 #editor .cm-lineNumbers .cm-gutterElement.cm-bml-struct::before {
   content: "";
   position: absolute;
-  left: 3px;
-  top: calc(50% - 3px);
-  width: 5px;
-  height: 5px;
+  left: 0.1875rem;
+  top: calc(50% - 0.15625rem);
+  width: 0.3125rem;
+  height: 0.3125rem;
   border-radius: 1px;
-  background: var(--syn-slug);
+  background: var(--muted);
 }
 #editor .cm-lineNumbers .cm-gutterElement.cm-bml-cond {
   box-shadow: inset -1px 0 0 var(--warn);
@@ -822,7 +958,7 @@ summary {
 }
 /* %% ──── draws as a hairline rule (its text shows while the cursor is on it) */
 #editor .cm-line.cm-bml-rule {
-  font-family: var(--mono); /* box-drawing runs are line-wide in mono only */
+  font-family: var(--f-mono); /* box-drawing runs are line-wide in mono only */
 }
 #editor .cm-line.cm-bml-rule:not(.cm-activeLine) {
   white-space: pre;
@@ -846,11 +982,12 @@ summary {
 }
 /* the {only} editions tag at the end of a span's first line */
 #editor .cm-bml-cond-tag {
-  font: 10.5px system-ui, sans-serif;
+  font: var(--fs-2xs) var(--f-ui);
   border: 1px solid currentColor;
-  border-radius: 3px;
-  padding: 0 5px;
-  margin-left: 8px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: 0 var(--s-2);
+  margin-left: var(--s-4);
   color: var(--warn);
 }
 /* where a dragged image file would land (editor-images.ts): a hairline at
@@ -864,35 +1001,34 @@ summary {
 #editor .cm-image-drop span {
   position: absolute;
   left: 0;
-  top: -11px;
-  padding: 2px 8px;
-  border-radius: var(--radius);
-  background: var(--inv-bg);
-  color: var(--inv-fg);
-  font: var(--fs-sm)/16px system-ui, sans-serif;
+  top: -1px; /* centred on the 2px line */
+  transform: translateY(-50%);
+  padding: var(--s-1) var(--s-4);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: var(--acc-btn);
+  color: var(--on-acc);
+  font: var(--fs-2xs)/var(--lh) var(--f-ui);
 }
 /* the find/replace bar (search-panel.ts) */
 .cm-bml-find {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 6px 8px;
-  padding: 8px 10px;
+  gap: var(--s-3) var(--s-4);
+  padding: var(--s-4);
   background: var(--bg);
-  font: var(--fs)/1.4 system-ui, sans-serif;
+  font: var(--fs)/1.4 var(--f-ui);
 }
 .cm-bml-find .field {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-2);
   min-width: 0;
-  height: 28px;
-  padding: 0 4px 0 8px;
+  height: var(--h-md);
+  padding: 0 var(--s-2) 0 var(--s-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--soft);
-}
-.cm-bml-find .field:focus-within {
-  border-color: var(--fg);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
 }
 .cm-bml-find input {
@@ -900,7 +1036,7 @@ summary {
   flex: 1;
   min-width: 0;
   color: var(--fg);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .cm-bml-find input::placeholder {
   color: var(--muted);
@@ -908,60 +1044,64 @@ summary {
 .cm-bml-find .acts {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--s-1);
 }
 .cm-bml-find button {
   background: none;
   border: none;
   color: var(--muted);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
 }
 .cm-bml-find button:hover {
   background: var(--hover);
   color: var(--fg);
 }
 .cm-bml-find .opt {
-  font: 11px ui-monospace, Menlo, monospace;
-  padding: 2px 5px;
+  font: var(--fs-2xs) var(--f-mono);
+  padding: var(--s-1) var(--s-2);
   white-space: nowrap;
 }
 .cm-bml-find .opt[aria-pressed="true"] {
-  color: var(--fg);
-  background: var(--hover);
-  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--acc-ink);
+  background: var(--acc-wash);
 }
 .cm-bml-find .ghost {
-  padding: 2px 7px;
-  font-size: 14px;
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--fs-sm);
 }
 .cm-bml-find .btn {
-  padding: 3px 10px;
-  font-size: 12.5px;
+  min-height: var(--h-sm);
+  padding: 0 var(--s-3);
+  font-size: var(--fs-sm);
 }
 .cm-bml-find .count {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-2xs);
   font-variant-numeric: tabular-nums;
-  padding: 0 4px;
+  padding: 0 var(--s-2);
   white-space: nowrap;
 }
 /* insert popovers (editor-insert.ts): `{` completions, the ⌘K list of
-   every sentinel, and the wrap bar over a selection */
+   every sentinel, and the wrap bar over a selection. One menu surface (§6.9),
+   shared with the switcher and the font picker. */
 #editor .cm-tooltip {
+  background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 2px 6px var(--backdrop), 0 16px 40px var(--backdrop);
-  font: var(--fs)/1.4 system-ui, sans-serif;
+  border-radius: var(--r-pop);
+  corner-shape: var(--corner);
+  box-shadow: var(--shadow-pop);
+  font: var(--fs)/1.4 var(--f-ui);
 }
 #editor .cm-tooltip-autocomplete,
 #editor .cm-bml-palette {
-  padding: 6px;
+  padding: var(--s-2);
 }
 #editor .cm-tooltip.cm-tooltip-autocomplete > ul,
 #editor .cm-bml-palette ul {
   font: inherit;
-  width: 340px;
+  width: 24rem;
   min-width: 0;
   max-height: 22em;
   margin: 0;
@@ -972,11 +1112,13 @@ summary {
 #editor .cm-tooltip-autocomplete > ul > li,
 #editor .cm-bml-palette li:not(.grp) {
   display: grid;
-  grid-template-columns: 92px 1fr auto;
-  gap: 10px;
+  grid-template-columns: 7rem 1fr auto;
+  gap: var(--s-3);
   align-items: baseline;
-  padding: 4px 8px;
-  border-radius: var(--radius);
+  min-height: var(--h-md);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   line-height: 1.4;
   cursor: pointer;
 }
@@ -986,12 +1128,16 @@ summary {
   border: none;
   opacity: 1;
   font-size: var(--fs-sm);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  font-weight: 500;
   color: var(--muted);
-  padding: 6px 8px 3px;
+  padding: var(--s-3) var(--s-3) var(--s-1);
 }
+/* a sentinel's name: markup, so mono in the red */
 #editor :is(.cm-completionLabel, .cm-bml-palette code) {
-  font: 12.5px ui-monospace, Menlo, monospace;
-  color: var(--fg);
+  font: 500 var(--fs-sm) var(--f-mono);
+  color: var(--acc-ink);
 }
 #editor .cm-completionMatchedText {
   text-decoration: none;
@@ -1000,29 +1146,29 @@ summary {
 #editor :is(.cm-completionDetail, .cm-bml-palette .d) {
   margin: 0;
   font-style: normal;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 #editor :is(.cm-tooltip-autocomplete, .cm-bml-palette) .f {
-  font: 10.5px ui-monospace, Menlo, monospace;
-  color: var(--syn-p);
+  font: var(--fs-2xs) var(--f-mono);
+  color: var(--muted);
 }
 /* image completions: a thumbnail beside the slug over its note */
 #editor .cm-tooltip-autocomplete > ul > li:has(> .cm-bml-thumb) {
-  grid-template-columns: 30px 1fr;
-  grid-template-rows: 20px 20px;
+  grid-template-columns: 1.875rem 1fr;
+  grid-template-rows: 1.25rem 1.25rem;
   row-gap: 0;
 }
 #editor .cm-tooltip-autocomplete li > .cm-bml-thumb {
   grid-row: 1 / span 2;
-  width: 30px;
-  height: 40px;
+  width: 1.875rem;
+  height: 2.5rem;
   object-fit: contain;
-  background: var(--paper);
-  border: 1px solid var(--soft);
+  background: var(--stock);
+  border: 1px solid var(--line);
   border-radius: 2px;
   box-sizing: border-box;
 }
@@ -1032,8 +1178,14 @@ summary {
   background: none;
   color: var(--muted);
 }
+/* an image's slug or filename: an identifier, in the row's colour (§3.1) */
 #editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .cm-completionLabel {
   align-self: end;
+  font: var(--fs-sm) var(--f-hivis);
+  color: inherit;
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb.add) > .cm-completionLabel {
+  font-family: var(--f-ui); /* "Add image from your computer…" is words */
 }
 #editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb):not(:has(> .cm-completionDetail)) > .cm-completionLabel {
   grid-row: 1 / span 2;
@@ -1047,27 +1199,22 @@ summary {
 }
 #editor .cm-tooltip-autocomplete > ul > li[aria-selected],
 #editor .cm-bml-palette li[aria-selected="true"] {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
-}
-#editor :is(.cm-tooltip-autocomplete li[aria-selected], .cm-bml-palette li[aria-selected="true"]) :is(code, .cm-completionLabel, .cm-completionDetail, .d, .f) {
-  color: var(--inv-fg);
-}
-#editor :is(.cm-tooltip-autocomplete li[aria-selected], .cm-bml-palette li[aria-selected="true"]) :is(.cm-completionDetail, .d, .f) {
-  opacity: .7;
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
 #editor .cm-bml-palette input {
   all: unset;
   box-sizing: border-box;
   display: block;
   width: 100%;
-  height: 28px;
-  margin-bottom: 4px;
-  padding: 0 8px;
-  border: 1px solid var(--fg);
-  border-radius: var(--radius);
+  height: var(--h-md);
+  margin-bottom: var(--s-2);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: var(--fg);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 #editor .cm-bml-palette input::placeholder {
   color: var(--muted);
@@ -1075,8 +1222,8 @@ summary {
 #editor .cm-bml-wrapbar {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 3px;
+  gap: var(--s-1);
+  padding: var(--s-1);
 }
 .cm-editor:not(.cm-focused) .cm-bml-wrapbar {
   visibility: hidden; /* e.g. while the find bar selects a hit */
@@ -1084,13 +1231,14 @@ summary {
 #editor .cm-bml-wrapbar button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-4);
   white-space: nowrap;
   background: none;
   border: 0;
-  padding: 4px 9px;
-  border-radius: var(--radius);
-  font-size: 12.5px;
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  font-size: var(--fs-sm);
   color: var(--fg);
   cursor: pointer;
 }
@@ -1099,36 +1247,29 @@ summary {
 }
 #editor .cm-bml-wrapbar .vsep {
   width: 1px;
-  height: 18px;
-  margin: 0 4px;
+  height: 1.125rem;
+  margin: 0 var(--s-2);
   background: var(--line);
 }
 /* spell check (spelling.ts): a wavy underline, and the hover menu is the wrap bar */
 #editor .cm-bml-misspelled {
   text-decoration: underline wavy var(--err);
   text-decoration-skip-ink: none;
-  text-underline-offset: 3px;
+  text-underline-offset: 0.2em;
 }
 #editor .cm-bml-spell {
   visibility: visible; /* a hover, focused or not, unlike the wrap bar */
 }
 #editor .cm-bml-spell .none {
-  padding: 4px 9px;
-  font-size: 12.5px;
+  padding: var(--s-2) var(--s-4);
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
-#editor .cm-bml-wrapbar kbd {
-  font: 10px ui-monospace, Menlo, monospace;
-  padding: 0 4px;
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  color: var(--muted);
-}
+
 #preview {
   background: var(--desk);
   overflow: auto;
-  padding: 16px;
+  padding: var(--s-6);
   position: relative;
   --preview-zoom: var(--preview-fit, 1); /* --preview-fit: fitPreview() */
 }
@@ -1151,9 +1292,9 @@ summary {
   counter-increment: staged;
 }
 #preview[data-rendering]::after {
-  content: "Rendering pages… " counter(staged);
+  content: "Setting type… " counter(staged) " pages";
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   display: block;
   text-align: center;
 }
@@ -1163,10 +1304,11 @@ summary {
 #preview[data-rendering="again"]::after {
   position: sticky;
   bottom: 0;
-  margin: 8px auto -8px;
+  margin: var(--s-4) auto calc(var(--s-4) * -1);
   width: max-content;
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--desk);
 }
 /* The pages on screen no longer match the text: an edit is on its way
@@ -1179,7 +1321,7 @@ summary {
 }
 #preview .preview-stage {
   position: absolute;
-  inset: 16px;
+  inset: var(--s-6);
   pointer-events: none; /* clicks reach the old pages until the swap */
   --preview-zoom: 1;
 }
@@ -1204,7 +1346,7 @@ summary {
 }
 /* Pages are paper: ink black, never the chrome's text color — even in dark mode. */
 .pagedjs_page {
-  background: var(--paper);
+  background: var(--stock);
   color: #141210;
   box-shadow: var(--page-shadow);
   margin-bottom: 16px;
@@ -1270,20 +1412,21 @@ summary {
   min-width: 0;
   min-height: 0;
 }
-/* Nav: small group headings, rows with a muted count, current inverted. */
+/* Nav: small group headings, rows with a muted count, current in the red wash. */
 #style-nav {
   overflow-y: auto;
-  padding: 10px 8px;
+  padding: var(--s-4);
 }
 #style-nav .ni {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--s-4);
   width: 100%;
   background: none;
   border: 0;
-  border-radius: var(--radius);
-  padding: 4px 8px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: var(--s-2) var(--s-4);
   text-align: left;
   color: var(--fg);
   cursor: pointer;
@@ -1292,8 +1435,8 @@ summary {
   background: var(--hover);
 }
 #style-nav .ni[aria-current="true"] {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
 #style-nav .ni .t {
   flex: 1;
@@ -1302,7 +1445,7 @@ summary {
   white-space: nowrap;
 }
 #style-nav .ni .k {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-2xs);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1313,14 +1456,14 @@ summary {
 .cfg-field {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 5px 0;
+  gap: var(--s-4);
+  margin: var(--s-2) 0;
   /* so a full-width .cfg-error drops to its own line instead of
      squeezing the control it belongs to down to nothing */
   flex-wrap: wrap;
 }
 .cfg-label {
-  width: 110px;
+  width: 6.875rem;
   flex: none;
   color: var(--muted);
 }
@@ -1332,14 +1475,15 @@ summary {
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 4px 8px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: var(--s-2) var(--s-4);
 }
 .cfg-row {
   display: flex;
   flex: 1;
   min-width: 0;
-  gap: 6px;
+  gap: var(--s-3);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -1349,8 +1493,8 @@ summary {
 }
 .cfg-entry {
   border-top: 1px dashed var(--line);
-  padding-top: 6px;
-  margin-top: 6px;
+  padding-top: var(--s-3);
+  margin-top: var(--s-3);
 }
 /* Click-to-style: hovered, highlighted ("on N pages") and picked
    elements in the preview; the pick stays solid over the others. Screen
@@ -1359,7 +1503,7 @@ summary {
   [data-style-hover],
   [data-style-hl] {
     outline: 1px solid var(--hover-ring);
-    outline-offset: 3px;
+    outline-offset: 0.1875rem;
   }
   [data-style-hl] {
     background: var(--hl);
@@ -1367,7 +1511,7 @@ summary {
   [data-style-selected],
   [data-edit-hl] {
     outline: 1px solid var(--pick);
-    outline-offset: 3px;
+    outline-offset: 0.1875rem;
   }
 }
 .pagedjs_page .bml *,
@@ -1376,8 +1520,8 @@ summary {
 }
 /* ---- style panel controls (web/src/panel-controls.ts), scoped so they cannot collide ---- */
 #config-overlay svg.i {
-  width: 16px;
-  height: 16px;
+  width: var(--icon);
+  height: var(--icon);
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;
@@ -1385,36 +1529,57 @@ summary {
   stroke-linejoin: round;
   flex: none;
 }
+/* View heading (§6.5): the nav group over the view's name in Fell, and
+   where it applies at the right. */
 #config-overlay .phead {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 10px 10px 12px;
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-5) var(--s-6) var(--s-4);
   border-bottom: 1px solid var(--line);
 }
-#config-overlay .crumbs {
+#config-overlay .crumb {
+  font-size: var(--fs-xs);
   color: var(--muted);
-  white-space: nowrap;
+}
+#config-overlay .vh-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-width: 0;
+}
+#config-overlay .phead h2 {
+  margin: 0;
+  font: 400 var(--fs-h)/var(--lh-tight) var(--f-title);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-#config-overlay .crumbs b {
+#config-overlay .applies {
+  flex: none;
+  padding: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 0.1875rem;
+}
+#config-overlay .applies:hover {
+  background: none;
   color: var(--fg);
-  font-weight: 600;
 }
 #config-overlay .pbody {
   overflow-y: auto;
-  padding: 4px 16px 28px;
+  padding: var(--s-2) var(--s-6) var(--s-7);
   flex: 1;
   min-height: 0;
   container-type: inline-size;
 }
 #config-overlay .sec {
-  padding: 14px 0 12px;
+  padding: var(--s-5) 0;
   border-bottom: 1px solid var(--line);
   display: grid;
-  gap: 4px;
-  border-radius: 4px;
+  gap: var(--s-3);
   transition: background-color .8s cubic-bezier(.16,1,.3,1);
 }
 #config-overlay .sec[hidden] {
@@ -1433,13 +1598,13 @@ summary {
    view, next to the cards it acts on. */
 #theme-bar {
   position: sticky;
-  top: -4px; /* .pbody's top padding */
+  top: calc(var(--s-2) * -1); /* .pbody's top padding */
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: -14px -16px 6px;
-  padding: 8px 16px;
+  gap: var(--s-3);
+  margin: calc(var(--s-5) * -1) calc(var(--s-6) * -1) var(--s-3);
+  padding: var(--s-4) var(--s-6);
   background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
@@ -1454,26 +1619,27 @@ summary {
   white-space: nowrap;
 }
 #config-overlay .tintro {
-  margin: 0 0 10px;
+  margin: 0 0 var(--s-4);
   color: var(--muted);
   line-height: 1.45;
 }
 .tgrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--s-4);
 }
 .tcard,
 #config-overlay .tcard {
   white-space: normal;
   min-width: 0;
   display: grid;
-  gap: 6px;
+  gap: var(--s-3);
   align-content: start;
   text-align: left;
-  padding: 12px 12px 10px;
+  padding: var(--s-5) var(--s-5) var(--s-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
   color: var(--fg);
   cursor: pointer;
@@ -1489,77 +1655,81 @@ summary {
   box-shadow: inset 0 0 0 1px var(--fg);
 }
 .tname {
-  font-size: 21px;
+  font-size: var(--fs-h);
   line-height: 1.1;
 }
 .tspec {
   display: grid;
-  gap: 3px;
+  gap: var(--s-1);
   justify-items: center;
   text-align: center;
-  padding: 12px 8px;
-  background: var(--paper);
+  padding: var(--s-5) var(--s-4);
+  background: var(--stock);
   color: var(--sheet-ink);
-  border: 1px solid var(--soft);
-  border-radius: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
 }
 .ttitle {
   line-height: 1.25;
 }
 .tbody {
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   text-align: left;
   justify-self: stretch;
-  margin-top: 6px;
+  margin-top: var(--s-3);
 }
 .tdesc {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 1.35;
 }
 .tpair {
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .tcard.sm,
 #config-overlay .tcard.sm {
-  padding: 8px 8px 7px;
-  gap: 4px;
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  gap: var(--s-2);
 }
 .tcard.sm .tname {
-  font-size: 16px;
+  font-size: var(--fs-lg);
 }
 .tcard.sm .tspec {
-  padding: 8px 4px;
+  padding: var(--s-4) var(--s-2);
 }
 #config-overlay .sech {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  margin: 0 0 4px;
+  gap: var(--s-4);
 }
+/* A group label (§3): small caps, tracked, muted. */
 #config-overlay .sech h3 {
   margin: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  letter-spacing: -.005em;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  color: var(--muted);
 }
 #config-overlay .where {
   background: none;
   border: 0;
-  padding: 2px 6px;
-  margin-right: -6px;
-  border-radius: var(--radius);
+  padding: var(--s-1) var(--s-3);
+  margin-right: calc(var(--s-3) * -1);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--s-2);
 }
 #config-overlay .where:hover {
   color: var(--fg);
@@ -1568,106 +1738,107 @@ summary {
 #config-overlay .info {
   background: none;
   border: 0;
-  padding: 0 0 0 4px;
+  padding: 0 0 0 var(--s-2);
   color: var(--muted);
   cursor: help;
-  vertical-align: -2px;
+  vertical-align: -0.125em;
 }
 #config-overlay .info:hover,
 #config-overlay .info:focus-visible {
   color: var(--fg);
 }
 #config-overlay .info svg.i {
-  width: 13px;
-  height: 13px;
-}
-#config-overlay .where svg.i {
-  width: 13px;
-  height: 13px;
+  width: 0.8125rem;
+  height: 0.8125rem;
 }
 #config-overlay .row {
   display: grid;
-  grid-template-columns: 116px minmax(0,1fr);
+  grid-template-columns: 8.5rem minmax(0,1fr);
   align-items: center;
-  gap: 10px;
-  min-height: 32px;
+  gap: var(--s-4);
+  min-height: var(--h-md);
 }
 #config-overlay .row[hidden] {
   display: none;
 }
 #config-overlay .lbl {
-  color: var(--muted);
   position: relative;
-  padding-left: 11px;
+  padding-left: var(--s-5);
 }
-#config-overlay .row.set .lbl {
-  color: var(--fg);
-}
+/* The set dot: a value this view set. */
 #config-overlay .row.set .lbl::before {
   content: "";
   position: absolute;
   left: 0;
-  top: .55em;
-  width: 5px;
-  height: 5px;
+  top: .6em;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: 50%;
-  background: var(--fg);
+  background: var(--acc);
+}
+#config-overlay .lbl .from {
+  display: block;
 }
 #config-overlay .ctl {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-4);
   flex-wrap: wrap;
   min-width: 0;
 }
 #config-overlay .from {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 #config-overlay .st {
   display: inline-flex;
   align-items: center;
-  height: 28px;
+  height: var(--h-md);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
 }
 #config-overlay .st:focus-within {
-  border-color: var(--muted);
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px var(--acc);
 }
 #config-overlay .st button {
   background: none;
   border: 0;
   height: 100%;
-  width: 26px;
+  width: var(--h-sm);
   display: grid;
   place-items: center;
   color: var(--muted);
   cursor: pointer;
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
 }
 #config-overlay .st button:hover {
   color: var(--fg);
   background: var(--hover);
 }
 #config-overlay .st input {
-  width: 44px;
+  width: 3.25rem;
   border: 0;
   background: none;
-  text-align: right;
-  padding: 0 2px;
+  text-align: center;
+  padding: 0 var(--s-1);
   font-variant-numeric: tabular-nums;
   outline: none;
 }
+/* An inherited value shows as the placeholder: muted and italic. */
 #config-overlay .st input::placeholder {
   color: var(--muted);
-  opacity: .75;
+  font-style: italic;
+  opacity: 1;
 }
 #config-overlay .st .u {
   color: var(--muted);
-  font-size: 12px;
-  padding: 0 4px 0 2px;
-  min-width: 18px;
+  font-size: var(--fs-xs);
+  padding: 0 var(--s-2) 0 var(--s-1);
+  min-width: 1.125rem;
 }
 /* the unit as a quiet picker: no caret, a faint chip on hover */
 #config-overlay .st select.u {
@@ -1676,12 +1847,13 @@ summary {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
-  height: 20px;
-  margin-left: 3px;
-  padding: 0 4px;
-  border-radius: var(--radius);
+  height: 1.25rem;
+  margin-left: var(--s-1);
+  padding: 0 var(--s-2);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   cursor: pointer;
 }
 #config-overlay .st select.u:hover,
@@ -1691,106 +1863,176 @@ summary {
 }
 :is(#config-overlay, #text-view) .seg {
   display: inline-flex;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--s-1);
+  padding: var(--s-1);
   border: 1px solid var(--line);
-  border-radius: calc(var(--radius) + 2px);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   flex-wrap: wrap;
 }
 :is(#config-overlay, #text-view) .seg button {
   background: none;
   border: 0;
-  border-radius: var(--radius);
-  padding: 2px 9px;
-  min-height: 22px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: var(--s-1) var(--s-4);
+  min-height: calc(var(--h-md) - 2 * var(--s-1) - 2 * var(--hair));
   color: var(--muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-2);
 }
 :is(#config-overlay, #text-view) .seg button:hover {
   color: var(--fg);
-  background: var(--hover);
 }
 #config-overlay .seg button[aria-checked="true"],
 #text-view .seg button[aria-checked="true"],
 #config-overlay .tog[aria-pressed="true"] {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
 #config-overlay .tog {
   background: none;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 2px 10px;
-  min-height: 28px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: var(--s-1) var(--s-4);
+  min-height: var(--h-md);
   color: var(--muted);
   cursor: pointer;
 }
 #config-overlay .tog:not([aria-pressed="true"]):not(.primary):hover {
-  color: var(--fg); /* a primary toggle keeps its inverted text on hover */
+  color: var(--fg); /* a primary toggle keeps its own text on hover */
 }
-#config-overlay .tog[aria-pressed="true"] {
-  border-color: var(--inv-bg);
+#config-overlay .tog:is([aria-pressed="true"], .primary) {
+  border-color: transparent;
 }
-/* switch (panel-controls.ts switchInput): a hairline track, the knob in
-   --muted; on, the track is the inverted pill and the knob its text colour */
+/* An action that must read as a button out of context (§6.1 outline). */
+#config-overlay .tog.outline {
+  color: var(--fg);
+}
+/* swatches (panel-controls.ts swatches, §6.5): colour chips, then a picker
+   beside its code; the chosen one sits in the red wash */
+#config-overlay .colours {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1);
+}
+#config-overlay .colour,
+#config-overlay .colours input[type="color"] {
+  width: var(--h-md);
+  height: var(--h-md);
+  padding: var(--s-1);
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  cursor: pointer;
+}
+#config-overlay .colour i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: var(--stock); /* the unset option: the default stock */
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+#config-overlay .colour[aria-pressed="true"],
+#config-overlay .colours input[type="color"].on {
+  background: var(--acc-wash);
+  box-shadow: inset 0 0 0 1px var(--acc);
+}
+#config-overlay .colours input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+#config-overlay .colours input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+#config-overlay .colours input[type="color"]::-moz-color-swatch {
+  border: 0;
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+#config-overlay .colours input.txt {
+  width: 6.5rem;
+  margin-left: var(--s-2);
+  font-family: var(--f-hivis); /* a typed code (§3.1) */
+  font-size: var(--fs-sm);
+}
+/* switch (panel-controls.ts switchInput, §6.4): always a pill; a --line
+   track, --acc when on, a paper knob that slides */
 :is(#config-overlay, #text-view) .sw {
   appearance: none;
   position: relative;
   flex: none;
-  width: 30px;
-  height: 18px;
+  width: 1.875rem;
+  height: 1.0625rem;
   margin: 0;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: none;
+  border: 0;
+  border-radius: 999rem; /* a pill */
+  background: var(--line);
   cursor: pointer;
-  transition: background .15s, border-color .15s;
+  transition: background var(--t-fast);
 }
 :is(#config-overlay, #text-view) .sw::before {
   content: "";
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
+  top: var(--s-1);
+  left: var(--s-1);
+  width: 0.8125rem;
+  height: 0.8125rem;
   border-radius: 50%;
-  background: var(--muted);
-  transition: transform .15s, background .15s;
-}
-:is(#config-overlay, #text-view) .sw:hover::before {
-  background: var(--fg);
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .2);
+  transition: transform var(--t-fast);
 }
 :is(#config-overlay, #text-view) .sw:checked {
-  background: var(--inv-bg);
-  border-color: var(--inv-bg);
+  background: var(--acc);
 }
 :is(#config-overlay, #text-view) .sw:checked::before {
-  transform: translateX(12px);
-  background: var(--inv-fg);
+  transform: translateX(0.8125rem);
+}
+:is(#config-overlay, #text-view) .sw:disabled {
+  opacity: .45;
 }
 :is(#config-overlay, #text-view) select.sel,
 #config-overlay input.txt {
-  height: 28px;
+  height: var(--h-md);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
-  padding: 0 8px;
+  padding: 0 var(--s-4);
   min-width: 0;
   max-width: 100%;
 }
+/* The native select with the sheet's chevron (mid-grey reads on both papers). */
 :is(#config-overlay, #text-view) select.sel {
-  padding-right: 4px;
+  appearance: none;
+  padding-right: var(--s-7);
+  background: var(--bg) no-repeat right var(--s-3) center / 0.625rem
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.4'/%3E%3C/svg%3E");
+  color: var(--fg);
   cursor: pointer;
 }
+:is(#config-overlay, #text-view) select.sel:focus-visible,
+#config-overlay input.txt:focus-visible,
+#config-overlay details.more textarea:focus-visible {
+  outline: none;
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px var(--acc);
+}
 #text-view select.sel {
-  height: 22px; /* the bar's other controls are 20px */
-  padding-left: 6px;
+  height: var(--h-sm); /* as the bar's steppers */
+  padding-left: var(--s-3);
 }
 #config-overlay input.txt {
-  width: 140px;
+  width: 8.75rem;
 }
 /* font picker (font-picker.ts): a button in the family's own face that
    opens a search popup over the whole Google catalog */
@@ -1802,15 +2044,16 @@ summary {
 #config-overlay .fontbtn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-3);
   width: 100%;
-  height: 30px;
-  padding: 0 6px 0 8px;
+  height: var(--h-md);
+  padding: 0 var(--s-3) 0 var(--s-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
   color: var(--fg);
-  font-size: 15px;
+  font-size: var(--fs-lg);
   text-align: left;
   cursor: pointer;
 }
@@ -1830,27 +2073,29 @@ summary {
 #config-overlay .fontpop {
   position: absolute;
   z-index: 20;
-  top: calc(100% + 4px);
+  top: calc(100% + var(--s-2));
   right: 0;
-  width: max(100%, 320px);
+  width: max(100%, 20rem);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px;
+  gap: var(--s-3);
+  padding: var(--s-2);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 2px 6px var(--backdrop), 0 16px 40px var(--backdrop);
+  border-radius: var(--r-pop);
+  corner-shape: var(--corner);
+  box-shadow: var(--shadow-pop);
 }
 #config-overlay .fontpop .find {
   all: unset;
   box-sizing: border-box;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--fg);
-  border-radius: var(--radius);
+  height: var(--h-md);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: var(--fg);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 #config-overlay .fontpop .find::placeholder {
   color: var(--muted);
@@ -1859,16 +2104,17 @@ summary {
   align-self: flex-start;
 }
 #config-overlay .fontpop ul {
-  max-height: 320px;
+  max-height: 20rem;
   margin: 0;
   padding: 0;
   list-style: none;
   overflow: hidden auto;
 }
 #config-overlay .fontpop li {
-  padding: 4px 8px;
-  border-radius: var(--radius);
-  font-size: 17px;
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  font-size: var(--fs-lg);
   line-height: 1.35;
   white-space: nowrap;
   overflow: hidden;
@@ -1880,31 +2126,33 @@ summary {
   display: none;
 }
 #config-overlay .fontpop li.grp {
-  font: var(--fs-sm) system-ui, sans-serif;
+  font: 500 var(--fs-sm) var(--f-ui);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
   color: var(--muted);
-  padding: 8px 8px 3px;
+  padding: var(--s-4) var(--s-4) var(--s-1);
   cursor: default;
 }
 #config-overlay .fontpop li.typed {
-  font: var(--fs) system-ui, sans-serif;
+  font: var(--fs) var(--f-ui);
 }
 #config-overlay .fontpop li:not(.grp):hover {
   background: var(--hover);
 }
 #config-overlay .fontpop li[aria-selected="true"] {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
 #config-overlay .spec {
-  font-size: 22px;
+  font-size: var(--fs-h);
   line-height: 1;
-  width: 30px;
+  width: 1.875rem;
   text-align: center;
   color: var(--fg);
 }
 #config-overlay .sample {
-  margin: 6px 0 2px 11px;
-  font-size: 21px;
+  margin: var(--s-3) 0 var(--s-1) var(--s-5);
+  font-size: var(--fs-h);
   line-height: 1.3;
   color: var(--fg);
   text-wrap: pretty;
@@ -1913,18 +2161,24 @@ summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 6px;
-  padding: 6px 0 2px 11px;
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-3) 0 var(--s-1) var(--s-5);
 }
 #config-overlay .uses .from {
-  margin-right: 2px;
+  margin-right: var(--s-1);
 }
+/* Chip (§6.10): "Used by" links. */
 #config-overlay .chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--h-sm);
   background: none;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 1px 9px;
-  font-size: 12px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: 0 var(--s-3);
+  font-size: var(--fs-xs);
   color: var(--fg);
   cursor: pointer;
 }
@@ -1934,30 +2188,30 @@ summary {
 #config-overlay .range {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-4);
   flex: 1;
 }
 #config-overlay .range input {
   flex: 1;
-  min-width: 80px;
+  min-width: 5rem;
   accent-color: var(--fg);
 }
 #config-overlay .range output {
   font-variant-numeric: tabular-nums;
-  min-width: 34px;
+  min-width: 2.125rem;
 }
 #config-overlay details.more {
-  margin-top: 2px;
+  margin-top: var(--s-1);
 }
 #config-overlay details.more summary {
   cursor: pointer;
   color: var(--muted);
-  padding: 6px 0;
+  padding: var(--s-3) 0;
   list-style: none;
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
+  gap: var(--s-3);
+  font-size: var(--fs-sm);
 }
 #config-overlay details.more summary::-webkit-details-marker {
   display: none;
@@ -1973,43 +2227,48 @@ summary {
 }
 #config-overlay details.more textarea {
   width: 100%;
-  min-height: 62px;
+  min-height: 5.5rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
-  padding: 6px 8px;
-  font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  padding: var(--s-3) var(--s-4);
+  font: var(--fs-sm)/1.5 var(--f-hivis);
   resize: vertical;
 }
 #config-overlay .hint {
   color: var(--muted);
-  font-size: 12px;
-  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  margin: var(--s-1) 0 0;
 }
 #config-overlay .hint.warn {
   color: var(--warn);
-  margin: 4px 0 0 11px;
+  margin: var(--s-2) 0 0 var(--s-5);
 }
 #config-overlay .foot {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 12px;
+  padding-top: var(--s-5);
 }
 #config-overlay .tip {
-  margin: 16px 0 0;
+  margin: var(--s-6) 0 0;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   display: flex;
-  gap: 8px;
+  gap: var(--s-4);
   align-items: flex-start;
+}
+#config-overlay .tip .manicule {
+  color: var(--acc-ink);
+  font: var(--fs-h)/1 var(--f-title);
 }
 /* Page numbers' position picker: a spread, four folio slots a page. */
 #config-overlay .pospick {
   display: flex;
-  gap: 14px;
+  gap: var(--s-5);
   align-items: center;
-  padding: 4px 0 6px;
+  padding: var(--s-2) 0 var(--s-3);
 }
 #config-overlay .spread-mini {
   display: flex;
@@ -2017,8 +2276,8 @@ summary {
 }
 #config-overlay .spread-mini .pm {
   position: relative;
-  width: 58px;
-  height: 84px;
+  width: 3.625rem;
+  height: 5.25rem;
   background: var(--bg);
   border: 1px solid var(--line);
 }
@@ -2028,14 +2287,14 @@ summary {
 #config-overlay .spread-mini .pm::before {
   content: "";
   position: absolute;
-  inset: 14px 9px 16px;
+  inset: 0.875rem 0.5625rem 1rem;
   background: repeating-linear-gradient(var(--line) 0 1px, transparent 1px
-    5px);
+    0.3125rem);
 }
 #config-overlay .pospick .slot {
   position: absolute;
-  width: 10px;
-  height: 6px;
+  width: 0.625rem;
+  height: 0.375rem;
   padding: 0;
   border-radius: 2px;
   border: 1px solid var(--muted);
@@ -2059,38 +2318,38 @@ summary {
   background: var(--err);
 }
 #config-overlay .pospick .slot.bc {
-  bottom: 5px;
-  left: 23px;
+  bottom: 0.3125rem;
+  left: 1.4375rem;
 }
 #config-overlay .pospick .slot.tc {
-  top: 4px;
-  left: 23px;
+  top: 0.25rem;
+  left: 1.4375rem;
 }
 #config-overlay .pm.v .slot.bo {
-  bottom: 5px;
-  left: 6px;
+  bottom: 0.3125rem;
+  left: 0.375rem;
 }
 #config-overlay .pm.r .slot.bo {
-  bottom: 5px;
-  right: 6px;
+  bottom: 0.3125rem;
+  right: 0.375rem;
 }
 #config-overlay .pm.v .slot.to {
-  top: 4px;
-  left: 6px;
+  top: 0.25rem;
+  left: 0.375rem;
 }
 #config-overlay .pm.r .slot.to {
-  top: 4px;
-  right: 6px;
+  top: 0.25rem;
+  right: 0.375rem;
 }
 #config-overlay .pospick .label {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 #config-overlay .pospick .label b {
   display: block;
   color: var(--fg);
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 /* "Where they're dropped": read-only rule rows. */
 #config-overlay .rules {
@@ -2101,9 +2360,9 @@ summary {
 #config-overlay .rules li {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--soft);
+  gap: var(--s-5);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line);
 }
 #config-overlay .rules li:last-child {
   border-bottom: 0;
@@ -2118,10 +2377,10 @@ summary {
   display: grid;
   grid-template-columns: auto minmax(0,1fr) auto;
   grid-template-rows: auto auto auto;
-  gap: 6px 8px;
+  gap: var(--s-3) var(--s-4);
   align-items: center;
   justify-items: center;
-  padding: 6px 0 2px;
+  padding: var(--s-3) 0 var(--s-1);
 }
 #config-overlay .mdiag .stage {
   grid-area: 2 / 2;
@@ -2130,8 +2389,8 @@ summary {
 }
 #config-overlay .mpage {
   position: relative;
-  height: 138px;
-  background: var(--paper);
+  height: 8.625rem;
+  background: var(--stock);
   border: 1px solid var(--line);
 }
 #config-overlay .mpage.v {
@@ -2140,8 +2399,9 @@ summary {
 }
 #config-overlay .mblock {
   position: absolute;
-  background: repeating-linear-gradient(var(--hover) 0 3px, transparent 3px
-    7px);
+  background: repeating-linear-gradient(var(--hover) 0 0.1875rem, transparent
+    0.1875rem
+    0.4375rem);
 }
 #config-overlay .mdiag .mt {
   grid-area: 1 / 2;
@@ -2157,7 +2417,7 @@ summary {
 }
 /* Narrow slot: the side steppers would overlap the drawing, so Inside and
    Outside move to a row of their own under it. */
-@container (max-width: 400px) {
+@container (max-width: 25rem) {
   #config-overlay .mdiag {
     grid-template-columns: 1fr 1fr;
   }
@@ -2180,15 +2440,15 @@ summary {
 #config-overlay .mlab {
   display: grid;
   justify-items: center;
-  gap: 2px;
-  font-size: 11.5px;
+  gap: var(--s-1);
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 #config-overlay .readout {
   color: var(--muted);
   display: grid;
-  gap: 4px;
-  padding: 4px 0 0 11px;
+  gap: var(--s-2);
+  padding: var(--s-2) 0 0 var(--s-5);
 }
 #config-overlay .readout p {
   margin: 0;
@@ -2204,21 +2464,21 @@ summary {
    in the SVG's units, inches, where its dash pattern is measured. */
 #sheet-view {
   display: grid;
-  gap: 10px;
+  gap: var(--s-4);
   align-content: start;
   background: var(--desk);
   overflow-y: auto;
-  padding: 16px;
+  padding: var(--s-6);
 }
 #sheet-view .sheet {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: var(--s-4);
 }
 #sheet-view .sheet figure {
   margin: 0;
   display: grid;
-  gap: 3px;
+  gap: var(--s-1);
   justify-items: center;
 }
 #sheet-view .sheet svg {
@@ -2226,7 +2486,7 @@ summary {
   height: auto;
 }
 #sheet-view .sheet figcaption {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 #sheet-view .sheet .paper {
@@ -2262,27 +2522,22 @@ summary {
 }
 #sheet-view .hint {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   margin: 0;
 }
 #config-overlay .actions {
   display: flex;
-  gap: 8px;
-  padding: 4px 0;
-}
-#config-overlay .tog.primary {
-  background: var(--inv-bg);
-  border-color: var(--inv-bg);
-  color: var(--inv-fg);
+  gap: var(--s-4);
+  padding: var(--s-2) 0;
 }
 #config-overlay .tog:disabled {
-  opacity: .5;
+  opacity: .45;
   cursor: progress;
 }
 #config-overlay .export-status {
   display: grid;
-  gap: 4px;
-  padding-top: 6px;
+  gap: var(--s-2);
+  padding-top: var(--s-3);
   justify-items: start;
 }
 #config-overlay .export-status p {
@@ -2294,14 +2549,14 @@ summary {
 }
 #config-overlay .export-status ul {
   margin: 0;
-  padding-left: 18px;
-  font-size: 12px;
+  padding-left: var(--s-6);
+  font-size: var(--fs-xs);
 }
 #config-overlay .files {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  padding: 4px 0;
+  gap: var(--s-3) var(--s-5);
+  padding: var(--s-2) 0;
 }
 #config-overlay .files a {
   color: var(--fg);
@@ -2316,13 +2571,14 @@ summary {
 #config-overlay .ghost {
   background: none;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: var(--muted);
-  padding: 6px 9px;
+  padding: var(--s-3) var(--s-4);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-3);
   white-space: nowrap;
 }
 #config-overlay .ghost:hover {
@@ -2337,145 +2593,128 @@ summary {
 
 /* The books column's footer and the library dialog (no server: pick a folder). */
 .sw-foot {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
   border-top: 1px solid var(--line);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-3);
 }
 .ask {
   margin: auto;
-  padding: 20px 22px;
-  width: 440px;
-  max-width: calc(100vw - 20px);
+  padding: var(--s-6);
+  width: 26rem;
+  max-width: calc(100vw - var(--s-7));
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-dlg);
+  corner-shape: var(--corner);
   background: var(--bg);
   color: var(--fg);
-  box-shadow: 0 14px 36px var(--backdrop);
+  box-shadow: var(--shadow-dlg);
+}
+.ask::backdrop {
+  background: var(--backdrop);
 }
 .ask h2 {
-  margin: 0 0 6px;
-  font-size: 15px;
+  margin: 0 0 var(--s-2);
+  font: 400 var(--fs-h)/var(--lh-tight)
+    var(--f-title); /* Fell: never smaller */
 }
 .ask p {
-  margin: 0 0 14px;
+  margin: 0 0 var(--s-5);
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.4;
 }
-/* Choice list: a column of full-width rows, each a title with an optional
-   <small> note, for a dialog that asks one question. Rows separate with
-   --soft; `.primary` is the inverted pill, for the safe default. */
+.ask .empty {
+  padding: 0 0 var(--s-5);
+}
+.ask .empty h2 {
+  font-size: var(--fs-hero);
+}
+.ask .empty p {
+  margin: 0;
+}
+/* Choice list (§6.7): full-width rows, each a 500 title over an optional
+   <small> note, for a dialog that asks one question. `.primary`, the
+   recommended one, takes the red wash and a red title. */
 .choices {
-  display: flex;
-  flex-direction: column;
-  margin: 0 -10px;
+  display: grid;
+  gap: var(--s-1);
+  margin: 0 calc(var(--s-5) * -1);
 }
 .choice {
   display: block;
   width: 100%;
   margin: 0;
-  padding: 10px;
+  padding: var(--s-4) var(--s-5);
   border: 0;
-  border-top: 1px solid var(--soft);
-  border-radius: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: none;
   color: var(--fg);
   font: inherit;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
 .choice[hidden] {
   display: none;
 }
-.choice:first-child,
-.choice[hidden] + .choice,
-.choice.primary + .choice {
-  border-top: 0;
-}
 .choice:hover {
   background: var(--hover);
 }
-.choice:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: -2px;
-}
 .choice small {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--s-1);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
+  font-weight: 400;
   line-height: 1.35;
 }
 .choice.primary {
-  margin-bottom: 4px;
-  border-top: 0;
-  border-radius: var(--radius);
-  background: var(--inv-bg);
-  color: var(--inv-fg);
-}
-.choice.primary:hover {
-  background: var(--inv-bg);
-  opacity: .92;
-}
-.choice.primary small {
-  color: var(--inv-fg);
-  opacity: .7;
-}
-/* A dialog's (or the theme bar's) main button: the inverted pill, as the
-   primary choice row. */
-:is(.ask, #theme-bar) .btn.primary {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
-}
-:is(.ask, #theme-bar) .btn.primary:hover {
-  background: var(--inv-bg);
-  opacity: .92;
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
 .ask .sw-err {
   display: block;
-  margin-top: 10px;
+  margin-top: var(--s-4);
 }
 .sw-note {
   flex-basis: 100%;
-  margin: 2px 0 0;
+  margin: var(--s-1) 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 1.35;
 }
+/* The warning banner: --warn-wash and a warn icon. */
 #spec-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--soft);
-  color: var(--fg);
-  font-size: 13px;
-  line-height: 1.4;
+  background: var(--warn-wash);
 }
-#spec-banner[hidden] {
-  display: none;
+#spec-banner::before {
+  content: "";
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  background: var(--warn);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2 14.5 13.5h-13z'/%3E%3Cpath d='M8 6.5v3.2M8 11.6v.1'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 #spec-banner span {
   flex: 1;
 }
 
 /* The first-run dialogs (§7.9): Welcome, Create a new manuscript, title. */
+/* A tag on a choice ("Chromium only"): the experimental chip (§6.10). */
 .pill {
   display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  border: 1px solid var(--warn);
-  border-radius: 999px;
+  margin-left: var(--s-3);
+  padding: 0 var(--s-3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: var(--warn);
-  font-size: 10.5px;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  vertical-align: 1px;
+  font-size: var(--fs-2xs);
+  font-weight: 400;
 }
 .pill[hidden] {
   display: none;
@@ -2488,10 +2727,10 @@ summary {
   background: none;
 }
 .ask .privacy {
-  margin: 14px 0 0;
-  padding-top: 12px;
+  margin: var(--s-5) 0 0;
+  padding-top: var(--s-5);
   border-top: 1px solid var(--line);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 .ask .privacy b {
   color: var(--fg);
@@ -2505,8 +2744,8 @@ summary {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 14px;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
 }
 .ask-foot .sw-err {
   flex: 1;
@@ -2515,44 +2754,54 @@ summary {
 .ask .field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin: 10px 0 8px;
+  gap: var(--s-2);
+  margin: var(--s-4) 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .ask .field input,
 .ask .field textarea {
-  padding: 8px 10px;
+  padding: var(--s-3);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: var(--bg);
   color: var(--fg);
-  font: var(--fs) system-ui, sans-serif;
+  font: var(--fs) var(--f-ui);
   resize: vertical;
+}
+.ask .field input {
+  height: var(--h-md);
+  padding-block: 0;
+}
+/* typed codes (§3.1) */
+#web-url,
+#title-slug {
+  font: var(--fs-sm) var(--f-hivis);
 }
 .ask .hint {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .ask .hint a {
   color: var(--fg);
 }
 #title-source {
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 /* The title dialog's theme picker: a row of five small cards, wide enough
    for them. */
 #title-dlg {
-  width: 620px;
+  width: 38.75rem;
 }
 #title-themes {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
 }
-/* A fifth of 620px: 16px names (Devotional's Cinzel) outrun the card. */
+/* A fifth of the dialog: --fs-lg names (Devotional's Cinzel) outrun the card. */
 #title-themes .tname {
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }
 #import-notes {
   font: inherit;
@@ -2565,36 +2814,38 @@ summary {
 }
 #import-notes-list {
   position: fixed; /* #footer clips its overflow; fixed escapes that */
-  left: 12px;
-  bottom: 34px;
+  left: var(--s-5);
+  bottom: calc(var(--h-footer) + var(--s-2));
   z-index: 30;
-  width: min(460px, calc(100vw - 24px));
+  width: min(28.75rem, calc(100vw - var(--s-7)));
   max-height: 50vh;
   overflow: auto;
-  padding: 6px;
+  padding: var(--s-3);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-pop);
+  corner-shape: var(--corner);
   background: var(--bg);
   box-shadow: var(--page-shadow);
 }
 #import-notes-list .h {
-  padding: 6px 10px 8px;
+  padding: var(--s-3) var(--s-4) var(--s-4);
   border-bottom: 1px solid var(--line);
-  margin-bottom: 4px;
+  margin-bottom: var(--s-2);
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
 }
 #import-notes-list button {
   display: flex;
-  gap: 10px;
+  gap: var(--s-4);
   width: 100%;
-  padding: 6px 10px;
+  padding: var(--s-3) var(--s-4);
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: none;
   color: var(--fg);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   text-align: left;
   cursor: pointer;
 }
@@ -2603,8 +2854,8 @@ summary {
 }
 #import-notes-list .l {
   flex: none;
-  width: 52px;
-  padding-top: 3px;
+  width: 3.25rem;
+  padding-top: var(--s-1);
   color: var(--muted);
-  font: 11px ui-monospace, Menlo, monospace;
+  font: var(--fs-2xs) var(--f-mono);
 }

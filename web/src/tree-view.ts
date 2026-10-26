@@ -35,8 +35,12 @@ function list(
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.className = `tree-node tree-${n.kind}`;
-    btn.style.paddingLeft = `${8 + depth * 14}px`;
+    btn.style.paddingLeft = `calc(var(--s-4) * ${depth + 1})`;
     btn.textContent = n.label;
+    // no {title}: the slug stands in, and reads as one (§3.1)
+    if (n.kind !== "matter" && n.label === n.anchorId) {
+      btn.classList.add("hivis");
+    }
     btn.dataset.line = String(n.line);
     btn.onclick = () => {
       btn.closest("nav")?.querySelector("[aria-current]")?.removeAttribute(

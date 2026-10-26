@@ -178,11 +178,18 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   let current = navId(route); // the nav row to mark, kept past focus's flash
   opts.onRoute?.(current); // the healed row, so the URL drops an unknown one
 
-  const crumbs = document.createElement("span");
-  crumbs.className = "crumbs";
+  // The view heading: the nav group over the row's name, and "On N pages"
+  // when the view has just one (render() lifts it out of the view).
+  const crumb = document.createElement("span");
+  crumb.className = "crumb";
+  const title = document.createElement("h2");
+  const where = document.createElement("span");
+  const titleRow = document.createElement("div");
+  titleRow.className = "vh-row";
+  titleRow.append(title, where);
   const head = document.createElement("div");
   head.className = "phead";
-  head.append(crumbs);
+  head.append(crumb, titleRow);
   const body = document.createElement("div");
   body.className = "pbody";
   opts.overlay.replaceChildren(head, body);
@@ -211,11 +218,11 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       "aria-label",
       route.tab === "publish" ? "Publish sections" : "Style sections",
     );
-    crumbs.replaceChildren();
-    opts.nav.replaceChildren(...groups.flatMap(([title, rows]) => {
+    crumb.textContent = title.textContent = "";
+    opts.nav.replaceChildren(...groups.flatMap(([group, rows]) => {
       const h = document.createElement("div");
       h.className = "nh";
-      h.textContent = title;
+      h.textContent = group;
       return [
         h,
         ...rows.map((r) => {
@@ -223,7 +230,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
           b.type = "button";
           b.className = "ni";
           const t = document.createElement("span");
-          t.className = "t";
+          t.className = r.id.startsWith("is.") ? "t hivis" : "t";
           t.textContent = r.label;
           const k = document.createElement("span");
           k.className = "k";
@@ -231,9 +238,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
           b.append(t, k);
           if (r.id === current) {
             b.setAttribute("aria-current", "true");
-            const name = document.createElement("b");
-            name.textContent = r.label;
-            crumbs.append(`${title} / `, name);
+            crumb.textContent = group;
+            title.textContent = r.label;
           }
           b.onclick = () => go(r.route);
           return b;
@@ -287,6 +293,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     }
     if (route.tab !== "publish") opts.sheetView.replaceChildren();
     body.replaceChildren(...build());
+    const on = body.querySelectorAll(".applies");
+    where.replaceChildren(...(on.length === 1 ? on : []));
     const focus = route.focus;
     if (focus) {
       route = { ...route, focus: undefined }; // flash once, not on every refresh
