@@ -603,7 +603,8 @@ export function installPageIndicator(
 }
 
 // Fit a full spread (two pages + gap) to the pane width via CSS zoom, never
-// upscaling past 1:1. Called after each render and on pane resize.
+// upscaling past 1:1. Called after each render and on pane resize. This is
+// 100%; the reader's zoom (preview-zoom.ts, --preview-user) multiplies it.
 const SPREAD_GAP = 8;
 const PANE_PADDING = 48; // 2×16px pane padding + slack so the spread never wraps
 export function fitPreview(container: HTMLElement): void {

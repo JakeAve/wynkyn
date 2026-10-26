@@ -386,7 +386,7 @@ reads as a control beside the fields, and drops it for the wash when pressed;
 `.tog.primary` and `.tog.outline` (`--fg` text) are the panel's actions, e.g.
 Publish's one primary "Print sheets" beside the outlined "Print pages" and
 "Export EPUB". `.btn.sm` (banners), `.btn.lg` (the empty state) and `.btn.icon`
-(with `.sm`, the pane headers' expand) are built.
+(with `.sm`, the pane headers' expand and the pages' zoom − and +) are built.
 
 ### 6.2 Segmented control (`seg`)
 
@@ -479,7 +479,8 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   book and edition switcher (`#switcher`), the font picker (`.fontpop`), `{`
   completions (`.cm-tooltip-autocomplete`), ⌘K (`.cm-bml-palette`), the wrap bar
   and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling with the Prose
-  view. Fields inside a popover are §6.3 frames (focus: `--acc` border and
+  view; the pages' zoom menu (`.menu`, a native popover of `menuitemradio`
+  rows). Fields inside a popover are §6.3 frames (focus: `--acc` border and
   ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but its fields
   and pressed options follow the same rules.
 - **Completion row:** a sentinel's name in `--f-mono` `--fs-sm` `--acc-ink`, a
@@ -521,7 +522,9 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   (`.btn.sm.icon
   .expand`) pinned to the top-right corner even when the
   controls wrap. A hairline below; the pages pane's header sits on `--desk` with
-  none.
+  none. The pages pane's controls sit at the right instead, beside expand: zoom
+  (`#zoom`), `−` and `+` as small icon buttons around the percentage, a small
+  ghost in tabular figures that opens the zoom menu (§6.9). Hidden in Publish.
 - **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; Go to style
   with a dotted underline; the session count in `--acc-ink` once non-zero
   (planned: there is no session count yet).
@@ -542,9 +545,9 @@ changing, right is the result.
 
 - **Pane headers.** Write pane: Prose | Source, Aa, Spelling at left; expand at
   right (until the Prose view lands, the text view's Serif/Sans/Mono, size, Hide
-  markup and Spelling sit there). Pages pane, in every mode: expand at right
-  (room later for zoom or spread/single). The style panel keeps its view heading
-  inside.
+  markup and Spelling sit there). Pages pane: zoom (`−` `100%` `+`) then expand,
+  at right; Publish shows the sheets, so expand alone. The style panel keeps its
+  view heading inside.
 - **Expand.** The write pane and the pages pane each expand from their top-right
   corner (arrows out; arrows in, in `--acc-ink`, while expanded).
   - Expanding the **writing** hides the outline and the pages. The text keeps

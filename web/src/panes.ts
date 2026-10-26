@@ -4,7 +4,7 @@
 // (localStorage tree-hidden, pages-hidden); the expanded pane persists per
 // mode (expanded:<mode>, "writing" | "pages" | ""). Pages hide in Write only.
 import type { Mode } from "./preview.ts";
-import { $ } from "./dom.ts";
+import { $, store } from "./dom.ts";
 
 type Pane = "writing" | "pages";
 
@@ -14,16 +14,6 @@ export interface Panes {
   toggleExpand(): void;
   /** False when nothing was expanded, so esc can fall through. */
   returnFromExpand(): boolean;
-}
-
-function store(key: string, value?: string): string | null {
-  try {
-    if (value === undefined) return localStorage.getItem(key);
-    localStorage.setItem(key, value);
-  } catch {
-    // storage blocked: the layout just won't survive a reload
-  }
-  return null;
 }
 
 export function installPanes(deps: { mode(): Mode }): Panes {
