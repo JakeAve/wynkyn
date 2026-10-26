@@ -3,7 +3,12 @@
 // its kind (title, subtitle, block indent), a stand-in (⁂, an illustration)
 // and the `%%` notes behind a ☞ in the right margin. Pure; prose.ts draws it.
 import { parseSentinelLine, type SentinelTag } from "../../parser/sentinel.ts";
-import { RULE_RE, STRUCTURAL } from "./bml-language.ts";
+import {
+  RULE_RE,
+  STRUCTURAL,
+  structuralBlock,
+  wrapRanges,
+} from "./bml-language.ts";
 
 export interface Rubric {
   label: string;
@@ -156,4 +161,61 @@ export function proseLines(lines: string[], cursor: number): ProseLine[] {
     at(h).note = at(h).note === undefined ? text : `${at(h).note}\n${text}`;
   });
   return out;
+}
+
+// The text of a prose line without its inline tags: `{em}`/`{/em}` and
+// `{footnote: x}` / `{ref: x}` are cut (so `wo{em}rd{/em}` is one word), and
+// an escaped character stands for itself.
+function plainText(line: string): string {
+  let out = "", at = 0;
+  for (const { name, at: [a, s, e, b] } of wrapRanges(line)) {
+    if (a < at) continue;
+    out += line.slice(at, a);
+    if (name === "em") out += line.slice(s, e);
+    at = b;
+  }
+  return (out + line.slice(at)).replace(/\\(.)/g, "$1");
+}
+
+// Words in the manuscript's prose: no sentinel lines, no `%%` lines, no tags.
+// A word has a letter or digit in it, so a lone dash isn't one.
+export function wordCount(lines: string[]): number {
+  let n = 0;
+  for (const line of lines) {
+    if (line.startsWith("%%") || parseSentinelLine(line)) continue;
+    for (const w of plainText(line).split(/\s+/)) {
+      if (/[\p{L}\p{N}]/u.test(w)) n++;
+    }
+  }
+  return n;
+}
+
+// The chapter holding `line` (1-based): its slug and the first line under its
+// `{title}`, if it has one. null before any chapter, or in a matter or part.
+export function chapterAt(
+  lines: string[],
+  line: number,
+): { slug: string; title: string | null } | null {
+  const [from, to] = structuralBlock(
+    (n) => lines[n - 1] ?? "",
+    lines.length,
+    line,
+  );
+  const head = parseSentinelLine(lines[from - 1] ?? "");
+  if (head?.name !== "chapter" || head.closing) return null;
+  let title: string | null = null;
+  for (let n = from + 1; n <= to && title === null; n++) {
+    const t = parseSentinelLine(lines[n - 1]!);
+    if (t?.name !== "title" || t.closing) continue;
+    // the first text line under it, in its paragraph
+    for (let m = n + 1; m <= to && lines[m - 1]!.trim() !== ""; m++) {
+      const l = lines[m - 1]!;
+      if (!l.startsWith("%%") && !parseSentinelLine(l)) {
+        title = plainText(l).trim() || null;
+        break;
+      }
+    }
+    break;
+  }
+  return { slug: head.slug ?? "", title };
 }

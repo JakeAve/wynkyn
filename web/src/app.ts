@@ -36,6 +36,7 @@ import {
   setEditionSpans,
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
+import { chapterAt, wordCount } from "./prose-model.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
 import { type ImageHost, pickImageFile } from "./editor-images.ts";
@@ -238,9 +239,38 @@ function onDocChanged(text: string): void {
 
 let isNames: string[] = []; // `{is}` classes in the manuscript, from reparse
 
+// Words in the manuscript now, and when this book was opened (a book switch
+// reloads the page, so that is the session's start).
+let words = 0;
+let wordsAtOpen: number | null = null;
+
+// The writer's footer: the chapter at the cursor, the words, the words added.
+function showStats(lines: string[], line: number): void {
+  if (wordsAtOpen === null) return;
+  const chapter = chapterAt(lines, line);
+  const parts: (string | HTMLElement)[] = [];
+  if (chapter) {
+    const name = document.createElement("span");
+    name.textContent = chapter.title ?? chapter.slug;
+    if (chapter.title === null) name.className = "hivis";
+    parts.push(name, " · ");
+  }
+  const added = Math.max(0, words - wordsAtOpen);
+  parts.push(
+    `${words.toLocaleString()} ${
+      words === 1 ? "word" : "words"
+    } · +${added.toLocaleString()} today`,
+  );
+  $("write-stats").replaceChildren(...parts);
+}
+
 function reparse(text: string): void {
   const doc = parse(text);
-  isNames = text.split("\n").flatMap((line) => {
+  const lines = text.split("\n");
+  words = wordCount(lines);
+  wordsAtOpen ??= words;
+  showStats(lines, cursorLine);
+  isNames = lines.flatMap((line) => {
     const t = parseSentinelLine(line);
     return t?.name === "is" && !t.closing && t.slug ? [t.slug] : [];
   });
@@ -297,6 +327,7 @@ function followCursor(line: number): void {
   markEdited($("preview"), mode === "write" ? line : null);
   const lines = editor.state.doc.toString().split("\n");
   noteImageDpi(lines, line);
+  showStats(lines, line);
   const keys = styleKeysAt(lines, line);
   const cat = styleCatalog();
   const entry = keys.map((k) => cat.find((e) => e.key === k)).find((e) => e);

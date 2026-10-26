@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { proseLines } from "./prose-model.ts";
+import { chapterAt, proseLines, wordCount } from "./prose-model.ts";
 
 const folded = (lines: string[], cursor: number) =>
   proseLines(lines, cursor).flatMap((l, i) => l.fold ? [i] : []);
@@ -212,4 +212,43 @@ Deno.test("proseLines: %% lines fold into notes", () => {
   // At the cursor the %% line shows in place and is no note.
   const at = proseLines(lines, 7);
   assertEquals([at[7]!.fold, at[6]!.note], [false, undefined]);
+});
+
+Deno.test("wordCount: skips sentinels, comments and tags", () => {
+  assertEquals(wordCount([]), 0);
+  assertEquals(
+    wordCount([
+      "{chapter: one}", // sentinel
+      "{title}",
+      "Marley's Ghost", // 2
+      "",
+      "%% a note that is not counted", // comment
+      "One {em}two{/em} thr{em}ee{/em} four.{footnote: n1}", // 4: tags cut
+      "Escaped \\{em} and back — here", // 5: escaped text counts, a dash is no word
+      "{only: pocket}",
+      "Only in the pocket.", // 4: an {only} span's words count
+      "{/only}",
+    ]),
+    2 + 4 + 5 + 4,
+  );
+});
+
+Deno.test("chapterAt: title, slug fallback, before any chapter", () => {
+  const lines = [
+    "Front words.", // 1
+    "{chapter: one}", // 2
+    "{title}", // 3
+    "Marley's {em}Ghost{/em}", // 4
+    "",
+    "Text.", // 6
+    "{chapter: two}", // 7
+    "Text.", // 8
+    "{part: p}", // 9
+    "x", // 10
+  ];
+  assertEquals(chapterAt(lines, 1), null);
+  assertEquals(chapterAt(lines, 2), { slug: "one", title: "Marley's Ghost" });
+  assertEquals(chapterAt(lines, 6), { slug: "one", title: "Marley's Ghost" });
+  assertEquals(chapterAt(lines, 8), { slug: "two", title: null });
+  assertEquals(chapterAt(lines, 10), null);
 });

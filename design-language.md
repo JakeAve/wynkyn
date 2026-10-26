@@ -522,9 +522,9 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   .expand`) pinned to the top-right corner even when the
   controls wrap. A hairline below; the pages pane's header sits on `--desk` with
   none.
-- **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; Go to style
-  with a dotted underline; the session count in `--acc-ink` once non-zero
-  (planned: there is no session count yet).
+- **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; the writer's
+  cell opens with the stats line (§8.3), then Go to style with a dotted
+  underline.
 
 ### 6.12 Empty state
 
@@ -618,9 +618,13 @@ a hairline and rows of label left, control right: Size a − n + stepper, Dim a
 seg, Page turns a switch. Dim and page turns are saved but not drawn yet.
 Spelling's popover lists the word lists and None as check items. Completions,
 the wrap bar, ⌘K, sentinel shortcuts, find and replace, image drops and the
-preview following the cursor work in both views and expanded. Footer: chapter,
-word count, words this session, Go to style. No goals or streaks. Typewriter
-scrolling and writing on the book's paper were considered and dropped.
+preview following the cursor work in both views and expanded. Footer (built):
+the writer's cell opens with "Chapter title · 41,210 words · +512 today", the
+chapter at the cursor (its slug in `--f-hivis` when it has no title; left out
+before the first chapter), the manuscript's words and the words added since the
+book was opened (never below 0), recounted with the parse; then Go to style. No
+goals or streaks. Typewriter scrolling and writing on the book's paper were
+considered and dropped.
 
 ## 9. Winks
 
