@@ -96,7 +96,8 @@ export function installTextView(d: TextViewDeps): void {
       b.setAttribute("aria-checked", String(b.dataset.font === prefs.font));
     }
     size.value = String(prefs.size);
-    size.nextElementSibling!.textContent = `${prefs.size}px`;
+    size.parentElement!.querySelector("output")!.textContent =
+      `${prefs.size}px`;
     hide.checked = prefs.hide;
     spell.value = prefs.spell;
     setHideMarkup(editor, prefs.hide);
