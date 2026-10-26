@@ -19,6 +19,10 @@ export function printSheets(
   document.getElementById("print-sheets")?.remove();
   const layer = document.createElement("div");
   layer.id = "print-sheets";
+  // The pages' sheets are scoped to their render (preview.ts); the clones
+  // sit in that scope too.
+  const scope = pages[0]?.closest<HTMLElement>("[data-scope]")?.dataset.scope;
+  if (scope) layer.dataset.scope = scope;
   const { w: W, h: H } = geom.sheet;
   for (const side of sides) {
     const sheet = document.createElement("div");

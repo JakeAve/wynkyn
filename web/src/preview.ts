@@ -13,6 +13,7 @@ import {
   renderHash,
   saveCachedRender,
 } from "./preview-cache.ts";
+import { scopeSheet } from "./scope-css.ts";
 import type { PageProblem, Seed } from "../../renderer/page-map-types.ts";
 
 interface RenderResult {
@@ -40,7 +41,41 @@ declare const Paged: {
   Previewer: new (
     options: { pageMap: { seed: Seed; numbering: PageNumberingConfig } },
   ) => Previewer;
+  // A handler sees the render it's part of; its hooks are its methods.
+  Handler: new (...args: never[]) => {
+    chunker: { pagesArea: HTMLElement };
+    polisher: {
+      base: HTMLStyleElement;
+      inserted: HTMLStyleElement[];
+      styleEl: HTMLStyleElement;
+    };
+  };
+  registerHandlers(...handlers: unknown[]): void;
 };
+
+// Each render's sheets apply to its own pages only (scope-css.ts), so the
+// pages on screen keep their look while the next render is laid out. Done
+// after parsing: Paged.js has put in the book's sheets and its generated
+// rules, and laid nothing out or waited on a font yet. Its base sheet stays
+// global; it is the same for every render, and its print rules need <body>.
+let scoped = false;
+function scopeRenders(): void {
+  if (scoped) return;
+  scoped = true;
+  Paged.registerHandlers(
+    class ScopeSheets extends Paged.Handler {
+      afterParsed(): void {
+        const root = this.chunker.pagesArea.parentElement!;
+        root.dataset.scope ||= Math.random().toString(36).slice(2, 10);
+        const scope = `[data-scope="${root.dataset.scope}"]`;
+        const { base, inserted, styleEl } = this.polisher;
+        for (const el of [...inserted, styleEl]) {
+          if (el !== base && el.sheet) scopeSheet(el.sheet, scope);
+        }
+      }
+    },
+  );
+}
 // renderer/folios.js, imported by app.ts.
 declare const BookPageMap: {
   settle(
@@ -135,8 +170,10 @@ async function runRender(
   const tick = (cb: () => void) => {
     if (!cancelled) renderTick(cb);
   };
+  scopeRenders();
   try {
-    setFontLinks(update.fontLinks);
+    // The pages on screen keep their fonts until the swap drops them.
+    setFontLinks(update.fontLinks, { keep: true });
     // pagedCss must go through the Previewer so Paged.js processes @page;
     // base + dom CSS ride along in the same sheet.
     const css = [update.baseCss, update.domCss, update.pagedCss].join("\n");
@@ -183,11 +220,13 @@ async function runRender(
       if (err === CANCELLED) return problems; // a restore took the screen
       throw err;
     }
-    for (const old of container.children) if (old !== stage) old.remove();
-    // The old sheets belong to the pages that just went away.
+    // A copy: removing from the live collection would skip every other one.
+    for (const old of [...container.children]) if (old !== stage) old.remove();
+    // The old sheets and fonts belong to the pages that just went away.
     livePreviewer?.polisher.destroy();
     for (const el of restoredStyles) el.remove();
     restoredStyles = [];
+    setFontLinks(update.fontLinks);
     livePreviewer = previewer!;
     stage.className = "";
     fitPreview(container);
@@ -260,13 +299,20 @@ export function restoreCachedRender(
   dropped?.done.resolve(problems);
 }
 
-export function setFontLinks(html: string): void {
-  for (const el of document.querySelectorAll("link[data-book-font]")) {
-    el.remove();
-  }
+// The book's font links, as `html` lists them. A link already in the page
+// stays put rather than load again; `keep` leaves the ones `html` doesn't list.
+export function setFontLinks(html: string, { keep = false } = {}): void {
+  const key = (l: Element) =>
+    `${l.getAttribute("rel")} ${l.getAttribute("href")}`;
   const tpl = document.createElement("template");
   tpl.innerHTML = html;
-  for (const link of tpl.content.querySelectorAll("link")) {
+  const want = new Map(
+    [...tpl.content.querySelectorAll("link")].map((l) => [key(l), l]),
+  );
+  for (const el of document.querySelectorAll("link[data-book-font]")) {
+    if (!want.delete(key(el)) && !keep) el.remove();
+  }
+  for (const link of want.values()) {
     link.setAttribute("data-book-font", "");
     document.head.appendChild(link);
   }
