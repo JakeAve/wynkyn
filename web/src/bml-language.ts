@@ -90,19 +90,19 @@ export const bmlLanguage = StreamLanguage.define<BmlStreamState>({
 });
 
 // Colors are CSS variables from the chrome's tokens, so one highlight
-// style serves light and dark without a reconfigure. Markup is set in --mono
+// style serves light and dark without a reconfigure. Markup is set in --f-mono
 // whatever font the writer picks for prose, so it reads as markup.
-const mono = "var(--mono)";
+const mono = "var(--f-mono)";
 const bmlHighlight = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.comment, color: "var(--syn-c)", fontStyle: "italic" },
   {
     tag: tags.keyword,
     color: "var(--syn-k)",
-    fontWeight: "600",
+    fontWeight: "500",
     fontFamily: mono,
   },
-  { tag: tags.labelName, color: "var(--syn-slug)", fontFamily: mono },
-  { tag: tags.propertyName, color: "var(--syn-key)", fontFamily: mono },
+  { tag: tags.labelName, color: "var(--syn-p)", fontFamily: mono },
+  { tag: tags.propertyName, color: "var(--muted)", fontFamily: mono },
   { tag: tags.string, color: "var(--syn-t)", fontFamily: mono },
   { tag: tags.bracket, color: "var(--syn-p)", fontFamily: mono },
   { tag: tags.punctuation, color: "var(--syn-p)", fontFamily: mono },

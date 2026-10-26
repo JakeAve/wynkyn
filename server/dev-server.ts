@@ -42,6 +42,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
   ".txt": "text/plain; charset=utf-8",
   ".xml": "application/xml",
+  ".woff2": "font/woff2",
 };
 const contentType = (name: string) =>
   CONTENT_TYPES[name.slice(name.lastIndexOf("."))] ??

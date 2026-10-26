@@ -19,6 +19,7 @@ export const FILES: Record<string, string> = {
   "web/robots.txt": "robots.txt",
   "web/sitemap.xml": "sitemap.xml",
   "web/app.js": "web/app.js",
+  "web/tokens.css": "web/tokens.css",
   "web/app.css": "web/app.css",
   "web/brand/mark.svg": "web/brand/mark.svg",
   "web/brand/icon-32.png": "web/brand/icon-32.png",
@@ -28,6 +29,22 @@ export const FILES: Record<string, string> = {
   "web/brand/og.png": "web/brand/og.png",
   "vendor/pagedjs/paged.js": "vendor/paged.js",
   "vendor/scowl/en.txt": "vendor/words-en.txt",
+  // The faces web/tokens.css names, with their licences, at the same paths.
+  ...Object.fromEntries(
+    [
+      "alegreya-sans/alegreya-sans-400.woff2",
+      "alegreya-sans/alegreya-sans-400i.woff2",
+      "alegreya-sans/alegreya-sans-500.woff2",
+      "alegreya-sans/alegreya-sans-700.woff2",
+      "alegreya-sans/OFL.txt",
+      "alegreya/alegreya.woff2",
+      "alegreya/alegreya-italic.woff2",
+      "alegreya/OFL.txt",
+      "im-fell-great-primer/im-fell-great-primer.woff2",
+      "im-fell-great-primer/im-fell-great-primer-italic.woff2",
+      "im-fell-great-primer/OFL.txt",
+    ].map((f) => [`vendor/fonts/${f}`, `vendor/fonts/${f}`]),
+  ),
   "renderer/base.css": "renderer/base.css",
   "templates/metadata.json": "templates/metadata.json",
 };

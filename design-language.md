@@ -30,8 +30,9 @@ Visual references (private artifacts; this document stands without them):
 - Tokens live in `web/tokens.css`, which `web/app.css` and the site pages both
   load. `web/design-tokens_test.ts` checks both ways: every token there is named
   here, and every token named here exists there (range names like `--s-*` and
-  `--sheet-*` stand for the family). It also bans stray `px` (§4.1). When it
-  fails, fix the doc or the CSS; never loosen the test.
+  `--sheet-*` stand for the family; a struck-through name, ~~`--soft`~~, is
+  retired). It also bans stray `px` (§4.1). When it fails, fix the doc or the
+  CSS; never loosen the test.
 
 ---
 
@@ -52,9 +53,9 @@ Visual references (private artifacts; this document stands without them):
 6. **Sizes follow the reader.** Everything is in rem off the browser's own text
    size, so a reader who sets larger text gets a larger app, not clipped labels.
 
-## 2. Colour (planned)
+## 2. Colour
 
-### 2.1 Paper and ink (neutrals) (planned)
+### 2.1 Paper and ink (neutrals)
 
 The interface is drawn on one **UI paper** colour and one ink. Every other
 neutral is mixed from those two in OKLab, so the chrome stays in key and dark
@@ -70,13 +71,13 @@ mode needs no hand-tuned greys. UI paper is neutral `#fafafa`.
 | `--line`  | `mix(--fg 11%, --bg)`      | `#dedede` | `mix(--fg 13%, --bg)`      | `#2b2b2b` |
 | `--muted` | `mix(--fg 62%, --bg)`      | `#676767` | `mix(--fg 62%, --bg)`      | `#919191` |
 
-`mix(a p%, b)` is `color-mix(in oklab, a p%, b)`. Retired from Ink: `--soft`,
-`--inv-bg`, `--inv-fg` (the black pill, see §6.1).
+`mix(a p%, b)` is `color-mix(in oklab, a p%, b)`. Retired from Ink:
+~~`--soft`~~, ~~`--inv-bg`~~, ~~`--inv-fg`~~ (the black pill, see §6.1).
 
 The UI paper is fixed at neutral. The derivation is what would make a UI tint
 possible later; it is not a setting.
 
-### 2.2 The red: minium (planned)
+### 2.2 The red: minium
 
 Red lead, the orange-red of early printed rubrics. Two strengths, because the
 bright pigment is too light to carry small text.
@@ -108,7 +109,7 @@ any surface.
 **Never:** backgrounds of regions, large fills, borders of panes, decoration,
 and never errors (§2.3).
 
-### 2.3 Status (planned)
+### 2.3 Status
 
 Errors must not read as the accent: they are a crimson, bluer than minium, and
 always carry a word and an icon.
@@ -121,7 +122,7 @@ always carry a word and an icon.
 
 `--warn-wash` and `--err-wash` (9% / 8%) tint a banner's background.
 
-### 2.4 Drawn on the pages (planned)
+### 2.4 Drawn on the pages
 
 The pages stay paper in both themes, so their marks use fixed values.
 
@@ -150,7 +151,7 @@ other `page` key. Kept deliberately quiet:
 - Never touches the manuscript; the colophon's `{paper}` line is the author's
   text.
 
-### 2.6 Source view syntax (planned)
+### 2.6 Source view syntax
 
 | Part                         | Token                     | Colour                  |
 | ---------------------------- | ------------------------- | ----------------------- |
@@ -165,9 +166,9 @@ other `page` key. Kept deliberately quiet:
 | text the open edition skips  | `--off`                   | opacity .38             |
 
 The editor's CodeMirror theme reads these variables, so a theme switch needs no
-reconfigure. Ink's sage `--syn-key` and bronze `--syn-slug` are retired.
+reconfigure. Ink's sage ~~`--syn-key`~~ and bronze ~~`--syn-slug`~~ are retired.
 
-## 3. Type (planned)
+## 3. Type
 
 Two families, plus the system's own monospace.
 
@@ -605,8 +606,9 @@ Everything scales with the browser's text size.
 
 - **Tokens:** move them out of `web/app.css` into `web/tokens.css`, replacing
   Ink's `:root` blocks with the sheet's; rename Ink's `--paper` to `--stock`;
-  retire `--soft`, `--inv-bg`, `--inv-fg`, `--syn-key`, `--syn-slug`,
-  `--radius`, `--fs`/`--fs-sm` as px; `--pick` becomes minium.
+  retire ~~`--soft`~~, ~~`--inv-bg`~~, ~~`--inv-fg`~~, ~~`--syn-key`~~,
+  ~~`--syn-slug`~~, ~~`--radius`~~, `--fs`/`--fs-sm` as px; `--pick` becomes
+  minium.
 - **Units:** convert every font size, padding, gap, height and radius in
   `app.css` (590 px values today) to the tokens; keep `1px`/`2px` for hairlines
   and rings. `web/design-tokens_test.ts` then holds the line: no `px` in

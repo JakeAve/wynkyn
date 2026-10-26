@@ -7,7 +7,7 @@
     "build:web": "deno check web/src/app.ts && deno bundle --platform browser --output web/app.js web/src/app.ts",
     "build:site": "deno task build:web && deno run --allow-read --allow-write=dist scripts/build-site.ts",
     "serve:site": "deno run --allow-net --allow-read=dist --allow-env=PORT scripts/serve-site.ts",
-    "dev": "deno task build:web && (deno bundle --watch --platform browser --output web/app.js web/src/app.ts & deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys --watch=web/app.js,web/index.html,web/app.css,renderer/,vendor/ server/dev-server.ts)",
+    "dev": "deno task build:web && (deno bundle --watch --platform browser --output web/app.js web/src/app.ts & deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys --watch=web/app.js,web/index.html,web/tokens.css,web/app.css,renderer/,vendor/ server/dev-server.ts)",
     "bml": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys bml.ts",
     "pre-commit": "deno task check && deno task test:fast",
     "pre-push": "deno task check && deno task test",

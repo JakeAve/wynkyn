@@ -62,9 +62,9 @@ async function spellCheck(d: TextViewDeps, lang: string): Promise<void> {
 // The text view (the bar atop the editor): the editor's font and size, Hide markup and Spelling, a per-reader
 // preference kept in localStorage, not the book.
 const TEXT_FONTS: Record<string, string> = {
-  serif: "ui-serif, Georgia, serif",
-  sans: "system-ui, sans-serif",
-  mono: "var(--mono)",
+  serif: "var(--f-text)",
+  sans: "var(--f-ui)",
+  mono: "var(--f-mono)",
 };
 export function installTextView(d: TextViewDeps): void {
   const { editor } = d;
