@@ -1892,6 +1892,17 @@ exports anyway.
   has no unsaved edits, and otherwise shows a changed-on-disk banner (Reload /
   Keep mine); a save based on a stale version is refused (409) rather than
   overwriting.
+- **Saving:** the service answers after it writes; there is no server-side
+  debounce, and a failed write is that save's own error. A store's `watch`
+  reports every change, its own writes included. Tabs over one library (the
+  browser's folder or private storage) hear each other through a
+  BroadcastChannel named for the library, and each version check + write runs
+  under a lock (`navigator.locks`), so two tabs cannot both pass the check. The
+  client keeps one save in flight per channel (manuscript, metadata) and shows
+  "Saved" only when every channel is idle with nothing pending, failed or in
+  conflict; a failed save keeps its edit and retries. Switching book or edition
+  waits for saves; closing or hiding the tab sends them, and prompts while any
+  remain.
 - **One pagination engine (§5.4):** Paged.js paginates both the live preview and
   the print export. Chosen deliberately over a hybrid
   Paged.js-preview/native-Chrome-export split: (a) the preview and the exported

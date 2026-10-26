@@ -7,11 +7,14 @@ import type { Metadata } from "../../metadata/types.ts";
 import type { EditionInfo } from "../../server/editions.ts";
 import {
   BookService,
+  libraryId,
   type MetadataResult,
   type SaveResult,
+  ServiceError,
   themedTemplate,
 } from "../../server/book-service.ts";
-import type { BookStore } from "../../server/store.ts";
+import { type BookStore, withTabs } from "../../server/store.ts";
+import { handleStore } from "./fs-store.ts";
 import type { ImageFile } from "../../server/images.ts";
 import type { EpubResult } from "./style-catalog.ts";
 
@@ -19,7 +22,8 @@ export interface Backend {
   readonly kind: "http" | "local";
   /** The folder the service runs over; only in-page (the app zips from it). */
   readonly store?: BookStore;
-  listBooks(): Promise<string[]>;
+  /** The books, and the folders skipped for their names (BookService.list). */
+  listBooks(): Promise<{ books: string[]; skipped: string[] }>;
   /** The library's id (BookService.libraryId). */
   libraryId(): Promise<string>;
   /** `theme`: a preset's slug (spec §4.13); none is House. */
@@ -42,8 +46,6 @@ export interface Backend {
     edition: string | null,
     sections: object,
   ): Promise<{ version: string }>;
-  /** Lands a debounced metadata save now; in-page, before the page goes. */
-  flushMetadata(book: string, edition: string | null): Promise<void>;
   /** A build in the given style, nothing saved (try on, spec §4.13). */
   tryBuild(
     book: string,
@@ -99,11 +101,14 @@ const query = (book: string, edition: string | null) =>
   `?book=${encodeURIComponent(book)}` +
   (edition === null ? "" : `&edition=${encodeURIComponent(edition)}`);
 
-async function call<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  if (!res.ok) throw new Error(await res.text());
+// A refusal carries its status, as the in-page service's do: Sync retries
+// only what might go through next time.
+async function answer<T>(res: Response): Promise<T> {
+  if (!res.ok) throw new ServiceError(res.status, await res.text());
   return res.status === 204 ? (undefined as T) : await res.json();
 }
+const call = async <T>(url: string, init?: RequestInit): Promise<T> =>
+  answer<T>(await fetch(url, init));
 const post = <T>(url: string, body: unknown) =>
   call<T>(url, {
     method: "POST",
@@ -112,10 +117,29 @@ const post = <T>(url: string, body: unknown) =>
   });
 
 export function httpBackend(): Backend {
+  // A save outlives a tab closed right after it: keepalive, which the browser
+  // allows only while every keepalive body in flight totals under 64 KB.
+  // Past that a save goes plain and relies on the leave prompt.
+  let keptAlive = 0; // keepalive body bytes in flight
+  async function send(url: string, body: unknown): Promise<Response> {
+    const json = JSON.stringify(body);
+    const size = new TextEncoder().encode(json).length;
+    const keepalive = keptAlive + size < 65536;
+    if (keepalive) keptAlive += size;
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: json,
+        keepalive,
+      });
+    } finally {
+      if (keepalive) keptAlive -= size;
+    }
+  }
   return {
     kind: "http",
-    listBooks: () =>
-      call<{ books: string[] }>("/api/books").then((r) => r.books),
+    listBooks: () => call("/api/books"),
     libraryId: () => call<{ id: string }>("/api/library").then((r) => r.id),
     createBook: (slug, title, theme) =>
       post("/api/books", { slug, title, theme }),
@@ -139,16 +163,11 @@ export function httpBackend(): Backend {
       return await res.json();
     },
     async saveManuscript(book, save) {
-      const res = await fetch(
+      const res = await send(
         `/api/books/${encodeURIComponent(book)}/manuscript`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(save),
-        },
+        save,
       );
-      if (res.status !== 409 && !res.ok) throw new Error(await res.text());
-      return await res.json();
+      return res.status === 409 ? await res.json() : await answer(res);
     },
     async metadata(book, edition) {
       const res = await fetch(metadataUrl(book, edition));
@@ -159,10 +178,8 @@ export function httpBackend(): Backend {
       }
       return await res.json();
     },
-    saveMetadata: (book, edition, sections) =>
-      post(metadataUrl(book, edition), { sections }),
-    // The server lands its own debounced writes; this page going doesn't stop it.
-    flushMetadata: async () => {},
+    saveMetadata: async (book, edition, sections) =>
+      answer(await send(metadataUrl(book, edition), { sections })),
     async tryBuild(book, edition, metadata) {
       const res = await fetch(
         `/api/books/${encodeURIComponent(book)}/try`,
@@ -251,11 +268,17 @@ const IMAGE_TYPES: Record<string, string> = {
 };
 
 /** The service in-page over the author's folder; `template` is a new book's
- * metadata.json, `baseCss` renderer/base.css (both fetched as static files). */
-export function localBackend(
-  store: BookStore,
+ * metadata.json, `baseCss` renderer/base.css (both fetched as static files).
+ * Other tabs over the same library are other services on the same files:
+ * named for its id, the tab channel carries each one's writes to the others
+ * and the locks make a save's check + write atomic across them. */
+export async function localBackend(
+  root: FileSystemDirectoryHandle,
   assets: { baseCss: string; template: string },
-): Backend {
+): Promise<Backend> {
+  const id = await libraryId(handleStore(root));
+  // Kept as backend.store too, so the app's imports reach the other tabs.
+  const store = withTabs(handleStore(root), `wynkyn:${id}`);
   const urls = new Map<string, string>(); // image path → object URL
   async function imageUrl(book: string, name: string): Promise<string> {
     const path = `${book}/images/${name}`;
@@ -278,6 +301,7 @@ export function localBackend(
     store,
     baseCss: assets.baseCss,
     imageUrl,
+    lock: (key, fn) => navigator.locks.request(`${id}:${key}`, fn),
   });
   return {
     kind: "local",
@@ -302,7 +326,6 @@ export function localBackend(
     metadata: (book, edition) => service.metadata(book, edition),
     saveMetadata: (book, edition, sections) =>
       service.saveMetadata(book, edition, sections),
-    flushMetadata: (book, edition) => service.flushMetadata(book, edition),
     tryBuild: (book, edition, metadata) =>
       service.build(book, edition, metadata),
     dictionary: (book) => service.dictionary(book),

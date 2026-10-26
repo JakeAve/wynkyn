@@ -332,8 +332,9 @@ export interface EpubBytes {
   diagnostics: number;
 }
 
-/** The package from a store: the browser builds it in the page, the CLI and
- * dev server write it to the export dir (exportEpub). */
+/** The package from a store: the browser builds it in the page, the CLI
+ * writes it to the export dir (exportEpub), the dev server through the
+ * service (BookService.exportEpub). */
 export async function epubBytes(
   root: string | BookStore,
   book: string,

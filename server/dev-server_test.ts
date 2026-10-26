@@ -40,7 +40,7 @@ Deno.test("http: shell, book list, build json, images, 404s", async () => {
     await bare.body?.cancel();
 
     const books = await (await fetch(`${base}/api/books`)).json();
-    assertEquals(books, { books: ["demo-book"] });
+    assertEquals(books, { books: ["demo-book"], skipped: [] });
 
     // The library id is minted into library.json once and then stable.
     const { id } = await (await fetch(`${base}/api/library`)).json();
@@ -117,6 +117,24 @@ function nextMessageWhere(
     ws.addEventListener("message", onMessage);
   });
 }
+
+Deno.test("epub: the export lands in the edition's export folder", async () => {
+  const root = await makeBooksRoot();
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const base = `http://localhost:${server.port}/api/books/demo-book`;
+  try {
+    const res = await fetch(`${base}/epub?edition=pocket`, { method: "POST" });
+    assertEquals(res.status, 200);
+    assertEquals((await res.json()).file, "book.epub");
+    const epub = await fetch(`${base}/export/book.epub?edition=pocket`);
+    assertEquals(epub.status, 200);
+    assertEquals(epub.headers.get("content-type"), "application/epub+zip");
+    await epub.body?.cancel();
+  } finally {
+    await server.stop();
+    await Deno.remove(root, { recursive: true });
+  }
+});
 
 Deno.test("websocket: initial build on connect, rebuild pushed on file change", async () => {
   const root = await makeBooksRoot();
@@ -385,11 +403,7 @@ Deno.test("save: unknown book is a 404", async () => {
 
 Deno.test("metadata: GET returns config; POST merges sections, preserves the rest", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   try {
     const res = await fetch(`${base}/api/books/demo-book/metadata`);
@@ -415,14 +429,7 @@ Deno.test("metadata: GET returns config; POST merges sections, preserves the res
     const posted = await post.json();
     assertEquals(posted.ok, true);
 
-    // Pending save reads through before the debounce flushes.
-    const during = await (await fetch(`${base}/api/books/demo-book/metadata`))
-      .json();
-    assertEquals(during.metadata.page.size, "A5");
-    assertEquals(during.version, posted.version);
-
-    await new Promise((r) => setTimeout(r, 150));
-    // The version is of exactly the text that was written.
+    // Landed before the answer: a read sees it. The version is of exactly the text that was written.
     assertEquals(
       posted.version,
       await contentVersion(
@@ -442,7 +449,6 @@ Deno.test("metadata: GET returns config; POST merges sections, preserves the res
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ sections: { numbering: null } }),
     })).body?.cancel();
-    await new Promise((r) => setTimeout(r, 150));
     const afterDelete = JSON.parse(
       await Deno.readTextFile(`${root}/demo-book/metadata.json`),
     );
@@ -481,11 +487,7 @@ Deno.test("metadata: GET returns config; POST merges sections, preserves the res
 Deno.test("metadata: missing metadata.json GETs as {} and POST creates it", async () => {
   const root = await makeBooksRoot();
   await Deno.remove(`${root}/demo-book/metadata.json`);
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   try {
     const empty = await (await fetch(`${base}/api/books/demo-book/metadata`))
@@ -497,7 +499,6 @@ Deno.test("metadata: missing metadata.json GETs as {} and POST creates it", asyn
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ sections: { notes: { placement: "endnote" } } }),
     })).body?.cancel();
-    await new Promise((r) => setTimeout(r, 150));
     const created = JSON.parse(
       await Deno.readTextFile(`${root}/demo-book/metadata.json`),
     );
@@ -508,13 +509,9 @@ Deno.test("metadata: missing metadata.json GETs as {} and POST creates it", asyn
   }
 });
 
-Deno.test("metadata: debounced write broadcasts an update with the POSTed version", async () => {
+Deno.test("metadata: the write broadcasts an update with the POSTed version", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const ws = new WebSocket(
     `ws://localhost:${server.port}/ws?book=demo-book&client=cfg-1`,
   );
@@ -549,13 +546,9 @@ Deno.test("metadata: debounced write broadcasts an update with the POSTed versio
   }
 });
 
-Deno.test("metadata: an outside edit to another section during the debounce survives", async () => {
+Deno.test("metadata: an outside edit to another section survives a save", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 200,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const path = `${root}/demo-book/metadata.json`;
   const post = (sections: unknown) =>
     fetch(`http://localhost:${server.port}/api/books/demo-book/metadata`, {
@@ -565,14 +558,13 @@ Deno.test("metadata: an outside edit to another section during the debounce surv
     }).then((r) => r.body?.cancel());
   try {
     await post({ notes: { placement: "footnote" } });
-    // Another writer names the edition while the save is still debounced.
+    // Another writer names the edition between two saves.
     const disk = JSON.parse(await Deno.readTextFile(path));
     await Deno.writeTextFile(
       path,
       JSON.stringify({ ...disk, name: "External" }, null, 2),
     );
-    await post({ toc: { title: "Contents" } }); // same window, accumulates
-    await new Promise((r) => setTimeout(r, 400));
+    await post({ toc: { title: "Contents" } });
     const saved = JSON.parse(await Deno.readTextFile(path));
     assertEquals(saved.name, "External");
     assertEquals(saved.notes, { placement: "footnote" });
@@ -583,54 +575,36 @@ Deno.test("metadata: an outside edit to another section during the debounce surv
   }
 });
 
-Deno.test("metadata: a failed debounced write reaches the edition's editors as a save error", async () => {
+Deno.test("metadata: a failed write is a 500 with the error, and nothing lands", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 150,
-  });
-  const base = `http://localhost:${server.port}`;
-  const ws = new WebSocket(
-    `ws://localhost:${server.port}/ws?book=demo-book&client=observer`,
-  );
+  const server = await startServer({ booksRoot: root, port: 0 });
+  const dir = `${root}/demo-book`;
+  const before = await Deno.readTextFile(`${dir}/metadata.json`);
   try {
-    await nextMessage(ws); // initial build
-    const failed = nextMessageWhere(ws, (m) => m.save === "metadata");
-    // Accepted at once; the write happens after the debounce.
-    const post = await fetch(`${base}/api/books/demo-book/metadata`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sections: { notes: { placement: "footnote" } } }),
-    });
-    assertEquals(post.status, 200);
-    await post.body?.cancel();
-
-    // Yank the book out from under the pending write.
-    await Deno.remove(`${root}/demo-book`, { recursive: true });
-    const msg = await failed;
-    assertEquals(msg.type, "error");
-    assertEquals(msg.book, "demo-book");
-    assertEquals(msg.edition, null);
-    assert((msg.message as string).startsWith("save failed:"));
-
-    // Server must still be alive and serving other requests.
-    const books = await (await fetch(`${base}/api/books`)).json();
-    assertEquals(books, { books: [] });
+    await Deno.chmod(dir, 0o555); // readable, but the tmp file can't be made
+    const res = await fetch(
+      `http://localhost:${server.port}/api/books/demo-book/metadata`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sections: { notes: { placement: "footnote" } },
+        }),
+      },
+    );
+    assertEquals(res.status, 500);
+    assert((await res.text()).startsWith("save failed:"));
+    assertEquals(await Deno.readTextFile(`${dir}/metadata.json`), before);
   } finally {
-    ws.close();
+    await Deno.chmod(dir, 0o755);
     await server.stop();
-    await Deno.remove(root, { recursive: true }).catch(() => {});
+    await Deno.remove(root, { recursive: true });
   }
 });
 
 Deno.test("editions: list, build json per edition, metadata GET/POST touch only that file", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   try {
     const list = await (await fetch(`${base}/api/books/demo-book/editions`))
@@ -684,7 +658,6 @@ Deno.test("editions: list, build json per edition, metadata GET/POST touch only 
       },
     );
     assertEquals((await post.json()).ok, true);
-    await new Promise((r) => setTimeout(r, 150));
     const pocket = JSON.parse(
       await Deno.readTextFile(`${root}/demo-book/editions/pocket.json`),
     );
@@ -708,11 +681,7 @@ Deno.test("editions: list, build json per edition, metadata GET/POST touch only 
 
 Deno.test("editions: create copies the source's current metadata; rename; delete", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   const json = (body: unknown) => ({
     method: "POST",
@@ -720,7 +689,7 @@ Deno.test("editions: create copies the source's current metadata; rename; delete
     body: JSON.stringify(body),
   });
   try {
-    // A pending (not yet flushed) save on the unnamed edition must be what gets copied.
+    // A save on the unnamed edition just before is what gets copied.
     await (await fetch(
       `${base}/api/books/demo-book/metadata`,
       json({
@@ -814,11 +783,7 @@ Deno.test("editions: create copies the source's current metadata; rename; delete
 
 Deno.test("rename rewrites {only} tokens in manuscript.md", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   const post = (path: string, body: unknown) =>
     fetch(`${base}/api/books/demo-book${path}`, {
@@ -857,11 +822,7 @@ Deno.test("rename rewrites {only} tokens in manuscript.md", async () => {
 
 Deno.test("rename: a stale save carrying the old token lands with the new one", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   const post = (path: string, body: unknown) =>
     fetch(`${base}/api/books/demo-book${path}`, {
@@ -913,11 +874,7 @@ Deno.test("rename: a stale save carrying the old token lands with the new one", 
 
 Deno.test("rename: a rewritten save returns text; an untouched one does not", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   const post = (path: string, body: unknown) =>
     fetch(`${base}/api/books/demo-book${path}`, {
@@ -953,13 +910,9 @@ Deno.test("rename: a rewritten save returns text; an untouched one does not", as
   }
 });
 
-Deno.test("editions: the default edition renames by display name, through the pending save", async () => {
+Deno.test("editions: the default edition renames by display name, keeping a style edit", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   const post = (path: string, body: unknown) =>
     fetch(`${base}/api/books/demo-book${path}`, {
@@ -968,7 +921,7 @@ Deno.test("editions: the default edition renames by display name, through the pe
       body: JSON.stringify(body),
     });
   try {
-    // A debounced metadata edit must survive the rename, not be clobbered.
+    // A metadata edit just before must survive the rename, not be clobbered.
     await (await post("/metadata", { sections: { page: { size: "A5" } } }))
       .body?.cancel();
     const r = await post("/editions/default/rename", { name: " Hardcover " });
@@ -1002,11 +955,7 @@ Deno.test("editions: the default edition renames by display name, through the pe
 
 Deno.test("editions: ws clients get their own edition's builds; manuscript edits reach all", async () => {
   const root = await makeBooksRoot();
-  const server = await startServer({
-    booksRoot: root,
-    port: 0,
-    saveDebounceMs: 40,
-  });
+  const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
   const unnamed = new WebSocket(
     `ws://localhost:${server.port}/ws?book=demo-book&client=u`,

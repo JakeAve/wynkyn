@@ -25,9 +25,10 @@ export interface BookStore {
   remove(path: string): Promise<boolean>;
   /** Names of the files directly in `dir`; [] when it doesn't exist. */
   listDir(dir: string): Promise<string[]>;
-  /** Changes by other writers (an editor, the CLI), as relative paths. A
-   * store without one (the browser) has no other writers. Returns stop. */
-  watch?(onChange: (paths: string[]) => void): () => void;
+  /** Every change, as relative paths: this store's own writes, creates,
+   * renames and removes, and other writers' (an editor, the CLI) where the
+   * store can see them. Returns stop. */
+  watch(onChange: (paths: string[]) => void): () => void;
 }
 
 const encoder = new TextEncoder();
@@ -123,7 +124,7 @@ export function diskStore(root: string): BookStore {
       return names.sort();
     },
     watch(onChange) {
-      // watchFs reports resolved absolute paths (on macOS /var/… is realpathed
+      // fs events see this store's own writes like anyone else's. watchFs reports resolved absolute paths (on macOS /var/… is realpathed
       // to /private/var/…), so map events back through the root's realpath.
       const abs = Deno.realPathSync(root) + "/";
       const w = watchTree(root, (paths) =>
@@ -136,4 +137,57 @@ export function diskStore(root: string): BookStore {
     },
   };
   return store;
+}
+
+/** The store for one tab of several over one library (the browser, where a
+ * store sees only its own writes): what it writes is posted on a
+ * BroadcastChannel named `channel`, and its watch hears the other tabs' posts
+ * too — the dev server's fs watcher, between tabs. */
+export function withTabs(store: BookStore, channel: string): BookStore {
+  // A channel per post: delivery is queued when posted, so closing at once
+  // loses nothing, and there is nothing left open to close. Posts carry this
+  // store's id: every other channel of the name hears them, this tab's watch
+  // included, and the store already reports its own writes.
+  const from = crypto.randomUUID();
+  const post = (...paths: string[]) => {
+    const c = new BroadcastChannel(channel);
+    c.postMessage({ from, paths });
+    c.close();
+  };
+  return {
+    ...store,
+    async write(path, data) {
+      await store.write(path, data);
+      post(path);
+    },
+    async create(path, data) {
+      const made = await store.create(path, data);
+      if (made) post(path);
+      return made;
+    },
+    async rename(from, to) {
+      const moved = await store.rename(from, to);
+      if (moved) post(from, to);
+      return moved;
+    },
+    async remove(path) {
+      const removed = await store.remove(path);
+      if (removed) post(path);
+      return removed;
+    },
+    watch(onChange) {
+      const stop = store.watch(onChange);
+      const c = new BroadcastChannel(channel);
+      c.onmessage = (e: MessageEvent) => {
+        const { from: sender, paths } = e.data ?? {};
+        if (sender !== from && Array.isArray(paths)) {
+          onChange(paths.map(String));
+        }
+      };
+      return () => {
+        stop();
+        c.close();
+      };
+    },
+  };
 }

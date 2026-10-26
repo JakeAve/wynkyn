@@ -27,7 +27,10 @@ pure        pure          pure+2 js     disk, Chrome   browser only
 - `server/` owns every side effect, behind one seam: `store.ts`'s `BookStore`
   is the only way book files are read or written (`diskStore` here,
   `web/src/fs-store.ts` in the browser, a Node store for the desktop app
-  later). `pipeline.ts` (`buildBook`) and `book-service.ts` (`BookService`:
+  later); every store reports its own writes through `watch`, and
+  `store-contract.ts` is what each must pass. Saves are in the service (it
+  answers after the write) and `web/src/sync.ts` (the client's queues, retry,
+  "Saved"). `pipeline.ts` (`buildBook`) and `book-service.ts` (`BookService`:
   everything an editor does to a library) are pure over a store and run in
   the browser too. Front doors: `dev-server.ts` (HTTP/WebSocket over
   `books/`, plus the Chrome exports), `bml.ts` (CLI), and

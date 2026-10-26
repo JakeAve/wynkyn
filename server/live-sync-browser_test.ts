@@ -70,7 +70,6 @@ Deno.test({
     const server = await startServer({
       booksRoot: root,
       port: 0,
-      saveDebounceMs: 50,
     });
     const browser = await chromium.launch({ channel: "chrome" });
     try {

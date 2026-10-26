@@ -36,35 +36,41 @@ rewrite themselves on the next save.
   handlers, imported by `web/src/app.ts`: `plates.js` (full-page illustrations
   as plates, inlined by `toHtml`) and `folios.js` (the page map: folios, TOC and
   ref numbers, running heads)
-- `server/` `store.ts` (`BookStore`: where a library's files live — `diskStore`
-  for a folder; the browser has its own in `web/src/fs-store.ts`); `pipeline.ts`
-  (`buildBook`, pure over a store, so it runs in Deno and in the browser);
-  `book-service.ts` (`BookService`: saves with version checks, metadata merges,
-  editions, rebuild pushes — runtime-agnostic, over a store); `dev-server.ts`
-  (HTTP/WebSocket in front of the service over `books/`, plus the EPUB export);
-  `export-html.ts` (`toHtml` + the vendored Paged.js, Deno only)
+- `server/` `store.ts` (`BookStore`: where a library's files live, whose `watch`
+  reports every change, its own writes included — `diskStore` for a folder; the
+  browser has its own in `web/src/fs-store.ts`; `withTabs` shares a library's
+  changes between tabs over a BroadcastChannel); `store-contract.ts` (the one
+  contract every store passes; `testing/memory-store.ts` is the in-memory one);
+  `pipeline.ts` (`buildBook`, pure over a store, so it runs in Deno and in the
+  browser); `book-service.ts` (`BookService`: saves with version checks,
+  metadata merges, editions, rebuild pushes — runtime-agnostic, over a store);
+  `dev-server.ts` (HTTP/WebSocket in front of the service over `books/`, plus
+  the EPUB export); `export-html.ts` (`toHtml` + the vendored Paged.js, Deno
+  only)
 - `web/` browser app; `web/src/app.ts` bundles to `web/app.js` (gitignored);
-  `web/src/backend.ts` is what the app talks to: `httpBackend` (the dev server)
-  or `localBackend` (the same `BookService` run in the page over the author's
-  own folder via the File System Access API, or the browser's private storage) —
-  the hosted site has no server at all (`deno task build:site` → `dist/`, plain
-  files); `web/app.css` is the chrome's stylesheet and holds the Ink tokens.
-  Paged.js paginates the preview. The Write/Style/Publish mode (`setMode` in
-  `app.ts`) decides three columns in `#panes`: `#tree` | `#editor` | `#preview`,
-  `#style-nav` | `#config-overlay` | `#preview`, or `#style-nav` |
-  `#config-overlay` | `#sheet-view`; `preview.ts`'s `installPreviewClicks`
-  routes a page click to the source line or the style by mode. `config-panel.ts`
-  is the panel shell (nav, routing, debounced `queueSave`); `panel-page.ts`
-  (Page + Publish views), `panel-fonts.ts`, `panel-parts.ts` (Book parts list
-  and detail views) build the views from `panel-controls.ts` primitives;
-  `style-catalog.ts` maps preview clicks and book parts to metadata keys. The
-  Publish view is grouped Binding / PDF / E-book: the binding setup, whose first
-  signature it draws with `server/imposition.ts` and whose Print sheets button
-  (`print.ts`) imposes the live preview's pages onto sheet-sized print layers
-  and opens the browser's print dialog; Print pages (the preview's pages at the
-  page size); and Export EPUB (`POST /api/books/<book>/epub`, the same
-  `exportEpub` as `bml epub`). No print export runs on the server; sheet PDFs
-  and proofs on disk are `bml export`'s. Paper's "Change in Style" leaves a
+  `web/src/sync.ts` is the client's save state machine (queues, retry, the one
+  place "Saved" is decided; spec §6); `web/src/backend.ts` is what the app talks
+  to: `httpBackend` (the dev server) or `localBackend` (the same `BookService`
+  run in the page over the author's own folder via the File System Access API,
+  or the browser's private storage) — the hosted site has no server at all
+  (`deno task build:site` → `dist/`, plain files); `web/app.css` is the chrome's
+  stylesheet and holds the Ink tokens. Paged.js paginates the preview. The
+  Write/Style/Publish mode (`setMode` in `app.ts`) decides three columns in
+  `#panes`: `#tree` | `#editor` | `#preview`, `#style-nav` | `#config-overlay` |
+  `#preview`, or `#style-nav` | `#config-overlay` | `#sheet-view`;
+  `preview.ts`'s `installPreviewClicks` routes a page click to the source line
+  or the style by mode. `config-panel.ts` is the panel shell (nav, routing,
+  `queueSave`, which hands each edited section to Sync's debounce);
+  `panel-page.ts` (Page + Publish views), `panel-fonts.ts`, `panel-parts.ts`
+  (Book parts list and detail views) build the views from `panel-controls.ts`
+  primitives; `style-catalog.ts` maps preview clicks and book parts to metadata
+  keys. The Publish view is grouped Binding / PDF / E-book: the binding setup,
+  whose first signature it draws with `server/imposition.ts` and whose Print
+  sheets button (`print.ts`) imposes the live preview's pages onto sheet-sized
+  print layers and opens the browser's print dialog; Print pages (the preview's
+  pages at the page size); and Export EPUB (`POST /api/books/<book>/epub`, the
+  same `exportEpub` as `bml epub`). No print export runs on the server; sheet
+  PDFs and proofs on disk are `bml export`'s. Paper's "Change in Style" leaves a
   history entry (`toStyle` in `app.ts`, like Write's Go to style), so Back
   returns to Publish.
 

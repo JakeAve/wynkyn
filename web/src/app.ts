@@ -62,6 +62,7 @@ import {
 } from "./editions.ts";
 import { editionToken, titleCase } from "../../server/editions.ts";
 import { zipBook } from "./book-zip.ts";
+import { Sync, type SyncStatus } from "./sync.ts";
 import {
   type Backend,
   hasServer,
@@ -72,13 +73,11 @@ import {
 import {
   browserFolder,
   createBooksFolder,
-  handleStore,
   importBooks,
   pickFolder,
   rememberedFolder,
   reopenFolder,
 } from "./fs-store.ts";
-import type { BookStore } from "../../server/store.ts";
 import { importSource } from "../../server/import/mod.ts";
 import { arrowKeys, themeCard } from "./panel-themes.ts";
 import { applyTheme, THEMES } from "../../metadata/themes.ts";
@@ -97,7 +96,6 @@ declare const BookPageMap: {
 };
 
 const PARSE_DEBOUNCE_MS = 250;
-const SAVE_DEBOUNCE_MS = 600;
 
 const clientId = crypto.randomUUID();
 const params = new URLSearchParams(location.search);
@@ -249,34 +247,24 @@ let backend: Backend; // the dev server, or the service in-page over a folder
 let book: string;
 let edition: string | null = null; // null = the unnamed edition (metadata.json)
 let parseTimer: ReturnType<typeof setTimeout> | undefined;
-let saveTimer: ReturnType<typeof setTimeout> | undefined;
-let saveInFlight = false;
-let queuedSaveText: string | null = null;
-let dirty = false; // local edits newer than the last completed save
+// Both save queues and the versions they are based on (`sync.base`: every
+// manuscript save names it, and one from a version that is no longer current
+// is refused instead of overwriting a change this editor never saw). Made in
+// main once the book, edition and manuscript version are known.
+let sync: Sync;
 let remoteFetchGen = 0;
 let renaming: Promise<unknown> = Promise.resolve(); // this tab's edition rename
-// The server version the buffer is based on; every save names it, and a save
-// from a version that is no longer current is refused (409) instead of
-// overwriting a change this editor never saw. Set on load and by every save.
-let base: string | null = null;
 // The disk text the changed-on-disk banner is offering, while it is up.
 let diskOffer: { text: string; version: string } | null = null;
-let metaBase: string | null = null; // the metadata version the panel shows
 let metaStale = false; // metadata changed while the panel had unsaved edits
 let metaFetchGen = 0;
 let configPanel: ConfigPanel | null = null;
-let metaSaveInFlight = false;
-let metaSaveDone: Promise<void> = Promise.resolve(); // the save in flight
-let queuedMetaSections: Partial<Metadata> | null = null;
 
 function onDocChanged(text: string): void {
-  dirty = true;
-  setStatus("saving");
   $("preview").dataset.stale = ""; // dimmed until the render catches up
   clearTimeout(parseTimer);
   parseTimer = setTimeout(() => reparse(text), PARSE_DEBOUNCE_MS);
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => save(text), SAVE_DEBOUNCE_MS);
+  sync.editManuscript(text);
 }
 
 let isNames: string[] = []; // `{is}` classes in the manuscript, from reparse
@@ -458,7 +446,7 @@ function openEdition(b: string, slug: string | null, line?: number): void {
     }
     return;
   }
-  location.href = editionHref(b, slug) + (line ? `#line=${line}` : "");
+  void leave(editionHref(b, slug) + (line ? `#line=${line}` : ""));
 }
 
 function renderEditions(): void {
@@ -527,10 +515,12 @@ function renderEditions(): void {
             } edition? The manuscript is untouched.`,
           )
         ) return;
+        // Style edits waiting for the open edition go with it.
+        if (selBook === book && slug === edition) sync.dropMetadata();
         await backend.deleteEdition(selBook, slug);
         await deleteCachedRender(cacheId(selBook, slug));
         if (selBook === book && slug === edition) {
-          location.href = editionHref(book, null);
+          await leave(editionHref(book, null));
         } else await selectBook(selBook);
       });
     }
@@ -576,13 +566,15 @@ async function renameEdition(e: EditionInfo, value: string): Promise<void> {
     const next = slugify(value);
     if (!next) throw new Error("the name needs a letter or digit");
     if (next !== e.slug) {
+      // Style edits waiting for the open edition land first, and move with it.
+      if (selBook === book && e.slug === edition) await sync.flush();
       const done = backend.renameEdition(selBook, e.slug, next)
         .then(() => selBook === book ? rebaseAfterRename() : undefined);
       renaming = done.catch(() => {});
       await done;
       await deleteCachedRender(cacheId(selBook, e.slug));
       if (selBook === book && e.slug === edition) {
-        location.href = editionHref(book, next);
+        await leave(editionHref(book, next));
         return;
       }
     }
@@ -707,7 +699,7 @@ function installSwitcher(): void {
   }
   lib.onclick = () => {
     localStorage.removeItem("library");
-    location.href = location.pathname;
+    void leave(location.pathname);
   };
 
   $("edition-new").onclick = () => {
@@ -732,111 +724,60 @@ function installSwitcher(): void {
     if (!slug) return;
     try {
       await backend.createEdition(selBook, slug, from.value);
-      location.href = editionHref(selBook, slug);
+      await leave(editionHref(selBook, slug));
     } catch (err) {
       formErr.textContent = brief(err);
     }
   };
 }
 
-// Never let two save requests be in flight at once (Task 4 fix): a second
-// save while one is pending would race the first over the network, and
-// whichever POST body the server sees last wins — an older in-flight save
-// could clobber a newer one on disk. Instead, queue the latest text and
-// fire it immediately when the in-flight request finishes.
-function save(text: string): void {
-  if (saveInFlight) {
-    queuedSaveText = text; // supersede any earlier queued text — only the latest matters
-    return;
+// Every page switch: send what is waiting first, and ask before dropping an
+// edit whose save failed or that a conflict still holds.
+let leaving = false; // the author chose to go: beforeunload asks nothing more
+async function leave(href: string): Promise<void> {
+  // No sync before a book opens (an empty library's first create).
+  if (sync) {
+    await sync.flush();
+    if (
+      sync.hasUnsaved() &&
+      !confirm("Some changes aren't saved. Leave anyway?")
+    ) return;
   }
-  setSaveInFlight(true);
-  doSave(text);
+  leaving = true;
+  location.href = href;
 }
 
-// The banner's choices wait for a save in flight to settle: Reload under an
-// accepted save would show text the disk no longer has.
-function setSaveInFlight(on: boolean): void {
-  saveInFlight = on;
+// Sync's status onto the toolbar — the only way "Saved" gets there.
+function showSync(s: SyncStatus): void {
+  lastSaved = sync.savedAt;
+  if (s.kind === "conflict") {
+    setStatus("error", "something else touched the manuscript");
+  } else if (s.kind === "error") setStatus("error", brief(s.detail));
+  else setStatus(s.kind);
+}
+
+// The save state onto the page: sync.ts calls this whenever a save starts,
+// lands or fails, or an edit changes what is unsaved.
+let metaWasBusy = false;
+function syncChanged(s: SyncStatus): void {
+  // The banner's choices wait for a save in flight to settle: Reload under an
+  // accepted save would show text the disk no longer has.
   for (const id of ["disk-reload", "disk-keep"]) {
-    ($(id) as HTMLButtonElement).disabled = on;
+    ($(id) as HTMLButtonElement).disabled = sync.manuscriptBusy();
   }
-}
-
-async function doSave(text: string): Promise<void> {
-  try {
-    await renaming; // a rename's token rewrite moves `base`
-    const ok = await backend.saveManuscript(book, { text, clientId, base });
-    if ("conflict" in ok) {
-      // Equal: Reload or Keep mine already settled on this version, and a
-      // Keep mine save may be queued behind this one — leave it.
-      if (ok.version !== base) {
-        queuedSaveText = null; // based on the same stale version
-        showDiskBanner(ok);
-        setStatus("error", "something else touched the manuscript");
-      }
-      return;
-    }
-    base = ok.version;
-    // The server rewrote the save (a renamed edition's token): take its text,
-    // unless the author has typed past what was sent.
-    if (ok.text !== undefined && editor.state.doc.toString() === text) {
-      replaceBuffer(editor, ok.text);
-      reparse(ok.text);
-    }
-    if (diskOffer?.version === base) hideDiskBanner(); // it was our own save
-    if (editor.state.doc.toString() === (ok.text ?? text)) {
-      dirty = false;
-      lastSaved = new Date();
-      if (!metaSaveInFlight && !configPanel?.isDirty()) setStatus("saved");
-    }
-  } catch (err) {
-    setStatus("error", brief(err));
-  } finally {
-    setSaveInFlight(false);
-    if (queuedSaveText !== null) {
-      const next = queuedSaveText;
-      queuedSaveText = null;
-      // fire-and-forget: intentional non-blocking dispatch, not a missing await —
-      // doSave's own finally will run again when this one settles.
-      setSaveInFlight(true);
-      doSave(next); // catch-up save, no debounce — the debounce already happened once
-    }
-  }
+  if (diskOffer?.version === sync.base) hideDiskBanner(); // it was our own save
+  showSync(s);
+  const metaBusy = sync.metadataBusy();
+  if (metaWasBusy && !metaBusy && metaStale) refreshConfigFromRemote();
+  metaWasBusy = metaBusy;
 }
 
 function saveMetadataSections(sections: Partial<Metadata>): void {
   if ("page" in sections) setCrumbSize(sections.page?.size);
-  // Saves replace whole sections, so this keeps `metadata` what the panel shows.
-  if (metadata) metadata = { ...metadata, ...structuredClone(sections) };
-  if (metaSaveInFlight) {
-    queuedMetaSections = { ...queuedMetaSections, ...sections };
-    return;
-  }
-  metaSaveInFlight = true;
-  metaSaveDone = doMetadataSave(sections);
-}
-
-async function doMetadataSave(sections: Partial<Metadata>): Promise<void> {
-  try {
-    metaBase = (await backend.saveMetadata(book, edition, sections)).version;
-    lastSaved = new Date();
-    if (
-      !dirty && !saveInFlight && !queuedMetaSections && !configPanel?.isDirty()
-    ) {
-      setStatus("saved");
-    }
-  } catch (err) {
-    setStatus("error", `config: ${brief(err)}`);
-  } finally {
-    metaSaveInFlight = false;
-    if (queuedMetaSections !== null) {
-      const next = queuedMetaSections;
-      queuedMetaSections = null;
-      // fire-and-forget: same intentional non-blocking dispatch as doSave.
-      metaSaveInFlight = true;
-      metaSaveDone = doMetadataSave(next);
-    } else if (metaStale) refreshConfigFromRemote(); // no-op while still dirty
-  }
+  // Saves replace whole sections, so this keeps `metadata` what the panel
+  // shows: its own sections, uncopied (Sync copies what it sends).
+  if (metadata) metadata = { ...metadata, ...sections };
+  sync.editMetadata(sections);
 }
 
 const fetchMetadata = (): Promise<
@@ -852,7 +793,7 @@ const styleCatalog = () => {
 
 // The Publish tab's e-book export, run once every style save has landed.
 async function exportEpub(): Promise<EpubResult> {
-  while (metaSaveInFlight) await metaSaveDone;
+  await sync.flush();
   try {
     return await backend.exportEpub(book, edition);
   } catch (err) {
@@ -865,17 +806,16 @@ let panelLoad: Promise<ConfigPanel | null> | null = null;
 function ensureConfigPanel(): Promise<ConfigPanel | null> {
   return panelLoad ??= (async () => {
     try {
-      ({ metadata, version: metaBase } = await fetchMetadata());
+      const loaded = await fetchMetadata();
+      metadata = loaded.metadata;
+      sync.rebaseMetadata(loaded.version);
       return configPanel = createConfigPanel({
         overlay: $("config-overlay"),
         nav: $("style-nav"),
         sheetView: $("sheet-view"),
         metadata,
         saveSections: saveMetadataSections,
-        onEdit: () => {
-          setStatus("saving");
-          $("preview").dataset.stale = "";
-        },
+        onEdit: () => $("preview").dataset.stale = "",
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
         exportEpub,
@@ -916,8 +856,7 @@ const themeName = (slug: string) =>
 // what the author sees. The held copy is current unless another writer changed
 // metadata.json since (metaStale until refreshConfigFromRemote catches up).
 async function settledMetadata(): Promise<Metadata> {
-  configPanel?.flush();
-  while (metaSaveInFlight) await metaSaveDone;
+  await sync.flush();
   if (metadata && !metaStale) return metadata;
   return (await fetchMetadata()).metadata;
 }
@@ -1038,18 +977,18 @@ function installThemeApply(): void {
     await backend.createEdition(book, next, edition ?? "default");
     try {
       await backend.saveMetadata(book, next, themeSections(applied));
-      await backend.flushMetadata(book, next); // the page is about to go
     } catch (err) {
       // An edition named for the theme but holding the old style misleads.
       await backend.deleteEdition(book, next).catch(() => {});
       throw err;
     }
-    location.href = editionHref(book, next);
+    await leave(editionHref(book, next));
   });
   $("theme-replace").onclick = run(async (slug) => {
     const applied = applyTheme(await settledMetadata(), slug);
     metadata = applied;
     saveMetadataSections(themeSections(applied));
+    void sync.flush(); // no debounce: the author chose this
     configPanel?.refresh(applied);
     endPreview(true);
     dlg.close();
@@ -1122,23 +1061,26 @@ const fetchManuscript = (
 // show in every browser: one without the API (Firefox, Safari, Brave until its
 // flag is on) fails the click with its own error rather than hiding the
 // options.
-async function chooseLibrary(): Promise<BookStore> {
+async function chooseLibrary(): Promise<FileSystemDirectoryHandle> {
   const remembered = await rememberedFolder();
   const pref = localStorage.getItem("library");
   if (
     pref === "folder" && remembered && await reopenFolder(remembered, false)
-  ) return handleStore(remembered);
-  if (pref === "browser") return handleStore(await browserFolder());
+  ) return remembered;
+  if (pref === "browser") return await browserFolder();
   return new Promise((resolve) => {
     const dlg = $("library") as HTMLDialogElement;
     const err = $("lib-err");
     // Persisted storage is evicted last; the browser may still say no.
     const persist = () => navigator.storage.persist?.().catch(() => false);
-    const done = (store: BookStore, kind: "folder" | "browser") => {
+    const done = (
+      dir: FileSystemDirectoryHandle,
+      kind: "folder" | "browser",
+    ) => {
       localStorage.setItem("library", kind);
       if (kind === "browser") persist();
       dlg.close();
-      resolve(store);
+      resolve(dir);
     };
     const fail = (e: unknown) => {
       if ((e as Error).name !== "AbortError") err.textContent = brief(e);
@@ -1149,7 +1091,7 @@ async function chooseLibrary(): Promise<BookStore> {
       reopen.textContent = `Open “${remembered.name}” again`;
       reopen.onclick = async () => {
         if (await reopenFolder(remembered, true)) {
-          done(handleStore(remembered), "folder");
+          done(remembered, "folder");
         } else err.textContent = "The folder wasn't allowed.";
       };
     }
@@ -1161,11 +1103,11 @@ async function chooseLibrary(): Promise<BookStore> {
       ($(id).querySelector(".pill") as HTMLElement).hidden = !tagged;
     }
     $("lib-new").onclick = () =>
-      createBooksFolder().then((d) => done(handleStore(d), "folder"), fail);
+      createBooksFolder().then((d) => done(d, "folder"), fail);
     $("lib-pick").onclick = () =>
-      pickFolder().then((d) => done(handleStore(d), "folder"), fail);
+      pickFolder().then((d) => done(d, "folder"), fail);
     $("lib-browser").onclick = () =>
-      browserFolder().then((d) => done(handleStore(d), "browser"), fail);
+      browserFolder().then((d) => done(d, "browser"), fail);
     dlg.showModal();
   });
 }
@@ -1204,7 +1146,7 @@ async function connect(): Promise<Backend> {
   if (await hasServer()) return httpBackend();
   const assets = localAssets();
   await browserNotice();
-  return localBackend(await chooseLibrary(), await assets);
+  return await localBackend(await chooseLibrary(), await assets);
 }
 
 // An update built from a version the buffer isn't based on: fetch the current
@@ -1213,18 +1155,20 @@ async function connect(): Promise<Backend> {
 // banner and the author decides.
 async function refreshFromRemote(): Promise<void> {
   const gen = ++remoteFetchGen;
-  const was = base;
+  const was = sync.base;
   const disk = await fetchManuscript(book);
   // A save acknowledged meanwhile is newer than this read; a change after it
   // sends its own update.
-  if (gen !== remoteFetchGen || base !== was || disk.version === base) return;
-  if (dirty || saveInFlight) {
+  if (
+    gen !== remoteFetchGen || sync.base !== was || disk.version === sync.base
+  ) return;
+  if (sync.manuscriptDirty() || sync.manuscriptBusy()) {
     showDiskBanner(disk);
     return;
   }
   replaceBuffer(editor, disk.text);
   reparse(disk.text);
-  base = disk.version;
+  sync.rebase(disk.version);
   hideDiskBanner();
 }
 
@@ -1233,12 +1177,12 @@ async function refreshFromRemote(): Promise<void> {
 // server rewrites the old token in that save). A clean buffer takes the text.
 async function rebaseAfterRename(): Promise<void> {
   const disk = await fetchManuscript(book);
-  if (!dirty && !saveInFlight) {
+  if (!sync.manuscriptDirty() && !sync.manuscriptBusy()) {
     replaceBuffer(editor, disk.text);
     reparse(disk.text);
   }
-  base = disk.version;
-  if (diskOffer?.version === base) hideDiskBanner();
+  sync.rebase(disk.version);
+  if (diskOffer?.version === sync.base) hideDiskBanner();
 }
 
 function showDiskBanner(disk: { text: string; version: string }): void {
@@ -1254,24 +1198,19 @@ function hideDiskBanner(): void {
 function reloadFromDisk(): void {
   if (!diskOffer) return;
   const { text, version } = diskOffer;
-  clearTimeout(saveTimer);
-  queuedSaveText = null;
+  sync.dropManuscript(version);
   replaceBuffer(editor, text);
   reparse(text);
-  base = version;
-  dirty = false;
   hideDiskBanner();
-  setStatus("saved");
   editor.focus();
 }
 
 // Keep mine: base the buffer on the disk version, so the save overwrites it.
 function keepMine(): void {
   if (!diskOffer) return;
-  base = diskOffer.version;
+  const { version } = diskOffer;
   hideDiskBanner();
-  clearTimeout(saveTimer);
-  save(editor.state.doc.toString());
+  sync.keepMine(version);
   editor.focus();
 }
 
@@ -1282,7 +1221,7 @@ function keepMine(): void {
 // version check (409 like the manuscript) if that ever bites.
 async function refreshConfigFromRemote(): Promise<void> {
   if (!configPanel) return;
-  if (configPanel.isDirty() || metaSaveInFlight) {
+  if (sync.metadataBusy()) {
     metaStale = true;
     return;
   }
@@ -1290,12 +1229,13 @@ async function refreshConfigFromRemote(): Promise<void> {
   try {
     const fresh = await fetchMetadata();
     if (gen !== metaFetchGen) return;
-    if (configPanel.isDirty() || metaSaveInFlight) { // edited meanwhile
+    if (sync.metadataBusy()) { // edited meanwhile
       metaStale = true;
       return;
     }
     metaStale = false;
-    ({ metadata, version: metaBase } = fresh);
+    metadata = fresh.metadata;
+    sync.rebaseMetadata(fresh.version);
     configPanel.refresh(metadata);
   } catch {
     // 409/network — leave the panel as-is; the user can close and reopen.
@@ -1612,13 +1552,24 @@ function createManuscript(cancelable: boolean): void {
     if (!dir.files?.length) return;
     try {
       err.textContent = "Copying…";
-      const books = await importBooks(backend.store!, dir.files);
-      if (!books.length) {
+      const { written, skipped } = await importBooks(
+        backend.store!,
+        dir.files,
+      );
+      const first = written[0];
+      // Nothing skipped, or nowhere else to go: open the first book copied.
+      if (first && (!skipped.length || !cancelable)) {
+        await leave(editionHref(first, null));
+        return;
+      }
+      if (!skipped.length) {
         err.textContent =
           "No book found: a book is a folder with a manuscript.md.";
         return;
       }
-      location.href = editionHref(books[0]!, null);
+      err.textContent = `Already in the library: ${skipped.join(", ")}.` +
+        (first ? ` Copied ${written.map(titleCase).join(", ")}.` : "");
+      if (first) books = (await backend.listBooks()).books;
     } catch (e) {
       err.textContent = brief(e);
     }
@@ -1629,7 +1580,7 @@ function createManuscript(cancelable: boolean): void {
       const got = await askTitle("", null, "Create book");
       if (!got) return createManuscript(cancelable);
       await backend.createBook(got.slug, got.title, got.theme);
-      location.href = editionHref(got.slug, null);
+      await leave(editionHref(got.slug, null));
     } catch (e) {
       err.textContent = brief(e);
       dlg.showModal();
@@ -1659,7 +1610,7 @@ async function importPicked(
       ? r
       : importSource(src.name, bytes, { from: src.from, title: got.title });
     await backend.importBook(got.slug, book, got.theme);
-    location.href = editionHref(got.slug, null);
+    await leave(editionHref(got.slug, null));
   } catch (e) {
     err.textContent = brief(e);
     if (!dlg.open) dlg.showModal();
@@ -1858,7 +1809,8 @@ function renderImportNotes(text: string): void {
 
 async function main(): Promise<void> {
   backend = await connect();
-  [books, libId] = await Promise.all([
+  let skipped: string[];
+  [{ books, skipped }, libId] = await Promise.all([
     backend.listBooks(),
     backend.libraryId().catch(() => null),
   ]);
@@ -1867,9 +1819,18 @@ async function main(): Promise<void> {
     location.replace(location.pathname); // someone else's place: start at home
     return;
   }
+  // Folders whose names a book can't have are left out, and named, so one
+  // never keeps the rest of the library from opening.
+  const notShown = skipped.length
+    ? `Not shown: ${skipped.join(", ")} — folder names may use letters, ` +
+      "digits, dot, dash and underscore"
+    : "";
+  $("book-skipped").textContent = notShown;
+  $("book-skipped").hidden = !notShown;
   if (!books.length) {
     // An empty library: the first book is the only thing to do.
     createManuscript(false);
+    $("create-err").textContent = notShown;
     return;
   }
   const requested = params.get("book");
@@ -1900,7 +1861,31 @@ async function main(): Promise<void> {
   });
 
   const { text, version } = await fetchManuscript(book);
-  base = version;
+  sync = new Sync({
+    backend,
+    book,
+    edition,
+    clientId,
+    base: version,
+    metaBase: null, // until the Style panel loads it
+    current: () => editor.state.doc.toString(),
+    before: () => renaming,
+    onConflict: showDiskBanner, // the status follows from sync
+    onRewrite: (rewritten) => {
+      replaceBuffer(editor, rewritten);
+      reparse(rewritten);
+    },
+    onStatus: syncChanged,
+  });
+  // Hiding or closing the tab sends what is waiting; closing prompts while
+  // anything is unsaved (keepalive carries a save sent as the tab goes).
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") void sync.flush();
+  });
+  addEventListener("pagehide", () => void sync.flush());
+  addEventListener("beforeunload", (e) => {
+    if (!leaving && sync.hasUnsaved()) e.preventDefault();
+  });
   // The list is fetched once per few seconds, not per keystroke in a slug's
   // completion; an add drops it so the new image shows next time.
   let imageList: Promise<ImageFile[]> | null = null;
@@ -1987,10 +1972,10 @@ async function main(): Promise<void> {
       const up = await fetch("/").then((r) => r.ok, () => false);
       if (!up) return;
       clearInterval(retry);
-      if (
-        dirty || saveInFlight || metaSaveInFlight || configPanel?.isDirty()
-      ) setStatus("offline", "Server restarted — reload to reconnect");
-      else location.reload();
+      await sync.flush(); // a save that failed while it was down goes now
+      if (sync.hasUnsaved()) {
+        setStatus("offline", "Server restarted — reload to reconnect");
+      } else location.reload();
     }, 500);
   };
   paint = (msg, cacheKey: string | null = key) => {
@@ -2017,22 +2002,17 @@ async function main(): Promise<void> {
   installThemeApply();
   const onMessage = (msg: ServerMessage) => {
     if (msg.type === "error") {
-      if (msg.save === "metadata") { // accepted, then the write failed
-        setStatus("error", `config not saved — ${brief(msg.message)}`);
-      } else setStatus("error", `build: ${brief(msg.message)}`);
+      setStatus("error", `build: ${brief(msg.message)}`);
       return;
     }
-    if (
-      !dirty && !saveInFlight && !metaSaveInFlight && !configPanel?.isDirty() &&
-      !diskOffer
-    ) setStatus("saved");
+    showSync(sync.status()); // clears a build or preview error; Sync says if saved
     if (!holdForPreview(msg)) {
       lastShown = msg;
       paint(msg);
     }
     // Versions this client already reflects need nothing (spec §6).
-    if (msg.manuscriptVersion !== base) refreshFromRemote();
-    if (msg.metadataVersion !== metaBase) {
+    if (msg.manuscriptVersion !== sync.base) refreshFromRemote();
+    if (msg.metadataVersion !== sync.metaBase) {
       metaStale = true; // until refreshConfigFromRemote fetches it
       refreshConfigFromRemote();
     }

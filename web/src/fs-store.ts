@@ -3,6 +3,7 @@
 // or the site's origin-private file system where that API is missing. Same
 // handle API either way, so one store serves both.
 import type { BookStore } from "../../server/store.ts";
+import { slugify } from "./editions.ts";
 
 declare global {
   interface FileSystemHandle {
@@ -80,6 +81,22 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
     }
     return names.sort();
   }
+  // No fs events in the browser: the store reports its own changes.
+  const listeners = new Set<(paths: string[]) => void>();
+  const changed = (...paths: string[]) => {
+    for (const l of listeners) l(paths);
+  };
+  async function remove(path: string): Promise<boolean> {
+    const dir = await dirOf(path, false);
+    if (!dir) return false;
+    try {
+      await dir.removeEntry(nameOf(path));
+      return true;
+    } catch (e) {
+      if (isMissing(e)) return false;
+      throw e;
+    }
+  }
   const store: BookStore = {
     async list() {
       const books: string[] = [];
@@ -108,10 +125,12 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
       const dir = await dirOf(path, false);
       if (!dir) throw new Error(`no such directory for ${path}`);
       await put(dir, path, data);
+      changed(path);
     },
     async create(path, data) {
       if (await store.exists(path)) return false;
       await put((await dirOf(path, true))!, path, data);
+      changed(path);
       return true;
     },
     async rename(from, to) {
@@ -119,21 +138,20 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
       const data = await store.read(from);
       if (data === null) return false;
       await put((await dirOf(to, true))!, to, data);
-      await store.remove(from);
+      await remove(from);
+      changed(from, to);
       return true;
     },
     async remove(path) {
-      const dir = await dirOf(path, false);
-      if (!dir) return false;
-      try {
-        await dir.removeEntry(nameOf(path));
-        return true;
-      } catch (e) {
-        if (isMissing(e)) return false;
-        throw e;
-      }
+      if (!await remove(path)) return false;
+      changed(path);
+      return true;
     },
     listDir,
+    watch(onChange) {
+      listeners.add(onChange);
+      return () => listeners.delete(onChange);
+    },
   };
   return store;
 }
@@ -185,11 +203,14 @@ export const browserFolder = (): Promise<FileSystemDirectoryHandle> =>
 
 // Files picked with <input type="file" webkitdirectory>: every book is a
 // directory with a manuscript.md; its metadata, editions and images come
-// along, anything else is left behind. Returns the books written.
+// along, anything else is left behind. A book is named by its folder,
+// slugified; a slug the library already has (or this import already took) is
+// skipped whole, never merged or overwritten. Returns the slugs written and
+// the folder names skipped.
 export async function importBooks(
   store: BookStore,
   files: FileList | File[],
-): Promise<string[]> {
+): Promise<{ written: string[]; skipped: string[] }> {
   const roots = new Set<string>(); // "…/<book>" for each manuscript.md
   for (const f of files) {
     const p = f.webkitRelativePath || f.name;
@@ -197,12 +218,23 @@ export async function importBooks(
       roots.add(p.slice(0, -"/manuscript.md".length));
     } else if (p === "manuscript.md") roots.add("");
   }
+  const slugs = new Map<string, string>(); // root → slug, for those kept
+  const skipped: string[] = [];
+  for (const root of [...roots].sort()) {
+    const name = root === "" ? "book" : root.slice(root.lastIndexOf("/") + 1);
+    const slug = slugify(name) || "book";
+    const taken = [...slugs.values()].includes(slug) ||
+      await store.exists(`${slug}/manuscript.md`);
+    if (taken) skipped.push(name);
+    else slugs.set(root, slug);
+  }
   const written = new Set<string>();
   for (const f of files) {
     const p = f.webkitRelativePath || f.name;
     const root = [...roots].find((r) => r === "" || p.startsWith(r + "/"));
     if (root === undefined) continue;
-    const book = root === "" ? "book" : root.slice(root.lastIndexOf("/") + 1);
+    const book = slugs.get(root);
+    if (book === undefined) continue; // skipped
     const rel = root === "" ? p : p.slice(root.length + 1);
     if (
       !/^(manuscript\.md|metadata\.json|editions\/[^/]+\.json|images\/[^/]+)$/
@@ -213,7 +245,7 @@ export async function importBooks(
     if (!await store.create(path, data)) await store.write(path, data);
     written.add(book);
   }
-  return [...written].sort();
+  return { written: [...written].sort(), skipped };
 }
 
 function idb<T>(

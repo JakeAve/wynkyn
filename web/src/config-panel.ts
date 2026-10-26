@@ -22,14 +22,10 @@ import {
   setCount,
 } from "./style-catalog.ts";
 
-const SAVE_DEBOUNCE_MS = 600;
-
 export type PanelMode = "style" | "publish";
 
 export interface ConfigPanel {
   setMode(mode: PanelMode): void; // swap the nav and body between style and publish
-  isDirty(): boolean; // sections touched but not yet handed to saveSections
-  flush(): void; // hand any pending sections to saveSections now
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   selectStyle(key: string): void; // style mode, where a catalog entry is styled (§7.4)
   pagesChanged(): void; // the preview repaginated
@@ -42,8 +38,8 @@ export interface ConfigPanelOptions {
   nav: HTMLElement; // the left column
   sheetView: HTMLElement; // the right column in publish mode
   metadata: Metadata;
-  saveSections(sections: Partial<Metadata>): void;
-  onEdit(): void; // an edit is queued; saveSections follows after the debounce
+  saveSections(sections: Partial<Metadata>): void; // every edit; the app debounces
+  onEdit(): void; // an edit is made; saveSections follows at once
   preview: PreviewLink;
   isNames(): string[]; // `{is}` classes the manuscript uses
   exportEpub(): Promise<EpubResult>;
@@ -137,38 +133,23 @@ function routeById(id: string, meta: Metadata): Route | null {
 
 export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   let meta = structuredClone(opts.metadata);
-  const dirty = new Set<keyof Metadata>();
-  let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const queueSave = (key: keyof Metadata): void => {
-    dirty.add(key);
+  // Hands the edited section to saveSections.
+  function queueSave(key: keyof Metadata): void {
     opts.onEdit();
-    clearTimeout(timer);
-    timer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
-  };
-
-  // Hands the dirty sections to saveSections now; the debounce ends here.
-  function flushSave(): void {
-    clearTimeout(timer);
-    if (!dirty.size) return;
     const sections: Record<string, unknown> = {};
     // ?? null: defensive fallback for a section the user emptied out to
     // delete server-side. In the current UI every section builder eagerly
     // creates its object via `??=`, so meta[k] is always defined (possibly
     // {}) by the time this fires — this branch is not reachable today, but
     // is kept in case a future section is built lazily.
-    for (const k of dirty) {
-      sections[k] = (meta as Record<string, unknown>)[k] ?? null;
-    }
+    sections[key] = (meta as Record<string, unknown>)[key] ?? null;
     // Fonts rows can sit blank in the DOM while the user is still typing an
     // alias (see the Fonts tab's "+ font alias" button). A sibling
     // field's save must not flush that blank entry to disk — an empty
     // family produces a malformed css2 URL param in generateFontLinks and
     // can knock out every custom font in the live preview.
-    if (
-      dirty.has("fonts") && sections.fonts &&
-      typeof sections.fonts === "object"
-    ) {
+    if (sections.fonts && typeof sections.fonts === "object") {
       const filtered: Record<string, string> = {};
       for (
         const [alias, family] of Object.entries(
@@ -185,9 +166,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         Object.entries(sections.is).filter(([, p]) => Object.keys(p).length),
       );
     }
-    dirty.clear();
     opts.saveSections(sections as Partial<Metadata>);
-    renderNav(); // the "N set" counts follow the edit, once per save
+    renderNav(true); // the "N set" counts follow the edit
   }
   let onPages: (() => void) | null = null; // the open view's redraw, if any
 
@@ -218,8 +198,15 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     render();
   }
 
-  function renderNav(): void {
+  let navShown = ""; // what renderNav last drew, so an edit redraws on change
+  function renderNav(ifChanged = false): void {
     const groups = route.tab === "publish" ? PUBLISH_NAV : styleNav(meta);
+    const shown = JSON.stringify([
+      current,
+      groups.map(([t, rows]) => [t, rows.map((r) => [r.id, r.label, r.count])]),
+    ]);
+    if (ifChanged && shown === navShown) return;
+    navShown = shown;
     opts.nav.setAttribute(
       "aria-label",
       route.tab === "publish" ? "Publish sections" : "Style sections",
@@ -263,10 +250,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       go,
       preview: opts.preview,
       sheetView: opts.sheetView,
-      exportEpub: () => {
-        flushSave();
-        return opts.exportEpub();
-      },
+      exportEpub: () => opts.exportEpub(),
       toStyle: (view, from) => {
         current = `publish:${from}`; // Back lands on the section left from
         opts.onRoute?.(current);
@@ -323,8 +307,6 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       if ((route.tab === "publish") === (mode === "publish")) return;
       go(mode === "publish" ? { tab: "publish" } : styleRoute);
     },
-    isDirty: () => dirty.size > 0,
-    flush: flushSave,
     refresh(metadata: Metadata) {
       meta = structuredClone(metadata);
       render(true);

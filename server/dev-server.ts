@@ -50,7 +50,6 @@ const contentType = (name: string) =>
 export interface ServerOptions {
   booksRoot?: string; // default "books"
   port?: number; // 0 = OS-assigned (tests); default 8000
-  saveDebounceMs?: number; // metadata saves; default 250
 }
 
 export interface RunningServer {
@@ -69,10 +68,7 @@ export async function startServer(
       `${booksRoot}/ not found — in a worktree, \`deno task setup\` links it to the main checkout's library`,
     );
   }
-  const service = new BookService({
-    store: diskStore(booksRoot),
-    saveDebounceMs: opts.saveDebounceMs,
-  });
+  const service = new BookService({ store: diskStore(booksRoot) });
 
   async function json(req: Request): Promise<Record<string, unknown>> {
     try {
@@ -88,7 +84,8 @@ export async function startServer(
     `${booksRoot}/${book}/export${edition === null ? "" : `/${edition}`}`;
 
   // The Publish tab's e-book export (spec §7.8): `bml epub` behind an
-  // endpoint. The file lands in the book's export folder, served by
+  // endpoint, through the service so a style save under way lands first. The
+  // file lands in the book's export folder, served by
   // GET /api/books/<book>/export/<file>.
   async function handleEpub(
     book: string,
@@ -100,13 +97,11 @@ export async function startServer(
     }
     exporting.add(key);
     try {
-      const { exportEpub } = await import("./epub-export.ts");
-      await service.flushMetadata(book, edition);
-      const s = await exportEpub(booksRoot, book, { edition });
-      return Response.json({
-        file: s.file.slice(s.file.lastIndexOf("/") + 1),
-        documents: s.documents,
-      });
+      const { epub, documents } = await service.exportEpub(book, edition);
+      const dir = exportDir(book, edition);
+      await Deno.mkdir(dir, { recursive: true });
+      await Deno.writeFile(`${dir}/book.epub`, epub);
+      return Response.json({ file: "book.epub", documents });
     } catch (err) {
       return new Response((err as Error).message, { status: 500 });
     } finally {
@@ -175,7 +170,7 @@ export async function startServer(
       return Response.json({ id: await service.libraryId() });
     }
     if (path === "/api/books" && req.method === "GET") {
-      return Response.json({ books: await service.list() });
+      return Response.json(await service.list());
     }
     if (path === "/api/books" && req.method === "POST") {
       const { slug, title, theme } = await json(req);
