@@ -4,6 +4,10 @@
 * {
   box-sizing: border-box;
 }
+/* `hidden` wins over any class that sets display (.btn is inline-flex). */
+[hidden] {
+  display: none !important;
+}
 html,
 body {
   height: 100%;
