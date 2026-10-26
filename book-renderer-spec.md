@@ -1948,16 +1948,33 @@ and the mode persists across reloads:
 | Style   | book settings and parts | the chosen part's styles (§7.4)      | preview (§7.6)                   |
 | Publish | print and e-book rows   | page setup, print and e-book exports | the first signature as it prints |
 
-Each side column has a toggle at its own edge of the toolbar — Contents at the
-far left before the crumb (⌘\), Pages at the far right (⌘.) — drawn as a panel
-icon whose side is half filled while that column shows; both persist. The crumb
-reads library / book / edition. The library step, muted so the title leads, is
-an icon for where the books live (a folder on this device, or this browser) and
-its name (the folder's, or "This browser"); its tooltip says where, and a click
-goes back to the Welcome (§7.9) to pick another. The dev server has only its
-`books/`, so there the crumb starts at the book. Gutters between the columns
-drag to resize them. A hidden preview still lays out (it leaves the grid, never
+The toolbar holds only what is global: the Contents toggle at the far left
+before the crumb (⌘\), drawn as a panel icon whose side is half filled while the
+left column shows; the crumb; the modes; and the light/dark toggle alone at the
+right. The pages hide with ⌘. (no button); both choices persist. The crumb reads
+library / book / edition. The library step, muted so the title leads, is an icon
+for where the books live (a folder on this device, or this browser) and its name
+(the folder's, or "This browser"); its tooltip says where, and a click goes back
+to the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
+there the crumb starts at the book. Gutters between the columns drag to resize
+them. A hidden preview still lays out (it leaves the grid, never
 `display: none`), since Paged.js paginates by measuring.
+
+Each pane carries its own controls in a header along its top: the write pane
+(Write's middle column) has the text view (§7.3), the pages pane (the right
+column in every mode) none yet. Both headers end in an expand button at the top
+right corner:
+
+- **Writing expanded** (Write only): the outline and the pages leave and the
+  text centres at its measure. While typing, the toolbar, footer and pane header
+  (all but the expand button) fade, and return when the mouse moves.
+- **Pages expanded** (any mode): the pages, or Publish's sheet view, take the
+  whole width; the middle column leaves.
+- In either, the mouse at the left edge slides the left column in over the view,
+  and the Contents toggle pins it there.
+- The same button or esc returns (esc first closes an open dialog, find bar or
+  menu). ⌘⇧↩ expands the pane last used, or returns (⌘⇧F stays Footnote). The
+  expanded pane is remembered per mode.
 
 ### 7.2 Project Tree
 
@@ -1994,15 +2011,16 @@ CodeMirror 6 over plain BML text.
   `{subtitle}` italic. A `%%` line of only box-drawing characters draws as a
   hairline rule, and a `%%` label between two rules as small caps.
 - The selection is a green-grey tint, distinct from the quieter active line.
-- The text view (a bar along the top of the editor) is a per-reader preference,
+- The text view (in the write pane's header, §7.1) is a per-reader preference,
   not part of the book: prose in Serif (default), Sans or Mono at 12–24px
   (default 16), with sentinels always in monospace so markup reads as markup.
   The text holds a reading measure of about 70 characters (36em), centred in the
-  pane while Pages is hidden. **Hide markup** folds away the sentinel lines of
-  every paragraph that also has prose (`{title}`, `{dropcap}`, `{quote}` …
-  `{/quote}`) and the `{em}` tags, except in the paragraph holding the cursor;
-  structural lines stay as landmarks, and a paragraph of sentinels alone
-  (`{illustration}`, `{break}`) stays visible so it can still be reached.
+  pane while the pages are hidden or the writing expanded. **Hide markup** folds
+  away the sentinel lines of every paragraph that also has prose (`{title}`,
+  `{dropcap}`, `{quote}` … `{/quote}`) and the `{em}` tags, except in the
+  paragraph holding the cursor; structural lines stay as landmarks, and a
+  paragraph of sentinels alone (`{illustration}`, `{break}`) stays visible so it
+  can still be reached.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The footer is split by
@@ -2180,7 +2198,8 @@ Includes:
 ### 7.6 Preview Pane
 
 The right column in Write and Style (§7.1): the live, print-accurate spread
-view.
+view, under the pages pane's header, whose corner button expands it to the whole
+width (§7.1).
 
 ```
 +-------------------+  +--------------------+

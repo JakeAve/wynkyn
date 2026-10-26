@@ -36,9 +36,11 @@ picks all three, and the mode persists across reloads:
 | Style | book settings and parts | the chosen part's styles | preview |
 | Publish | print and e-book rows | page setup and exports | the first signature as it prints |
 
-Tabs and lists are for what you cannot click on. Side columns toggle at their
-own edge (Contents ⌘\, Pages ⌘.) and persist; gutters drag. A hidden preview
-still lays out, since Paged.js paginates by measuring.
+Tabs and lists are for what you cannot click on. Contents toggles from the
+toolbar (⌘\); the pages hide with ⌘. alone, no button; both persist; gutters
+drag. The write pane and the pages pane each expand from their header's
+top-right corner (⌘⇧↩, esc returns), per mode. A hidden preview still lays out,
+since Paged.js paginates by measuring.
 
 ## The file stays the truth
 

@@ -52,6 +52,7 @@ import { installSwitcher, type Switcher } from "./switcher.ts";
 import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
 import { installTextView } from "./text-view.ts";
+import { installPanes, type Panes } from "./panes.ts";
 import { connect } from "./library.ts";
 import { $, brief } from "./dom.ts";
 import { h } from "./panel-controls.ts";
@@ -664,32 +665,6 @@ function installGutters(): void {
   }
 }
 
-// A side column's toolbar toggle: hides the column, persisted across reloads.
-// Returns the toggle for its shortcut.
-function installColumnToggle(id: string, hiddenClass: string): () => void {
-  const btn = $(id);
-  const panes = $("panes");
-  const set = (hidden: boolean) => {
-    panes.classList.toggle(hiddenClass, hidden);
-    btn.setAttribute("aria-pressed", String(!hidden));
-    try {
-      localStorage.setItem(hiddenClass, hidden ? "1" : "");
-    } catch {
-      // storage blocked: the toggle just won't survive a reload
-    }
-  };
-  let saved = false;
-  try {
-    saved = localStorage.getItem(hiddenClass) === "1";
-  } catch {
-    // as above
-  }
-  set(saved);
-  const toggle = () => set(!panes.classList.contains(hiddenClass));
-  btn.onclick = toggle;
-  return toggle;
-}
-
 // Light/dark toggle; an explicit choice persists, first load follows the
 // system (resolved by the inline script in index.html before first paint).
 function installThemeToggle(): void {
@@ -721,16 +696,19 @@ function chordOf(e: KeyboardEvent): string | null {
     e.key.length === 1 ? e.key.toUpperCase() : e.key
   }`;
 }
-function installShortcuts(
-  toggleContents: () => void,
-  togglePages: () => void,
-): void {
+// Open popups esc closes first: a dialog, the find bar, completions, menus.
+const POPUPS =
+  "dialog[open], .cm-tooltip, .cm-bml-find, .cm-bml-palette, .fontpop";
+function installShortcuts(panes: Panes): void {
   const bySnippet = new Map(
     SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((
       s,
     ) => [SNIPPET_KEYS[s.label], s]),
   );
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.querySelector(POPUPS)) {
+      if (panes.returnFromExpand()) e.preventDefault();
+    }
     const chord = chordOf(e);
     if (!chord) return;
     const snippet = bySnippet.get(chord);
@@ -739,8 +717,9 @@ function installShortcuts(
       insertSnippet(editor, snippet);
     } else if (m) setMode(m);
     else if (chord === "Mod-,") setMode("style");
-    else if (chord === "Mod-\\") toggleContents();
-    else if (chord === "Mod-.") togglePages();
+    else if (chord === "Mod-\\") panes.toggleTree();
+    else if (chord === "Mod-.") panes.togglePages();
+    else if (chord === "Mod-Shift-Enter") panes.toggleExpand();
     else return;
     e.preventDefault();
   }, true);
@@ -751,7 +730,9 @@ function installShortcuts(
     );
   });
   $("tree-toggle").title += ` (${chordLabel("Mod-\\")})`;
-  $("pages-toggle").title += ` (${chordLabel("Mod-.")})`;
+  for (const b of document.querySelectorAll<HTMLElement>(".expand")) {
+    b.title += ` (${chordLabel("Mod-Shift-↩")})`;
+  }
 }
 
 // Create a new manuscript (spec §7.9): the empty library's first step, and
@@ -884,10 +865,7 @@ async function main(): Promise<void> {
   installTextView({ editor, backend, book, setStatus });
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
-  installShortcuts(
-    installColumnToggle("tree-toggle", "tree-hidden"),
-    installColumnToggle("pages-toggle", "pages-hidden"),
-  );
+  installShortcuts(installPanes({ mode: () => mode }));
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
       .mode as Mode | undefined;

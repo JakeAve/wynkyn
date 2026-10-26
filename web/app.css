@@ -100,6 +100,14 @@ summary {
   min-height: var(--h-lg);
   padding-inline: var(--s-6);
 }
+/* Icon (§6.1): square at its height. */
+.btn.icon {
+  width: var(--h-md);
+  padding: 0;
+}
+.btn.sm.icon {
+  width: var(--h-sm);
+}
 .btn svg,
 .tico {
   display: block;
@@ -207,7 +215,7 @@ kbd {
     transform: none;
   }
 }
-/* Column toggles: the panel icon's side is half filled while it shows. */
+/* Contents toggle: the panel icon's side is half filled while it shows. */
 .toggle[aria-pressed="true"] {
   --pf: .35;
 }
@@ -572,7 +580,7 @@ kbd {
 :root[data-mode="style"] :is(#tree, #editor, #sheet-view),
 :root[data-mode="publish"] :is(#tree, #editor),
 #panes.tree-hidden :is(#tree, #style-nav, #gutter-tree),
-#panes.pages-hidden :is(#sheet-view, #gutter-editor),
+#panes.pages-hidden #gutter-editor,
 #panes.tree-hidden ~ #footer :is(#foot-tree, #foot-gutter-tree),
 #panes.pages-hidden ~ #footer :is(#page-foot, #foot-gutter-pages) {
   display: none;
@@ -580,10 +588,117 @@ kbd {
 /* Hidden pages still lay out: Paged.js paginates by measuring, so the
    preview leaves the grid but never goes display:none. */
 :root[data-mode="publish"] #preview,
-#panes.pages-hidden #preview {
+#panes.pages-hidden #pages {
   position: absolute;
   inset: 0;
   visibility: hidden;
+}
+/* The pages pane (§7): its header on the desk, then the preview, or in
+   Publish the sheet view. */
+#pages {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--desk);
+}
+#pages .pane-head {
+  justify-content: flex-end;
+  border-bottom-color: transparent;
+}
+/* Pane header (§6.11): the pane's own controls at left, expand at right. */
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-pane);
+  padding: 0 var(--s-3) 0 var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+/* the top-right corner, even when the controls wrap */
+.expand {
+  align-self: start;
+  margin: calc((var(--h-pane) - var(--h-sm)) / 2) 0 0 auto;
+}
+.expand .in,
+.expand[aria-pressed="true"] .out {
+  display: none;
+}
+.expand[aria-pressed="true"] .in {
+  display: block;
+}
+.expand[aria-pressed="true"] {
+  color: var(--acc-ink);
+}
+/* Expanded views (§7, panes.ts): one pane takes #panes; :root outranks the
+   hidden-column rules above. Writing: the outline and pages leave. Pages:
+   the outline and the middle pane leave. What leaves keeps laying out. */
+:root #panes:is(.expand-writing, .expand-pages),
+:root #panes:is(.expand-writing, .expand-pages) ~ #footer {
+  grid-template-columns: minmax(0, 1fr);
+}
+#panes:is(.expand-writing, .expand-pages) .gutter,
+#panes.expand-writing ~ #footer > :not(#writer-foot),
+#panes.expand-pages ~ #footer > :not(#page-foot) {
+  display: none;
+}
+:root #panes.expand-pages ~ #footer > #page-foot {
+  display: flex;
+}
+:root #panes.expand-pages #pages {
+  position: relative;
+  visibility: visible;
+}
+#panes.expand-writing #pages,
+#panes.expand-pages :is(#editor, #config-overlay) {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+#panes.expand-writing #editor .cm-scroller {
+  justify-content: center;
+}
+/* Expanded, the outline slides in over the view from the left edge; the
+   Contents toggle pins it (pin-outline). */
+#outline-edge {
+  display: none;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--s-4);
+  z-index: 2;
+}
+#panes:is(.expand-writing, .expand-pages) #outline-edge {
+  display: block;
+}
+:root[data-mode="write"] #panes:is(.expand-writing, .expand-pages) #tree,
+:root:not([data-mode="write"]) #panes:is(.expand-writing, .expand-pages) #style-nav {
+  display: block;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--w-tree);
+  z-index: 3;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform var(--t), visibility var(--t);
+}
+#panes:is(.expand-writing, .expand-pages) :is(#outline-edge:hover ~ :is(#tree, #style-nav), #tree:hover, #style-nav:hover),
+:root #panes.pin-outline:is(.expand-writing, .expand-pages) :is(#tree, #style-nav) {
+  transform: none;
+  visibility: visible;
+  box-shadow: var(--shadow-pop);
+}
+/* Writing expanded: the chrome fades while typing, back on a mouse move. */
+:is(#toolbar, #footer, #editor .pane-head > :not(.expand)) {
+  transition: opacity var(--t);
+}
+body.typing :is(#toolbar, #footer, #editor .pane-head > :not(.expand)) {
+  opacity: 0;
+}
+body.typing #editor .pane-head {
+  border-bottom-color: transparent;
 }
 #tree {
   overflow-y: auto;
@@ -676,14 +791,14 @@ kbd {
 #panes.pages-hidden #editor .cm-scroller {
   justify-content: center;
 }
-/* the text view bar along the top of the editor */
+/* the text view, in the write pane's header */
 #text-view {
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-3) var(--s-6);
-  padding: var(--s-3) var(--s-5);
-  border-bottom: 1px solid var(--line);
+  padding-block: var(--s-2);
   color: var(--muted);
   font-size: var(--fs-xs);
 }

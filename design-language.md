@@ -344,8 +344,9 @@ same radius; no clip-path imitation.
 | panes, columns, toolbar, footer                                 | square, hairline-separated |
 | book pages                                                      | square                     |
 
-**Depth:** shadows only under pages (`--page-shadow`), popovers (`--shadow-pop`)
-and dialogs (`--shadow-dlg` over `--backdrop`).
+**Depth:** shadows only under pages (`--page-shadow`), popovers and the outline
+slid in over an expanded view (`--shadow-pop`), and dialogs (`--shadow-dlg` over
+`--backdrop`).
 
 ## 6. Components
 
@@ -379,8 +380,8 @@ Inside the style panel a `toggle` (`.tog`) keeps a 1px `--line` frame so it
 reads as a control beside the fields, and drops it for the wash when pressed;
 `.tog.primary` and `.tog.outline` (`--fg` text) are the panel's actions, e.g.
 Publish's one primary "Print sheets" beside the outlined "Print pages" and
-"Export EPUB". `.btn.sm` (banners) and `.btn.lg` (the empty state) are built;
-the icon class arrives with its first use.
+"Export EPUB". `.btn.sm` (banners), `.btn.lg` (the empty state) and `.btn.icon`
+(with `.sm`, the pane headers' expand) are built.
 
 ### 6.2 Segmented control (`seg`)
 
@@ -502,10 +503,14 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
 
 - **Toolbar** (`--h-toolbar`): left, the Contents toggle (⌘\) and the crumb
   (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`); centre,
-  Write / Style / Publish (⌘1–3); right, the theme toggle alone (planned: the
-  Pages toggle leaves, §7).
-- **Pane header** (`--h-pane`, planned with §7): the pane's own controls at left
-  in small sizes, `--s-2` apart; its expand button at right. A hairline below.
+  Write / Style / Publish (⌘1–3); right, the theme toggle alone. The save status
+  sits after the crumb.
+- **Pane header** (`--h-pane` at least, `.pane-head`): the pane's own controls
+  at left in small sizes, `--s-2` apart; its expand button
+  (`.btn.sm.icon
+  .expand`) pinned to the top-right corner even when the
+  controls wrap. A hairline below; the pages pane's header sits on `--desk` with
+  none.
 - **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; Go to style
   with a dotted underline; the session count in `--acc-ink` once non-zero
   (planned: there is no session count yet).
@@ -517,24 +522,27 @@ sentence, one large primary button (`.btn.primary.lg`). `--s-8` padding. In
 `web/app.css`: `.empty` (an `h2` and a `p`; the ❦ is drawn). A list with nothing
 in it says so in one centred `--muted` `--fs-sm` line (`.book-empty`).
 
-## 7. Layout and expanded views (planned)
+## 7. Layout and expanded views
 
 The three-column rule stands: left is where you are, middle is what you're
 changing, right is the result.
 
 - **Pane headers.** Write pane: Prose | Source, Aa, Spelling at left; expand at
-  right. Pages pane, in every mode: expand at right (room later for zoom or
-  spread/single). The style panel keeps its view heading inside.
+  right (until the Prose view lands, the text view's Serif/Sans/Mono, size, Hide
+  markup and Spelling sit there). Pages pane, in every mode: expand at right
+  (room later for zoom or spread/single). The style panel keeps its view heading
+  inside.
 - **Expand.** The write pane and the pages pane each expand from their top-right
   corner (arrows out; arrows in, in `--acc-ink`, while expanded).
   - Expanding the **writing** hides the outline and the pages. The text keeps
     its measure, the margins widen so notes are written out, and the toolbar,
     footer and pane header (except the expand button) fade while typing and
-    return when the mouse moves.
+    return when the mouse moves. (The widened margins wait for Prose, §8.1.)
   - Expanding the **pages** shows the spread larger, nothing else. Same in Style
     and Publish.
-  - In either, the mouse at the left edge slides the outline in over the view;
-    the Contents toggle pins it.
+  - In either, the mouse at the left edge slides the outline in over the view
+    (Write's outline, or the Style / Publish nav), with `--shadow-pop`; the
+    Contents toggle pins it.
   - Return with the same button or `esc`. `⌘⇧↩` expands the pane last used, or
     returns. (`⌘⇧F` stays Footnote.)
   - Expanded state is per mode and persists. A hidden preview still lays out (it

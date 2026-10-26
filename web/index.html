@@ -66,11 +66,11 @@
           <circle cx="3.6" cy="4.5" r=".35" style="fill: currentColor" />
           <circle cx="5.2" cy="4.5" r=".35" style="fill: currentColor" />
         </symbol>
-        <symbol id="sideR" viewBox="0 0 16 16">
-          <rect x="10.5" y="3" width="3.5" height="10"
-            style="fill: currentColor; fill-opacity: var(--pf, 0); stroke: none" />
-          <rect x="1.5" y="2.5" width="13" height="11" rx="1.2" />
-          <line x1="10.5" y1="2.5" x2="10.5" y2="13.5" />
+        <symbol id="expand-out" viewBox="0 0 16 16">
+          <path d="M9.5 1.5h5v5M14.5 1.5 9 7M6.5 14.5h-5v-5M1.5 14.5 7 9" />
+        </symbol>
+        <symbol id="expand-in" viewBox="0 0 16 16">
+          <path d="M14 7H9V2M9 7l5.5-5.5M2 9h5v5M7 9l-5.5 5.5" />
         </symbol>
       </svg>
       <button id="tree-toggle" class="btn toggle" aria-pressed="true"
@@ -121,45 +121,54 @@
             d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1" />
         </svg>
       </button>
-      <button id="pages-toggle" class="btn toggle" aria-pressed="true"
-        title="Pages" aria-label="Pages">
-        <svg>
-          <use href="#sideR" />
-        </svg>
-      </button>
     </div>
     <div id="spec-banner" role="note" hidden><span></span></div>
     <div id="panes">
+      <!-- Expanded (panes.ts): the mouse here slides the outline in. -->
+      <div id="outline-edge" aria-hidden="true"></div>
       <nav id="tree" aria-label="Contents"></nav>
       <nav id="style-nav"></nav>
       <div id="gutter-tree" class="gutter" role="separator"
         aria-orientation="vertical" title="Drag to resize"></div>
       <div id="editor">
-        <div id="text-view" role="toolbar" aria-label="Text view">
-          <span class="seg" role="radiogroup" aria-label="Font">
-            <button type="button" role="radio" data-font="serif">Serif</button>
-            <button type="button" role="radio" data-font="sans">Sans</button>
-            <button type="button" role="radio" data-font="mono">Mono</button>
-          </span>
-          <label class="tv-size">
-            <button type="button" class="tv-step" data-step="-1"
-              aria-label="Smaller text">−</button>
-            <input id="tv-size" type="range" min="12" max="24" step="1"
-              aria-label="Text size">
-            <button type="button" class="tv-step" data-step="1"
-              aria-label="Larger text">+</button>
-            <output for="tv-size"></output>
-          </label>
-          <label class="tv-hide"
-            title="Folds sentinel lines and {em} tags away, except in the paragraph you're in">
+        <div class="pane-head">
+          <div id="text-view" role="toolbar" aria-label="Text view">
+            <span class="seg" role="radiogroup" aria-label="Font">
+              <button type="button" role="radio"
+                data-font="serif">Serif</button>
+              <button type="button" role="radio" data-font="sans">Sans</button>
+              <button type="button" role="radio" data-font="mono">Mono</button>
+            </span>
+            <label class="tv-size">
+              <button type="button" class="tv-step" data-step="-1"
+                aria-label="Smaller text">−</button>
+              <input id="tv-size" type="range" min="12" max="24" step="1"
+                aria-label="Text size">
+              <button type="button" class="tv-step" data-step="1"
+                aria-label="Larger text">+</button>
+              <output for="tv-size"></output>
+            </label>
+            <label class="tv-hide"
+              title="Folds sentinel lines and {em} tags away, except in the paragraph you're in">
             Hide markup
             <input id="tv-hide" type="checkbox" role="switch" class="sw">
           </label>
-          <label
-            title="Underlines words not in the word list or this book's dictionary.json; hover one for suggestions">
+            <label
+              title="Underlines words not in the word list or this book's dictionary.json; hover one for suggestions">
             Spelling
             <select id="tv-spell" class="sel"></select>
           </label>
+          </div>
+          <button class="btn sm icon expand" data-pane="writing"
+            aria-pressed="false" title="Expand the writing; esc returns"
+            aria-label="Expand the writing">
+            <svg class="out">
+              <use href="#expand-out" />
+            </svg>
+            <svg class="in">
+              <use href="#expand-in" />
+            </svg>
+          </button>
         </div>
         <div id="disk-banner" role="alert" hidden>
           <div class="msg">
@@ -180,8 +189,22 @@
       <div id="config-overlay"></div>
       <div id="gutter-editor" class="gutter" role="separator"
         aria-orientation="vertical" title="Drag to resize"></div>
-      <div id="preview"></div>
-      <div id="sheet-view"></div>
+      <div id="pages">
+        <div class="pane-head">
+          <button class="btn sm icon expand" data-pane="pages"
+            aria-pressed="false" title="Expand the pages; esc returns"
+            aria-label="Expand the pages">
+            <svg class="out">
+              <use href="#expand-out" />
+            </svg>
+            <svg class="in">
+              <use href="#expand-in" />
+            </svg>
+          </button>
+        </div>
+        <div id="preview"></div>
+        <div id="sheet-view"></div>
+      </div>
     </div>
     <div id="footer">
       <!-- One cell per column of #panes: the writer's under the editor, the
