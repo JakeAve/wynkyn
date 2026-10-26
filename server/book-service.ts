@@ -106,8 +106,14 @@ export class BookService {
 
   // ---- reading ----------------------------------------------------------
 
-  list(): Promise<string[]> {
-    return this.store.list();
+  /** The books, and the folders left out because their names are not
+   * `safeName` (a space, say): the app names those instead of failing on them. */
+  async list(): Promise<{ books: string[]; skipped: string[] }> {
+    const all = await this.store.list();
+    return {
+      books: all.filter((b) => safeName(b)),
+      skipped: all.filter((b) => !safeName(b)),
+    };
   }
 
   /** The library's id (`library.json`), minted on first ask. It lives with

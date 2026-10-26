@@ -19,7 +19,8 @@ export interface Backend {
   readonly kind: "http" | "local";
   /** The folder the service runs over; only in-page (the app zips from it). */
   readonly store?: BookStore;
-  listBooks(): Promise<string[]>;
+  /** The books, and the folders skipped for their names (BookService.list). */
+  listBooks(): Promise<{ books: string[]; skipped: string[] }>;
   /** The library's id (BookService.libraryId). */
   libraryId(): Promise<string>;
   /** `theme`: a preset's slug (spec §4.13); none is House. */
@@ -112,8 +113,7 @@ const post = <T>(url: string, body: unknown) =>
 export function httpBackend(): Backend {
   return {
     kind: "http",
-    listBooks: () =>
-      call<{ books: string[] }>("/api/books").then((r) => r.books),
+    listBooks: () => call("/api/books"),
     libraryId: () => call<{ id: string }>("/api/library").then((r) => r.id),
     createBook: (slug, title, theme) =>
       post("/api/books", { slug, title, theme }),

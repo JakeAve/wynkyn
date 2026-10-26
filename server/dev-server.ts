@@ -170,7 +170,7 @@ export async function startServer(
       return Response.json({ id: await service.libraryId() });
     }
     if (path === "/api/books" && req.method === "GET") {
-      return Response.json({ books: await service.list() });
+      return Response.json(await service.list());
     }
     if (path === "/api/books" && req.method === "POST") {
       const { slug, title, theme } = await json(req);

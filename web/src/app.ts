@@ -1611,13 +1611,24 @@ function createManuscript(cancelable: boolean): void {
     if (!dir.files?.length) return;
     try {
       err.textContent = "Copying…";
-      const books = await importBooks(backend.store!, dir.files);
-      if (!books.length) {
+      const { written, skipped } = await importBooks(
+        backend.store!,
+        dir.files,
+      );
+      const first = written[0];
+      // Nothing skipped, or nowhere else to go: open the first book copied.
+      if (first && (!skipped.length || !cancelable)) {
+        location.href = editionHref(first, null);
+        return;
+      }
+      if (!skipped.length) {
         err.textContent =
           "No book found: a book is a folder with a manuscript.md.";
         return;
       }
-      location.href = editionHref(books[0]!, null);
+      err.textContent = `Already in the library: ${skipped.join(", ")}.` +
+        (first ? ` Copied ${written.map(titleCase).join(", ")}.` : "");
+      if (first) books = (await backend.listBooks()).books;
     } catch (e) {
       err.textContent = brief(e);
     }
@@ -1857,7 +1868,8 @@ function renderImportNotes(text: string): void {
 
 async function main(): Promise<void> {
   backend = await connect();
-  [books, libId] = await Promise.all([
+  let skipped: string[];
+  [{ books, skipped }, libId] = await Promise.all([
     backend.listBooks(),
     backend.libraryId().catch(() => null),
   ]);
@@ -1866,9 +1878,18 @@ async function main(): Promise<void> {
     location.replace(location.pathname); // someone else's place: start at home
     return;
   }
+  // Folders whose names a book can't have are left out, and named, so one
+  // never keeps the rest of the library from opening.
+  const notShown = skipped.length
+    ? `Not shown: ${skipped.join(", ")} — folder names may use letters, ` +
+      "digits, dot, dash and underscore"
+    : "";
+  $("book-skipped").textContent = notShown;
+  $("book-skipped").hidden = !notShown;
   if (!books.length) {
     // An empty library: the first book is the only thing to do.
     createManuscript(false);
+    $("create-err").textContent = notShown;
     return;
   }
   const requested = params.get("book");

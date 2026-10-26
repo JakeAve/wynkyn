@@ -81,6 +81,12 @@ if (import.meta.main) {
   };
   if (cmd === "list") {
     for (const b of await listBooks(BOOKS)) {
+      if (!safeName(b)) {
+        console.error(
+          `skipped: ${b} (folder names may use letters, digits, dot, dash and underscore)`,
+        );
+        continue;
+      }
       console.log(b);
       for (const e of await listEditions(BOOKS, b)) {
         const row = [e.slug ?? "default", e.name, e.summary].filter(Boolean);

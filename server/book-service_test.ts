@@ -2,6 +2,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { BookService, ServiceError } from "./book-service.ts";
 import { diskStore } from "./store.ts";
+import { memoryStore } from "../testing/memory-store.ts";
 import { contentVersion, imageFiles } from "./pipeline.ts";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
@@ -201,5 +202,21 @@ Deno.test("importBook: a new book's images/ is made for its pictures", async () 
   } finally {
     await service.stop();
     await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("list: a folder named Old Drafts is skipped and named", async () => {
+  const files = new Map([
+    ["demo-book/manuscript.md", bytes("{title}\nX\n")],
+    ["Old Drafts/manuscript.md", bytes("{title}\nY\n")],
+  ]);
+  const service = new BookService({ store: memoryStore(files) });
+  try {
+    assertEquals(await service.list(), {
+      books: ["demo-book"],
+      skipped: ["Old Drafts"],
+    });
+  } finally {
+    await service.stop();
   }
 });
