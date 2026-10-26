@@ -1,6 +1,6 @@
 ---
 name: bookbinding
-description: Use whenever work touches how a book becomes paper — page size against sheet size, margins, folios and signatures, imposition, duplex and flipping, page numbers and running heads, recto/verso rules, blank pages, the colophon, proofs — or when a term like folio, signature, quarto, recto, verso, trim, gutter, n-up or booklet needs the house meaning. Read it before changing metadata/page-setup.ts, server/imposition.ts, renderer/folios.js, server/print-export.ts, or the Page, Print and page-furniture panels, and before answering a question about printing or binding.
+description: Use whenever work touches how a book becomes paper — the `page` section of metadata.json, page size against sheet size, margins, folios and signatures, imposition, duplex and flipping, page numbers and running heads, recto/verso rules, blank pages, the colophon, proofs — or when a term like folio, signature, quarto, recto, verso, trim, gutter, n-up or booklet needs the house meaning. Read it before changing metadata/page-setup.ts, server/imposition.ts, renderer/folios.js, server/print-export.ts, or the Page, Print and page-furniture panels, and before answering a question about printing or binding.
 ---
 
 # Bookbinding, as this app models it
@@ -9,6 +9,17 @@ The user folds and sews the books by hand. The app's job is to put the right
 book page on the right spot of a printer sheet so that folding and nesting
 reconstructs reading order. The fold is a choice (`page.fold`); the
 geometry it implies is derived, never configured.
+
+## The `page` section
+
+Page setup lives in one `page` section of `metadata.json` (spec §4.3): `size`,
+`margins`, `sheet`, `fold` (`folio`/`quarto`/`octavo`/`cut`/`leaves`; unset
+picks the most pages a sheet), `folios-per-signature` (a number or
+`"booklet"`), `duplex`, and for backs printed by hand `flip` and
+`reverse-backs`. `metadata/page-setup.ts` resolves it (page + sheet +
+signature) into the derived imposition, shared by the panel and print export.
+The retired `print` section is folded into it on load (`metadata/upgrade.ts`),
+so older books still work and rewrite themselves on the next save.
 
 ## Vocabulary
 

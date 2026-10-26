@@ -51,6 +51,24 @@ are the ones that know whether a page actually moved, so never finish a
 pagination or CSS change on the fast tier alone. `UPDATE_GOLDEN=1 deno task
 test` rewrites `testdata/*/page-map.json`; read the diff, it is the change.
 
+Tests are `*_test.ts` beside each module. `web/src/local-browser_test.ts`
+drives the built `dist/` with no server, so `deno task build:site` first or it
+is skipped. Chrome tests gate on `hasChrome` from `testing/chrome.ts`, which
+launches Chrome once and skips them only if that fails.
+
+## Fixtures
+
+- `server/testdata/demo-book` — the fixture book most tests build.
+- `testdata/common-sense` and `testdata/great-gatsby` — the tracked
+  full-grammar corpus (`books_test.ts`), with their golden page maps. Public
+  domain, kept in sync by hand with `books/` when their styling changes.
+
+## CI
+
+`.github/workflows/ci.yml` runs `check`, `build:web` and `test` on macOS:
+Chrome is preinstalled there, and the golden page maps need macOS font
+rasterisation.
+
 ## Verifying a layout change for real
 
 Reasoning from CSS is not verification, and the static `render.html` isn't
