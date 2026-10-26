@@ -51,6 +51,7 @@ function setup(over: Partial<SyncOptions> = {}) {
   const fake = fakeBackend();
   let buffer = "";
   const log: string[] = [];
+  const statuses: string[] = [];
   const sync = new Sync({
     backend: fake.backend,
     book: "b",
@@ -65,14 +66,14 @@ function setup(over: Partial<SyncOptions> = {}) {
       log.push(`rewrite ${t}`);
       buffer = t;
     },
-    onChange: () => {},
+    onStatus: (s) => statuses.push(s.kind),
     ...over,
   });
   const type = (t: string) => {
     buffer = t;
     sync.editManuscript(t);
   };
-  return { fake, sync, type, log };
+  return { fake, sync, type, log, statuses };
 }
 
 Deno.test("sync: one manuscript save in flight; later edits coalesce to the newest", async () => {
@@ -149,8 +150,11 @@ Deno.test("sync: a rewrite replaces the buffer only if untyped past what was sen
   assert(sync.manuscriptDirty());
 });
 
-Deno.test("sync: flush sends now and resolves after both channels land", async () => {
-  const { fake, sync, type } = setup({ debounceMs: 10_000 });
+Deno.test("sync: flush resolves after both channels land", async () => {
+  const { fake, sync, type } = setup({
+    debounceMs: 10_000,
+    retryMs: () => 10_000,
+  });
   type("a");
   sync.editMetadata({ fonts: {} });
   let done = false;
@@ -161,8 +165,77 @@ Deno.test("sync: flush sends now and resolves after both channels land", async (
   await fake.landText({ ok: true, version: "v1" });
   assert(!done);
   await fake.landMeta(new Error("down"));
-  await flushed;
-  assertEquals(sync.lastError?.channel, "metadata");
+  await flushed; // landed or failed: it does not wait out the retry
+  assertEquals(sync.status(), { kind: "error", detail: "config: down" });
+  // A flush retries a failed channel at once.
+  const again = sync.flush();
+  await tick();
+  assertEquals(fake.sections, [{ fonts: {} }, { fonts: {} }]);
+  await fake.landMeta({ version: "m1" });
+  await again;
+  assertEquals(sync.status(), { kind: "saved" });
+});
+
+Deno.test("sync: a save rejected once stays error until the retry lands, and the retry carries the lost sections", async () => {
+  const { fake, sync, statuses } = setup({ retryMs: () => 20 });
+  sync.editMetadata({ fonts: { body: "A" } });
+  await wait(10);
+  sync.editMetadata({ language: "es" } as Partial<Metadata>);
+  sync.editMetadata({ fonts: { body: "B" } });
+  await wait(10); // queued behind the save in flight
+  await fake.landMeta(new Error("offline"));
+  assertEquals(sync.status(), { kind: "error", detail: "config: offline" });
+  assert(sync.hasUnsaved());
+  await wait(30);
+  // Newer sections win over the lost ones, and all of them go.
+  assertEquals(fake.sections[1], { fonts: { body: "B" }, language: "es" });
+  assertEquals(sync.status().kind, "error"); // still in flight
+  await fake.landMeta({ version: "m1" });
+  assertEquals(sync.status(), { kind: "saved" });
+  assertEquals(statuses.at(-1), "saved");
+});
+
+Deno.test("sync: a failed manuscript save keeps the newest text and retries", async () => {
+  const { fake, sync, type } = setup({ retryMs: (n) => [20, 10_000][n]! });
+  type("a");
+  await wait(10);
+  type("ab");
+  await wait(10); // queued
+  await fake.landText(new Error("down"));
+  assertEquals(sync.status(), { kind: "error", detail: "down" });
+  await wait(30);
+  assertEquals(fake.texts[1], { text: "ab", base: "v0" });
+  await fake.landText(new Error("still down")); // backs off: 10 s next
+  type("abc"); // a new edit sends anyway, cancelling the wait
+  await wait(10);
+  assertEquals(fake.texts[2], { text: "abc", base: "v0" });
+  assertEquals(sync.status().kind, "error");
+  await fake.landText({ ok: true, version: "v1" });
+  assertEquals(sync.status(), { kind: "saved" });
+});
+
+Deno.test("sync: a conflict never reads saved", async () => {
+  const { fake, sync, type, statuses } = setup();
+  type("a");
+  await wait(10);
+  await fake.landText({ conflict: true, text: "disk", version: "v9" });
+  assertEquals(sync.status(), { kind: "conflict" });
+  sync.editMetadata({ fonts: {} });
+  await wait(10);
+  await fake.landMeta({ version: "m1" }); // the other channel landing
+  assertEquals(sync.status(), { kind: "conflict" });
+  assert(!statuses.slice(1).includes("saved"));
+  sync.keepMine("v9");
+  assertEquals(sync.status(), { kind: "saving" });
+  await tick();
+  await fake.landText({ ok: true, version: "v10" });
+  assertEquals(sync.status(), { kind: "saved" });
+  // Reload settles it too.
+  type("b");
+  await wait(10);
+  await fake.landText({ conflict: true, text: "disk2", version: "v11" });
+  sync.dropManuscript("v11");
+  assertEquals(sync.status(), { kind: "saved" });
 });
 
 Deno.test("sync: debounceMs is honoured, and before() runs first", async () => {

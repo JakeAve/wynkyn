@@ -112,6 +112,18 @@ const post = <T>(url: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
+// A save outlives a tab closed right after it: keepalive, which the browser
+// allows only for bodies under 64 KB. Longer ones rely on the leave prompt.
+function saveInit(body: unknown): RequestInit {
+  const json = JSON.stringify(body);
+  return {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: json,
+    keepalive: new TextEncoder().encode(json).length < 65536,
+  };
+}
+
 export function httpBackend(): Backend {
   return {
     kind: "http",
@@ -141,11 +153,7 @@ export function httpBackend(): Backend {
     async saveManuscript(book, save) {
       const res = await fetch(
         `/api/books/${encodeURIComponent(book)}/manuscript`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(save),
-        },
+        saveInit(save),
       );
       if (res.status !== 409 && !res.ok) throw new Error(await res.text());
       return await res.json();
@@ -160,7 +168,7 @@ export function httpBackend(): Backend {
       return await res.json();
     },
     saveMetadata: (book, edition, sections) =>
-      post(metadataUrl(book, edition), { sections }),
+      call(metadataUrl(book, edition), saveInit({ sections })),
     async tryBuild(book, edition, metadata) {
       const res = await fetch(
         `/api/books/${encodeURIComponent(book)}/try`,

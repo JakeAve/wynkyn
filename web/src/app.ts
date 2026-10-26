@@ -62,7 +62,7 @@ import {
 } from "./editions.ts";
 import { editionToken, titleCase } from "../../server/editions.ts";
 import { zipBook } from "./book-zip.ts";
-import { Sync, type SyncError } from "./sync.ts";
+import { Sync, type SyncStatus } from "./sync.ts";
 import {
   type Backend,
   hasServer,
@@ -261,7 +261,6 @@ let metaFetchGen = 0;
 let configPanel: ConfigPanel | null = null;
 
 function onDocChanged(text: string): void {
-  setStatus("saving");
   $("preview").dataset.stale = ""; // dimmed until the render catches up
   clearTimeout(parseTimer);
   parseTimer = setTimeout(() => reparse(text), PARSE_DEBOUNCE_MS);
@@ -447,7 +446,7 @@ function openEdition(b: string, slug: string | null, line?: number): void {
     }
     return;
   }
-  location.href = editionHref(b, slug) + (line ? `#line=${line}` : "");
+  void leave(editionHref(b, slug) + (line ? `#line=${line}` : ""));
 }
 
 function renderEditions(): void {
@@ -519,7 +518,7 @@ function renderEditions(): void {
         await backend.deleteEdition(selBook, slug);
         await deleteCachedRender(cacheId(selBook, slug));
         if (selBook === book && slug === edition) {
-          location.href = editionHref(book, null);
+          await leave(editionHref(book, null));
         } else await selectBook(selBook);
       });
     }
@@ -571,7 +570,7 @@ async function renameEdition(e: EditionInfo, value: string): Promise<void> {
       await done;
       await deleteCachedRender(cacheId(selBook, e.slug));
       if (selBook === book && e.slug === edition) {
-        location.href = editionHref(book, next);
+        await leave(editionHref(book, next));
         return;
       }
     }
@@ -696,7 +695,7 @@ function installSwitcher(): void {
   }
   lib.onclick = () => {
     localStorage.removeItem("library");
-    location.href = location.pathname;
+    void leave(location.pathname);
   };
 
   $("edition-new").onclick = () => {
@@ -721,35 +720,49 @@ function installSwitcher(): void {
     if (!slug) return;
     try {
       await backend.createEdition(selBook, slug, from.value);
-      location.href = editionHref(selBook, slug);
+      await leave(editionHref(selBook, slug));
     } catch (err) {
       formErr.textContent = brief(err);
     }
   };
 }
 
+// Every page switch: send what is waiting first, and ask before dropping an
+// edit whose save failed or that a conflict still holds.
+let leaving = false; // the author chose to go: beforeunload asks nothing more
+async function leave(href: string): Promise<void> {
+  // No sync before a book opens (an empty library's first create).
+  if (sync) {
+    await sync.flush();
+    if (
+      sync.hasUnsaved() &&
+      !confirm("Some changes aren't saved. Leave anyway?")
+    ) return;
+  }
+  leaving = true;
+  location.href = href;
+}
+
+// Sync's status onto the toolbar — the only way "Saved" gets there.
+function showSync(s: SyncStatus): void {
+  lastSaved = sync.savedAt;
+  if (s.kind === "conflict") {
+    setStatus("error", "something else touched the manuscript");
+  } else if (s.kind === "error") setStatus("error", brief(s.detail));
+  else setStatus(s.kind);
+}
+
 // The save state onto the page: sync.ts calls this whenever a save starts,
 // lands or fails, or an edit changes what is unsaved.
-let seenSavedAt: Date | null = null;
-let seenError: SyncError | null = null;
 let metaWasBusy = false;
-function syncChanged(): void {
+function syncChanged(s: SyncStatus): void {
   // The banner's choices wait for a save in flight to settle: Reload under an
   // accepted save would show text the disk no longer has.
   for (const id of ["disk-reload", "disk-keep"]) {
     ($(id) as HTMLButtonElement).disabled = sync.manuscriptBusy();
   }
   if (diskOffer?.version === sync.base) hideDiskBanner(); // it was our own save
-  if (sync.savedAt !== seenSavedAt) {
-    seenSavedAt = lastSaved = sync.savedAt;
-    if (!sync.hasUnsaved()) setStatus("saved");
-  }
-  const err = sync.lastError;
-  if (err && err !== seenError) {
-    const why = brief(err.error);
-    setStatus("error", err.channel === "metadata" ? `config: ${why}` : why);
-  }
-  seenError = err;
+  showSync(s);
   const metaBusy = sync.metadataBusy();
   if (metaWasBusy && !metaBusy && metaStale) refreshConfigFromRemote();
   metaWasBusy = metaBusy;
@@ -797,10 +810,7 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         sheetView: $("sheet-view"),
         metadata,
         saveSections: saveMetadataSections,
-        onEdit: () => {
-          setStatus("saving");
-          $("preview").dataset.stale = "";
-        },
+        onEdit: () => $("preview").dataset.stale = "",
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
         exportEpub,
@@ -967,7 +977,7 @@ function installThemeApply(): void {
       await backend.deleteEdition(book, next).catch(() => {});
       throw err;
     }
-    location.href = editionHref(book, next);
+    await leave(editionHref(book, next));
   });
   $("theme-replace").onclick = run(async (slug) => {
     const applied = applyTheme(await settledMetadata(), slug);
@@ -1187,7 +1197,6 @@ function reloadFromDisk(): void {
   replaceBuffer(editor, text);
   reparse(text);
   hideDiskBanner();
-  setStatus("saved");
   editor.focus();
 }
 
@@ -1545,7 +1554,7 @@ function createManuscript(cancelable: boolean): void {
       const first = written[0];
       // Nothing skipped, or nowhere else to go: open the first book copied.
       if (first && (!skipped.length || !cancelable)) {
-        location.href = editionHref(first, null);
+        await leave(editionHref(first, null));
         return;
       }
       if (!skipped.length) {
@@ -1566,7 +1575,7 @@ function createManuscript(cancelable: boolean): void {
       const got = await askTitle("", null, "Create book");
       if (!got) return createManuscript(cancelable);
       await backend.createBook(got.slug, got.title, got.theme);
-      location.href = editionHref(got.slug, null);
+      await leave(editionHref(got.slug, null));
     } catch (e) {
       err.textContent = brief(e);
       dlg.showModal();
@@ -1596,7 +1605,7 @@ async function importPicked(
       ? r
       : importSource(src.name, bytes, { from: src.from, title: got.title });
     await backend.importBook(got.slug, book, got.theme);
-    location.href = editionHref(got.slug, null);
+    await leave(editionHref(got.slug, null));
   } catch (e) {
     err.textContent = brief(e);
     if (!dlg.open) dlg.showModal();
@@ -1856,15 +1865,21 @@ async function main(): Promise<void> {
     metaBase: null, // until the Style panel loads it
     current: () => editor.state.doc.toString(),
     before: () => renaming,
-    onConflict: (disk) => {
-      showDiskBanner(disk);
-      setStatus("error", "something else touched the manuscript");
-    },
+    onConflict: showDiskBanner, // the status follows from sync
     onRewrite: (rewritten) => {
       replaceBuffer(editor, rewritten);
       reparse(rewritten);
     },
-    onChange: syncChanged,
+    onStatus: syncChanged,
+  });
+  // Hiding or closing the tab sends what is waiting; closing prompts while
+  // anything is unsaved (keepalive carries a save sent as the tab goes).
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") void sync.flush();
+  });
+  addEventListener("pagehide", () => void sync.flush());
+  addEventListener("beforeunload", (e) => {
+    if (!leaving && sync.hasUnsaved()) e.preventDefault();
   });
   // The list is fetched once per few seconds, not per keystroke in a slug's
   // completion; an add drops it so the new image shows next time.
@@ -1952,6 +1967,7 @@ async function main(): Promise<void> {
       const up = await fetch("/").then((r) => r.ok, () => false);
       if (!up) return;
       clearInterval(retry);
+      await sync.flush(); // a save that failed while it was down goes now
       if (sync.hasUnsaved()) {
         setStatus("offline", "Server restarted — reload to reconnect");
       } else location.reload();
@@ -1984,7 +2000,7 @@ async function main(): Promise<void> {
       setStatus("error", `build: ${brief(msg.message)}`);
       return;
     }
-    if (!sync.hasUnsaved() && !diskOffer) setStatus("saved");
+    showSync(sync.status()); // clears a build or preview error; Sync says if saved
     if (!holdForPreview(msg)) {
       lastShown = msg;
       paint(msg);
