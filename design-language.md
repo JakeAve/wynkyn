@@ -566,19 +566,28 @@ The label is always the plain word; the wink sits beside or behind it.
 
 Out of scope unless asked: illustrations, woodcut empty states, blackletter.
 
-## 10. The mark (planned)
+## 10. The mark
 
-The existing sun (`web/brand/mark.svg`), rays and disc, drawn in `--acc` (the
-dark value on dark). Favicon and app icons keep their artwork until re-exported
-in minium.
+The existing sun (`web/brand/mark.svg`), rays and disc, drawn in `--acc`: the
+SVG sets its own `color` (`#e2582b`, `#f58a5f` under
+`prefers-color-scheme:
+dark`), since an `<img>` or favicon cannot read the
+page's tokens. Favicon and app icons keep their artwork until re-exported in
+minium.
 
-## 11. The hosted site (planned)
+## 11. The hosted site
 
-Same tokens, a louder register: headlines in Fell Great Primer at 2.875rem, one
-phrase in italic `--acc-ink`; body in Alegreya Sans 1.0625rem `--muted`; one
-large primary button ("Open the editor"); feature heads in Fell with a ❦; a
-colophon at the foot; the sun beside the wordmark "Wynkyn" in Fell. The site
-pages link the same `web/tokens.css` as the app, before `web/site/site.css`.
+Same tokens, a louder register: headlines (`h1`) in Fell Great Primer at
+2.875rem, one phrase in italic `--acc-ink` (`<em>`); body in Alegreya Sans
+1.0625rem `--muted`, the lead 1.125rem; one large primary button ("Open the
+editor", §6.1); section heads (`h2`) in Fell at `--fs-hero`; feature heads
+(`.facts h3`) and the FAQ's questions in Fell at `--fs-h`, the feature heads
+behind a ❦ in `--acc-ink`; the sun beside the wordmark "Wynkyn" in Fell at
+`--fs-h`. The foot is a `--fs-xs` link line and the colophon, "Set in IM Fell
+Great Primer and Alegreya.", in Alegreya italic behind the same red ❦. The site
+pages have no `data-theme` and follow the system (`tokens.css`'s
+`prefers-color-scheme` block); they link the same `web/tokens.css` as the app,
+before `web/site/site.css`, which holds no tokens of its own.
 
 ## 12. Motion (planned)
 

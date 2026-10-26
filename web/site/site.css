@@ -1,70 +1,53 @@
-/* The static pages (landing, about, FAQ): the Ink tokens the app uses, on
-   their own so a visitor never downloads the editor's stylesheet. */
-:root {
-  color-scheme: light dark;
-  --bg: #fbfbfa;
-  --fg: #161616;
-  --muted: #71716c;
-  --line: #e7e7e4;
-  --inv-bg: #161616;
-  --inv-fg: #fbfbfa;
-  --page-shadow: 0 1px 2px rgba(0, 0, 0, .07), 0 8px 22px rgba(0, 0, 0, .09);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111111;
-    --fg: #ececea;
-    --muted: #93938d;
-    --line: #262626;
-    --inv-bg: #ececea;
-    --inv-fg: #111111;
-    --page-shadow: 0 2px 4px rgba(0, 0, 0, .5), 0 12px 30px rgba(0, 0, 0, .6);
-  }
-}
+/* The static pages (landing, about, FAQ): web/tokens.css in the site's louder
+   register (design-language.md §11), on their own so a visitor never
+   downloads the editor's stylesheet. */
 * {
   box-sizing: border-box;
 }
 body {
   margin: 0;
   background: var(--bg);
-  color: var(--fg);
-  font: 17px/1.55 system-ui, sans-serif;
+  color: var(--muted);
+  font: 1.0625rem/1.55 var(--f-ui);
+  font-variant-numeric: lining-nums;
 }
 a {
-  color: inherit;
+  color: var(--fg);
 }
 header,
 main,
 footer {
   max-width: 44rem;
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 var(--s-6);
 }
 header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: .5rem 1rem;
-  padding-top: 1.25rem;
-  padding-bottom: 1.25rem;
-  font-size: 15px;
+  gap: var(--s-4) var(--s-6);
+  padding-top: var(--s-6);
+  padding-bottom: var(--s-6);
+  font-size: var(--fs);
 }
+/* The sun beside the wordmark in Fell. */
 header .mark {
   display: flex;
   align-items: center;
-  gap: .5rem;
-  font-weight: 600;
+  gap: var(--s-4);
+  font: var(--fs-h) / 1 var(--f-title);
+  color: var(--fg);
   text-decoration: none;
 }
 header .mark img {
-  width: 26px;
-  height: 26px;
+  width: var(--h-md);
+  height: var(--h-md);
 }
 header nav {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: var(--s-6);
 }
 header nav a {
   white-space: nowrap;
@@ -77,111 +60,152 @@ header nav a[aria-current] {
 }
 /* GitHub's mark, coloured by the link like the text links beside it. */
 header nav a.github {
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   background: currentColor;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.06-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z'/%3E%3C/svg%3E")
     center / contain no-repeat;
 }
+/* Display type is Fell, never below 1.125rem; one phrase of the headline in
+   the red. */
+h1,
+h2,
+h3 {
+  color: var(--fg);
+  font-family: var(--f-title);
+  font-weight: 400;
+  line-height: var(--lh-tight);
+}
 h1 {
-  font-size: 2.25rem;
-  line-height: 1.15;
-  letter-spacing: -.01em;
-  margin: 2rem 0 1rem;
+  font-size: 2.875rem;
+  margin: var(--s-8) 0 var(--s-6);
+}
+h1 em {
+  color: var(--acc-ink);
 }
 h2 {
-  font-size: 1.25rem;
-  margin: 2.5rem 0 .5rem;
+  font-size: var(--fs-hero);
+  margin: var(--s-9) 0 var(--s-4);
 }
 h3 {
-  font-size: 1.05rem;
-  margin: 1.75rem 0 .25rem;
+  font-size: var(--fs-h);
+  margin: 0 0 var(--s-2);
+}
+/* Feature heads carry a fleuron. */
+.facts h3::before {
+  content: "❦ ";
+  color: var(--acc-ink);
 }
 p,
 ul,
 ol,
 dl {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--s-6);
 }
 .lead {
-  font-size: 1.2rem;
-  color: var(--muted);
+  font-size: 1.125rem;
 }
+/* The one large primary button (§6.1). */
 .btn {
-  display: inline-block;
-  padding: .6rem 1.1rem;
-  border-radius: 6px;
-  background: var(--inv-bg);
-  color: var(--inv-fg);
-  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  height: var(--h-lg);
+  padding: 0 var(--s-6);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: var(--acc-btn);
+  color: var(--on-acc);
   font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background var(--t-fast);
+}
+.btn:hover {
+  background: color-mix(in oklab, var(--acc-btn) 88%, var(--fg));
 }
 .cta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  margin: 1.5rem 0 2.5rem;
+  gap: var(--s-6);
+  margin: var(--s-7) 0 var(--s-9);
 }
 .cta small {
-  color: var(--muted);
+  font-size: var(--fs-sm);
 }
 figure {
-  margin: 2.5rem 0;
+  margin: var(--s-9) 0;
 }
 figure img {
   width: 100%;
   height: auto;
-  border-radius: 6px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   box-shadow: var(--page-shadow);
 }
 figcaption {
-  font-size: 14px;
-  color: var(--muted);
-  margin-top: .6rem;
+  font-size: var(--fs-sm);
+  margin-top: var(--s-4);
 }
 .facts {
   list-style: none;
   padding: 0;
+  margin: var(--s-9) 0;
   display: grid;
-  gap: .75rem 1.5rem;
+  gap: var(--s-7) var(--s-8);
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
 }
-.facts b {
-  display: block;
-}
-.facts li {
-  color: var(--muted);
-}
 dt {
-  font-weight: 600;
-  margin-top: 1.25rem;
+  color: var(--fg);
+  font: var(--fs-h) / var(--lh-tight) var(--f-title);
+  margin-top: var(--s-8);
 }
 dd {
-  margin: .25rem 0 0;
+  margin: var(--s-2) 0 0;
 }
 code,
 pre {
-  font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: var(--fs-sm) / 1.5 var(--f-mono);
+  color: var(--fg);
 }
 pre {
-  padding: .9rem 1rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  padding: var(--s-5) var(--s-6);
+  border: var(--hair) solid var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   overflow-x: auto;
 }
 footer {
-  margin-top: 4rem;
-  padding-top: 1.25rem;
-  padding-bottom: 2.5rem;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 14px;
+  margin-top: var(--s-9);
+  padding-top: var(--s-6);
+  padding-bottom: var(--s-9);
+  border-top: var(--hair) solid var(--line);
+  font-size: var(--fs-xs);
   display: flex;
   flex-wrap: wrap;
-  gap: .5rem 1.5rem;
+  gap: var(--s-4) var(--s-7);
+}
+footer a {
+  color: inherit;
+}
+/* The colophon, set in the serif it names. */
+footer .colophon {
+  flex-basis: 100%;
+  margin: var(--s-4) 0 0;
+  font: italic var(--fs) / var(--lh) var(--f-text);
+}
+footer .colophon::before {
+  content: "❦ ";
+  color: var(--acc-ink);
+  font-style: normal;
 }
 a:focus-visible {
-  outline: 2px solid var(--fg);
+  outline: var(--ring) solid var(--acc);
   outline-offset: 1px;
+  border-radius: var(--r);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
 }
