@@ -54,6 +54,7 @@ import { ThemePreview } from "./theme-preview.ts";
 import { installTextView } from "./text-view.ts";
 import { connect } from "./library.ts";
 import { $, brief } from "./dom.ts";
+import { h } from "./panel-controls.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
 // folios.js is a classic script (toHtml inlines it), so its helpers hang off
@@ -152,7 +153,11 @@ let imageNoteTimer: ReturnType<typeof setTimeout> | undefined;
 let cursorNote = { text: "", warn: false };
 function showImageNote({ text, warn }: typeof cursorNote): void {
   const el = $("image-note");
-  el.textContent = text;
+  // the filenames read as identifiers (§3.1)
+  const m = text.match(/^(Added to the book's images as )(.+)/);
+  el.replaceChildren(
+    ...m ? [m[1]!, h("span", { class: "hivis" }, m[2]!)] : [text],
+  );
   el.classList.toggle("warn", warn);
 }
 function imageNote(text: string, warn = false): void {

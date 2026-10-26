@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Rubric Components</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <script>
+    // The app's own theme choice, else the system's (as index.html does).
+    document.documentElement.dataset.theme = localStorage.theme ??
+      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    </script>
+    <link rel="stylesheet" href="/web/tokens.css">
+    <link rel="stylesheet" href="/web/app.css">
+    <style>
+    /* The sheet's own layout only. Every control below is styled by the app's
+       real CSS (tokens.css, app.css) through the app's real class names and
+       container ids, so the sheet cannot drift from the app. */
+    html,
+    body {
+      height: auto;
+    }
+    body {
+      display: block;
+      overflow: visible;
+      padding: var(--s-8) var(--s-6) var(--s-9);
+    }
+    main {
+      max-width: 68rem;
+      margin: 0 auto;
+      display: grid;
+      gap: var(--s-9);
+    }
+    main > header {
+      display: grid;
+      gap: var(--s-4);
+    }
+    main > header h1 {
+      margin: 0;
+      font: 400 clamp(2.25rem, 6vw, 3.25rem)/1.05 var(--f-title);
+    }
+    main > header p,
+    .part > p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 46rem;
+    }
+    #text-view.ctrls {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: var(--bg);
+      padding-inline: 0;
+    }
+    .part {
+      display: grid;
+      gap: var(--s-6);
+    }
+    .part > h2 {
+      margin: 0;
+      font: 400 1.75rem/1.1 var(--f-title);
+      display: flex;
+      align-items: baseline;
+      gap: var(--s-4);
+    }
+    .part > h2 span {
+      font: var(--fs-xs) var(--f-mono);
+      color: var(--muted);
+    }
+    .planned {
+      color: var(--muted);
+      font-style: italic;
+    }
+    .demo {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--s-6) var(--s-8);
+      align-items: flex-start;
+    }
+    .cell {
+      display: grid;
+      gap: var(--s-3);
+      justify-items: start;
+      min-width: 0;
+    }
+    .cap {
+      font: var(--fs-2xs)/1.3 var(--f-mono);
+      color: var(--muted);
+    }
+    .board {
+      background: var(--desk);
+      padding: var(--s-6);
+      border-radius: var(--r-dlg);
+      corner-shape: var(--corner);
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--s-6);
+      align-items: flex-start;
+    }
+    .surface {
+      background: var(--bg);
+      border-radius: var(--r-pop);
+      corner-shape: var(--corner);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+      gap: var(--s-4);
+    }
+    .swatch {
+      display: grid;
+      gap: var(--s-2);
+      font: var(--fs-2xs) var(--f-mono);
+      color: var(--muted);
+    }
+    .swatch i {
+      height: 2.75rem;
+      border-radius: var(--r);
+      corner-shape: var(--corner);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    .swatch b {
+      color: var(--fg);
+      font-weight: 500;
+    }
+    .scale {
+      display: grid;
+      gap: var(--s-3);
+    }
+    .scale > div {
+      display: grid;
+      grid-template-columns: 9rem 1fr;
+      align-items: baseline;
+      gap: var(--s-5);
+    }
+    .bars {
+      display: grid;
+      gap: var(--s-2);
+    }
+    .bars div {
+      display: flex;
+      align-items: center;
+      gap: var(--s-4);
+      font: var(--fs-2xs) var(--f-mono);
+      color: var(--muted);
+    }
+    .bars i {
+      height: 0.625rem;
+      background: var(--acc);
+    }
+    /* Containers the app places for itself: here they sit in the flow. */
+    main #config-overlay {
+      display: contents;
+    }
+    main #config-overlay .panel {
+      width: 26rem;
+      max-width: 100%;
+      padding: 0 var(--s-5);
+    }
+    main :is(#tree, #style-nav) {
+      width: 15rem;
+      padding-block: var(--s-4);
+    }
+    main #editor {
+      display: contents;
+    }
+    main #editor .cm-tooltip {
+      position: static;
+    }
+    main dialog[open] {
+      position: static;
+      margin: 0;
+      max-width: 100%;
+    }
+    main #switcher {
+      position: static;
+      max-width: 100%;
+    }
+    main #config-overlay .fontpanel .pbody {
+      overflow: visible;
+    }
+    main .cm-bml-find {
+      width: 28rem;
+      max-width: 100%;
+    }
+    main :is(#disk-banner, #spec-banner) {
+      background-clip: padding-box;
+    }
+    main #disk-banner {
+      background-color: var(--bg);
+    }
+    .board > :is(#disk-banner, #spec-banner) {
+      width: 100%;
+    }
+    .fontpanel {
+      padding-bottom: 16rem !important;
+    }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="check" viewBox="0 0 16 16">
+        <path d="M3.5 8.5l3 3 6-7" />
+      </symbol>
+    </svg>
+    <main>
+      <header>
+        <h1>Rubric Components</h1>
+        <p>Wynkyn's chrome on its own CSS: <code>web/tokens.css</code> and
+          <code>web/app.css</code>, nothing else. Every size is in rem off the
+          browser's text size, so try the size control: everything grows except
+          hairlines and focus rings. Hover, focus and tab through the controls;
+          they are the real thing. The rules are in
+          <code>design-language.md</code>.</p>
+      </header>
+
+      <div id="text-view" class="ctrls" role="toolbar" aria-label="Sheet">
+        <label>Theme <span class="seg" id="theme-seg" role="radiogroup"
+            aria-label="Theme"><button type="button" role="radio"
+              data-v="light">Light</button><button type="button" role="radio"
+              data-v="dark">Dark</button></span></label>
+        <label>Browser text size <span class="seg" id="size-seg"
+            role="radiogroup" aria-label="Text size"><button type="button"
+              role="radio" data-v="" aria-checked="true">16px</button><button
+              type="button" role="radio" data-v="112.5%"
+              aria-checked="false">18px</button><button type="button"
+              role="radio" data-v="125%"
+              aria-checked="false">20px</button></span></label>
+      </div>
+
+      <section class="part">
+        <h2>Colour <span>§2</span></h2>
+        <div class="swatches">
+          <div
+            class="swatch"><i style="background: var(--bg)"></i><b>--bg</b>paper</div>
+          <div
+            class="swatch"><i style="background: var(--desk)"></i><b>--desk</b>fg 6%</div>
+          <div
+            class="swatch"><i style="background: var(--hover)"></i><b>--hover</b>fg 5%</div>
+          <div
+            class="swatch"><i style="background: var(--line)"></i><b>--line</b>fg 11%</div>
+          <div
+            class="swatch"><i style="background: var(--muted)"></i><b>--muted</b>fg 62%</div>
+          <div
+            class="swatch"><i style="background: var(--fg)"></i><b>--fg</b>ink</div>
+          <div
+            class="swatch"><i style="background: var(--acc)"></i><b>--acc</b>marks</div>
+          <div
+            class="swatch"><i style="background: var(--acc-ink)"></i><b>--acc-ink</b>red text</div>
+          <div
+            class="swatch"><i style="background: var(--acc-wash)"></i><b>--acc-wash</b>selected</div>
+          <div
+            class="swatch"><i style="background: var(--err)"></i><b>--err</b>crimson</div>
+          <div
+            class="swatch"><i style="background: var(--warn)"></i><b>--warn</b>ochre</div>
+          <div
+            class="swatch"><i style="background: var(--ok)"></i><b>--ok</b>green</div>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Type <span>§3</span></h2>
+        <div class="scale">
+          <div><span class="cap">--fs-hero 1.75rem<br>Fell Great Primer</span><span style="font: 400 var(--fs-hero)/1.2 var(--f-title)">Your library is empty</span></div>
+          <div><span class="cap">--fs-h 1.375rem<br>Fell Great Primer</span><span style="font: 400 var(--fs-h)/1.2 var(--f-title)">Page numbers</span></div>
+          <div><span class="cap">--fs-lg 1.0625rem<br>Alegreya 500</span><span style="font: 500 var(--fs-lg) var(--f-text)">A Christmas Carol</span></div>
+          <div><span class="cap">--fs 0.9375rem<br>Alegreya Sans</span><span>Space between paragraphs</span></div>
+          <div><span class="cap">--fs-sm 0.875rem<br>small caps</span><span style="font-size: var(--fs-sm); font-variant-caps: all-small-caps; letter-spacing: var(--track-caps); font-weight: 500">Page furniture</span></div>
+          <div><span class="cap">--fs-xs 0.8125rem</span><span style="font-size: var(--fs-xs); color: var(--muted)">Mirrored on facing pages.</span></div>
+          <div><span class="cap">--fs-2xs 0.75rem</span><span style="font-size: var(--fs-2xs); color: var(--muted)">9 set</span></div>
+          <div><span class="cap">.hivis (--f-hivis)</span><span class="hivis">IMG_0110.jpg · part-ll · letter-Il</span></div>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Space <span>§4</span></h2>
+        <div class="bars">
+          <div><i style="width: var(--s-1)"></i>--s-1 .125</div>
+          <div><i style="width: var(--s-2)"></i>--s-2 .25</div>
+          <div><i style="width: var(--s-3)"></i>--s-3 .375</div>
+          <div><i style="width: var(--s-4)"></i>--s-4 .5</div>
+          <div><i style="width: var(--s-5)"></i>--s-5 .75</div>
+          <div><i style="width: var(--s-6)"></i>--s-6 1</div>
+          <div><i style="width: var(--s-7)"></i>--s-7 1.5</div>
+          <div><i style="width: var(--s-8)"></i>--s-8 2</div>
+          <div><i style="width: var(--s-9)"></i>--s-9 3</div>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Buttons <span>§6.1</span></h2>
+        <p>Ghost by default; one primary per screen. In the style panel a
+          <code>toggle</code> keeps a hairline frame and takes the red wash
+          when pressed.</p>
+        <div class="demo">
+          <div
+            class="cell"><span class="cap">.btn</span><button class="btn">Reset</button></div>
+          <div
+            class="cell"><span class="cap">.btn.sm</span><button class="btn sm">Load file from disk</button></div>
+          <div
+            class="cell"><span class="cap">disabled</span><button class="btn" disabled>Reset</button></div>
+          <div
+            class="cell"><span class="cap">.btn.primary</span><button class="btn primary">Create book</button></div>
+          <div
+            class="cell"><span class="cap">primary disabled</span><button class="btn primary" disabled>Create book</button></div>
+          <div
+            class="cell"><span class="cap">.btn.primary.lg</span><button class="btn primary lg">Create a book</button></div>
+        </div>
+      </section>
+
+      <div id="config-overlay">
+        <section class="part">
+          <h2>Panel controls <span>§6.1–6.5</span></h2>
+          <p>Built by <code>panel-controls.ts</code> inside <code>#config-overlay</code>:
+          a view heading, sections with small-caps labels, rows of label and
+          control. A red dot marks a value this view set; an inherited value is
+          muted and italic. A <code>toggle</code> keeps a hairline frame and
+          takes the red wash when pressed.</p>
+          <div class="demo">
+            <div
+              class="cell"><span class="cap">.tog</span><button type="button" class="tog" aria-pressed="false">Italic</button></div>
+            <div
+              class="cell"><span class="cap">.tog pressed</span><button type="button" class="tog" aria-pressed="true">Italic</button></div>
+            <div
+              class="cell"><span class="cap">.tog.primary</span><button type="button" class="tog primary">Print sheets</button></div>
+            <div
+              class="cell"><span class="cap">.tog.outline</span><button type="button" class="tog outline">Export EPUB</button></div>
+          </div>
+          <div class="board">
+            <div class="panel surface">
+              <div
+                class="phead"><span class="crumb">Page furniture</span><div class="vh-row"><h2>Page numbers</h2><span><button type="button" class="applies" title="Hover to outline every match">On 109 pages</button></span></div></div>
+              <div class="pbody">
+                <section class="sec">
+                  <div class="sech">
+                    <h3>Numerals</h3>
+                  </div>
+                  <div
+                    class="row set"><span class="lbl">Front matter</span><div class="ctl"><select class="sel" aria-label="Front matter numerals"><option>i, ii, iii</option><option>1, 2, 3</option></select></div></div>
+                  <div
+                    class="row"><span class="lbl">Body<span class="from">from Book</span></span><div class="ctl"><select class="sel" aria-label="Body numerals"><option>1, 2, 3</option></select></div></div>
+                </section>
+                <section class="sec">
+                  <div class="sech">
+                    <h3>Type</h3>
+                  </div>
+                  <div
+                    class="row set"><span class="lbl">Size</span><div class="ctl"><span class="st"><button type="button" aria-label="Decrease size" tabindex="-1"><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M4 8h8"></path></svg></button><input type="text" inputmode="decimal" aria-label="Size" value="9"><select class="u" aria-label="Size unit"><option>pt</option><option>mm</option><option>em</option></select><button type="button" aria-label="Increase size" tabindex="-1"><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M4 8h8M8 4v8"></path></svg></button></span></div></div>
+                  <div
+                    class="row"><span class="lbl">Letter spacing<span class="from">from Body text</span></span><div class="ctl"><span class="st"><button type="button" aria-label="Decrease" tabindex="-1"><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M4 8h8"></path></svg></button><input type="text" inputmode="decimal" aria-label="Letter spacing" placeholder="0"><span class="u">em</span><button type="button" aria-label="Increase" tabindex="-1"><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M4 8h8M8 4v8"></path></svg></button></span></div></div>
+                  <div
+                    class="row"><span class="lbl">Font</span><div class="ctl"><span class="seg" role="radiogroup" aria-label="Font"><button type="button" role="radio" aria-checked="true">Body</button><button type="button" role="radio" aria-checked="false">Display</button></span></div></div>
+                  <div
+                    class="row"><span class="lbl">Align</span><div class="ctl"><span class="seg" role="radiogroup" aria-label="Align"><button type="button" role="radio" aria-checked="true" aria-label="Left"><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M3 4h10M3 7h6M3 10h10M3 13h6"></path></svg></button><button type="button" role="radio" aria-checked="false" aria-label="Centre"><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M3 4h10M5 7h6M3 10h10M5 13h6"></path></svg></button><button type="button" role="radio" aria-checked="false" aria-label="Right"><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M3 4h10M7 7h6M3 10h10M7 13h6"></path></svg></button></span></div></div>
+                  <div
+                    class="row"><span class="lbl">Style</span><div class="ctl"><button type="button" class="tog" aria-pressed="true">Italic</button></div></div>
+                  <div
+                    class="row"><span class="lbl">On openers</span><div class="ctl"><input type="checkbox" role="switch" class="sw" checked aria-label="On openers"></div></div>
+                  <div
+                    class="row"><span class="lbl">Off</span><div class="ctl"><input type="checkbox" role="switch" class="sw" aria-label="Off"></div></div>
+                  <div
+                    class="row"><span class="lbl">Disabled</span><div class="ctl"><input type="checkbox" role="switch" class="sw" checked disabled aria-label="Disabled"></div></div>
+                  <details class="more" open>
+                    <summary><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M6.5 4 10.5 8l-4 4"></path></svg><span>More CSS for page numbers (1)</span></summary>
+                    <textarea aria-label="More CSS"
+                      spellcheck="false">font-feature-settings: "onum";</textarea>
+                    <p class="hint">Use the control above for font-size.</p>
+                  </details>
+                </section>
+              </div>
+            </div>
+            <div class="panel surface fontpanel">
+              <div class="pbody">
+                <section class="sec">
+                  <div class="sech">
+                    <h3>Body</h3>
+                  </div>
+                  <p class="sample"
+                    style="font-family: var(--f-text)">The quick brown fox jumps over the lazy dog.</p>
+                  <div
+                    class="uses"><span class="from">Used by</span><button class="chip" type="button">Body text</button><button class="chip" type="button">Chapter opener</button></div>
+
+                  <div
+                    class="row set"><span class="lbl">Typeface</span><div class="ctl">      <div class="fontpick"><button type="button" class="fontbtn" aria-expanded="true" aria-label="body font"><span class="fam" style="font-family: var(--f-text)">Alegreya</span><svg viewBox="0 0 16 16" class="i" aria-hidden="true"><path d="M4 6.5 8 10.5l4-4"></path></svg></button><div class="fontpop"><input type="search" class="find" placeholder="Search 1,997 fonts" aria-label="Search fonts" spellcheck="false"><span class="seg" role="radiogroup" aria-label="Font category"><button type="button" role="radio" aria-checked="true">All</button><button type="button" role="radio" aria-checked="false">Serif</button><button type="button" role="radio" aria-checked="false">Sans</button></span><ul role="listbox"><li class="grp">For books</li><li role="option" aria-selected="true" style="font-family: var(--f-text)">Alegreya</li><li role="option" style="font-family: Georgia">Georgia</li><li class="grp">On this Mac</li><li role="option" style="font-family: Palatino">Palatino</li></ul></div></div></div></div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="part">
+        <h2>Lists <span>§6.6</span></h2>
+        <p>A small-caps group label, then rows; the current row takes the red
+          wash. A slug standing in for a title and an <code>{is}</code> name
+          read as identifiers.</p>
+        <div class="board">
+          <nav id="style-nav" class="surface" aria-label="Style sections">
+            <div class="nh">Page furniture</div>
+            <button type="button" class="ni"
+              aria-current="true"><span class="t">Page numbers</span><span class="k">9 set</span></button>
+            <button type="button"
+              class="ni"><span class="t">Running heads</span><span class="k">8 set</span></button>
+            <div class="nh">Custom styles</div>
+            <button type="button"
+              class="ni"><span class="t hivis">center</span><span class="k">2 set</span></button>
+            <button type="button"
+              class="ni"><span class="t hivis">letter-Il</span><span class="k"></span></button>
+          </nav>
+          <nav id="tree" class="surface" aria-label="Contents">
+            <div class="nh">Front matter</div>
+            <ul class="tree-list">
+              <li><button class="tree-node tree-matter" style="padding-left: calc(var(--s-4) * 1)">Title page</button></li>
+            </ul>
+            <div class="nh">Chapters</div>
+            <ul class="tree-list">
+              <li><button class="tree-node tree-part" style="padding-left: calc(var(--s-4) * 1)">Part one</button>
+                <ul class="tree-list">
+                  <li><button class="tree-node tree-chapter" aria-current="true" style="padding-left: calc(var(--s-4) * 2)">Marley's Ghost</button></li>
+                  <li><button class="tree-node tree-chapter hivis" style="padding-left: calc(var(--s-4) * 2)">stave-2</button></li>
+                </ul>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Dialogs and choice lists <span>§6.7–6.8</span></h2>
+        <p>A dialog that asks one question answers it with full-width choice
+          rows; the recommended one carries the red wash and a red title.
+          Titles in Fell; actions bottom right, primary last.</p>
+        <div class="board">
+          <dialog class="ask" open aria-labelledby="s-lib">
+            <h2 id="s-lib">Welcome to Wynkyn</h2>
+            <p>Choose where to keep your books.</p>
+            <div class="choices">
+              <button class="choice primary">Reopen the Books folder
+                <small>The folder you used last time.</small></button>
+              <button class="choice">Select an existing folder on my device
+                <span class="pill">Chromium only</span>
+                <small>You already have a Wynkyn books folder.</small></button>
+              <button class="choice" disabled>Save books in the cloud
+                <span class="pill">Paid · Coming soon</span>
+                <small>Backed up and editable from any device.</small></button>
+            </div>
+            <span class="sw-err">Couldn't open the folder: permission was
+              denied.</span>
+          </dialog>
+          <dialog class="ask" open aria-labelledby="s-web">
+            <form method="dialog">
+              <h2 id="s-web">Import from the web</h2>
+              <label class="field">Address
+                <input id="web-url" type="text" spellcheck="false"
+                  value="https://www.gutenberg.org/ebooks/1I0l">
+              </label>
+              <p
+                class="hint">Folder: <code id="title-slug">a-christmas-carol/</code></p>
+              <div class="ask-foot">
+                <button class="btn" type="button">← Back</button>
+                <button class="btn primary" type="button">Fetch</button>
+              </div>
+            </form>
+          </dialog>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Menus and popovers <span>§6.9</span></h2>
+        <p>Every popup is one surface: paper, hairline, the popover radius, a
+          soft shadow. The current item takes the red wash.</p>
+        <div class="board">
+          <dialog id="switcher" open aria-label="Books and editions">
+            <div class="sw-books">
+              <input id="book-search" type="search" placeholder="Find a book…"
+                aria-label="Find a book">
+              <div id="book-list" role="listbox" aria-label="Books">
+                <button class="book-row" role="option"
+                  aria-selected="true">A Christmas Carol</button>
+                <button class="book-row" role="option"
+                  aria-selected="false">Common Sense</button>
+              </div>
+              <div
+                class="sw-foot"><button class="btn">New book</button><button class="btn">Download</button></div>
+            </div>
+            <div class="sw-eds">
+              <div id="edition-list">
+                <div class="ed-row" role="button" tabindex="0"
+                  aria-current="true"><svg class="tico ck"><use href="#check" /></svg><span class="nm">Standard</span><span class="acts"><button>Rename</button></span><span class="setup">5.25in × 8in · folio on legal · 11pt</span><span class="sw-err"></span></div>
+                <div class="ed-row" role="button"
+                  tabindex="0"><svg class="tico ck"></svg><span class="nm">Pocket Edition</span><span class="acts"><button>Rename</button><button>Delete</button></span><span class="setup">4.25in × 7in · quarto on legal · 10pt</span><button class="diff">3 passages differ</button><span class="sw-err"></span></div>
+              </div>
+              <div
+                class="eds-foot"><button class="btn">New edition</button></div>
+            </div>
+          </dialog>
+          <div id="editor">
+            <div class="cell">
+              <span class="cap">{ completions</span>
+              <div class="cm-tooltip-autocomplete cm-tooltip">
+                <ul role="listbox" aria-label="Completions">
+                  <completion-section>Structure</completion-section>
+                  <li role="option"
+                    aria-selected="true"><span class="cm-completionLabel">chapter</span><span class="cm-completionDetail">Chapter, with a name and title</span><span class="f">—</span></li>
+                  <li
+                    role="option"><span class="cm-completionLabel">heading</span><span class="cm-completionDetail">Section heading</span><span class="f">—</span></li>
+                  <completion-section>Blocks</completion-section>
+                  <li
+                    role="option"><span class="cm-completionLabel">quote</span><span class="cm-completionDetail">Block quotation</span><span class="f">{/quote}</span></li>
+                </ul>
+              </div>
+            </div>
+            <div class="cell">
+              <span class="cap">image completions</span>
+              <div class="cm-tooltip-autocomplete cm-tooltip">
+                <ul role="listbox" aria-label="Completions">
+                  <completion-section>Images in this book</completion-section>
+                  <li role="option"
+                    aria-selected="true"><span class="cm-bml-thumb"></span><span class="cm-completionLabel">IMG_0110.jpg</span><span class="f"></span></li>
+                  <li
+                    role="option"><span class="cm-bml-thumb"></span><span class="cm-completionLabel">fezziwigs-ball</span><span class="cm-completionDetail">Not in the text yet</span><span class="f"></span></li>
+                  <li
+                    role="option"><span class="cm-bml-thumb add">+</span><span class="cm-completionLabel">Add image from your computer…</span><span class="f"></span></li>
+                </ul>
+              </div>
+            </div>
+            <div class="cell">
+              <span class="cap">⌘K palette</span>
+              <div
+                class="cm-bml-palette cm-tooltip"><input placeholder="Insert a sentinel…" aria-label="Find a sentinel" spellcheck="false"><ul role="listbox"><li class="grp">Structure</li><li role="option" aria-selected="true"><code>matter</code><span class="d">Front or back matter, by type</span><span class="f">—</span></li><li role="option" aria-selected="false"><code>part</code><span class="d">Part, grouping chapters</span><span class="f">—</span></li><li class="grp">Blocks</li><li role="option" aria-selected="false"><code>pullquote</code><span class="d">Phrase pulled out large</span><span class="f">{/pullquote}</span></li></ul></div>
+            </div>
+            <div class="cell">
+              <span class="cap">wrap bar</span>
+              <div
+                class="cm-bml-wrapbar cm-tooltip"><button type="button">Emphasis<kbd>⌘I</kbd></button><button type="button">Quote</button><button type="button">Footnote</button><span class="vsep"></span><button type="button">Wrap in…<kbd>⌘K</kbd></button></div>
+              <span class="cap">spelling suggestions</span>
+              <div
+                class="cm-bml-wrapbar cm-bml-spell cm-tooltip"><button type="button">Scrooge</button><button type="button">Scourge</button><span class="vsep"></span><button type="button">Add to dictionary</button></div>
+            </div>
+          </div>
+          <div class="cell">
+            <span class="cap">find bar</span>
+            <div class="cm-bml-find surface">
+              <div
+                class="field"><input aria-label="Find" placeholder="Find" spellcheck="false" value="Marley"><button type="button" class="opt" aria-pressed="true" title="Match case">Aa</button><button type="button" class="opt" aria-pressed="false" title="Whole word">ab</button><button type="button" class="opt" aria-pressed="false" title="Regular expression">.*</button></div>
+              <div
+                class="acts"><span class="count">1 of 12</span><button type="button" class="ghost" title="Previous">↑</button><button type="button" class="ghost" title="Next">↓</button><button type="button" class="ghost" title="Close">×</button></div>
+              <div
+                class="field"><input aria-label="Replace" placeholder="Replace with" spellcheck="false"></div>
+              <div
+                class="acts"><button type="button" class="btn">Replace</button><button type="button" class="btn">All</button><button type="button" class="opt" aria-pressed="false">in chapter</button></div>
+            </div>
+          </div>
+          <div class="cell">
+            <span class="cap">tooltip</span>
+            <span
+              class="planned">Planned: the inverted tooltip (winks, §9).</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Banners, status, chips, kbd <span>§6.10</span></h2>
+        <p>Banners are a strip across the top of the pane they concern, never
+          a toast. Errors are crimson, not the accent.</p>
+        <div class="board">
+          <div id="disk-banner" role="alert">
+            <div class="msg"><strong>Save failed because something else touched
+                the manuscript.</strong><span>Load it and lose your unsaved
+                edits, or keep yours and overwrite it.</span></div>
+            <div
+              class="acts"><button class="btn sm" type="button">Load file from
+                disk</button><button class="btn sm" type="button">Keep my
+                edits</button></div>
+          </div>
+          <div id="spec-banner" role="note"><span>This book's metadata.json
+              follows spec 1.9, newer than this app's 1.8. Settings it doesn't
+              know are kept but not shown.</span></div>
+          <div class="cell surface" style="padding: var(--s-5) var(--s-6)">
+            <span class="cap">status lines</span>
+            <span class="sw-err">Can't save: the folder is read-only.</span>
+            <span
+              id="image-note">Added to the book's images as <span class="hivis">IMG_0110.jpg</span></span>
+            <span id="image-note-warn"
+              style="color: var(--warn)">Prints at 150 dpi here; 300 looks sharp</span>
+            <span class="planned">Planned: the status icon and bold lead; the
+              busy dot.</span>
+          </div>
+          <div class="cell surface" style="padding: var(--s-5) var(--s-6)">
+            <span class="cap">kbd (chips: the style panel above)</span>
+            <div class="demo"
+              style="gap: var(--s-2)"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>↩</kbd><kbd>⌘K</kbd></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Empty state <span>§6.12</span></h2>
+        <div class="board">
+          <div class="empty surface" style="width: 100%">
+            <h2>No books yet</h2>
+            <p>Start one from a file you have, a web address, or a blank
+              page.</p>
+            <button class="btn primary lg">Create a book</button>
+          </div>
+          <div class="surface" style="width: 15rem">
+            <div class="book-empty">No books match</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Chrome and the write pane <span>§6.11, §7–8</span></h2>
+        <p class="planned">Planned: the toolbar, pane headers with expand, the
+          footer and the Prose view's marks. Until they are built, the app
+          itself is their sheet.</p>
+      </section>
+    </main>
+
+    <script>
+    // The sheet's own controls: theme and the browser's text size.
+    const root = document.documentElement;
+    function pick(id, apply) {
+      const seg = document.getElementById(id);
+      const btns = [...seg.querySelectorAll("button")];
+      btns.forEach((b) =>
+        b.onclick = () => {
+          btns.forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+          apply(b.dataset.v);
+        }
+      );
+    }
+    for (const b of document.querySelectorAll("#theme-seg button")) {
+      b.setAttribute("aria-checked", String(b.dataset.v === root.dataset.theme));
+    }
+    pick("theme-seg", (v) => root.dataset.theme = v);
+    pick("size-seg", (v) => root.style.fontSize = v);
+    // the demo segments behave like the real ones
+    for (const seg of document.querySelectorAll("main .seg")) {
+      if (seg.closest("#text-view")) continue;
+      const btns = [...seg.querySelectorAll("button")];
+      btns.forEach((b) =>
+        b.onclick = () =>
+          btns.forEach((x) => x.setAttribute("aria-checked", String(x === b)))
+      );
+    }
+    </script>
+  </body>
+</html>

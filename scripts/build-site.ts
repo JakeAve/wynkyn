@@ -21,6 +21,8 @@ export const FILES: Record<string, string> = {
   "web/app.js": "web/app.js",
   "web/tokens.css": "web/tokens.css",
   "web/app.css": "web/app.css",
+  // The component sheet: the chrome's own CSS on every component (design-language.md §6).
+  "web/components.html": "web/components.html",
   "web/brand/mark.svg": "web/brand/mark.svg",
   "web/brand/icon-32.png": "web/brand/icon-32.png",
   "web/brand/apple-touch-icon.png": "web/brand/apple-touch-icon.png",

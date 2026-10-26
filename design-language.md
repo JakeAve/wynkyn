@@ -33,6 +33,10 @@ Visual references (private artifacts; this document stands without them):
   `--sheet-*` stand for the family; a struck-through name, ~~`--soft`~~, is
   retired). It also bans stray `px` (§4.1). When it fails, fix the doc or the
   CSS; never loosen the test.
+- `web/components.html` is the living component sheet: the real components on
+  `web/tokens.css` and `web/app.css` alone, with the app's own class names and
+  container ids (served at `/web/components.html` by `deno task dev` and the
+  hosted site). A new or changed component gets a board there in the same diff.
 
 ---
 
@@ -206,7 +210,7 @@ places it matters are covered by §3.1. If small text proves hard to read in use
 it is the first thing to try: it changes `--f-ui` and the scale's sizes, nothing
 else.
 
-### 3.1 High-visibility strings (planned)
+### 3.1 High-visibility strings
 
 Wherever a reader must tell I from l from 1 or O from 0 with no words around to
 help, the text is set in `--f-hivis` (at `--fs-sm`, the interface's colour).
@@ -222,6 +226,14 @@ Always `--f-hivis`:
 - typed codes: the web-address field, a hex colour field, More CSS.
 
 Never: labels, menus, numbers, words. Context reads those.
+
+In `web/app.css` the `.hivis` class sets it (`--f-hivis` at `--fs-sm`) on a slug
+standing in for a title in the outline (`tree-view.ts`), an `{is}` name in the
+style nav (`config-panel.ts`) and the filenames in the footer's "Added to the
+book's images as …" (`app.ts`). Image completions, switcher book rows, the
+web-address field (`#web-url`) and the title dialog's folder (`#title-slug`) set
+it in their own rules; More CSS already did. Switcher rows show the folder name
+title-cased (`titleCase`), still in `--f-hivis`.
 
 ### Scale
 
@@ -337,10 +349,10 @@ and dialogs (`--shadow-dlg` over `--backdrop`).
 
 ## 6. Components
 
-The sheet (`components.html`) shows each in every state. They are built from
-`web/src/panel-controls.ts` primitives (`h`, `icon`, `stepper`, `seg`,
-`toggle`/`switchInput`, `select`, `row`, `section`, `moreCss`) and the shared
-CSS classes; this section is what each must look like.
+The sheet (`web/components.html`, built on the app's own CSS) shows each. They
+are built from `web/src/panel-controls.ts` primitives (`h`, `icon`, `stepper`,
+`seg`, `toggle`/`switchInput`, `select`, `row`, `section`, `moreCss`) and the
+shared CSS classes; this section is what each must look like.
 
 States, everywhere: **hover** `--hover` wash; **focus** 2px `--acc` ring offset
 1px (fields: border turns `--acc` plus a 1px `--acc` ring); **selected /
@@ -367,7 +379,8 @@ Inside the style panel a `toggle` (`.tog`) keeps a 1px `--line` frame so it
 reads as a control beside the fields, and drops it for the wash when pressed;
 `.tog.primary` and `.tog.outline` (`--fg` text) are the panel's actions, e.g.
 Publish's one primary "Print sheets" beside the outlined "Print pages" and
-"Export EPUB". The small, large and icon classes arrive with their first use.
+"Export EPUB". `.btn.sm` (banners) and `.btn.lg` (the empty state) are built;
+the icon class arrives with its first use.
 
 ### 6.2 Segmented control (`seg`)
 
@@ -419,71 +432,90 @@ pill, whatever the corner shape.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.
 
-### 6.6 Lists: style nav, tree, outline (planned)
+### 6.6 Lists: style nav, tree, outline
 
 Group label (§3) then rows: padding `--s-2 --s-4`, `--r` + corner, `--s-1`
 apart, a right-aligned count in `--fs-2xs` `--muted`. Hover wash; the current
-row takes the red wash. Nesting indents by `--s-4` per level. No separators.
+row takes the red wash. Nesting indents by `--s-4` per level. No separators. In
+`web/app.css`: `:is(#tree, #style-nav) .nh` is the label, `#style-nav .ni` and
+`#tree .tree-node` the rows; the switcher's `.book-row` follows the same rules.
 
-### 6.7 Choice list (planned)
+### 6.7 Choice list
 
 How a dialog asks one question. Full-width rows: a 500 title over a `--fs-xs`
 `--muted` note, padding `--s-4 --s-5`, `--s-1` apart. Hover wash; the
 recommended choice carries the red wash and a red title (Ink's `.choice.primary`
-black pill becomes this). The library dialog stays the reference.
+black pill became this). The library dialog stays the reference. `.choices`
+bleeds `--s-5` into the dialog's padding so the titles line up with its heading;
+a tag on a choice ("Chromium only") is the experimental chip (`.pill`, §6.10).
 
-### 6.8 Dialog (planned)
+### 6.8 Dialog
 
 `--bg`, `--r-dlg` + corner, `--shadow-dlg` over `--backdrop`; width by content
 up to about 26rem (wider only for the font picker and themes). Header: title in
-Fell `--fs-h`, optional lead in `--muted`. Body padding `--s-4 --s-5`. Footer:
-actions right-aligned, `--s-3` apart, ghost first, primary last. `esc` and the
-backdrop close it unless it guards unsaved work.
+Fell `--fs-h`, optional lead in `--muted`. Padding `--s-6`. Footer: actions
+right-aligned, `--s-3` apart, ghost first, primary last. `esc` closes it unless
+it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
+`.ask` with `.ask-foot`; fields in a dialog (`.ask .field`) are §6.3 frames.
 
-### 6.9 Menu, popover, tooltip (planned)
+### 6.9 Menu, popover, tooltip
 
 - **Menu / popover:** `--bg`, 1px `--line`, `--r-pop` + corner, `--shadow-pop`,
   padding `--s-2`. Items `--h-md` tall, a 1rem check column, a right column for
   kbd or detail. Current item: red wash and a red check. Separators are
-  hairlines bleeding to the edges. Optional small-caps heading. Used by: edition
-  switcher, Aa, Spelling, the font picker, `{` completions, ⌘K, spelling
-  suggestions.
-- **Completion row:** name in `--f-mono` `--fs-sm` `--acc-ink`, a 7rem column;
-  description `--muted`; how it closes (`{/quote}`, "wraps", "—") in mono
-  `--fs-2xs` at the right.
-- **Tooltip:** inverted, `--bg` text on an `--fg` fill, `--fs-xs`, `--r-pop`,
-  padding `--s-2 --s-3`. Winks go here (§9).
+  hairlines bleeding to the edges. Optional small-caps heading. Used by: the
+  book and edition switcher (`#switcher`), the font picker (`.fontpop`), `{`
+  completions (`.cm-tooltip-autocomplete`), ⌘K (`.cm-bml-palette`), the wrap bar
+  and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling with the Prose
+  view. Fields inside a popover are §6.3 frames (focus: `--acc` border and
+  ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but its fields
+  and pressed options follow the same rules.
+- **Completion row:** a sentinel's name in `--f-mono` `--fs-sm` `--acc-ink`, a
+  7rem column; description `--muted`; how it closes (`{/quote}`, "wraps", "—")
+  in mono `--fs-2xs` `--muted` at the right. An image's row is a thumbnail, its
+  slug or filename in `--f-hivis` in the row's colour, and its note.
+- **Tooltip** (planned): inverted, `--bg` text on an `--fg` fill, `--fs-xs`,
+  `--r-pop`, padding `--s-2 --s-3`. Winks go here (§9). Native `title` tooltips
+  until then.
 
-### 6.10 Banner, status, chip, kbd (planned)
+### 6.10 Banner, status, chip, kbd
 
-- **Banner:** a strip across the top of the pane it concerns, never a toast.
-  Hairlines above and below, padding `--s-3 --s-5`, `--fs-sm` message, small
-  ghost buttons right. A warning banner adds `--warn-wash` and a warn icon.
-  (Changed on disk; the spec-version banner.)
-- **Status:** icon + bold lead word + plain sentence in the status colour:
-  "Can't save: the folder is read-only." Never colour alone.
-- **Busy:** a pulsing 6px `--acc` dot + "Setting type… 30 pages" in `--fs-xs`
-  `--muted`.
-- **Chip:** `--h-sm`, `--fs-xs`, 1px `--line` inset ring (quiet variant: a
-  `--hover` fill, no ring; experimental: `--warn` text and ring). "Used by"
-  chips, edition tags.
-- **kbd:** `--fs-2xs`, 1px `--line` with a 2px bottom.
+- **Banner:** a strip across the top of the pane it concerns, never a toast. A
+  hairline below (the bar above it draws the one above), padding `--s-3 --s-5`,
+  `--fs-sm` message, small ghost buttons (`.btn.sm`) right. A warning banner
+  adds `--warn-wash` and a warn icon. Changed on disk (`#disk-banner`) is plain
+  with its lead in `--err`, because saving has stopped; the spec-version banner
+  (`#spec-banner`) is the warning.
+- **Status** (planned): icon + bold lead word + plain sentence in the status
+  colour: "Can't save: the folder is read-only." Never colour alone. Today's
+  lines are the sentence in the status colour (`.sw-err`, `#image-note.warn`).
+- **Busy** (planned, with §9's "Setting type…"): a pulsing 6px `--acc` dot +
+  "Setting type… 30 pages" in `--fs-xs` `--muted`.
+- **Chip:** `--h-sm`, `--fs-xs`, 1px `--line` inset ring, `--r` + corner (quiet
+  variant: a `--hover` fill, no ring; experimental: `--warn` text and a 40%
+  `--warn` ring). "Used by" chips (`#config-overlay .chip`), tags on a choice
+  (`.pill`), edition tags.
+- **kbd:** `--fs-2xs` Alegreya Sans, 1px `--line` with a 2px bottom, `--r` +
+  corner. One `kbd` rule for the whole app.
 
-### 6.11 Chrome (planned)
+### 6.11 Chrome
 
 - **Toolbar** (`--h-toolbar`): left, the Contents toggle (⌘\) and the crumb
   (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`); centre,
-  Write / Style / Publish (⌘1–3); right, the theme toggle alone.
-- **Pane header** (`--h-pane`): the pane's own controls at left in small sizes,
-  `--s-2` apart; its expand button at right. A hairline below.
-- **Footer** (`--h-footer`): split by column as today, `--fs-xs` `--muted`; Go
-  to style with a dotted underline; the session count in `--acc-ink` once
-  non-zero.
+  Write / Style / Publish (⌘1–3); right, the theme toggle alone (planned: the
+  Pages toggle leaves, §7).
+- **Pane header** (`--h-pane`, planned with §7): the pane's own controls at left
+  in small sizes, `--s-2` apart; its expand button at right. A hairline below.
+- **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; Go to style
+  with a dotted underline; the session count in `--acc-ink` once non-zero
+  (planned: there is no session count yet).
 
-### 6.12 Empty state (planned)
+### 6.12 Empty state
 
 Centred: a ❦ in `--acc-ink`, the title in Fell `--fs-hero`, one `--muted`
-sentence, one large primary button. `--s-8` padding.
+sentence, one large primary button (`.btn.primary.lg`). `--s-8` padding. In
+`web/app.css`: `.empty` (an `h2` and a `p`; the ❦ is drawn). A list with nothing
+in it says so in one centred `--muted` `--fs-sm` line (`.book-empty`).
 
 ## 7. Layout and expanded views (planned)
 

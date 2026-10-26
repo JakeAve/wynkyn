@@ -90,6 +90,16 @@ summary {
   background: color-mix(in oklab, var(--acc-btn) 88%, var(--fg));
   color: var(--on-acc);
 }
+/* Small (§6.1): banners, pane headers. Large: empty states, the site. */
+.btn.sm {
+  min-height: var(--h-sm);
+  padding-inline: var(--s-3);
+  font-size: var(--fs-sm);
+}
+.btn.lg {
+  min-height: var(--h-lg);
+  padding-inline: var(--s-6);
+}
 .btn svg,
 .tico {
   display: block;
@@ -101,12 +111,16 @@ summary {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.caption {
+/* kbd (§6.10): a key cap. */
+kbd {
+  font: var(--fs-2xs) var(--f-ui);
+  font-variant-numeric: lining-nums;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: var(--muted);
-  text-transform: uppercase;
-  font-size: var(--fs-2xs);
-  letter-spacing: .1em;
-  font-weight: 600;
 }
 
 /* ---- toolbar ---- */
@@ -147,8 +161,7 @@ summary {
   text-overflow: ellipsis;
 }
 #book-name {
-  font-family: var(--f-text);
-  font-weight: 500;
+  font: 500 var(--fs-lg) var(--f-text);
 }
 #crumb .slash {
   color: var(--syn-p);
@@ -257,6 +270,8 @@ summary {
   display: block;
   width: 100%;
   padding: var(--s-2) var(--s-4);
+  font: var(--fs-sm)
+    var(--f-hivis); /* a folder standing in for a title (§3.1) */
   background: none;
   border: none;
   border-radius: var(--r);
@@ -274,9 +289,32 @@ summary {
   background: var(--acc-wash);
   color: var(--acc-ink);
 }
-.book-empty {
-  padding: var(--s-2) var(--s-4);
+/* Empty state (§6.12): a ❦, a Fell title, one sentence, one primary. */
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-3);
+  padding: var(--s-8);
+  text-align: center;
+}
+.empty::before {
+  content: "❦";
+  color: var(--acc-ink);
+  font: 1.5rem/1 var(--f-title);
+}
+.empty h2 {
+  margin: 0;
+  font: 400 var(--fs-hero)/var(--lh-tight) var(--f-title);
+}
+.empty p {
+  margin: 0 0 var(--s-3);
   color: var(--muted);
+}
+.book-empty {
+  padding: var(--s-4);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  text-align: center;
 }
 .sw-eds {
   padding: var(--s-4);
@@ -294,14 +332,18 @@ summary {
   corner-shape: var(--corner);
   cursor: pointer;
 }
-.ed-row:hover,
-.ed-row[aria-current="true"] {
+.ed-row:hover {
   background: var(--hover);
+}
+/* The open edition: the menu's current item, a red wash and a red check. */
+.ed-row[aria-current="true"] {
+  background: var(--acc-wash);
 }
 .ed-row .ck {
   width: 0.875rem;
   height: 0.875rem;
   align-self: center;
+  color: var(--acc-ink);
 }
 .ed-row .nm {
   font-weight: 500;
@@ -348,12 +390,20 @@ summary {
 }
 #switcher input:not(#book-search),
 #switcher select {
+  height: var(--h-md);
   border: 1px solid var(--line);
   border-radius: var(--r);
   corner-shape: var(--corner);
   background: var(--bg);
-  padding: var(--s-1) var(--s-3);
+  padding: 0 var(--s-3);
   min-width: 0;
+}
+/* Fields (§6.3) outside the panel: focus turns the border red. */
+:is(#switcher, .ask .field, #editor .cm-bml-palette, #config-overlay .fontpop) :is(input, select, textarea):focus-visible,
+.cm-bml-find .field:focus-within {
+  outline: none;
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px var(--acc);
 }
 .eds-foot {
   margin-top: auto;
@@ -410,6 +460,8 @@ summary {
 }
 #style-here span:last-child {
   color: var(--fg);
+  text-decoration: underline dotted;
+  text-underline-offset: 0.1875rem;
 }
 #style-here:hover {
   color: var(--fg);
@@ -537,19 +589,32 @@ summary {
   overflow-y: auto;
   padding: var(--s-4);
 }
+/* Lists (§6.6): a small-caps group label, then rows --s-1 apart. */
 :is(#tree, #style-nav) .nh {
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-sm);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
   font-weight: 500;
   color: var(--muted);
-  padding: var(--s-4) var(--s-4) var(--s-2);
+  padding: var(--s-5) var(--s-4) var(--s-1);
 }
 :is(#tree, #style-nav) .nh:first-child {
-  padding-top: var(--s-1);
+  padding-top: 0;
 }
-#tree ul.tree-list {
+#tree :is(ul.tree-list, li) {
+  display: grid;
+  gap: var(--s-1);
   list-style: none;
   margin: 0;
   padding: 0;
+}
+#style-nav .ni + .ni {
+  margin-top: var(--s-1);
+}
+/* An identifier standing in for a name (§3.1): a slug, an {is} name. */
+.hivis {
+  font-family: var(--f-hivis);
+  font-size: var(--fs-sm);
 }
 #tree button.tree-node {
   display: block;
@@ -657,20 +722,19 @@ summary {
 #text-view .tv-hide {
   margin-left: auto;
 }
-/* Changed-on-disk banner: the buffer has unsaved edits and the file moved
-   under it. Rare and it blocks saving, so it is the one loud thing in the
-   chrome: an err-tinted block with a bar, and bordered buttons. */
-#disk-banner {
+/* Banners (§6.10): a strip across the top of the pane they concern, small
+   ghost buttons at the right. Changed on disk: the buffer has unsaved edits
+   and the file moved under it, so saving stops; its lead says so in --err. */
+:is(#disk-banner, #spec-banner) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-4) var(--s-5);
-  padding: var(--s-5);
+  gap: var(--s-3) var(--s-4);
+  padding: var(--s-3) var(--s-5);
   border-bottom: 1px solid var(--line);
-  border-left: 0.1875rem solid var(--err);
-  background: color-mix(in srgb, var(--err) 10%, var(--bg));
+  font-size: var(--fs-sm);
 }
-#disk-banner[hidden] {
+:is(#disk-banner, #spec-banner)[hidden] {
   display: none;
 }
 #disk-banner .msg {
@@ -682,19 +746,10 @@ summary {
 }
 #disk-banner .msg span {
   color: var(--muted);
-  font-size: var(--fs-xs);
 }
 #disk-banner .acts {
   display: flex;
-  gap: var(--s-3);
-}
-#disk-banner .btn {
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--sheet-edge);
-}
-#disk-banner .btn:hover {
-  background: var(--hover);
+  gap: var(--s-1);
 }
 /* ---- editor: search hits, sentinels by kind, {only} spans ---- */
 #editor .cm-searchMatch {
@@ -857,10 +912,6 @@ summary {
   border: 1px solid var(--line);
   border-radius: var(--r);
   corner-shape: var(--corner);
-  background: var(--hover);
-}
-.cm-bml-find .field:focus-within {
-  border-color: var(--fg);
   background: var(--bg);
 }
 .cm-bml-find input {
@@ -896,9 +947,8 @@ summary {
   white-space: nowrap;
 }
 .cm-bml-find .opt[aria-pressed="true"] {
-  color: var(--fg);
-  background: var(--hover);
-  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--acc-ink);
+  background: var(--acc-wash);
 }
 .cm-bml-find .ghost {
   padding: var(--s-1) var(--s-3);
@@ -917,8 +967,10 @@ summary {
   white-space: nowrap;
 }
 /* insert popovers (editor-insert.ts): `{` completions, the ⌘K list of
-   every sentinel, and the wrap bar over a selection */
+   every sentinel, and the wrap bar over a selection. One menu surface (§6.9),
+   shared with the switcher and the font picker. */
 #editor .cm-tooltip {
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-pop);
   corner-shape: var(--corner);
@@ -927,12 +979,12 @@ summary {
 }
 #editor .cm-tooltip-autocomplete,
 #editor .cm-bml-palette {
-  padding: var(--s-3);
+  padding: var(--s-2);
 }
 #editor .cm-tooltip.cm-tooltip-autocomplete > ul,
 #editor .cm-bml-palette ul {
   font: inherit;
-  width: 21.25rem;
+  width: 24rem;
   min-width: 0;
   max-height: 22em;
   margin: 0;
@@ -943,10 +995,11 @@ summary {
 #editor .cm-tooltip-autocomplete > ul > li,
 #editor .cm-bml-palette li:not(.grp) {
   display: grid;
-  grid-template-columns: 5.75rem 1fr auto;
-  gap: var(--s-4);
+  grid-template-columns: 7rem 1fr auto;
+  gap: var(--s-3);
   align-items: baseline;
-  padding: var(--s-2) var(--s-4);
+  min-height: var(--h-md);
+  padding: var(--s-2) var(--s-3);
   border-radius: var(--r);
   corner-shape: var(--corner);
   line-height: 1.4;
@@ -957,13 +1010,17 @@ summary {
   display: block;
   border: none;
   opacity: 1;
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-sm);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  font-weight: 500;
   color: var(--muted);
-  padding: var(--s-3) var(--s-4) var(--s-1);
+  padding: var(--s-3) var(--s-3) var(--s-1);
 }
+/* a sentinel's name: markup, so mono in the red */
 #editor :is(.cm-completionLabel, .cm-bml-palette code) {
-  font: var(--fs-sm) var(--f-hivis);
-  color: var(--fg);
+  font: 500 var(--fs-sm) var(--f-mono);
+  color: var(--acc-ink);
 }
 #editor .cm-completionMatchedText {
   text-decoration: none;
@@ -980,7 +1037,7 @@ summary {
 }
 #editor :is(.cm-tooltip-autocomplete, .cm-bml-palette) .f {
   font: var(--fs-2xs) var(--f-mono);
-  color: var(--syn-p);
+  color: var(--muted);
 }
 /* image completions: a thumbnail beside the slug over its note */
 #editor .cm-tooltip-autocomplete > ul > li:has(> .cm-bml-thumb) {
@@ -1004,8 +1061,14 @@ summary {
   background: none;
   color: var(--muted);
 }
+/* an image's slug or filename: an identifier, in the row's colour (§3.1) */
 #editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .cm-completionLabel {
   align-self: end;
+  font: var(--fs-sm) var(--f-hivis);
+  color: inherit;
+}
+#editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb.add) > .cm-completionLabel {
+  font-family: var(--f-ui); /* "Add image from your computer…" is words */
 }
 #editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb):not(:has(> .cm-completionDetail)) > .cm-completionLabel {
   grid-row: 1 / span 2;
@@ -1022,12 +1085,6 @@ summary {
   background: var(--acc-wash);
   color: var(--acc-ink);
 }
-#editor :is(.cm-tooltip-autocomplete li[aria-selected], .cm-bml-palette li[aria-selected="true"]) :is(code, .cm-completionLabel, .cm-completionDetail, .d, .f) {
-  color: var(--acc-ink);
-}
-#editor :is(.cm-tooltip-autocomplete li[aria-selected], .cm-bml-palette li[aria-selected="true"]) :is(.cm-completionDetail, .d, .f) {
-  opacity: .7;
-}
 #editor .cm-bml-palette input {
   all: unset;
   box-sizing: border-box;
@@ -1036,7 +1093,7 @@ summary {
   height: var(--h-md);
   margin-bottom: var(--s-2);
   padding: 0 var(--s-4);
-  border: 1px solid var(--fg);
+  border: 1px solid var(--line);
   border-radius: var(--r);
   corner-shape: var(--corner);
   color: var(--fg);
@@ -1091,15 +1148,7 @@ summary {
   font-size: var(--fs-sm);
   color: var(--muted);
 }
-#editor .cm-bml-wrapbar kbd {
-  font: var(--fs-2xs) var(--f-mono);
-  padding: 0 var(--s-2);
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
-  border-radius: var(--r);
-  corner-shape: var(--corner);
-  color: var(--muted);
-}
+
 #preview {
   background: var(--desk);
   overflow: auto;
@@ -1861,7 +1910,7 @@ summary {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
-  padding: var(--s-3);
+  padding: var(--s-2);
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-pop);
@@ -1873,7 +1922,7 @@ summary {
   box-sizing: border-box;
   height: var(--h-md);
   padding: 0 var(--s-4);
-  border: 1px solid var(--fg);
+  border: 1px solid var(--line);
   border-radius: var(--r);
   corner-shape: var(--corner);
   color: var(--fg);
@@ -1908,7 +1957,9 @@ summary {
   display: none;
 }
 #config-overlay .fontpop li.grp {
-  font: var(--fs-2xs) var(--f-ui);
+  font: 500 var(--fs-sm) var(--f-ui);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
   color: var(--muted);
   padding: var(--s-4) var(--s-4) var(--s-1);
   cursor: default;
@@ -1947,11 +1998,17 @@ summary {
 #config-overlay .uses .from {
   margin-right: var(--s-1);
 }
+/* Chip (§6.10): "Used by" links. */
 #config-overlay .chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--h-sm);
   background: none;
-  border: 1px solid var(--line);
-  border-radius: 999rem; /* a pill */
-  padding: 1px var(--s-4);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  padding: 0 var(--s-3);
   font-size: var(--fs-xs);
   color: var(--fg);
   cursor: pointer;
@@ -2373,8 +2430,8 @@ summary {
 }
 .ask {
   margin: auto;
-  padding: var(--s-6) var(--s-7);
-  width: 27.5rem;
+  padding: var(--s-6);
+  width: 26rem;
   max-width: calc(100vw - var(--s-7));
   border: 1px solid var(--line);
   border-radius: var(--r-dlg);
@@ -2383,75 +2440,58 @@ summary {
   color: var(--fg);
   box-shadow: var(--shadow-dlg);
 }
+.ask::backdrop {
+  background: var(--backdrop);
+}
 .ask h2 {
-  margin: 0 0 var(--s-3);
+  margin: 0 0 var(--s-2);
   font: 400 var(--fs-h)/var(--lh-tight)
     var(--f-title); /* Fell: never smaller */
 }
 .ask p {
   margin: 0 0 var(--s-5);
   color: var(--muted);
-  font-size: var(--fs-sm);
-  line-height: 1.4;
 }
-/* Choice list: a column of full-width rows, each a title with an optional
-   <small> note, for a dialog that asks one question. Rows separate with
-   --line; `.primary` takes the red wash, for the safe default. */
+/* Choice list (§6.7): full-width rows, each a 500 title over an optional
+   <small> note, for a dialog that asks one question. `.primary`, the
+   recommended one, takes the red wash and a red title. */
 .choices {
-  display: flex;
-  flex-direction: column;
-  margin: 0 calc(var(--s-4) * -1);
+  display: grid;
+  gap: var(--s-1);
+  margin: 0 calc(var(--s-5) * -1);
 }
 .choice {
   display: block;
   width: 100%;
   margin: 0;
-  padding: var(--s-4);
+  padding: var(--s-4) var(--s-5);
   border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: none;
   color: var(--fg);
   font: inherit;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
 .choice[hidden] {
   display: none;
 }
-.choice:first-child,
-.choice[hidden] + .choice,
-.choice.primary + .choice {
-  border-top: 0;
-}
 .choice:hover {
   background: var(--hover);
-}
-.choice:focus-visible {
-  outline: 2px solid var(--acc);
-  outline-offset: -2px;
 }
 .choice small {
   display: block;
   margin-top: var(--s-1);
   color: var(--muted);
   font-size: var(--fs-xs);
+  font-weight: 400;
   line-height: 1.35;
 }
 .choice.primary {
-  margin-bottom: var(--s-2);
-  border-top: 0;
-  border-radius: var(--r);
-  corner-shape: var(--corner);
   background: var(--acc-wash);
   color: var(--acc-ink);
-}
-.choice.primary:hover {
-  background: var(--acc-wash);
-  opacity: .92;
-}
-.choice.primary small {
-  color: var(--muted);
 }
 .ask .sw-err {
   display: block;
@@ -2464,36 +2504,35 @@ summary {
   font-size: var(--fs-xs);
   line-height: 1.35;
 }
+/* The warning banner: --warn-wash and a warn icon. */
 #spec-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--s-5);
-  padding: var(--s-4) var(--s-5);
-  border-bottom: 1px solid var(--line);
   background: var(--warn-wash);
-  color: var(--fg);
-  font-size: var(--fs-sm);
-  line-height: 1.4;
 }
-#spec-banner[hidden] {
-  display: none;
+#spec-banner::before {
+  content: "";
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  background: var(--warn);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2 14.5 13.5h-13z'/%3E%3Cpath d='M8 6.5v3.2M8 11.6v.1'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 #spec-banner span {
   flex: 1;
 }
 
 /* The first-run dialogs (§7.9): Welcome, Create a new manuscript, title. */
+/* A tag on a choice ("Chromium only"): the experimental chip (§6.10). */
 .pill {
   display: inline-block;
   margin-left: var(--s-3);
-  padding: 1px var(--s-3);
-  border: 1px solid var(--warn);
-  border-radius: 999rem; /* a pill */
+  padding: 0 var(--s-3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   color: var(--warn);
   font-size: var(--fs-2xs);
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  vertical-align: 1px;
+  font-weight: 400;
 }
 .pill[hidden] {
   display: none;
@@ -2523,7 +2562,7 @@ summary {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--s-4);
+  gap: var(--s-3);
   margin-top: var(--s-5);
 }
 .ask-foot .sw-err {
@@ -2540,7 +2579,7 @@ summary {
 }
 .ask .field input,
 .ask .field textarea {
-  padding: var(--s-4);
+  padding: var(--s-3);
   border: 1px solid var(--line);
   border-radius: var(--r);
   corner-shape: var(--corner);
@@ -2548,6 +2587,15 @@ summary {
   color: var(--fg);
   font: var(--fs) var(--f-ui);
   resize: vertical;
+}
+.ask .field input {
+  height: var(--h-md);
+  padding-block: 0;
+}
+/* typed codes (§3.1) */
+#web-url,
+#title-slug {
+  font: var(--fs-sm) var(--f-hivis);
 }
 .ask .hint {
   margin: 0;

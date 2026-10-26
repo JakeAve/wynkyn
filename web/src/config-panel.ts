@@ -230,7 +230,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
           b.type = "button";
           b.className = "ni";
           const t = document.createElement("span");
-          t.className = "t";
+          t.className = r.id.startsWith("is.") ? "t hivis" : "t";
           t.textContent = r.label;
           const k = document.createElement("span");
           k.className = "k";
