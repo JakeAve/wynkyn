@@ -35,7 +35,7 @@ import type { Diagnostic, OnlySpan } from "../../parser/types.ts";
 let suppressChanges = false;
 
 // Chrome-matched editor theme: every color is a CSS variable from
-// index.html's Ink palette, so light/dark switching needs no CodeMirror
+// the chrome's tokens, so light/dark switching needs no CodeMirror
 // reconfigure — the vars flip and the editor follows.
 const inkTheme = EditorView.theme({
   "&": { height: "100%", backgroundColor: "transparent", color: "var(--fg)" },

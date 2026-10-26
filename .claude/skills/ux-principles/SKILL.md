@@ -63,7 +63,10 @@ still lays out, since Paged.js paginates by measuring.
 - Don't copy Vellum or Atticus; they only toggle things on and off. The
   differentiators here are typographic control (TOC leaders, numbering styles,
   furniture placement) presented in plain words.
-- Keep the Ink look (`ink-design` skill); the panel never covers the preview.
+- Controls live with what they control: a pane carries its own controls in its
+  own header; the toolbar holds only what is global.
+- Follow the Rubric look (`rubric-design` skill, `design-language.md`); the
+  panel never covers the preview.
 
 ## Read next
 

@@ -89,7 +89,7 @@ export const bmlLanguage = StreamLanguage.define<BmlStreamState>({
   token: bmlToken,
 });
 
-// Colors are CSS variables from index.html's Ink palette, so one highlight
+// Colors are CSS variables from the chrome's tokens, so one highlight
 // style serves light and dark without a reconfigure. Markup is set in --mono
 // whatever font the writer picks for prose, so it reads as markup.
 const mono = "var(--mono)";

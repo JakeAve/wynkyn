@@ -2,8 +2,8 @@
 
 `web/` is the browser app. `web/src/app.ts` bundles to `web/app.js`
 (gitignored, built per checkout); `web/index.html` holds the DOM;
-`web/app.css` is the chrome's stylesheet and holds the Ink tokens
-(`ink-design` skill). Paged.js paginates the preview. The rules for adding to
+`web/app.css` is the chrome's stylesheet; its tokens live in `web/tokens.css`
+(`rubric-design` skill, `design-language.md`). Paged.js paginates the preview. The rules for adding to
 it are in `SKILL.md`, The web app; this is the map.
 
 ## Wiring
