@@ -80,6 +80,22 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
     }
     return names.sort();
   }
+  // No fs events in the browser: the store reports its own changes.
+  const listeners = new Set<(paths: string[]) => void>();
+  const changed = (...paths: string[]) => {
+    for (const l of listeners) l(paths);
+  };
+  async function remove(path: string): Promise<boolean> {
+    const dir = await dirOf(path, false);
+    if (!dir) return false;
+    try {
+      await dir.removeEntry(nameOf(path));
+      return true;
+    } catch (e) {
+      if (isMissing(e)) return false;
+      throw e;
+    }
+  }
   const store: BookStore = {
     async list() {
       const books: string[] = [];
@@ -108,10 +124,12 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
       const dir = await dirOf(path, false);
       if (!dir) throw new Error(`no such directory for ${path}`);
       await put(dir, path, data);
+      changed(path);
     },
     async create(path, data) {
       if (await store.exists(path)) return false;
       await put((await dirOf(path, true))!, path, data);
+      changed(path);
       return true;
     },
     async rename(from, to) {
@@ -119,21 +137,20 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
       const data = await store.read(from);
       if (data === null) return false;
       await put((await dirOf(to, true))!, to, data);
-      await store.remove(from);
+      await remove(from);
+      changed(from, to);
       return true;
     },
     async remove(path) {
-      const dir = await dirOf(path, false);
-      if (!dir) return false;
-      try {
-        await dir.removeEntry(nameOf(path));
-        return true;
-      } catch (e) {
-        if (isMissing(e)) return false;
-        throw e;
-      }
+      if (!await remove(path)) return false;
+      changed(path);
+      return true;
     },
     listDir,
+    watch(onChange) {
+      listeners.add(onChange);
+      return () => listeners.delete(onChange);
+    },
   };
   return store;
 }

@@ -25,9 +25,10 @@ export interface BookStore {
   remove(path: string): Promise<boolean>;
   /** Names of the files directly in `dir`; [] when it doesn't exist. */
   listDir(dir: string): Promise<string[]>;
-  /** Changes by other writers (an editor, the CLI), as relative paths. A
-   * store without one (the browser) has no other writers. Returns stop. */
-  watch?(onChange: (paths: string[]) => void): () => void;
+  /** Every change, as relative paths: this store's own writes, creates,
+   * renames and removes, and other writers' (an editor, the CLI) where the
+   * store can see them. Returns stop. */
+  watch(onChange: (paths: string[]) => void): () => void;
 }
 
 const encoder = new TextEncoder();
@@ -123,7 +124,7 @@ export function diskStore(root: string): BookStore {
       return names.sort();
     },
     watch(onChange) {
-      // watchFs reports resolved absolute paths (on macOS /var/… is realpathed
+      // fs events see this store's own writes like anyone else's. watchFs reports resolved absolute paths (on macOS /var/… is realpathed
       // to /private/var/…), so map events back through the root's realpath.
       const abs = Deno.realPathSync(root) + "/";
       const w = watchTree(root, (paths) =>

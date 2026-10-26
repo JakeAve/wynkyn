@@ -83,7 +83,7 @@ export class BookService {
     string,
     { from: string; to: string; stale: Set<string> }[]
   >();
-  private readonly stopWatch: (() => void) | undefined;
+  private readonly stopWatch: () => void;
   // book → a rebuild held back after a change to images/ alone (onChanged).
   private readonly heldImages = new Map<
     string,
@@ -93,13 +93,12 @@ export class BookService {
   constructor(opts: ServiceOptions) {
     this.store = opts.store;
     this.buildOpts = { baseCss: opts.baseCss, imageUrl: opts.imageUrl };
-    // A store with other writers (a folder on disk) reports their changes;
-    // the service's own writes are reported by itself when it has none.
-    this.stopWatch = this.store.watch?.((paths) => this.onChanged(paths));
+    // The store reports every change, the service's own writes included.
+    this.stopWatch = this.store.watch((paths) => this.onChanged(paths));
   }
 
   async stop(): Promise<void> {
-    this.stopWatch?.();
+    this.stopWatch();
     for (const t of this.heldImages.values()) clearTimeout(t);
     await Promise.all(this.chains.values()); // writes under way land
     this.clients.clear();
@@ -269,7 +268,6 @@ export class BookService {
       if (!await this.store.create(path, bytes)) {
         throw new ServiceError(409, "an image with that name is already there");
       }
-      this.notify([path]);
       return { slug: name.slice(0, -parsed.ext.length - 1), name };
     });
   }
@@ -288,7 +286,6 @@ export class BookService {
     );
     if (!made) return false;
     await this.store.write(metadataKey(book, null), metadataText);
-    this.notify([manuscript, metadataKey(book, null)]);
     return true;
   }
 
@@ -314,7 +311,6 @@ export class BookService {
         await this.store.write(file, data);
       }
     }
-    this.notify([manuscript, meta]);
     return true;
   }
 
@@ -355,7 +351,6 @@ export class BookService {
       } catch (err) {
         throw new ServiceError(500, `save failed: ${String(err)}`);
       }
-      this.notify([path]);
       const version = await contentVersion(text);
       return text === save.text
         ? { ok: true, version }
@@ -384,7 +379,6 @@ export class BookService {
       } catch (err) {
         throw new ServiceError(500, `save failed: ${String(err)}`);
       }
-      this.notify([path]);
       return { version: await contentVersion(text) };
     });
   }
@@ -413,7 +407,6 @@ export class BookService {
     if (!await createEdition(this.store, book, slug, source.metadata)) {
       throw new ServiceError(409, "edition already exists");
     }
-    this.notify([metadataKey(book, slug)]);
   }
 
   async renameEdition(
@@ -434,7 +427,6 @@ export class BookService {
     const from = metadataKey(book, edition);
     const moved = await this.serialize(from, () => this.store.rename(from, to));
     if (!moved) throw notFound("edition not found");
-    this.notify([from, to]);
     // EXPERIMENTAL (§3.2.9): the edition's {only} token follows its slug.
     // Later saves carrying the old token are rewritten as they arrive.
     const stale = new Set(
@@ -456,7 +448,6 @@ export class BookService {
         const next = renameOnlyToken(text, edition, target);
         if (next !== text) {
           await this.store.write(manuscript, next);
-          this.notify([manuscript]);
         }
       });
     } catch (err) {
@@ -476,7 +467,6 @@ export class BookService {
     const path = metadataKey(book, edition);
     const removed = await this.serialize(path, () => this.store.remove(path));
     if (!removed) throw notFound("edition not found");
-    this.notify([path]);
   }
 
   // ---- subscriptions ----------------------------------------------------
@@ -553,11 +543,6 @@ export class BookService {
         "metadata is not a valid JSON object — fix it on disk first",
       );
     }
-  }
-
-  // The service's own writes, for a store that can't see them happen.
-  private notify(paths: string[]) {
-    if (!this.store.watch) this.onChanged(paths);
   }
 
   private onChanged(paths: string[]) {
