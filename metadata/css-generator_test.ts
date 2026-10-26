@@ -483,3 +483,51 @@ Deno.test("folio position: an unknown value falls back to bottom center", () => 
     ["", "bottom-center"],
   ]);
 });
+
+Deno.test("keys and values that could break out of the CSS are left out (§4.10 item 0)", () => {
+  const css = generateDomCSS({
+    fonts: { display: 'Evil" } body { color: red' },
+    elements: {
+      chapter: {
+        color: "red; } body { display: none",
+        "margin-top": "/* swallow",
+        "font-family": "display",
+        "text-align": "center",
+        "bad key!": "x",
+        title: { "font-style": "italic" },
+        "evil } x": { color: "blue" },
+      },
+      "x } y": { color: "green" },
+      break: { content: "} </style> is fine as a string" },
+    },
+    is: { "a:b": { color: "red" }, "pull-quote": { color: "gray" } },
+  });
+  assertStringIncludes(css, "text-align: center;");
+  assertStringIncludes(css, ".chapter .title {\n  font-style: italic;");
+  assertStringIncludes(css, ".is-pull-quote {");
+  assertStringIncludes(css, 'font-family: "Evil\\" } body { color: red";');
+  assertStringIncludes(css, 'content: "} </style> is fine as a string";');
+  for (const gone of ["red;", "swallow", "bad key", "evil", "x }", "a:b"]) {
+    assert(!css.includes(gone), gone);
+  }
+});
+
+Deno.test("page and running values are checked too; an unknown area is dropped", () => {
+  const css = generatePagedCSS({
+    page: { size: "5in 8in; } x {", margins: { top: "1in", bottom: "1in" } },
+    running: {
+      odd: [
+        { area: "top-center", content: "chapter-title", color: "red;" },
+        { area: "top-center } x {", content: "book-title" },
+      ],
+    },
+  });
+  assert(!css.includes("5in 8in"));
+  assertStringIncludes(css, "margin-top: 1in;");
+  assertStringIncludes(
+    css,
+    "@top-center {\n    content: var(--chapter-title);",
+  );
+  assert(!css.includes("color: red"));
+  assert(!css.includes("} x {"));
+});

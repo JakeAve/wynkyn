@@ -28,7 +28,7 @@ Deno.test("zones, matter classes and ids", () => {
   assertStringIncludes(html, '<article class="bml">');
   assertStringIncludes(
     html,
-    '<section class="matter matter-half-title zone-front" id="matter-half-title">',
+    '<section class="matter matter-half-title matter-display zone-front" id="matter-half-title">',
   );
   assertStringIncludes(
     html,
@@ -36,7 +36,7 @@ Deno.test("zones, matter classes and ids", () => {
   );
   assertStringIncludes(
     html,
-    '<section class="matter matter-colophon zone-back" id="matter-colophon">',
+    '<section class="matter matter-colophon matter-display zone-back" id="matter-colophon">',
   );
   assert(!html.includes('class="zone'), "no zone wrapper divs");
 });
@@ -654,4 +654,23 @@ Deno.test("dropcap image stands for the first letter (§3.5.4)", () => {
     html,
     '<img class="dropcap" src="images/initial-t.png" alt="T">he morning came.',
   );
+});
+
+Deno.test("toc: a titled colophon is not listed (§3.7); an open matter type is", () => {
+  const html = render(parse([
+    "{matter: toc}",
+    "{title}",
+    "Contents",
+    "{chapter: one}",
+    "Prose.",
+    "{matter: afterword}",
+    "{title}",
+    "Afterword",
+    "{matter: colophon}",
+    "{title}",
+    "Colophon",
+  ].join("\n")));
+  assertStringIncludes(html, 'href="#matter-afterword">Afterword</a>');
+  assert(!html.includes('href="#matter-colophon"'));
+  assert(!html.includes("matter-afterword matter-display"));
 });

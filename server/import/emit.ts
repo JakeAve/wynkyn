@@ -5,6 +5,7 @@
 import type { Block } from "./blocks.ts";
 import type { Outline } from "./structure.ts";
 import { slugify } from "./structure.ts";
+import { matterType } from "../../parser/types.ts";
 
 const needsEscape = /^(-\s|\d+\.\s|%%|\{(?!\/?em\}))/;
 const line = (t: string) => needsEscape.test(t) ? `\\${t}` : t;
@@ -165,9 +166,7 @@ export function emit(o: Outline, today = new Date()): Emitted {
     if (sec.check) out.push(`%% check: ${sec.check}`);
     out.push(`{matter: ${sec.type}}`);
     if (sec.title) out.push("{title}", line(sec.title));
-    else if (
-      !["dedication", "epigraph", "copyright", "colophon"].includes(sec.type)
-    ) {
+    else if (matterType(sec.type).listed) {
       out.push("{title}", sec.type[0]!.toUpperCase() + sec.type.slice(1));
     }
     out.push("");

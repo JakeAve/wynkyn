@@ -63,13 +63,60 @@
     return out;
   }
 
+  const ONES = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const TENS = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+
+  // ponytail: spelled numbers stop at 99; a book with a hundred chapters gets
+  // digits.
+  /** @param {number} n */
+  function words(n) {
+    if (n < 1 || n >= 100) return String(n);
+    if (n < 20) return ONES[n] ?? String(n);
+    const tens = TENS[Math.floor(n / 10)] ?? "";
+    const ones = ONES[n % 10] ?? "";
+    return ones ? `${tens}-${ones}` : tens;
+  }
+
   /**
-   * "words" is arabic for pages (§4.7).
+   * The one number formatter: page folios here, and chapter and part numbers
+   * through renderer/render.ts.
    * @param {number} n
    * @param {NumberingStyle} style
    * @returns {string}
    */
-  function formatFolio(n, style) {
+  function formatNumber(n, style) {
     switch (style) {
       case "roman-lower":
         return roman(n);
@@ -79,12 +126,22 @@
         return alpha(n);
       case "alpha-upper":
         return alpha(n).toUpperCase();
+      case "words":
+        return words(n);
       case "none":
         return "";
       default:
         return String(n);
     }
   }
+
+  /**
+   * "words" is arabic for pages (§4.7).
+   * @param {number} n
+   * @param {NumberingStyle} style
+   */
+  const formatFolio = (n, style) =>
+    formatNumber(n, style === "words" ? "arabic" : style);
 
   // Running titles carry over through display pages, which show none, so the
   // carried value can't be read back off the previous entry.
@@ -262,6 +319,7 @@
   }
 
   /** @type {any} */ (globalThis).BookPageMap = {
+    formatNumber,
     formatFolio,
     pageEntry,
     buildPageMap,

@@ -32,6 +32,7 @@ type RenderResult = { map: PageEntry[]; seed: Seed; problems: PageProblem[] };
 
 const {
   formatFolio,
+  formatNumber,
   buildPageMap,
   anchorFolios,
   checkPageMap,
@@ -40,6 +41,7 @@ const {
 } = (globalThis as unknown as {
   BookPageMap: {
     formatFolio(n: number, style: NumberingStyle): string;
+    formatNumber(n: number, style: NumberingStyle): string;
     buildPageMap(f: PageFacts[], n: PageNumberingConfig): PageEntry[];
     anchorFolios(map: PageEntry[]): Seed;
     checkPageMap(map: PageEntry[], expected: string[]): PageProblem[];
@@ -83,6 +85,16 @@ Deno.test("formatFolio covers every page style", () => {
   assertEquals(formatFolio(28, "alpha-upper"), "AB");
   assertEquals(formatFolio(7, "words"), "7");
   assertEquals(formatFolio(7, "none"), "");
+});
+
+Deno.test("formatNumber spells words for chapters and parts; the page map's folio doesn't", () => {
+  assertEquals(formatNumber(7, "words"), "Seven");
+  assertEquals(formatNumber(42, "words"), "Forty-Two");
+  assertEquals(formatNumber(100, "words"), "100");
+  assertEquals(
+    formatNumber(1994, "roman-upper"),
+    formatFolio(1994, "roman-upper"),
+  );
 });
 
 Deno.test("front counts in roman, body restarts at 1, back continues", () => {

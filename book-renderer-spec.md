@@ -514,10 +514,10 @@ contents from the document tree (§4.10 item 10): front matter that has a
 dedication, epigraph, and the contents itself), every part and chapter with its
 number when `numbering` shows one and its `{subtitle}` if present, level-1
 headings that carry a slug when metadata `toc.headings` is `true` (§4.11), and
-back matter that has a `{title}`. An untitled chapter lists as its number alone,
-or its slug if numbers are off. Page numbers come from the page map (§4.7);
-front- and back-matter rows use their zone's page-number style (§4.7), so a
-preface shows `v`.
+back matter that has a `{title}` (except the colophon, §3.7). An untitled
+chapter lists as its number alone, or its slug if numbers are off. Page numbers
+come from the page map (§4.7); front- and back-matter rows use their zone's
+page-number style (§4.7), so a preface shows `v`.
 
 Any prose inside the block replaces the generated list and is rendered verbatim
 — the manual fallback for one-off layouts.
@@ -1642,6 +1642,14 @@ Controls how `{note:}` content (§3.6.8) is placed.
 
 When `metadata.json` is present, the renderer:
 
+0. Checks every key and value before writing it into CSS, and leaves out one
+   that could end its declaration, rule or comment: an `elements` or sub-element
+   key that isn't lowercase letters, digits and hyphens, an `is` name that isn't
+   a slug (§3.2.4), a property name that isn't a CSS ident, a value containing
+   `{`, `}`, `;`, `<` or `/*` or an unbalanced quote, and a `running` entry
+   whose `area` isn't one of the 16 margin boxes. `content` is written as a CSS
+   string, so any text is safe in it. A dropped value fails the way a typo does
+   — the browser would ignore it anyway.
 1. Loads Google Fonts via `<link>` tags for each entry in `fonts`, requesting
    the default variant set (400, 400 italic, 700, 700 italic) for each family
    (Google skips names it doesn't serve, which leaves installed fonts to Chrome;
@@ -1656,8 +1664,10 @@ When `metadata.json` is present, the renderer:
    from `running`; both read the page map's CSS variables (§4.7, §4.8).
 8. Resolves image slugs (`{illustration: slug}`, `{dropcap | image: slug}`)
    against the book's `images/` directory, trying `<slug>.svg`, `.png`, `.jpg`,
-   `.jpeg`, `.webp` in that order and using the first match; an unresolved slug
-   renders a visible placeholder, not an error:
+   `.jpeg`, `.webp` in that order and using the first match. A resolved drop-cap
+   image stands for the paragraph's first letter, which becomes its `alt`; an
+   unresolved one falls back to the typeset initial. An unresolved illustration
+   slug renders a visible placeholder, not an error:
    `<div class="illustration-placeholder" data-slug="<slug>">` reading "No image
    named <slug> yet" over "Click to add one". The copy is part of the render, so
    a `bml export` proof prints it too, and the page map warns of it (§5.4); the

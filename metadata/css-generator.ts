@@ -1,23 +1,47 @@
 // metadata/css-generator.ts — Metadata → CSS strings (spec §5.2). Pure, no I/O.
 import type { CssProps, ElementStyle, Metadata } from "./types.ts";
 import type { FolioPosition, NumberingStyle, RunningEntry } from "./types.ts";
+import { CLASS_NAME_RE, MATTER_TYPES } from "../parser/types.ts";
 
-const MATTER_KEYS = new Set([
-  "half-title",
-  "title-page",
-  "copyright",
-  "dedication",
-  "toc",
-  "foreword",
-  "preface",
-  "introduction",
-  "appendix",
-  "bibliography",
-  "index",
-  "colophon",
-]);
+const PROSE_MATTER = Object.keys(MATTER_TYPES).filter((t) =>
+  MATTER_TYPES[t]!.prose
+);
 
-const PROSE_MATTER = ["foreword", "preface", "introduction"];
+// The 16 CSS Paged Media margin boxes, in §4.8's order.
+export const MARGIN_AREAS = [
+  "top-left-corner",
+  "top-left",
+  "top-center",
+  "top-right",
+  "top-right-corner",
+  "right-top",
+  "right-middle",
+  "right-bottom",
+  "bottom-right-corner",
+  "bottom-right",
+  "bottom-center",
+  "bottom-left",
+  "bottom-left-corner",
+  "left-bottom",
+  "left-middle",
+  "left-top",
+] as const;
+
+// metadata.json is hand-editable and books arrive from other people's
+// folders, so a key or value is checked before it is written into CSS: one
+// that could end its declaration, rule or comment (or the <style> around it)
+// is left out, the way a browser drops a declaration it can't parse.
+const KEY_RE = /^[a-z][a-z0-9-]*$/; // element and sub-element keys
+const PROP_RE = /^-{0,2}[a-z][a-z0-9-]*$/; // property names, -vendor and --custom
+const AREAS: ReadonlySet<string> = new Set(MARGIN_AREAS);
+
+function safeValue(v: unknown): v is string {
+  return typeof v === "string" && !/[{};<]|\/\*/.test(v) &&
+    (v.split('"').length % 2 === 1) && (v.split("'").length % 2 === 1);
+}
+
+const safeProp = (k: string, v: unknown): v is string =>
+  PROP_RE.test(k) && safeValue(v);
 
 // Exported so the web style catalog matches clicks against the same selectors.
 export function selectorFor(key: string): string {
@@ -27,7 +51,10 @@ export function selectorFor(key: string): string {
   if (key === "prose-matter") {
     return PROSE_MATTER.map((t) => `.matter-${t}`).join(", ");
   }
-  if (MATTER_KEYS.has(key)) return `.matter-${key}`;
+  // `epigraph` styles the epigraph block, which a {matter: epigraph} holds.
+  if (Object.hasOwn(MATTER_TYPES, key) && key !== "epigraph") {
+    return `.matter-${key}`;
+  }
   return `.${key}`;
 }
 
@@ -35,7 +62,7 @@ function resolveFontValue(
   value: string,
   fonts: Record<string, string> | undefined,
 ): string {
-  if (fonts && Object.hasOwn(fonts, value)) return `"${fonts[value]}"`;
+  if (fonts && Object.hasOwn(fonts, value)) return JSON.stringify(fonts[value]);
   return value;
 }
 
@@ -47,6 +74,12 @@ function rule(
   const decls: string[] = [];
   const pseudo: string[] = [];
   for (const [prop, value] of Object.entries(props)) {
+    // `content` is written as a JSON string, so any text is safe in it.
+    if (
+      prop === "content" ? typeof value !== "string" : !safeProp(prop, value)
+    ) {
+      continue;
+    }
     if (prop === "content" && selector.endsWith(".leader")) {
       // TOC leaders repeat the string many times from base.css; hand it over
       // as a custom property instead of a single ::before content (spec §4.5).
@@ -82,7 +115,9 @@ function emitStyle(
   const nested: Array<[string, ElementStyle]> = [];
   for (const [prop, value] of Object.entries(style)) {
     if (typeof value === "string") flat[prop] = value;
-    else nested.push([prop, value]);
+    else if (KEY_RE.test(prop) && value && typeof value === "object") {
+      nested.push([prop, value]);
+    }
   }
   if (Object.keys(flat).length) out.push(rule(selector, flat, fonts));
   for (const [sub, subStyle] of nested) {
@@ -101,10 +136,10 @@ export function generateDomCSS(metadata: Metadata): string {
   const out: string[] = [];
   const fonts = metadata.fonts;
   for (const [key, style] of Object.entries(metadata.elements ?? {})) {
-    emitStyle(selectorFor(key), style, fonts, out);
+    if (KEY_RE.test(key)) emitStyle(selectorFor(key), style, fonts, out);
   }
   for (const [cls, props] of Object.entries(metadata.is ?? {})) {
-    out.push(rule(`.is-${cls}`, props, fonts));
+    if (CLASS_NAME_RE.test(cls)) out.push(rule(`.is-${cls}`, props, fonts));
   }
   return out.join("");
 }
@@ -211,15 +246,18 @@ export function generatePagedCSS(
   const page = metadata.page;
   if (page) {
     const decls: string[] = [];
-    if (page.size) decls.push(`  size: ${page.size};`);
-    if (page.margins?.top) decls.push(`  margin-top: ${page.margins.top};`);
-    if (page.margins?.bottom) {
+    const ok = (v: string | undefined): v is string => !!v && safeValue(v);
+    if (ok(page.size)) decls.push(`  size: ${page.size};`);
+    if (ok(page.margins?.top)) {
+      decls.push(`  margin-top: ${page.margins.top};`);
+    }
+    if (ok(page.margins?.bottom)) {
       decls.push(`  margin-bottom: ${page.margins.bottom};`);
     }
     if (decls.length) out.push(`@page {\n${decls.join("\n")}\n}\n`);
     const inside = page.margins?.inside;
     const outside = page.margins?.outside;
-    if (inside && outside) {
+    if (ok(inside) && ok(outside)) {
       out.push(
         `@page :right {\n  margin-left: ${inside};\n  margin-right: ${outside};\n}\n`,
       );
@@ -261,6 +299,7 @@ export function generatePagedCSS(
             ...cfg?.css,
           })
         ) {
+          if (!safeProp(k, v)) continue;
           decls.push(
             `    ${k}: ${
               k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
@@ -283,12 +322,13 @@ export function generatePagedCSS(
   ) => {
     const gap = metadata.running?.gap ?? DEFAULT_HEAD_GAP;
     for (const entry of entries ?? []) {
+      if (!AREAS.has(entry.area) || typeof entry.content !== "string") continue;
       const decls = [
         `    content: ${runningContent(entry.content, opts.bookTitle)};`,
       ];
       const props = { ...anchorToTextBlock(entry.area, gap), ...entry };
       for (const [k, v] of Object.entries(props)) {
-        if (k === "content" || k === "area") continue;
+        if (k === "content" || k === "area" || !safeProp(k, v)) continue;
         decls.push(
           `    ${k}: ${
             k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
@@ -317,7 +357,7 @@ export function generatePagedCSS(
       ...(metadata.running?.even ?? []),
     ]
   ) {
-    usedAreas.add(e.area);
+    if (AREAS.has(e.area)) usedAreas.add(e.area);
   }
   out.push(
     `@page display {\n${

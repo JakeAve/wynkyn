@@ -233,18 +233,41 @@ export interface LineBreakInline {
   kind: "linebreak";
 }
 
-// Matter types the generated contents never lists — display pages that carry
-// no entry of their own (spec §3.4.6). Shared with the renderer so the parser
-// can warn about a block that would silently vanish from the contents.
 // An `{is:}` name becomes a CSS class and selector (`.is-<name>`), so it is
 // held to the slug rule (§3.2.4).
 export const CLASS_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-export const DISPLAY_MATTER: ReadonlySet<string> = new Set([
-  "half-title",
-  "title-page",
-  "copyright",
-  "dedication",
-  "epigraph",
-  "toc",
-]);
+export interface MatterType {
+  // A titled block gets a contents row (§3.4.6); the parser warns when a
+  // listed block has no {title}, since it would silently vanish.
+  listed: boolean;
+  // Set on the display page: no folio, no running head (§4.7). The renderer
+  // classes the block `matter-display`, which base.css names the page on.
+  display: boolean;
+  // Styled together under the `prose-matter` key (§4.5).
+  prose: boolean;
+}
+
+// The one list of known matter types (§3.4, §3.7). The set is open: a type not
+// here is listed, set on ordinary pages, and styled under its own key.
+export const MATTER_TYPES: Readonly<Record<string, MatterType>> = {
+  "half-title": { listed: false, display: true, prose: false },
+  "title-page": { listed: false, display: true, prose: false },
+  copyright: { listed: false, display: true, prose: false },
+  dedication: { listed: false, display: true, prose: false },
+  epigraph: { listed: false, display: true, prose: false },
+  toc: { listed: false, display: false, prose: false },
+  foreword: { listed: true, display: false, prose: true },
+  preface: { listed: true, display: false, prose: true },
+  introduction: { listed: true, display: false, prose: true },
+  appendix: { listed: true, display: false, prose: false },
+  bibliography: { listed: true, display: false, prose: false },
+  index: { listed: true, display: false, prose: false },
+  colophon: { listed: false, display: true, prose: false },
+};
+
+const OPEN_TYPE: MatterType = { listed: true, display: false, prose: false };
+
+export function matterType(type: string): MatterType {
+  return Object.hasOwn(MATTER_TYPES, type) ? MATTER_TYPES[type]! : OPEN_TYPE;
+}

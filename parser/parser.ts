@@ -1,7 +1,7 @@
 // parser/parser.ts — parse(source): BmlDocument (spec §5.1). Line-based, never throws.
 import { parseSentinelLine, type SentinelTag } from "./sentinel.ts";
 import { parseInlines } from "./inline.ts";
-import { CLASS_NAME_RE, DISPLAY_MATTER } from "./types.ts";
+import { CLASS_NAME_RE, matterType } from "./types.ts";
 import type {
   BmlDocument,
   Break,
@@ -606,9 +606,8 @@ export function parse(
   popImplicitBlocks(lines.length);
 
   // §3.4.6/§3.4.7/§3.7: the generated contents lists only matter blocks that
-  // carry a {title}, so a block written without one silently disappears from
-  // it. A colophon is exempt — it is back matter but carries no heading by
-  // convention, and is not listed.
+  // carry a {title}, so a listed block written without one silently
+  // disappears from it. Unlisted types (the colophon among them) need none.
   const hasTitle = (m: MatterBlock) =>
     m.children.some((c) => c.kind === "component" && c.name === "title");
   for (const m of [...doc.frontMatter, ...doc.backMatter]) {
@@ -618,7 +617,7 @@ export function parse(
         m.line,
         "{matter: toc} has no {title} — the contents page will render without a heading",
       );
-    } else if (!DISPLAY_MATTER.has(m.type) && m.type !== "colophon") {
+    } else if (matterType(m.type).listed) {
       diag(
         m.line,
         `{matter: ${m.type}} has no {title} — it will not appear in the table of contents`,

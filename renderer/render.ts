@@ -1,5 +1,6 @@
 // renderer/render.ts — BmlDocument → semantic HTML (spec §5.3). Pure, no I/O.
-import { DISPLAY_MATTER } from "../parser/types.ts";
+import "./folios.js";
+import { matterType } from "../parser/types.ts";
 import type {
   BmlDocument,
   Chapter,
@@ -27,103 +28,15 @@ export interface RenderOptions {
   language?: string; // BCP 47 (spec §4.2); stamped on the article as `lang`
 }
 
+// folios.js is a classic script (toHtml inlines it), so its formatter hangs
+// off this global; importing it here keeps one formatter for pages and
+// chapters alike.
+declare const BookPageMap: {
+  formatNumber(n: number, style: NumberingStyle): string;
+};
+
 export function formatNumber(n: number, style: NumberingStyle): string {
-  switch (style) {
-    case "roman-upper":
-      return toRoman(n);
-    case "roman-lower":
-      return toRoman(n).toLowerCase();
-    case "alpha-upper":
-      return toAlpha(n);
-    case "alpha-lower":
-      return toAlpha(n).toLowerCase();
-    case "words":
-      return toWords(n);
-    case "none":
-      return "";
-    default:
-      return String(n);
-  }
-}
-
-function toRoman(n: number): string {
-  const table: Array<[number, string]> = [
-    [1000, "M"],
-    [900, "CM"],
-    [500, "D"],
-    [400, "CD"],
-    [100, "C"],
-    [90, "XC"],
-    [50, "L"],
-    [40, "XL"],
-    [10, "X"],
-    [9, "IX"],
-    [5, "V"],
-    [4, "IV"],
-    [1, "I"],
-  ];
-  let out = "";
-  for (const [v, s] of table) {
-    while (n >= v) {
-      out += s;
-      n -= v;
-    }
-  }
-  return out;
-}
-
-function toAlpha(n: number): string {
-  let out = "";
-  while (n > 0) {
-    n--;
-    out = String.fromCharCode(65 + (n % 26)) + out;
-    n = Math.floor(n / 26);
-  }
-  return out;
-}
-
-const ONES = [
-  "",
-  "One",
-  "Two",
-  "Three",
-  "Four",
-  "Five",
-  "Six",
-  "Seven",
-  "Eight",
-  "Nine",
-  "Ten",
-  "Eleven",
-  "Twelve",
-  "Thirteen",
-  "Fourteen",
-  "Fifteen",
-  "Sixteen",
-  "Seventeen",
-  "Eighteen",
-  "Nineteen",
-];
-const TENS = [
-  "",
-  "",
-  "Twenty",
-  "Thirty",
-  "Forty",
-  "Fifty",
-  "Sixty",
-  "Seventy",
-  "Eighty",
-  "Ninety",
-];
-
-// ponytail: spelled numbers stop at 99; a book with a hundred chapters gets digits.
-function toWords(n: number): string {
-  if (n < 1 || n >= 100) return String(n);
-  if (n < 20) return ONES[n] ?? String(n);
-  const tens = TENS[Math.floor(n / 10)] ?? "";
-  const ones = ONES[n % 10] ?? "";
-  return ones ? `${tens}-${ones}` : tens;
+  return BookPageMap.formatNumber(n, style);
 }
 
 export function escapeHtml(s: string): string {
@@ -559,7 +472,8 @@ function renderMatter(
   rawId: string,
 ): string {
   const id = escapeHtml(rawId);
-  const open = `<section class="matter matter-${escapeHtml(m.type)}${
+  const display = matterType(m.type).display ? " matter-display" : "";
+  const open = `<section class="matter matter-${escapeHtml(m.type)}${display}${
     zoneClass(zone)
   }" id="${id}"${dl(m)}>`;
   if (m.type === "toc") {
@@ -617,7 +531,7 @@ export function tocRows(doc: BmlDocument, opts: RenderOptions): TocRow[] {
   const ids = matterIds(doc);
   const matterRows = (blocks: MatterBlock[], cls: string) => {
     for (const m of blocks) {
-      if (DISPLAY_MATTER.has(m.type)) continue;
+      if (!matterType(m.type).listed) continue;
       const label = titleOf(m.children);
       if (label) rows.push({ cls, href: ids.get(m)!, label });
     }
