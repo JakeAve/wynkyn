@@ -2,7 +2,7 @@
 // app: Print sheets imposes the preview's pages onto sheet-sized print pages,
 // so printing to PDF gives one sheet side per page at the sheet size, the
 // layout sheets.pdf has; Print pages gives the pages as they are, book.pdf's.
-import { assertAlmostEquals, assertEquals } from "@std/assert";
+import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
 import { PDFDocument } from "pdf-lib";
 import { startServer } from "../../server/dev-server.ts";
@@ -60,6 +60,10 @@ Deno.test({
         await page.locator("#print-sheets .pagedjs_page").count(),
         slots.filter((t) => t.page !== null).length,
       );
+      // The clones sit in their render's scope, so the book's CSS reaches them.
+      const face = await page.locator("#print-sheets .pagedjs_page p").first()
+        .evaluate((p) => getComputedStyle(p).fontFamily);
+      assert(face.includes("EB Garamond"), `printed in ${face}`);
       const pdf = await PDFDocument.load(
         await page.pdf({ preferCSSPageSize: true, printBackground: true }),
       );
