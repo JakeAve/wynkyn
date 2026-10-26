@@ -159,3 +159,21 @@ Deno.test({
       );
     }),
 });
+
+Deno.test({
+  name: "the pages hide in Write only: Style shows them and ⌘. leaves them",
+  ignore: !hasChrome || !appBuilt,
+  fn: () =>
+    withApp(async (page) => {
+      const mode = (m: string) =>
+        page.locator(`#modes [data-mode="${m}"]`).click();
+      await page.keyboard.press("ControlOrMeta+Period");
+      assert((await panesClass(page)).includes("pages-hidden"));
+      await mode("style");
+      assert(!(await panesClass(page)).includes("pages-hidden"));
+      await page.keyboard.press("ControlOrMeta+Period");
+      assert(!(await panesClass(page)).includes("pages-hidden"));
+      await mode("write");
+      assert((await panesClass(page)).includes("pages-hidden"));
+    }),
+});

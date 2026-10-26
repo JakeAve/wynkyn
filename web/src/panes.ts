@@ -2,7 +2,7 @@
 // §7): the Contents toggle, Pages hidden by ⌘. alone, and the write pane and
 // the pages expanding from their top-right corner. Hidden columns persist
 // (localStorage tree-hidden, pages-hidden); the expanded pane persists per
-// mode (expanded:<mode>, "writing" | "pages" | "").
+// mode (expanded:<mode>, "writing" | "pages" | ""). Pages hide in Write only.
 import type { Mode } from "./preview.ts";
 import { $ } from "./dom.ts";
 
@@ -59,10 +59,19 @@ export function installPanes(deps: { mode(): Mode }): Panes {
       String(back || expanded() === "writing"),
     );
   };
-  const hide = (cls: "tree-hidden" | "pages-hidden", hidden: boolean) => {
-    panes.classList.toggle(cls, hidden);
-    store(cls, hidden ? "1" : "");
+  // The pages hide in Write only: Style and Publish work on the pages, and
+  // have no write pane to carry the way back.
+  const applyHidden = () => {
+    panes.classList.toggle("tree-hidden", store("tree-hidden") === "1");
+    panes.classList.toggle(
+      "pages-hidden",
+      deps.mode() === "write" && store("pages-hidden") === "1",
+    );
     syncButtons();
+  };
+  const hide = (cls: "tree-hidden" | "pages-hidden", hidden: boolean) => {
+    store(cls, hidden ? "1" : "");
+    applyHidden();
   };
   const show = (pane: Pane | "") => {
     panes.classList.toggle("expand-writing", pane === "writing");
@@ -80,6 +89,7 @@ export function installPanes(deps: { mode(): Mode }): Panes {
   };
   // Only Write has a write pane; Style and Publish expand the pages alone.
   const restore = () => {
+    applyHidden();
     const saved = store(`expanded:${deps.mode()}`);
     show(
       saved === "pages" || (saved === "writing" && deps.mode() === "write")
@@ -87,10 +97,11 @@ export function installPanes(deps: { mode(): Mode }): Panes {
         : "",
     );
   };
-  const togglePages = () =>
-    hide("pages-hidden", !panes.classList.contains("pages-hidden"));
-  hide("tree-hidden", store("tree-hidden") === "1");
-  hide("pages-hidden", store("pages-hidden") === "1");
+  const togglePages = () => {
+    if (deps.mode() === "write") {
+      hide("pages-hidden", !panes.classList.contains("pages-hidden"));
+    }
+  };
   restore();
   new MutationObserver(restore).observe(document.documentElement, {
     attributeFilter: ["data-mode"],

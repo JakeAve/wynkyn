@@ -564,7 +564,7 @@ changing, right is the result.
 - **Gone from the toolbar:** the Pages toggle (⌘. stays as a shortcut), focus,
   and every Write-only control. While the pages are hidden, the write pane's
   corner button shows the return state, "Show the pages (⌘.)", and brings them
-  back.
+  back. The pages hide in Write only; Style and Publish always show them.
 
 ## 8. The write pane (planned)
 

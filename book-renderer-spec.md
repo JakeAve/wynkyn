@@ -1957,15 +1957,16 @@ and the mode persists across reloads:
 The toolbar holds only what is global: the Contents toggle at the far left
 before the crumb (⌘\), drawn as a panel icon whose side is half filled while the
 left column shows; the crumb; the modes; and the light/dark toggle alone at the
-right. The pages hide with ⌘. (no button; while they are hidden the write pane's
-corner button reads "Show the pages" and brings them back); both choices
-persist. The crumb reads library / book / edition. The library step, muted so
-the title leads, is an icon for where the books live (a folder on this device,
-or this browser) and its name (the folder's, or "This browser"); its tooltip
-says where, and a click goes back to the Welcome (§7.9) to pick another. The dev
-server has only its `books/`, so there the crumb starts at the book. Gutters
-between the columns drag to resize them. A hidden preview still lays out (it
-leaves the grid, never `display: none`), since Paged.js paginates by measuring.
+right. In Write the pages hide with ⌘. (no button; while they are hidden the
+write pane's corner button reads "Show the pages" and brings them back); Style
+and Publish always show them. Both choices persist. The crumb reads library /
+book / edition. The library step, muted so the title leads, is an icon for where
+the books live (a folder on this device, or this browser) and its name (the
+folder's, or "This browser"); its tooltip says where, and a click goes back to
+the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
+there the crumb starts at the book. Gutters between the columns drag to resize
+them. A hidden preview still lays out (it leaves the grid, never
+`display: none`), since Paged.js paginates by measuring.
 
 Each pane carries its own controls in a header along its top: the write pane
 (Write's middle column) has the text view (§7.3), the pages pane (the right
