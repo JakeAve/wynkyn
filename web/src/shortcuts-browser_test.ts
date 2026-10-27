@@ -12,6 +12,7 @@ const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
 // The demo book open in Write, as on Windows.
 async function withApp(
   fn: (page: Page, saved: (has: string) => Promise<void>) => Promise<void>,
+  extra = "", // appended to the manuscript
 ): Promise<void> {
   const root = await Deno.makeTempDir();
   const fixture = new URL("../../server/testdata/demo-book", import.meta.url);
@@ -19,6 +20,10 @@ async function withApp(
     args: ["-R", fixture.pathname, root],
   }).output();
   assert(cp.success, "copy the fixture book");
+  if (extra) {
+    const md = `${root}/demo-book/manuscript.md`;
+    await Deno.writeTextFile(md, (await Deno.readTextFile(md)) + extra);
+  }
   const server = await startServer({ booksRoot: root, port: 0 });
   const browser = await chromium.launch({ channel: "chrome" });
   try {
@@ -166,4 +171,89 @@ Deno.test({
         null,
       );
     }),
+});
+
+// Three chapters, each running over several pages.
+const long = (
+  "The hallway smelt of boiled cabbage and old rag mats. ".repeat(10) + "\n\n"
+).repeat(12);
+const chapters =
+  ["two", "three"].map((c) =>
+    `\n${long}\n\n{chapter: ${c}}\n{title}\nChapter ${c}\n`
+  ).join("") + `\n${long}\n`;
+
+Deno.test({
+  name: "the new commands: theme, page and chapter steps, zoom, Style views",
+  ignore: !hasChrome || !appBuilt,
+  fn: () =>
+    withApp(async (page) => {
+      const theme = () =>
+        page.evaluate(() => document.documentElement.dataset.theme);
+      const before = await theme();
+      await page.keyboard.press("Control+Shift+L");
+      assert((await theme()) !== before, "Ctrl+Shift+L flips the theme");
+
+      // Laid out to the end: the last chapter is in, and the count holds.
+      await page.locator("#preview .chapter", { hasText: "Chapter three" })
+        .first().waitFor();
+      for (let n = -1, was = -2; n !== was;) {
+        was = n;
+        await page.waitForTimeout(300);
+        n = await page.locator("#preview .pagedjs_page").count();
+      }
+      // The footer's indicator names page n (it redraws a frame after a scroll).
+      const at = (n: number) =>
+        page.waitForFunction(
+          (n) =>
+            document.getElementById("page-indicator")!.textContent
+              ?.startsWith(`Page ${n} `),
+          n,
+        );
+      await at(1);
+      await page.keyboard.press("Alt+BracketRight");
+      await at(2);
+      // Each chapter press lands on the next opening, centred in the pane.
+      for (const id of ["two", "three"]) {
+        await page.keyboard.press("Alt+Shift+BracketRight");
+        const off = await page.evaluate((id) => {
+          const c = document.getElementById("preview")!
+            .getBoundingClientRect();
+          const p = [
+            ...document.querySelectorAll(
+              "#preview > :not(.preview-stage) .chapter:not([data-split-from])",
+            ),
+          ].find((ch) => ch.textContent?.includes(`Chapter ${id}`))!
+            .closest(".pagedjs_page")!.getBoundingClientRect();
+          return Math.abs((p.top + p.bottom) / 2 - (c.top + c.bottom) / 2);
+        }, id);
+        assert(off < 40, `chapter ${id} is ${off}px off centre`);
+      }
+      await page.keyboard.press("Alt+Shift+BracketLeft");
+      await page.keyboard.press("Alt+Shift+BracketLeft");
+      await page.keyboard.press("Alt+BracketLeft");
+      await at(1);
+
+      const pct = page.locator('#zoom [data-zoom="menu"]');
+      assertEquals(await pct.textContent(), "100%");
+      await page.keyboard.press("Control+Equal");
+      assert(parseInt((await pct.textContent()) ?? "") > 100, "zoomed in");
+      await page.keyboard.press("Control+0");
+      assertEquals(await pct.textContent(), "100%");
+
+      await page.keyboard.press("Control+2");
+      await page.keyboard.press("Control+Shift+1");
+      await page.locator('#style-nav [aria-current="true"]', {
+        hasText: "Theme",
+      }).waitFor();
+      await page.keyboard.press("Control+Shift+4");
+      await page.locator('#style-nav [aria-current="true"]', {
+        hasText: "Body",
+      }).waitFor();
+      // Print pages and Export EPUB exist only in Publish, labelled there.
+      await page.keyboard.press("Control+3");
+      await page.locator('[data-command="print-pages"][title="Ctrl+P"]')
+        .waitFor();
+      await page.locator('[data-command="export-epub"][title="Ctrl+Shift+E"]')
+        .waitFor();
+    }, chapters),
 });

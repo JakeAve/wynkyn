@@ -486,6 +486,35 @@
               </div>
             </form>
           </dialog>
+          <dialog id="shortcuts" class="ask" open
+            aria-labelledby="shortcuts-title">
+            <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+            <div class="field"><input id="shortcuts-filter" type="search"
+                placeholder="Filter shortcuts…" aria-label="Filter shortcuts">
+            </div>
+            <div id="shortcuts-list">
+              <div class="nh">Panes</div>
+              <button type="button" class="sc-row" aria-pressed="false"><span
+                  class="sc-label">Contents</span><span class="sc-hint">was
+                  Ctrl+B</span><kbd>Ctrl+\</kbd></button>
+              <button type="button" class="sc-row" aria-pressed="true"><span
+                  class="sc-label">Pages (Write)</span><span
+                  class="sc-hint">Press keys · Esc cancels · Backspace default ·
+                  Delete none</span></button>
+              <div class="nh">Preview</div>
+              <button type="button" class="sc-row" aria-pressed="false"><span
+                  class="sc-label">Next page</span><kbd>Alt+]</kbd></button>
+              <button type="button" class="sc-row" aria-pressed="false"><span
+                  class="sc-label">Inspect</span><span
+                  class="sc-hint">none</span></button>
+            </div>
+            <div class="ask-foot">
+              <p id="shortcuts-note"
+                class="hint sw-err">Ctrl+W closes the browser
+                tab; the page can't use it.</p>
+              <button class="btn" type="button">Done</button>
+            </div>
+          </dialog>
         </div>
       </section>
 

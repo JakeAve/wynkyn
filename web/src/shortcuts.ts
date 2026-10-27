@@ -6,7 +6,7 @@ import type { EditorView } from "@codemirror/view";
 import { combo, type Command, type Keymap, label, resolve } from "./keys.ts";
 import { insertSnippet, openPalette } from "./editor-insert.ts";
 import { SNIPPETS } from "./snippets.ts";
-import type { Mode } from "./preview.ts";
+import { type Mode, stepPreview } from "./preview.ts";
 import type { Panes } from "./panes.ts";
 import type { TextView } from "./text-view.ts";
 import { store } from "./dom.ts";
@@ -29,6 +29,12 @@ export interface ShortcutDeps {
   textView: TextView;
   inspect: { escape(): boolean };
   editor(): EditorView;
+  /** The pages pane, `#preview`. */
+  preview: HTMLElement;
+  /** The new-book dialog; `true` lets it be cancelled. */
+  createManuscript(cancelable: boolean): void;
+  /** The Style/Publish panel, built on first use. */
+  ensureConfigPanel(): Promise<{ open(view: string): void } | null>;
 }
 
 // Open popups esc closes first: a dialog, the find bar, completions, the
@@ -66,6 +72,36 @@ function table(d: ShortcutDeps): Command[] {
     keys,
     when: write,
     run: () => insertSnippet(d.editor(), SNIPPETS.find((s) => s.label === id)!),
+  });
+  const switcher = button("#book-switcher");
+  const zoomIn = button('[data-zoom="in"]');
+  const step = (
+    id: string,
+    label: string,
+    keys: string,
+    dir: 1 | -1,
+    unit: "page" | "chapter",
+  ): Command => ({
+    id,
+    label,
+    section: "Preview",
+    keys,
+    when: () => d.preview.checkVisibility(),
+    run: () => stepPreview(d.preview, dir, unit),
+  });
+  const view = (
+    id: string,
+    label: string,
+    nav: string,
+    n: string,
+  ): Command => ({
+    id,
+    label,
+    section: "Style",
+    keys: `mod+shift+${n}`,
+    mac: `alt+cmd+${n}`,
+    when: () => d.mode() === "style",
+    run: () => void d.ensureConfigPanel().then((p) => p?.open(nav)),
   });
   return [
     mode("write", "Write", "mod+1"),
@@ -116,6 +152,99 @@ function table(d: ShortcutDeps): Command[] {
       when: write,
       run: () => openPalette(d.editor()),
     },
+    {
+      id: "theme",
+      label: "Light / dark",
+      section: "App",
+      keys: "mod+shift+l",
+      ...button("#theme-toggle"),
+    },
+    {
+      id: "switch-book",
+      label: "Switch book",
+      section: "Book",
+      keys: "mod+o",
+      ...switcher,
+    },
+    {
+      id: "new-book",
+      label: "New book",
+      section: "Book",
+      // ponytail: Ctrl+Alt is AltGr on Windows, so on some layouts this types
+      // a character (Polish ń) instead; rebindable in the dialog.
+      keys: "mod+alt+n",
+      when: switcher.when,
+      run: () => d.createManuscript(true),
+    },
+    // Only while the zoom buttons are shown (the pages are); otherwise the
+    // browser zooms as usual.
+    {
+      id: "zoom-in",
+      label: "Zoom in",
+      section: "Preview",
+      keys: "mod+equal",
+      ...zoomIn,
+    },
+    {
+      id: "zoom-out",
+      label: "Zoom out",
+      section: "Preview",
+      keys: "mod+minus",
+      ...button('[data-zoom="out"]'),
+    },
+    // Fit spread sits in the zoom menu, shown or not.
+    {
+      id: "zoom-fit",
+      label: "Fit spread",
+      section: "Preview",
+      keys: "mod+0",
+      when: zoomIn.when,
+      run: () =>
+        document.querySelector<HTMLElement>('[data-fit="spread"]')?.click(),
+    },
+    step("page-next", "Next page", "alt+bracketright", 1, "page"),
+    step("page-prev", "Previous page", "alt+bracketleft", -1, "page"),
+    step(
+      "chapter-next",
+      "Next chapter",
+      "alt+shift+bracketright",
+      1,
+      "chapter",
+    ),
+    step(
+      "chapter-prev",
+      "Previous chapter",
+      "alt+shift+bracketleft",
+      -1,
+      "chapter",
+    ),
+    {
+      id: "inspect",
+      label: "Inspect",
+      section: "Preview",
+      keys: "mod+quote",
+      ...button("#inspect"),
+    },
+    // The buttons exist only in Publish, so being shown scopes them.
+    {
+      id: "print-pages",
+      label: "Print pages",
+      section: "Publish",
+      keys: "mod+p",
+      ...button('[data-command="print-pages"]'),
+    },
+    {
+      id: "export-epub",
+      label: "Export EPUB",
+      section: "Publish",
+      keys: "mod+shift+e",
+      ...button('[data-command="export-epub"]'),
+    },
+    // macOS keeps ⌘⇧3 and ⌘⇧4 for screenshots, so the Mac set is ⌥⌘1–4.
+    view("style-theme", "Theme", "themes", "1"),
+    view("style-page", "Page size & margins", "page", "2"),
+    view("style-fonts", "Fonts", "fonts", "3"),
+    view("style-body", "Body", "body", "4"),
   ];
 }
 

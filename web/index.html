@@ -93,6 +93,7 @@
         </button>
         <span id="library-slash" class="slash" hidden>/</span>
         <button id="book-switcher" class="btn" title="Switch book"
+          data-command="switch-book"
           aria-haspopup="dialog" aria-expanded="false">
           <span id="book-name"></span>
           <svg class="chev tico" viewBox="0 0 16 16">
@@ -119,7 +120,8 @@
           data-command="mode-publish" title="Publish">Publish</button>
       </span>
       <span class="spacer"></span>
-      <button id="theme-toggle" class="btn" title="Switch light/dark">
+      <button id="theme-toggle" class="btn" title="Switch light/dark"
+        data-command="theme">
         <svg class="icon-moon" viewBox="0 0 16 16">
           <path d="M13.2 9.4A5.6 5.6 0 0 1 6.6 2.8a5.6 5.6 0 1 0 6.6 6.6z" />
         </svg>
@@ -248,16 +250,19 @@
         <div class="pane-head">
           <div id="zoom" class="zoom" role="group" aria-label="Zoom">
             <button type="button" class="btn sm icon" data-zoom="out"
-              title="Zoom out (Ctrl/⌘-scroll or pinch zooms too)"
+              data-command="zoom-out"
+              title="Zoom out; Ctrl/⌘-scroll or pinch zooms too"
               aria-label="Zoom out">−</button>
             <button type="button" class="btn sm" data-zoom="menu"
               popovertarget="zoom-menu" title="Zoom: fit the spread or a page"
               aria-haspopup="menu">100%</button>
             <button type="button" class="btn sm icon" data-zoom="in"
-              title="Zoom in (Ctrl/⌘-scroll or pinch zooms too)"
+              data-command="zoom-in"
+              title="Zoom in; Ctrl/⌘-scroll or pinch zooms too"
               aria-label="Zoom in">+</button>
             <div id="zoom-menu" class="menu" popover role="menu">
-              <button type="button" role="menuitemradio" data-fit="spread">
+              <button type="button" role="menuitemradio" data-fit="spread"
+                data-command="zoom-fit">
                 <svg>
                   <use href="#check" />
                 </svg>Fit spread<span class="d">100%</span>
@@ -270,7 +275,7 @@
             </div>
           </div>
           <button type="button" id="inspect" class="btn sm icon"
-            aria-pressed="false"
+            data-command="inspect" aria-pressed="false"
             title="Inspect: point at anything on the pages to see what it is; esc leaves"
             aria-label="Inspect">
             <svg>

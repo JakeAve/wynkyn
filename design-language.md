@@ -546,8 +546,9 @@ control's tooltip and `kbd` show its key as the platform writes it
 (Ctrl+Shift+F, ⌘⇧F), filled from its `data-command` (`web/src/shortcuts.ts`).
 
 - **Toolbar** (`--h-toolbar`): left, the Contents toggle (Mod+\) and the crumb
-  (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`); centre,
-  Write / Style / Publish (Mod+1–3); right, the theme toggle alone. The save
+  (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`; the book
+  switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
+  Publish (Mod+1–3); right, the theme toggle alone (Mod+Shift+L). The save
   status sits after the crumb.
 - **Pane header** (`--h-pane` at least, `.pane-head`): the pane's own controls
   at left in small sizes, `--s-2` apart; its expand button
@@ -555,10 +556,16 @@ control's tooltip and `kbd` show its key as the platform writes it
   .expand`) pinned to the top-right corner even when the
   controls wrap. A hairline below; the pages pane's header sits on `--desk` with
   none. The pages pane's controls sit at the right instead, beside expand: zoom
-  (`#zoom`), `−` and `+` as small icon buttons around the percentage, a small
-  ghost in tabular figures that opens the zoom menu (§6.9); then Inspect
-  (`#inspect`), a small icon toggle (DevTools' picker arrow) that takes the red
-  wash while on. Both hidden in Publish.
+  (`#zoom`), `−` and `+` as small icon buttons around the percentage (Mod+−,
+  Mod+=; Mod+0 fits the spread), a small ghost in tabular figures that opens the
+  zoom menu (§6.9); then Inspect (`#inspect`, Mod+'), a small icon toggle
+  (DevTools' picker arrow) that takes the red wash while on. Both hidden in
+  Publish, where the zoom keys stay the browser's.
+- **Keys without a control of their own:** Alt+] and Alt+[ step the pages to the
+  next or previous spread, Alt+Shift+] and Alt+Shift+[ to the next or previous
+  chapter or part opening; in Style, Mod+Shift+1–4 open Theme, Page size &
+  margins, Fonts and Body (⌥⌘1–4 on a Mac, where ⌘⇧3 and ⌘⇧4 take screenshots);
+  in Publish, Mod+P prints the pages and Mod+Shift+E exports the EPUB.
 - **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; the writer's
   cell opens with the stats line (§8.3), the session count in `--acc-ink` once
   non-zero, then Go to style with a dotted underline.

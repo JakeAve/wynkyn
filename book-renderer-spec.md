@@ -1960,14 +1960,15 @@ table (`web/src/shortcuts.ts`), and the chrome labels them for the platform
 
 The toolbar holds only what is global: the Contents toggle at the far left
 before the crumb (Mod+\), drawn as a panel icon whose side is half filled while
-the left column shows; the crumb; the modes; and the light/dark toggle alone at
-the right. In Write the pages hide with Mod+. (no button; while they are hidden
-the write pane's corner button reads "Show the pages" and brings them back);
-Style and Publish always show them. Both choices persist. The crumb reads
-library / book / edition. The library step, muted so the title leads, is an icon
-for where the books live (a folder on this device, or this browser) and its name
-(the folder's, or "This browser"); its tooltip says where, and a click goes back
-to the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
+the left column shows; the crumb (Mod+O switches the book, Mod+Alt+N starts a
+new one); the modes; and the light/dark toggle alone at the right (Mod+Shift+L).
+In Write the pages hide with Mod+. (no button; while they are hidden the write
+pane's corner button reads "Show the pages" and brings them back); Style and
+Publish always show them. Both choices persist. The crumb reads library / book /
+edition. The library step, muted so the title leads, is an icon for where the
+books live (a folder on this device, or this browser) and its name (the
+folder's, or "This browser"); its tooltip says where, and a click goes back to
+the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
 there the crumb starts at the book. Gutters between the columns drag to resize
 them. A hidden preview still lays out (it leaves the grid, never
 `display: none`), since Paged.js paginates by measuring.
@@ -2197,9 +2198,9 @@ Includes:
   derives to), Signatures (hidden for loose leaves), and Print (auto duplex or
   by hand, the by-hand flip and back order, and the Print sheets buttons, §7.7);
   **PDF**, the pages in reading order at the page size, one per printed page
-  (Print pages; Save as PDF gives the file `book.pdf` would be); and **E-book**
-  (Export EPUB, §7.8). All printing runs in the browser; proofs and the sheet
-  PDFs on disk are `bml
+  (Print pages, Mod+P; Save as PDF gives the file `book.pdf` would be); and
+  **E-book** (Export EPUB, Mod+Shift+E, §7.8). All printing runs in the browser;
+  proofs and the sheet PDFs on disk are `bml
   export`'s
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a
@@ -2207,6 +2208,9 @@ Includes:
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)
+- Style's Book group opens from the keyboard too: Mod+Shift+1–4 for Theme, Page
+  size & margins, Fonts and Body (⌥⌘1–4 on a Mac, where ⌘⇧3 and ⌘⇧4 take
+  screenshots).
 - A **Theme** view, first in Style's Book group: a grid of cards, one per preset
   theme (§4.13), each drawn in the theme's own fonts (its name in the display
   face, a chapter label, a line of body text and the description), in name
@@ -2243,28 +2247,35 @@ width (§7.1).
 **Zoom.** At 100% a spread fits the pane's width (never larger than 1:1). The
 header's `−` `100%` `+`, just before the expand button, steps by 10% from 50% to
 400%; the percentage opens a menu with Fit spread (100%) and Fit page (one whole
-page fits the pane, centred). Mod-scroll or a trackpad pinch over the pages
-zooms continuously between 50% and 400% around the pointer; the buttons and menu
-zoom around the pane's centre. Past 100% the spread stays side by side and the
-pane scrolls sideways. Zoom is the reader's own (remembered in the browser,
-`preview-zoom`), not the book's: it is CSS zoom over a layout made at 1:1, so it
-never re-renders and never reaches paper. The sheet view in Publish has no zoom.
+page fits the pane, centred); Mod+= and Mod+− step, Mod+0 fits the spread, while
+the pages are shown (otherwise the browser zooms). Mod-scroll or a trackpad
+pinch over the pages zooms continuously between 50% and 400% around the pointer;
+the buttons and menu zoom around the pane's centre. Past 100% the spread stays
+side by side and the pane scrolls sideways. Zoom is the reader's own (remembered
+in the browser, `preview-zoom`), not the book's: it is CSS zoom over a layout
+made at 1:1, so it never re-renders and never reaches paper. The sheet view in
+Publish has no zoom.
 
-**Inspect.** The header's Inspect toggle, after zoom, turns the pages into
-something to point at, as a browser's element picker does; it starts off and
-isn't remembered, and clicks on the pages then belong to it rather than going to
-the source line or the style. Pointing at a block outlines it in blue, shades
-its space above and below (amber), its first-line indent (green) and its content
-(light blue), and tags it with its name, its size in the book's own units (mm
-when the page size is metric, else inches) and its face and size of type. A
-click pins it, with a minium outline: the block, or a span clicked directly (an
-italic, a cross-reference, a drop cap, a footnote reference), or, below a page's
-last block, the empty space that makes the page short. With something pinned,
-holding ⌥ while pointing at something else draws the distances between them. A
-running head or page number the page map dropped (a chapter opening, a display
-or blank page) shows as a dashed ghost in its margin box, and can be pinned too.
-A click on the desk unpins; esc unpins, then leaves Inspect, then returns an
-expanded pane.
+**Turning pages.** Alt+] and Alt+[ move to the next or previous page, the next
+spread when pages sit side by side; Alt+Shift+] and Alt+Shift+[ to the next or
+previous chapter or part opening. The page lands centred, so the footer's
+indicator names it.
+
+**Inspect.** The header's Inspect toggle (Mod+'), after zoom, turns the pages
+into something to point at, as a browser's element picker does; it starts off
+and isn't remembered, and clicks on the pages then belong to it rather than
+going to the source line or the style. Pointing at a block outlines it in blue,
+shades its space above and below (amber), its first-line indent (green) and its
+content (light blue), and tags it with its name, its size in the book's own
+units (mm when the page size is metric, else inches) and its face and size of
+type. A click pins it, with a minium outline: the block, or a span clicked
+directly (an italic, a cross-reference, a drop cap, a footnote reference), or,
+below a page's last block, the empty space that makes the page short. With
+something pinned, holding ⌥ while pointing at something else draws the distances
+between them. A running head or page number the page map dropped (a chapter
+opening, a display or blank page) shows as a dashed ghost in its margin box, and
+can be pinned too. A click on the desk unpins; esc unpins, then leaves Inspect,
+then returns an expanded pane.
 
 What is pinned opens the drawer under the pages: a breadcrumb of where it sits
 (Body › the chapter's title › Paragraph › Line 3; each crumb pins that), the

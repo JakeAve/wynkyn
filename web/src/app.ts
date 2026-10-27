@@ -904,6 +904,9 @@ async function main(): Promise<void> {
     textView,
     inspect,
     editor: () => editor,
+    preview: $("preview"),
+    createManuscript,
+    ensureConfigPanel,
   });
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
