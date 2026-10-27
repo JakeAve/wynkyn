@@ -36,8 +36,9 @@ Deno.test({
       assertEquals(await zoom.innerText(), "100%");
       const at100 = await rect(page, 1);
 
-      await page.getByRole("button", { name: "Zoom in" }).click();
-      await page.getByRole("button", { name: "Zoom in" }).click();
+      for (let i = 0; i < 10; i++) {
+        await page.getByRole("button", { name: "Zoom in" }).click();
+      }
       assertEquals(await zoom.innerText(), "200%");
       const at200 = await rect(page, 1);
       assertAlmostEquals(at200.width, 2 * at100.width, 1);
