@@ -6,7 +6,13 @@
 // the first signature drawn as it prints into the sheet view (R7), and printing
 // from this browser. Both write the `page` section; Publish reads the trim size
 // the Page tab set and links back to it.
-import type { Duplex, Flip, Fold, PageConfig } from "../../metadata/types.ts";
+import type {
+  Duplex,
+  Flip,
+  Fold,
+  PageConfig,
+  PageMarks,
+} from "../../metadata/types.ts";
 import {
   DEFAULT_SIZE,
   fmtLength,
@@ -210,6 +216,13 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       ? `Auto: ${FOLD_LABELS[setup.fold].toLowerCase()}`
       : "Auto";
     signatures.hidden = setup.error === null && setup.fold === "leaves";
+    // Each mark's row shows only while marks are on and it applies to the fold.
+    const fold = setup.error === null ? setup.fold : null;
+    const on = page.marks?.show === true;
+    foldsRow.hidden = sewingRow.hidden = !on || fold === "leaves";
+    cutsRow.hidden = !on || (fold !== "cut" && fold !== "leaves");
+    stationsRow.hidden = kettleRow.hidden = sewingRow.hidden ||
+      page.marks?.sewing === false;
   };
   const v = makeView(ctx, redraw);
   const save = () => v.changed("page");
@@ -344,6 +357,107 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
     ),
     folioRow,
   ]);
+
+  // Binding marks (§4.3): `show` is the master and the rest stay stored while
+  // it is off. A mark is on while unset, so switching one on deletes its key,
+  // and `marks` goes once nothing is left in it.
+  type Sewing = Exclude<NonNullable<PageMarks["sewing"]>, boolean>;
+  const tidy = (m: PageMarks) => {
+    if (!Object.keys(m).length) delete page.marks;
+    save();
+  };
+  // Turning sewing off and on again brings back its stations and kettle.
+  let lastSewing = typeof page.marks?.sewing === "object"
+    ? page.marks.sewing
+    : undefined;
+  const markRow = (label: string, key: "folds" | "cuts" | "sewing") =>
+    v.mark(
+      row(
+        label,
+        switchInput(label, page.marks?.[key] !== false, (on) => {
+          const m = page.marks ??= {};
+          if (!on) m[key] = false;
+          else if (key === "sewing" && lastSewing) m.sewing = lastSewing;
+          else delete m[key];
+          tidy(m);
+        }),
+      ),
+      () => page.marks?.[key] !== undefined,
+    );
+  // A stepper writes sewing as an object; emptied, it goes back to unset.
+  const sewing = (edit: (s: Sewing) => void) => {
+    const m = page.marks ??= {};
+    const s = typeof m.sewing === "object" ? m.sewing : {};
+    edit(s);
+    lastSewing = Object.keys(s).length ? s : undefined;
+    if (lastSewing) m.sewing = lastSewing;
+    else delete m.sewing;
+    tidy(m);
+  };
+  const foldsRow = markRow("Fold lines", "folds");
+  const cutsRow = markRow("Cut marks", "cuts");
+  const sewingRow = markRow("Sewing stations", "sewing");
+  const stationsRow = v.mark(
+    row(
+      "Stations",
+      stepper({
+        value: lastSewing?.stations?.toString(),
+        placeholder: "3",
+        unit: "",
+        label: "Stations",
+        onChange: (n) => {
+          if (n !== undefined && !Number.isInteger(Number(n))) return false;
+          sewing((s) => {
+            if (n === undefined) delete s.stations;
+            else s.stations = Number(n);
+          });
+        },
+      }),
+    ),
+    () =>
+      typeof page.marks?.sewing === "object" &&
+      page.marks.sewing.stations !== undefined,
+  );
+  const kettleRow = v.mark(
+    row(
+      "Kettle stitch",
+      stepper({
+        value: lastSewing?.kettle,
+        placeholder: "0.5in",
+        label: "Kettle stitch",
+        onChange: (k) =>
+          sewing((s) => {
+            if (k === undefined) delete s.kettle;
+            else s.kettle = k;
+          }),
+      }),
+    ),
+    () =>
+      typeof page.marks?.sewing === "object" &&
+      page.marks.sewing.kettle !== undefined,
+  );
+  const marks = section("Binding marks", "marks", [
+    v.mark(
+      row(
+        "Binding marks",
+        switchInput("Binding marks", page.marks?.show === true, (on) => {
+          (page.marks ??= {}).show = on;
+          save();
+        }),
+      ),
+      () => page.marks?.show !== undefined,
+    ),
+    foldsRow,
+    cutsRow,
+    sewingRow,
+    stationsRow,
+    kettleRow,
+    el(
+      "p",
+      "hint",
+      "Marks print on the sheets only: fold lines on the fronts, sewing dots on each signature's centre fold.",
+    ),
+  ]);
   redraw();
 
   return [
@@ -365,6 +479,7 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       readout,
     ]),
     signatures,
+    marks,
     printing.sec,
     pagesSection(ctx),
     ebookSection(ctx),
