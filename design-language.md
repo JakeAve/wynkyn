@@ -491,11 +491,11 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   hairlines bleeding to the edges. Optional small-caps heading. Used by: the
   book and edition switcher (`#switcher`), the font picker (`.fontpop`), `{`
   completions (`.cm-tooltip-autocomplete`), ⌘K (`.cm-bml-palette`), the wrap bar
-  and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling with the Prose
-  view; the pages' zoom menu (`.menu`, a native popover of `menuitemradio`
-  rows). Fields inside a popover are §6.3 frames (focus: `--acc` border and
-  ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but its fields
-  and pressed options follow the same rules.
+  and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write
+  pane's header (`.tvpop`); the pages' zoom menu (`.menu`, a native popover of
+  `menuitemradio` rows). Fields inside a popover are §6.3 frames (focus: `--acc`
+  border and ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but
+  its fields and pressed options follow the same rules.
 - **Completion row:** a sentinel's name in `--f-mono` `--fs-sm` `--acc-ink`, a
   7rem column; description `--muted`; how it closes (`{/quote}`, "wraps", "—")
   in mono `--fs-2xs` `--muted` at the right. An image's row is a thumbnail, its
@@ -540,9 +540,9 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   ghost in tabular figures that opens the zoom menu (§6.9); then Inspect
   (`#inspect`), a small icon toggle (DevTools' picker arrow) that takes the red
   wash while on. Both hidden in Publish.
-- **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; Go to style
-  with a dotted underline; the session count in `--acc-ink` once non-zero
-  (planned: there is no session count yet).
+- **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; the writer's
+  cell opens with the stats line (§8.3), the session count in `--acc-ink` once
+  non-zero, then Go to style with a dotted underline.
 
 ### 6.12 Empty state
 
@@ -583,23 +583,23 @@ marks' colours (§2.4).
 The three-column rule stands: left is where you are, middle is what you're
 changing, right is the result.
 
-- **Pane headers.** Write pane: Prose | Source, Aa, Spelling at left; expand at
-  right (until the Prose view lands, the text view's Serif/Sans/Mono, size, Hide
-  markup and Spelling sit there). Pages pane: zoom (`−` `100%` `+`), Inspect,
-  then expand, at right; Publish shows the sheets, so expand alone. The style
-  panel keeps its view heading inside.
+- **Pane headers.** Write pane: Prose | Source (a small seg), Aa and Spelling
+  (small ghost buttons opening §6.9 popovers) at left; expand at right. Pages
+  pane: zoom (`−` `100%` `+`), Inspect, then expand, at right; Publish shows the
+  sheets, so expand alone. The style panel keeps its view heading inside.
 - **Expand.** The write pane and the pages pane each expand from their top-right
   corner (arrows out; arrows in, in `--acc-ink`, while expanded).
   - Expanding the **writing** hides the outline and the pages. The text keeps
     its measure, the margins widen so notes are written out, and the toolbar,
     footer and pane header (except the expand button) fade while typing and
-    return when the mouse moves (a control focused by Tab stays visible). (The
-    widened margins wait for Prose, §8.1.)
+    return when the mouse moves (a control focused by Tab stays visible). The
+    writing grows to 19 (§3) with its measure; the margins are §8.1's.
   - Expanding the **pages** shows the spread larger, nothing else. Same in Style
     and Publish.
   - In either, the mouse at the left edge slides the outline in over the view
     (Write's outline, or the Style / Publish nav), with `--shadow-pop`; the
-    Contents toggle pins it.
+    Contents toggle pins it. While it is out, the pane header steps right of it
+    so its controls stay reachable.
   - Return with the same button or `esc`. `⌘⇧↩` expands the pane last used, or
     returns. (`⌘⇧F` stays Footnote.)
   - Expanded state is per mode and persists. A hidden preview still lays out (it
@@ -609,56 +609,100 @@ changing, right is the result.
   corner button shows the return state, "Show the pages (⌘.)", and brings them
   back. The pages hide in Write only; Style and Publish always show them.
 
-## 8. The write pane (planned)
+## 8. The write pane
 
 Two views of the same file, switched in the pane header or with `⌘/`. Nothing is
 stored differently.
 
-### 8.1 Prose (default) (planned)
+### 8.1 Prose (default)
 
 The text column holds only the writing, in the writing face (Alegreya by
 default).
 
 - **Rubrics, left margin.** Each sentinel that opens or labels a block is a red
-  small-caps rubric beside it: `Chapter` (slug beneath in `--f-hivis`, muted),
-  `Title`, `Drop cap`, `Quote`, `Poem`, `Illustration`, an `{is}` name, `Break`.
-  Structural blocks (matter, part, chapter) also draw a hairline across the text
-  column.
+  small-caps rubric beside it (`--f-ui` `--fs-xs`, `--acc-ink`, right-aligned):
+  `Chapter` (slug beneath in `--f-hivis` `--fs-2xs`, muted, right-aligned and
+  truncated within the margin, inset `--s-5` from the pane's edge), `Title`,
+  `Drop cap`, `Quote`, `Poem`, `Illustration`, an `{is}` name, `Break`.
+  Structural blocks (matter, part, chapter) also draw a hairline (`--line`)
+  across the text column. A rubric is a widget against `.cm-content`'s padding,
+  not a gutter; Prose has no line numbers. A click on it opens its markup.
+  Inline tags have rubrics too, `Em`, `Footnote`, `Ref`, once each beneath the
+  line's own rubric and slug (decided 2026-10-26: the margin names every tag, so
+  a writer new to them learns what each one is); a line with a stack grows to
+  hold it.
 - **Text as text.** The line after `{title}` / `{heading}` is set large in Fell
-  (2rem at normal width); `{em}` is italic; `{break}` is ⁂; quotes and poems
-  indent. Not a page preview: no page size, no book styles.
-- **Markup at the cursor.** The block the cursor is in shows its sentinel lines
-  and inline tags in place (`--f-mono`, muted, names in red), so everything
-  stays editable as plain text. Leaving the block folds them away. This replaces
-  Hide markup.
+  (2rem at normal width); `{subtitle}`'s line is italic; `{em}` is italic;
+  `{break}` is ⁂, centred and muted; quotes, epigraphs, poems and pullquotes
+  indent 2em. Not a page preview: no page size, no book styles.
+- **Markup on a click.** Markup stays folded while the cursor moves and types: a
+  sentinel line folds into the line above, or into its rubric row or stand-in. A
+  click on a rubric, ⁂, ☞ or an illustration's image opens that paragraph's
+  sentinel lines and inline tags in place (`--f-mono` at .75em, muted, names in
+  red), editable as plain text, until the cursor leaves it. Selecting text never
+  opens it (decided 2026-10-26: it felt like noise); a sentinel or `%%` line
+  alone shows while the cursor is on it (one being typed, a rubric row arrowed
+  onto). A key that would change folded markup (a backspace at a title's start)
+  opens its paragraph instead, so nothing hidden changes. This replaces Hide
+  markup. Plates, drop-cap images, illustrations whose file is missing, and
+  footnote and ref tags stay as markup.
 - **Notes, right margin.** `%%` comments, including import's `%% check:` notes,
-  sit behind a red ☞ as marginalia; at the cursor the `%%` line shows in place
-  instead.
-- **Page turns, right margin.** Where a printed page begins: a short rule and
-  the number, from the last layout; hidden for a block edited since, until the
-  next layout lands.
-- **Images.** `{illustration}` draws as a block: the image at a modest size, its
-  caption in italics, the rubric and slug in the margin. Plates, drop-cap images
-  and missing files: case by case, later.
-- **Margins.** Left 6–9.5rem, right 3–10.5rem. At normal width rubrics stay
-  (slug truncated), notes collapse to the ☞ (hover to read) and page turns show
-  the number alone. Expanded, they are written out.
+  sit behind a red ☞ as marginalia; the note reads on hover (a native title
+  until §6.9's tooltip). Opened, the `%%` line shows in place instead.
+  Box-drawing `%%` rules are dropped.
+- **Page turns, right margin.** Where a printed page begins: a short rule
+  (`--s-5`, `--hair`) and the number in `--muted`, above any ☞, from the last
+  layout: the page's printed folio (`data-folio`, as the contents would cite it,
+  "vii" or "12"), not its count from the first page. It sits on the block the
+  page begins in, not the exact line. Hidden for a paragraph edited since, until
+  the next layout lands; Aa's Page turns switch hides them all. Each carries its
+  long form, "p. 12" (`data-long`), for the expanded margins.
+- **Images.** An `{illustration}` whose file is in `images/` draws as a block
+  above its line: the image at most 12rem tall and no wider than the text column
+  (corners `--r`), its caption beneath in italics at .85em, `--muted`, and the
+  `Illustration` rubric with its slug in the margin beside the image. A click on
+  the image opens the markup under it, and the image stays drawn. Decided
+  2026-10-26: plates, drop-cap images and illustrations whose file is missing
+  stay plain markup lines (shown even without a click, so an unresolved one is
+  seen).
+- **`{only}`** (experimental) is a rubric `Only` with its editions beneath, the
+  way `{is}` shows its name (decided 2026-10-26).
+- **Margins.** Left 6rem and right 3rem at normal width, 9.5rem and 10.5rem
+  expanded. At normal width rubrics stay (slug truncated), notes collapse to the
+  ☞ (hover to read) and page turns show the number alone. Expanded, they are
+  written out: the note beside its ☞ in `--fs-xs` `--muted`, the turn as "p.
+  12", the slug on up to two lines. The right margin floats there, so a line
+  grows to hold its notes and the next line's notes start below them.
 
-### 8.2 Source (planned)
+### 8.2 Source
 
-Every mark as typed, all in `--f-mono`, coloured per §2.6, with today's sentinel
-treatments (structural band and hairline, rails joining explicit-close pairs,
-comment rules as hairlines).
+Every mark as typed, all in `--f-mono` at 13/17 of the reader's size (line
+numbers too), coloured per §2.6, with today's sentinel treatments (structural
+band and hairline, rails joining explicit-close pairs, comment rules as
+hairlines), scoped to `#editor[data-view="source"]`; Prose has its own (§8.1).
 
-### 8.3 Text view (Aa), spelling, footer (planned)
+### 8.3 Text view (Aa), spelling, footer
 
 Aa, per reader, not per book: face (Alegreya, Alegreya Sans, or the book's body
-face), size, dim (off by default; paragraph or sentence), page turns (on).
-Spelling stays its own menu. Completions, the wrap bar, ⌘K, sentinel shortcuts,
-find and replace, image drops and the preview following the cursor work in both
-views and expanded. Footer: chapter, word count, words this session, Go to
-style. No goals or streaks. Typewriter scrolling and writing on the book's paper
-were considered and dropped.
+face), size (12–24, default 17), dim (off by default; paragraph or sentence),
+page turns (on). Spelling stays its own menu. Built: the Aa popover is a
+small-caps Face heading over three check items, each face named in itself, then
+a hairline and rows of label left, control right: Size a − n + stepper, Dim a
+seg, Page turns a switch. Dim fades the text outside the cursor's paragraph, or
+outside its sentence, to opacity .28 over `--t` (instant under
+`prefers-reduced-motion`), in both views; the margins, rubrics and notes stay,
+and an illustration's image fades with its caption. A sentence ends at `.`, `?`
+or `!` (and any closing quotes) before a space or the line's end, so an
+abbreviation ends one early. Spelling's popover lists the word lists and None as
+check items. Completions, the wrap bar, ⌘K, sentinel shortcuts, find and
+replace, image drops and the preview following the cursor work in both views and
+expanded. Footer (built): the writer's cell opens with "Chapter title · 41,210
+words · +512 this session", the chapter at the cursor (its slug in `--f-hivis`
+when it has no title; left out before the first chapter), the manuscript's words
+and the words added since the book was opened (never below 0, in `--acc-ink`
+once above it; words a reload from disk brings in don't count), recounted with
+the parse; then Go to style. No goals or streaks. Typewriter scrolling and
+writing on the book's paper were considered and dropped.
 
 ## 9. Winks
 
@@ -667,10 +711,10 @@ The label is always the plain word; the wink sits beside or behind it.
 | Wink                    | Where                                                                           |
 | ----------------------- | ------------------------------------------------------------------------------- |
 | Small-caps group labels | style nav, outline, panel sections, menu headings                               |
-| Red rubrics             | the Prose margin (planned)                                                      |
+| Red rubrics             | the Prose margin                                                                |
 | Fell Great Primer       | view headings, dialog titles, empty states, the site                            |
 | ☞ manicule              | notes in the margin; tip lines in the panel                                     |
-| ⁂ asterism              | `{break}` in Prose (planned)                                                    |
+| ⁂ asterism              | `{break}` in Prose                                                              |
 | ❦ fleuron               | empty states; the site's feature heads and colophon                             |
 | "Setting type… N pages" | pagination status (was "Rendering pages… N")                                    |
 | Colophon                | About and the site footer: "Set in IM Fell Great Primer and Alegreya."          |
@@ -758,6 +802,4 @@ Everything scales with the browser's text size.
 
 ## 15. Open
 
-- Image blocks in Prose: plates, drop-cap images, missing files.
-- How `{only}` (experimental) spans show in Prose.
 - Whether the UI paper ever becomes a setting.

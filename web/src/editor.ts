@@ -6,6 +6,8 @@ import {
   EditorView,
   gutterLineClass,
   type GutterMarker,
+  ViewPlugin,
+  type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
 import {
@@ -18,7 +20,8 @@ import {
   type Text,
 } from "@codemirror/state";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
-import { bml, ClassMarker, emRanges, hiddenLines } from "./bml-language.ts";
+import { bml, ClassMarker } from "./bml-language.ts";
+import { paragraphAt, prose, turnsField } from "./prose.ts";
 import { toCmDiagnostics } from "./diagnostics.ts";
 import { searchPanel } from "./search-panel.ts";
 import { insertExtensions } from "./editor-insert.ts";
@@ -143,58 +146,95 @@ export function setEditionSpans(
   view.dispatch({ effects: setSpans.of({ spans, token }) });
 }
 
-// ---- hide markup (the text view bar): sentinel lines beside prose and {em} tags
-// fold away everywhere but the cursor's paragraph (hiddenLines) ----
+// The write pane's two views of the same file (design-language.md §8). Prose
+// draws the markup as rubrics and folds it outside the cursor's paragraph
+// (prose.ts); Source shows every mark. text-view.ts sets
+// #editor[data-view] beside this, for the faces and sizes in app.css.
+export type WriteView = "prose" | "source";
 
-const hide = Decoration.replace({});
+const writeView = new Compartment();
+// Each editor's image host, for Prose to draw illustrations with.
+const imageHosts = new WeakMap<EditorView, ImageHost>();
 
-function buildHidden(state: EditorState): DecorationSet {
-  const doc = state.doc;
-  const lines = doc.toString().split("\n");
-  const cursor = doc.lineAt(state.selection.main.head).number - 1;
-  const decos: Range<Decoration>[] = [];
-  for (const i of hiddenLines(lines, cursor)) {
-    const l = doc.line(i + 1);
-    // Fold the line into the one above, so the text line below keeps its
-    // own decorations (bold after {title}); the first line folds forward.
-    if (i > 0) decos.push(hide.range(l.from - 1, l.to));
-    else if (doc.lines > 1) decos.push(hide.range(l.from, l.to + 1));
+export function setWriteView(view: EditorView, v: WriteView): void {
+  view.dispatch({
+    effects: writeView.reconfigure(
+      v === "prose" ? prose({ images: imageHosts.get(view) }) : [],
+    ),
+  });
+}
+
+// Dim (design-language.md §8.3): every line's text is a mark, so it fades
+// apart from its margin marks; a line outside the cursor's paragraph takes
+// cm-dim, and in Sentence the paragraph's other sentences take cm-off. The
+// marks stay put as the cursor moves, so app.css can ease the opacity.
+export type Dim = "off" | "paragraph" | "sentence";
+
+const dimming = new Compartment();
+const textMark = Decoration.mark({ class: "cm-text" });
+const offMark = Decoration.mark({ class: "cm-text cm-off" });
+const dimLine = Decoration.line({ class: "cm-dim" });
+// ponytail: naive sentence split, abbreviations dim early.
+const SENTENCE_END = /[.?!]['"’”)\]]*(?=\s|$)/g;
+
+// The cursor's sentence as document positions within its paragraph.
+function sentenceAt(doc: Text, head: number, a: number, b: number) {
+  const from = doc.line(a).from, to = doc.line(b).to;
+  const text = doc.sliceString(from, to);
+  let start = 0, end = text.length;
+  for (const m of text.matchAll(SENTENCE_END)) {
+    const e = m.index + m[0].length;
+    if (e >= head - from) {
+      end = e;
+      break;
+    }
+    start = e;
   }
-  const [first, last] = paragraphOf(lines, cursor);
-  let pos = 0;
-  lines.forEach((line, i) => {
-    if (i < first || i > last) {
-      for (const [a, b, c, d] of emRanges(line)) {
-        decos.push(hide.range(pos + a, pos + b), hide.range(pos + c, pos + d));
+  return [from + start, from + end];
+}
+
+function dimDecos(view: EditorView, d: Dim): DecorationSet {
+  const { doc, selection } = view.state;
+  const head = selection.main.head;
+  const [a, b] = paragraphAt(doc, head);
+  const [s0, s1] = d === "sentence" && a ? sentenceAt(doc, head, a, b) : [];
+  const out: Range<Decoration>[] = [];
+  const mark = (m: Decoration, x: number, y: number) => {
+    if (x < y) out.push(m.range(x, y));
+  };
+  for (const { from, to } of view.visibleRanges) {
+    for (let pos = from; pos <= to;) {
+      const l = doc.lineAt(pos);
+      pos = l.to + 1;
+      if (l.number < a || l.number > b || !a) {
+        out.push(dimLine.range(l.from));
+        mark(textMark, l.from, l.to);
+      } else if (s0 === undefined || s1 === undefined) {
+        mark(textMark, l.from, l.to);
+      } else {
+        mark(offMark, l.from, Math.min(l.to, s0));
+        mark(textMark, Math.max(l.from, s0), Math.min(l.to, s1));
+        mark(offMark, Math.max(l.from, s1), l.to);
       }
     }
-    pos += line.length + 1;
+  }
+  return Decoration.set(out, true);
+}
+
+const dimmed = (d: Dim) =>
+  ViewPlugin.define((view) => ({
+    decos: dimDecos(view, d),
+    update(u: ViewUpdate) {
+      if (u.docChanged || u.viewportChanged || u.selectionSet) {
+        this.decos = dimDecos(u.view, d);
+      }
+    },
+  }), { decorations: (v) => v.decos });
+
+export function setDim(view: EditorView, d: Dim): void {
+  view.dispatch({
+    effects: dimming.reconfigure(d === "off" ? [] : dimmed(d)),
   });
-  return Decoration.set(decos, true);
-}
-
-// The cursor's paragraph as [first, last] line (0-based); [-1, -1] on a
-// blank line, so nothing is revealed there.
-function paragraphOf(lines: string[], i: number): [number, number] {
-  if (!lines[i]?.trim()) return [-1, -1];
-  let a = i, b = i;
-  while (a > 0 && lines[a - 1]!.trim()) a--;
-  while (b < lines.length - 1 && lines[b + 1]!.trim()) b++;
-  return [a, b];
-}
-
-// ponytail: whole-document rescan on every edit and cursor move; scan only
-// when the cursor's paragraph changes if it lags on long books.
-const hiddenMarkup = StateField.define<DecorationSet>({
-  create: buildHidden,
-  update: (v, tr) => tr.docChanged || tr.selection ? buildHidden(tr.state) : v,
-  provide: (f) => EditorView.decorations.from(f),
-});
-
-const markup = new Compartment();
-
-export function setHideMarkup(view: EditorView, on: boolean): void {
-  view.dispatch({ effects: markup.reconfigure(on ? hiddenMarkup : []) });
 }
 
 export function createEditor(opts: {
@@ -205,7 +245,7 @@ export function createEditor(opts: {
   images?: ImageHost; // image files dropped, pasted or picked go in the book
 }): EditorView {
   let lastLine = 0;
-  return new EditorView({
+  const view = new EditorView({
     parent: opts.parent,
     state: EditorState.create({
       doc: opts.text,
@@ -217,7 +257,9 @@ export function createEditor(opts: {
         insertExtensions(opts.images ? [imageCompletions(opts.images)] : []),
         editionSpans,
         lintGutter(),
-        markup.of([]),
+        writeView.of([]),
+        dimming.of([]),
+        turnsField,
         spellExtensions(),
         opts.images ? imageExtensions(opts.images) : [],
         EditorView.lineWrapping,
@@ -236,6 +278,8 @@ export function createEditor(opts: {
       ],
     }),
   });
+  if (opts.images) imageHosts.set(view, opts.images);
+  return view;
 }
 
 export function applyDiagnostics(view: EditorView, diags: Diagnostic[]): void {

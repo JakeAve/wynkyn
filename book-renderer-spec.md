@@ -1969,9 +1969,9 @@ them. A hidden preview still lays out (it leaves the grid, never
 `display: none`), since Paged.js paginates by measuring.
 
 Each pane carries its own controls in a header along its top: the write pane
-(Write's middle column) has the text view (§7.3), the pages pane (the right
-column in every mode) none yet. Both headers end in an expand button at the top
-right corner:
+(Write's middle column) has Prose | Source, Aa and Spelling (the text view,
+§7.3), the pages pane (the right column in every mode) none yet. Both headers
+end in an expand button at the top right corner:
 
 - **Writing expanded** (Write only): the outline and the pages leave and the
   text centres at its measure. While typing, the toolbar, footer and pane header
@@ -1979,7 +1979,7 @@ right corner:
 - **Pages expanded** (any mode): the pages, or Publish's sheet view, take the
   whole width; the middle column leaves.
 - In either, the mouse at the left edge slides the left column in over the view,
-  and the Contents toggle pins it there.
+  and the Contents toggle pins it there; the pane header moves right of it.
 - The same button or esc returns (esc first closes an open dialog, find bar or
   menu). ⌘⇧↩ expands the pane last used, or returns (⌘⇧F stays Footnote). The
   expanded pane is remembered per mode.
@@ -2019,27 +2019,53 @@ CodeMirror 6 over plain BML text.
   `{subtitle}` italic. A `%%` line of only box-drawing characters draws as a
   hairline rule, and a `%%` label between two rules as small caps.
 - The selection is a green-grey tint, distinct from the quieter active line.
-- The text view (in the write pane's header, §7.1) is a per-reader preference,
-  not part of the book: prose in Serif (default), Sans or Mono at 12–24px
-  (default 16), with sentinels always in monospace so markup reads as markup.
-  The text holds a reading measure of about 70 characters (36em), centred in the
-  pane while the pages are hidden or the writing expanded. **Hide markup** folds
-  away the sentinel lines of every paragraph that also has prose (`{title}`,
-  `{dropcap}`, `{quote}` … `{/quote}`) and the `{em}` tags, except in the
-  paragraph holding the cursor; structural lines stay as landmarks, and a
-  paragraph of sentinels alone (`{illustration}`, `{break}`) stays visible so it
-  can still be reached.
+- The text view (in the write pane's header, §7.1) is a per-reader preference in
+  localStorage, not part of the book. Two views of the same file, switched by
+  **Prose | Source** or ⌘/: **Source** sets every line in the system monospace
+  at 13/17 of the reader's size, with the sentinel treatments above; **Prose**
+  (the default, `web/src/prose.ts`, design-language.md §8.1) sets the writing in
+  the chosen face and draws the markup instead of showing it: each sentinel is a
+  red small-caps rubric in the left margin (a structural one with its slug
+  beneath and a hairline across the text), the line after `{title}` or
+  `{heading}` is large, after `{subtitle}` italic, `{em}` text italic, quotes
+  and poems indented, `{break}` a ⁂, and `%%` notes a ☞ in the right margin that
+  reads on hover. Inline tags (`{em}`, `{footnote}`, `{ref}`) get rubrics too,
+  `Em`, `Footnote`, `Ref`, once per line beneath its own. The sentinel lines,
+  `%%` lines and `{em}` tags fold away; a click on a rubric, ⁂, ☞ or image shows
+  that paragraph's markup in place, in monospace and editable, until the cursor
+  leaves it. Moving or selecting into text never shows them, though a sentinel
+  or `%%` line shows while the cursor is on it; a key that would change folded
+  markup shows its paragraph instead. An `{illustration}` whose file is in
+  `images/` draws its image (at most 12rem tall) above its line, its caption in
+  italics beneath, and stays drawn while its markup shows. Plates, drop-cap
+  images, illustrations whose file is missing, and footnote and ref tags stay as
+  markup. This replaces Hide markup. The **Aa** menu holds the face (Alegreya,
+  Alegreya Sans, or the book's body face), the size (12–24px, default 17), dim
+  (Off, Paragraph, Sentence) and page turns (on). Dim, in either view, fades all
+  the text but the cursor's paragraph, or but its sentence (one ends at `.`, `?`
+  or `!`, with any closing quotes, before a space or the line's end); the
+  margins stay. Page turns put a short rule and the page's printed folio (its
+  number in the finished book, "vii" or "12") in the right margin beside the
+  block each printed page begins in, from the last layout; a paragraph edited
+  since hides its turn until the next layout lands. The text holds a reading
+  measure of about 70 characters (36em), centred in the pane while the pages are
+  hidden or the writing expanded. Expanded, the writing grows by 19/17 and the
+  measure with it, and Prose's margins widen so notes are written out beside
+  their line (which grows to hold them), page turns read "p. 12" and slugs show
+  in full on up to two lines.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The footer is split by
-  column: under the editor, the writer's cell (parse warnings, import notes, and
-  "Go to style:" naming the style that block belongs to — "Chapter · Title",
-  "Body text · Paragraph", a custom `{is}` name); under the pages, the page
-  count and page problems. Go to style opens that style in Style mode, the way a
-  preview click does (§7.4), and leaves a history entry, so Back returns to
-  Write with the cursor where it was. The style is read from the enclosing
-  matter type, part or chapter, the enclosing block, and the field sentinel
-  whose text runs on to the line.
+  column: under the editor, the writer's cell (the chapter at the cursor, the
+  word count and the words added this session — "Marley's Ghost · 41,210 words ·
+  +512 this session", the last in red once it is above 0 — then parse warnings,
+  import notes, and "Go to style:" naming the style that block belongs to —
+  "Chapter · Title", "Body text · Paragraph", a custom `{is}` name); under the
+  pages, the page count and page problems. Go to style opens that style in Style
+  mode, the way a preview click does (§7.4), and leaves a history entry, so Back
+  returns to Write with the cursor where it was. The style is read from the
+  enclosing matter type, part or chapter, the enclosing block, and the field
+  sentinel whose text runs on to the line.
 - Find and replace is a bar pinned to the top of the editor, in the chrome's
   colors: find and replace fields, match case / whole word / regex toggles, an
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"
@@ -2053,11 +2079,11 @@ CodeMirror 6 over plain BML text.
   its capital; a possessive is checked without its `'s`. Hovering an underlined
   word offers up to five suggestions and **Add to dictionary**, which writes the
   word (a possessive as its name) to `dictionary.json` through
-  `POST /api/books/:book/dictionary` with `{ word }`. **Spelling** on the text
-  view bar is a menu of the word lists, English (the default) or None, kept with
-  the reader's other text view choices; each language is one list in `vendor/`
-  and a row in `WORD_LISTS` (`app.ts`), and `dictionary.json` is the same
-  whatever the language.
+  `POST /api/books/:book/dictionary` with `{ word }`. **Spelling** in the write
+  pane's header is a menu of the word lists, English (the default) or None, kept
+  with the reader's other text view choices; each language is one list in
+  `vendor/` and a row in `WORD_LISTS` (`text-view.ts`), and `dictionary.json` is
+  the same whatever the language.
 - **EXPERIMENTAL:** `{only}` spans (§3.2.9) carry an amber mark on every line's
   gutter and a tag naming their editions; lines the open edition skips are
   dimmed.

@@ -12,6 +12,7 @@ import {
   markEdited,
   type Mode,
   pageMap,
+  pageTurns,
   previewLink,
   renderPreview,
   restoreCachedRender,
@@ -37,6 +38,8 @@ import {
   setEditionSpans,
 } from "./editor.ts";
 import { styleKeysAt } from "./bml-language.ts";
+import { chapterAt, wordCount } from "./prose-model.ts";
+import { setPageTurns } from "./prose.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { insertSnippet } from "./editor-insert.ts";
 import { type ImageHost, pickImageFile } from "./editor-images.ts";
@@ -53,7 +56,7 @@ import type { Backend } from "./backend.ts";
 import { installSwitcher, type Switcher } from "./switcher.ts";
 import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
-import { installTextView } from "./text-view.ts";
+import { installTextView, type TextView } from "./text-view.ts";
 import { installPanes, type Panes } from "./panes.ts";
 import { installPreviewZoom } from "./preview-zoom.ts";
 import { installInspect } from "./inspect.ts";
@@ -241,9 +244,48 @@ function onDocChanged(text: string): void {
 
 let isNames: string[] = []; // `{is}` classes in the manuscript, from reparse
 
+// Words in the manuscript now, and the session's baseline: the count when
+// the page opened (a book switch reloads the page), moved by every reload
+// from disk, since words that arrive from outside weren't written here.
+let words = 0;
+let wordsAtOpen: number | null = null;
+
+// The buffer becomes the disk's text (a reload, another writer's change).
+function takeDiskText(text: string): void {
+  if (wordsAtOpen !== null) wordsAtOpen += wordCount(text.split("\n")) - words;
+  replaceBuffer(editor, text);
+  reparse(text);
+}
+
+// The writer's footer: the chapter at the cursor, the words, the words added.
+function showStats(lines: string[], line: number): void {
+  if (wordsAtOpen === null) return;
+  const chapter = chapterAt(lines, line);
+  const parts: (string | HTMLElement)[] = [];
+  if (chapter) {
+    const name = document.createElement("span");
+    name.textContent = chapter.title ?? chapter.slug;
+    if (chapter.title === null) name.className = "hivis";
+    parts.push(name, " · ");
+  }
+  const added = Math.max(0, words - wordsAtOpen);
+  const gain = document.createElement("span");
+  gain.textContent = `+${added.toLocaleString()} this session`;
+  if (added) gain.className = "gain";
+  parts.push(
+    `${words.toLocaleString()} ${words === 1 ? "word" : "words"} · `,
+    gain,
+  );
+  $("write-stats").replaceChildren(...parts);
+}
+
 function reparse(text: string): void {
   const doc = parse(text);
-  isNames = text.split("\n").flatMap((line) => {
+  const lines = text.split("\n");
+  words = wordCount(lines);
+  wordsAtOpen ??= words;
+  showStats(lines, cursorLine);
+  isNames = lines.flatMap((line) => {
     const t = parseSentinelLine(line);
     return t?.name === "is" && !t.closing && t.slug ? [t.slug] : [];
   });
@@ -300,6 +342,7 @@ function followCursor(line: number): void {
   markEdited($("preview"), mode === "write" ? line : null);
   const lines = editor.state.doc.toString().split("\n");
   noteImageDpi(lines, line);
+  showStats(lines, line);
   const keys = styleKeysAt(lines, line);
   const cat = styleCatalog();
   const entry = keys.map((k) => cat.find((e) => e.key === k)).find((e) => e);
@@ -441,7 +484,7 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
 // The live pages, both set in main. A null cacheKey paints without touching
 // the book's cached render.
 let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {};
-let restore: (cached: CachedRender) => void = () => {};
+let restore: (cached: CachedRender, version?: string) => void = () => {};
 
 // The edition's metadata with every style edit landed, so a theme goes over
 // what the author sees. The held copy is current unless another writer changed
@@ -463,7 +506,7 @@ const themes = new ThemePreview({
   setMetadata: (m) => metadata = m,
   saveSections: saveMetadataSections,
   paint: (msg, cacheKey) => paint(msg, cacheKey),
-  restore: (cached) => restore(cached),
+  restore: (cached, version) => restore(cached, version),
   leave,
   setStatus,
 });
@@ -556,8 +599,7 @@ async function refreshFromRemote(): Promise<void> {
     showDiskBanner(disk);
     return;
   }
-  replaceBuffer(editor, disk.text);
-  reparse(disk.text);
+  takeDiskText(disk.text);
   sync.rebase(disk.version);
   hideDiskBanner();
 }
@@ -568,8 +610,7 @@ async function refreshFromRemote(): Promise<void> {
 async function rebaseAfterRename(): Promise<void> {
   const disk = await fetchManuscript(book);
   if (!sync.manuscriptDirty() && !sync.manuscriptBusy()) {
-    replaceBuffer(editor, disk.text);
-    reparse(disk.text);
+    takeDiskText(disk.text);
   }
   sync.rebase(disk.version);
   if (diskOffer?.version === sync.base) hideDiskBanner();
@@ -589,8 +630,7 @@ function reloadFromDisk(): void {
   if (!diskOffer) return;
   const { text, version } = diskOffer;
   sync.dropManuscript(version);
-  replaceBuffer(editor, text);
-  reparse(text);
+  takeDiskText(text);
   hideDiskBanner();
   editor.focus();
 }
@@ -708,9 +748,10 @@ function chordOf(e: KeyboardEvent): string | null {
 // sentinel palette and wrap bar, menus (the zoom menu is a popover). Not
 // hover tooltips (spelling, lint).
 const POPUPS =
-  "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop";
+  "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
 function installShortcuts(
   panes: Panes,
+  textView: TextView,
   inspect: { escape(): boolean },
 ): void {
   const bySnippet = new Map(
@@ -734,6 +775,8 @@ function installShortcuts(
     else if (chord === "Mod-\\") panes.toggleTree();
     else if (chord === "Mod-.") panes.togglePages();
     else if (chord === "Mod-Shift-Enter") panes.toggleExpand();
+    // Prose | Source; capture phase, so CodeMirror's toggle comment never sees it
+    else if (chord === "Mod-/" && mode === "write") textView.toggleView();
     else return;
     e.preventDefault();
   }, true);
@@ -744,6 +787,7 @@ function installShortcuts(
     );
   });
   $("tree-toggle").title += ` (${chordLabel("Mod-\\")})`;
+  $("tv-views").title += ` (${chordLabel("Mod-/")})`;
   for (const b of document.querySelectorAll<HTMLElement>(".expand")) {
     b.title += ` (${chordLabel("Mod-Shift-↩")})`;
   }
@@ -877,7 +921,19 @@ async function main(): Promise<void> {
     images,
   });
   reparse(text);
-  installTextView({ editor, backend, book, setStatus });
+  const textView = installTextView({
+    editor,
+    backend,
+    book,
+    setStatus,
+    // The live pages' body text (the `body` style is `.bml`, spec §4.5).
+    bodyFace: () => {
+      const bml = $("preview").querySelector(
+        ":scope > :not(.preview-stage) .bml",
+      );
+      return bml ? getComputedStyle(bml).fontFamily : null;
+    },
+  });
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
   const inspect = installInspect({
@@ -895,7 +951,7 @@ async function main(): Promise<void> {
   // Inspect reads the book's metadata (running heads, units, where a value
   // comes from), which is otherwise fetched only when Style or Publish opens.
   $("inspect").addEventListener("click", () => void ensureConfigPanel());
-  installShortcuts(installPanes({ mode: () => mode }), inspect);
+  installShortcuts(installPanes({ mode: () => mode }), textView, inspect);
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
       .mode as Mode | undefined;
@@ -934,15 +990,7 @@ async function main(): Promise<void> {
     inspecting: inspect.active,
   });
   installStyleHover(previewEl, styleCatalog, () => mode, inspect.active);
-  // Restore before opening the socket so the previous render is on screen
-  // when the first update lands, instead of a blank preview.
   const key = cacheId(book, edition);
-  const cached = await loadCachedRender(key);
-  if (cached) {
-    restoreCachedRender(cached, previewEl);
-    refreshPageIndicator();
-    followCursor(cursorLine);
-  }
   const onClose = () => {
     // `deno task dev` restarts the server when app code changes; follow it
     // back with a fresh page, unless that would drop an unsaved edit.
@@ -957,27 +1005,41 @@ async function main(): Promise<void> {
       } else location.reload();
     }, 500);
   };
+  // Everything that reads the pages, once a layout is on screen. Its page
+  // turns are lines of the text it was built from (`version`), so they're
+  // taken only while the buffer is that text; otherwise the turns shown,
+  // mapped through each edit since, stay until a layout that matches.
+  const afterLayout = (version?: string) => {
+    refreshPageIndicator();
+    configPanel?.pagesChanged();
+    followCursor(cursorLine);
+    if (version === sync.base && !sync.manuscriptDirty()) {
+      setPageTurns(editor, pageTurns(previewEl));
+    }
+    textView.refresh();
+  };
   paint = (msg, cacheKey: string | null = key) => {
     renderPreview(msg, previewEl, cacheKey).then((problems) => {
       delete previewEl.dataset.stale;
       showPageProblems(problems);
-      refreshPageIndicator();
-      configPanel?.pagesChanged();
-      followCursor(cursorLine);
+      afterLayout(msg.manuscriptVersion);
     }, (err) => {
       // The old pages stay up; their problems no longer describe this book.
       setStatus("error", `preview: ${brief(err)}`);
       showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
     });
   };
-  restore = (cached) => {
+  restore = (cached, version) => {
     restoreCachedRender(cached, previewEl);
     delete previewEl.dataset.stale;
     showPageProblems(cached.problems ?? []);
-    refreshPageIndicator();
-    configPanel?.pagesChanged();
-    followCursor(cursorLine);
+    afterLayout(version);
   };
+  // Restore before opening the socket so the previous render is on screen
+  // when the first update lands, instead of a blank preview. Its text may be
+  // older than the buffer's, so its page turns wait for that update.
+  const cached = await loadCachedRender(key);
+  if (cached) restore(cached);
   themes.installApply();
   const onMessage = (msg: ServerMessage) => {
     if (msg.type === "error") {

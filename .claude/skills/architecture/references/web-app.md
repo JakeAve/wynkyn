@@ -16,11 +16,16 @@ it are in `SKILL.md`, The web app; this is the map.
 | `switcher.ts` | `installSwitcher`: the crumb (Book / Edition · size) and the book/edition switcher — search, Rename, Delete, New edition, download as zip, Change library |
 | `create-book.ts` | `installCreateBook`: Create a new manuscript (import a file or web page, copy in from a folder, start blank), the title and web dialogs; `renderImportNotes` for the footer's import notes |
 | `theme-preview.ts` | `ThemePreview`: try a theme with nothing saved, hold pushed builds meanwhile, Apply |
-| `text-view.ts` | `installTextView`: the editor's font, size, Hide markup and spell check (a reader preference, localStorage, not the book), in the write pane's header |
+| `text-view.ts` | `installTextView`: the write pane's header — Prose \| Source (`#editor[data-view]`, `setWriteView`, ⌘/), the Aa menu (face, size, dim, page turns) and Spelling; a reader preference in localStorage `text-view`, not the book (`readPrefs` migrates the old `font`/`hide`) |
 | `panes.ts` | `installPanes`: the Contents toggle (pins the outline while expanded), Pages hidden by ⌘., and each pane's expand (`#panes.expand-writing` / `expand-pages`, localStorage `expanded:<mode>`); returns what the shortcuts call |
 | `dom.ts` | `$`, `brief` — the helpers every module shares |
 
-Editor side: `editor.ts` (the CodeMirror pane), `bml-language.ts`,
+Editor side: `editor.ts` (the CodeMirror pane; `setWriteView` swaps Prose and
+Source, `setDim` fades all but the cursor's paragraph or sentence), `prose-model.ts` (pure: how Prose shows each line, folded or shown,
+its rubric, kind, stand-in and notes, plus the footer's word count and
+chapter) → `prose.ts` (`prose()`, the decorations and margin widgets that draw
+it; `setPageTurns` takes `preview.ts`'s `pageTurns` after each layout, and app.ts
+calls it), `bml-language.ts`,
 `editor-insert.ts` + `snippets.ts` (inserting sentinels), `editor-images.ts`
 (dropped/pasted images), `search-panel.ts`, `spelling.ts`, `diagnostics.ts`.
 Outline: `tree-data.ts` (pure) → `tree-view.ts`. Storage in the page:

@@ -196,6 +196,19 @@
     .fontpanel {
       padding-bottom: 16rem !important;
     }
+    .prose-board {
+      width: 100%;
+      padding-block: var(--s-6);
+    }
+    .prose-board .syn-k {
+      color: var(--syn-k); /* bmlHighlight's sentinel name */
+    }
+    main #text-view .tvpop {
+      position: static;
+    }
+    main .board #text-view {
+      display: contents;
+    }
     </style>
   </head>
   <body>
@@ -708,8 +721,102 @@
             </div>
           </div>
         </div>
-        <p class="planned">Planned: the footer's session count and the Prose
-          view's marks. Until they are built, the app itself is their
+        <p>The write pane's header: Prose | Source at left, then Aa and
+          Spelling, each opening a popover (§6.9, §8.3).</p>
+        <div class="board">
+          <div id="text-view" role="toolbar" aria-label="Text view">
+            <div class="surface" style="width: 100%">
+              <div class="pane-head">
+                <span class="seg" role="radiogroup" aria-label="View"><button
+                    type="button" role="radio" aria-checked="true">Prose</button><button
+                    type="button" role="radio" aria-checked="false">Source</button></span>
+                <button type="button" class="btn sm"
+                  aria-expanded="true">Aa</button>
+                <button type="button"
+                  class="btn sm">Spelling <svg class="chev tico" viewBox="0 0 16 16"><path d="M4 6.5l4 4 4-4" /></svg></button>
+              </div>
+            </div>
+            <div class="cell">
+              <span class="cap">Aa</span>
+              <div class="tvpop" role="dialog" aria-label="Text view">
+                <div class="hd">Face</div>
+                <div role="radiogroup" aria-label="Face">
+                  <button type="button" role="radio" class="it"
+                    data-face="alegreya"
+                    aria-checked="true"><svg class="tico ck"><use href="#check" /></svg>Alegreya</button>
+                  <button type="button" role="radio" class="it" data-face="sans"
+                    aria-checked="false"><svg class="tico ck"><use href="#check" /></svg>Alegreya Sans</button>
+                  <button type="button" role="radio" class="it" data-face="book"
+                    aria-checked="false"><svg class="tico ck"><use href="#check" /></svg>The book's body face</button>
+                </div>
+                <hr>
+                <div class="row"><span>Size</span><span class="tv-size"><button
+                      type="button" class="tv-step">−</button><output>17</output><button
+                      type="button" class="tv-step">+</button></span></div>
+                <div class="row"><span>Dim</span><span class="seg"
+                    role="radiogroup" aria-label="Dim"><button type="button"
+                      role="radio" aria-checked="true">Off</button><button
+                      type="button" role="radio"
+                      aria-checked="false">Paragraph</button><button
+                      type="button" role="radio"
+                      aria-checked="false">Sentence</button></span></div>
+                <label class="row">Page turns <input type="checkbox"
+                    role="switch" class="sw" checked></label>
+              </div>
+            </div>
+            <div class="cell">
+              <span class="cap">Spelling</span>
+              <div class="tvpop" role="radiogroup" aria-label="Spelling">
+                <button type="button" role="radio" class="it"
+                  aria-checked="true"><svg class="tico ck"><use href="#check" /></svg>English</button>
+                <button type="button" role="radio" class="it"
+                  aria-checked="false"><svg class="tico ck"><use href="#check" /></svg>None</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p>Prose (§8.1): rubrics in the left margin, a hairline under a
+          structural block, the title in Fell, ⁂ for a break, a ☞ note in the
+          right margin (hover to read). The paragraph at the cursor shows its
+          markup in monospace.</p>
+        <div class="board">
+          <div class="surface prose-board">
+            <div id="editor" data-view="prose">
+              <div class="cm-scroller">
+                <div class="cm-content">
+                  <div class="cm-line cm-prose-rule cm-prose-slugged"><span
+                    class="cm-prose-marks"><span class="cm-prose-rubric"
+                      data-label="Chapter" data-slug="stave-1"
+                      title="stave-1"></span></span></div>
+                  <div class="cm-line cm-prose-title"><span
+                    class="cm-prose-marks"><span class="cm-prose-rubric" data-label="Title"></span></span>Marley's Ghost</div>
+                  <div class="cm-line"><br></div>
+                  <div class="cm-line cm-prose-src">{<span
+                    class="syn-k">dropcap</span>}</div>
+                  <div class="cm-line"><span class="cm-prose-marks"><span
+                      class="cm-prose-rubric" data-label="Drop cap"></span></span>MARLEY was
+                  dead: to begin with. There is no doubt whatever about
+                  that.</div>
+                  <div class="cm-line"><br></div>
+                  <div class="cm-line"><span class="cm-prose-marks"><span
+                      class="cm-prose-note"
+                      data-note="check: Humbug is not in italics in the 1843 text."
+                      title="check: Humbug is not in italics in the 1843 text."></span></span>"Bah!"
+                  said Scrooge, "<span class="cm-bml-it">Humbug!</span>"</div>
+                  <div class="cm-line"><br></div>
+                  <div class="cm-line cm-prose-break"><span
+                    class="cm-prose-marks"><span class="cm-prose-rubric" data-label="Break"></span>⁂</span></div>
+                  <div class="cm-line"><br></div>
+                  <div class="cm-line cm-prose-block"><span
+                    class="cm-prose-marks"><span class="cm-prose-rubric" data-label="Quote"></span></span>A
+                  quote, indented.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="planned">Planned: Prose's page turns, illustration blocks
+          and expanded margins. Until they are built, the app itself is their
           sheet.</p>
       </section>
     </main>

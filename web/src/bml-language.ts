@@ -116,7 +116,7 @@ const bmlHighlight = syntaxHighlighting(HighlightStyle.define([
 
 // ---- sentinels by kind (UX round 1): line classes and gutter marks ----
 
-const STRUCTURAL = new Set(["matter", "part", "chapter"]);
+export const STRUCTURAL = new Set(["matter", "part", "chapter"]);
 const BLOCKS = new Set([
   "quote",
   "epigraph",
@@ -134,7 +134,7 @@ const NEXT_KIND: Record<string, LineKind> = {
   subtitle: "italic",
 };
 // A `%%` line made only of box-drawing characters (U+2500–U+257F).
-const RULE_RE = /^%%\s*[─-╿]+\s*$/;
+export const RULE_RE = /^%%\s*[─-╿]+\s*$/;
 
 // One rule, by closing form (§3.2.3): a nesting-close sentinel is a struct,
 // an explicit-close pair is a rail, and every other sentinel line — fields,
@@ -185,43 +185,25 @@ export function classifyLines(lines: string[]): LineKind[][] {
   });
 }
 
-// `{em}…{/em}` pairs on one line: [tagStart, textStart, textEnd, tagEnd].
+// Inline wrap tags on one line (spec §3.2.3), in order: `{em}…{/em}` as
+// [tagStart, textStart, textEnd, tagEnd], and the point tags
+// `{footnote: slug}` / `{ref: slug}` as [tagStart, slugStart, slugEnd, tagEnd].
 // ponytail: single-line only; a wrap spanning lines stays plain.
-export function emRanges(line: string): [number, number, number, number][] {
-  const out: [number, number, number, number][] = [];
+export function wrapRanges(
+  line: string,
+): { name: string; at: [number, number, number, number] }[] {
+  const out: { name: string; at: [number, number, number, number] }[] = [];
   for (const m of line.matchAll(/(?<!\\)\{em\}(.*?)(?<!\\)\{\/em\}/g)) {
-    const a = m.index;
-    const b = a + m[0].length;
-    out.push([a, a + 4, b - 5, b]);
+    const a = m.index, b = a + m[0].length;
+    out.push({ name: "em", at: [a, a + 4, b - 5, b] });
   }
-  return out;
-}
-
-// Hide markup (the editor's text view bar): which sentinel-only lines to hide
-// (0-based). Only those in a paragraph that also has prose, so a lone
-// {illustration} or {break} stays and there is always text to click; never a
-// structural line, the writer's landmarks; never in the paragraph holding
-// `cursor` (0-based), so the markup being edited is always in view.
-export function hiddenLines(lines: string[], cursor: number): number[] {
-  const out: number[] = [];
-  let start = 0;
-  for (let i = 0; i <= lines.length; i++) {
-    if (i < lines.length && lines[i]!.trim() !== "") continue;
-    // lines[start, i) is one paragraph
-    if (cursor < start || cursor >= i) {
-      const para = lines.slice(start, i).map((l) => parseSentinelLine(l));
-      const prose = para.some((t, j) =>
-        !t && !lines[start + j]!.startsWith("%%")
-      );
-      para.forEach((t, j) => {
-        if (prose && t && !(STRUCTURAL.has(t.name) && !t.closing)) {
-          out.push(start + j);
-        }
-      });
-    }
-    start = i + 1;
+  for (
+    const m of line.matchAll(/(?<!\\)\{(footnote|ref)\s*:\s*([^}]*?)\s*\}/dg)
+  ) {
+    const [s, e] = m.indices![2]!;
+    out.push({ name: m[1]!, at: [m.index, s, e, m.index + m[0].length] });
   }
-  return out;
+  return out.sort((x, y) => x.at[0] - y.at[0]);
 }
 
 // The structural block holding `line` (1-based): from the nearest
@@ -342,7 +324,8 @@ function buildKinds(doc: Text): KindDecos {
   text.forEach((line, i) => {
     for (const k of kinds[i] ?? []) decos.push(LINE_DECOS[k].range(pos));
     if (kinds[i]?.includes("struct")) marks.push(structGutter.range(pos));
-    for (const [a, b, c, d] of emRanges(line)) {
+    for (const { name, at: [a, b, c, d] } of wrapRanges(line)) {
+      if (name !== "em") continue;
       decos.push(emTag.range(pos + a, pos + b));
       if (c > b) decos.push(emText.range(pos + b, pos + c));
       decos.push(emTag.range(pos + c, pos + d));
