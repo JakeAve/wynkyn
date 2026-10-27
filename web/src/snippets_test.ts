@@ -3,6 +3,7 @@ import { EditorState } from "@codemirror/state";
 import {
   applySnippet,
   closingForm,
+  linkedClose,
   nextField,
   overSelection,
   SNIPPETS,
@@ -106,6 +107,24 @@ Deno.test("Tab stop after a slug is the title line", () => {
   // a placeholder that is already the content has no further stop
   assertEquals(nextField(snippet("quote"), 0), null);
   assertEquals(nextField(snippet("footnote"), 0), null);
+});
+
+Deno.test("linkedClose: {is}'s closing name, also around a selection", () => {
+  const state = stateWith("Prose.", 6);
+  const tr = state.update(applySnippet(state, snippet("is")));
+  const close = linkedClose(snippet("is"), tr.state.selection.main.from)!;
+  assertEquals(
+    tr.state.sliceDoc(close.from - 6, close.to + 1),
+    "{/is: class-name}",
+  );
+  // wrapped around text that happens to hold the name, the close still wins
+  const wrapped = wrapSnippet(snippet("is"), "a class-name here")!;
+  const at = wrapped.text.indexOf("class-name");
+  const c = linkedClose(wrapped, at)!;
+  assertEquals(wrapped.text.slice(c.from - 6, c.to + 1), "{/is: class-name}");
+  // a close without the name links nothing
+  assertEquals(linkedClose(snippet("verses"), 0), null);
+  assertEquals(linkedClose(snippet("chapter"), 0), null);
 });
 
 Deno.test("overSelection: a block without a close goes after the selected line, not mid-paragraph", () => {

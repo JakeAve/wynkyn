@@ -240,6 +240,21 @@ export function nextField(
   return null;
 }
 
+// Where a block's closing tag repeats its slug placeholder (`{/is: name}`),
+// that copy's range in the document, so typing the name renames both. `at` is
+// where the placeholder starts after applySnippet.
+export function linkedClose(
+  s: Snippet,
+  at: number,
+): { from: number; to: number } | null {
+  const p = s.placeholder;
+  if (s.kind !== "block" || !p) return null;
+  const first = s.text.indexOf(p), last = s.text.lastIndexOf(p);
+  // the copy must sit on the closing line, not in sample or selected text
+  if (first < 0 || last <= s.text.lastIndexOf("\n")) return null;
+  return { from: at + last - first, to: at + last - first + p.length };
+}
+
 export function applySnippet(
   state: EditorState,
   snippet: Snippet,

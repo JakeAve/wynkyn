@@ -2,7 +2,7 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
-import { addIsNames, catalogFor, type EpubResult } from "./style-catalog.ts";
+import { catalogFor, type EpubResult, syncIsNames } from "./style-catalog.ts";
 import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
   fitPreview,
@@ -289,6 +289,7 @@ function reparse(text: string): void {
     const t = parseSentinelLine(line);
     return t?.name === "is" && !t.closing && t.slug ? [t.slug] : [];
   });
+  configPanel?.isNamesChanged();
   applyDiagnostics(editor, doc.diagnostics);
   renderImportNotes(text, editor);
   setEditionSpans(editor, doc.onlySpans, editionToken(edition));
@@ -432,7 +433,7 @@ const fetchMetadata = (): Promise<
 let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
 const styleCatalog = () => {
   const m = metadata ?? {};
-  addIsNames(m, isNames);
+  syncIsNames(m, isNames);
   return catalogFor(m);
 };
 
