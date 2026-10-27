@@ -2710,6 +2710,16 @@ body.typing #editor .pane-head {
   border-radius: var(--r);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+/* Until a custom colour is chosen the picker reads "any colour", not a white
+   chip beside Bright white: a soft hue wheel (§6.5's one literal colour). */
+#config-overlay .colours input[type="color"]:not(.on)::-webkit-color-swatch {
+  background: conic-gradient(in oklch longer hue, oklch(0.82 0.1 30), oklch(0.82
+    0.1 30));
+}
+#config-overlay .colours input[type="color"]:not(.on)::-moz-color-swatch {
+  background: conic-gradient(in oklch longer hue, oklch(0.82 0.1 30), oklch(0.82
+    0.1 30));
+}
 #config-overlay .colours input.txt {
   width: 6.5rem;
   margin-left: var(--s-2);
