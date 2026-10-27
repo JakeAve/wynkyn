@@ -117,10 +117,12 @@ const imagesField = StateField.define<Map<string, string> | null>({
 
 // Lists the book's images now and after each edit: host.images() fetches
 // at most every few seconds and again after an add (a drop, a paste, a
-// pick), as the completions do.
+// pick), as the completions do. A list that maps the same slugs to the same
+// URLs changes nothing, so it doesn't redraw.
 function imageLister(host: ImageHost) {
   return ViewPlugin.define((view) => {
     let last: ImageFile[] | null = null;
+    let destroyed = false;
     const list = () =>
       host.images().then(async (files) => {
         if (files === last) return;
@@ -128,17 +130,28 @@ function imageLister(host: ImageHost) {
         const rank = (f: ImageFile) =>
           IMAGE_EXTS.indexOf(f.name.slice(f.slug.length + 1).toLowerCase());
         // the resolver's order when two files share a slug (spec §4.11)
-        const sorted = [...files].sort((a, b) => rank(a) - rank(b));
-        const map = new Map<string, string>();
-        for (const f of sorted) {
-          if (!map.has(f.slug)) map.set(f.slug, await host.url(f.name));
+        const names = new Map<string, string>();
+        for (const f of [...files].sort((a, b) => rank(a) - rank(b))) {
+          if (!names.has(f.slug)) names.set(f.slug, f.name);
         }
-        view.dispatch({ effects: imagesEffect.of(map) });
+        const urls = await Promise.all(
+          [...names.values()].map((n) => host.url(n)),
+        );
+        const map = new Map([...names.keys()].map((s, i) => [s, urls[i]!]));
+        const had = view.state.field(imagesField, false);
+        const same = had?.size === map.size &&
+          [...map].every(([s, u]) => had.get(s) === u);
+        if (!destroyed && !same) {
+          view.dispatch({ effects: imagesEffect.of(map) });
+        }
       }, () => {});
     list();
     return {
       update(u) {
         if (u.docChanged) list();
+      },
+      destroy() {
+        destroyed = true;
       },
     };
   });
@@ -211,14 +224,18 @@ export function setPageTurns(view: EditorView, turns: PageTurn[] | null): void {
 interface Drawn {
   decos: DecorationSet;
   para: [number, number];
+  held: boolean; // a mouse button is down: the reveal waits for its release
 }
 
 // ponytail: rescans the whole document on every edit and paragraph change;
 // rescan only the changed blocks if long books lag.
-function draw(state: EditorState): Drawn {
+function draw(
+  state: EditorState,
+  para: [number, number],
+  held: boolean,
+): Drawn {
   const doc = state.doc;
   const lines = doc.toString().split("\n");
-  const para = paragraphAt(doc, state.selection.main.head);
   const images = state.field(imagesField, false) ?? null;
   const model = proseLines(
     lines,
@@ -229,18 +246,28 @@ function draw(state: EditorState): Drawn {
   const decos: Range<Decoration>[] = [];
   let carried: number | undefined; // a turn on a line folded into the next
   let taken = -1; // a caption's line whose turn went beside its image
+  let skip = -1; // the last line an illustration's fold took in
   model.forEach((p, i) => {
+    if (i <= skip) return;
     const l = doc.line(i + 1);
     const turn = l.from === taken ? carried : turns?.get(l.from) ?? carried;
     carried = undefined;
     const url = p.standIn === "illustration" && images?.get(p.slug ?? "");
     if (url) {
-      // The image above the line; folded, the line goes into the caption
-      // below (the last line keeps an empty row), and a turn on the caption
-      // goes beside the image, since the fold would cover it.
-      const cap = p.fold && i + 1 < doc.lines ? doc.line(i + 2).from : -1;
-      const capTurn = cap < 0 ? undefined : turns?.get(cap);
-      if (capTurn !== undefined) taken = cap;
+      // The image above the line; folded, the line goes into the caption:
+      // the next shown line, past folded notes and sentinels, whose row
+      // starts here then (at the document's end an empty row stays). A turn
+      // on the caption goes beside the image, since the fold covers it.
+      let c = i + 1;
+      const collapses = (k: number) =>
+        model[k]?.fold && !model[k]!.rubric && !model[k]!.standIn;
+      while (p.fold && collapses(c)) c++;
+      const cap = p.fold && c < doc.lines ? doc.line(c + 1).from : -1;
+      let capTurn = cap < 0 ? undefined : turns?.get(cap);
+      for (let k = i + 1; k < c && capTurn === undefined; k++) {
+        capTurn = turns?.get(doc.line(k + 1).from);
+      }
+      if (cap >= 0) taken = cap;
       decos.push(
         Decoration.widget({
           widget: new Picture(url, new Marks(p, turn ?? capTurn)),
@@ -248,13 +275,13 @@ function draw(state: EditorState): Drawn {
           side: -1,
         }).range(l.from),
       );
-      const next = model[i + 1]?.kind;
       if (!p.fold) decos.push(LINES.src.range(l.from));
-      else if (i + 1 === doc.lines) decos.push(hide.range(l.from, l.to));
       else {
         // The caption's row starts here now, so its class goes here too.
-        decos.push(hide.range(l.from, l.to + 1));
-        if (next) decos.push(LINES[next].range(l.from));
+        decos.push(hide.range(l.from, cap < 0 ? doc.line(c).to : cap));
+        const kind = model[c]?.kind;
+        if (cap >= 0 && kind) decos.push(LINES[kind].range(l.from));
+        skip = c - 1;
       }
       return;
     }
@@ -297,21 +324,47 @@ function draw(state: EditorState): Drawn {
       }
     }
   });
-  return { decos: Decoration.set(decos, true), para };
+  return { decos: Decoration.set(decos, true), para, held };
 }
 
+// A click on a folded paragraph reveals its markup, which moves the text
+// under the pointer; were that at mousedown, a pixel of drift before mouseup
+// would select across the shift. So the reveal waits for the release, after
+// CodeMirror's own mouseup (a click inside a selection selects then).
+const heldEffect = StateEffect.define<boolean>();
+const holdReveal = ViewPlugin.define(() => ({}), {
+  eventHandlers: {
+    mousedown(e, view) {
+      if (e.button !== 0) return;
+      view.dispatch({ effects: heldEffect.of(true) });
+      // On the window, so it runs after CodeMirror's listener on the document.
+      view.dom.ownerDocument.defaultView?.addEventListener(
+        "mouseup",
+        () => view.dispatch({ effects: heldEffect.of(false) }),
+        { once: true },
+      );
+    },
+  },
+});
+
 const prosed = StateField.define<Drawn>({
-  create: draw,
+  create: (state) =>
+    draw(state, paragraphAt(state.doc, state.selection.main.head), false),
   update(v, tr) {
+    let held = v.held;
+    for (const e of tr.effects) if (e.is(heldEffect)) held = e.value;
+    // Only the pointer holds: a key that moves the cursor reveals at once.
+    if (tr.selection && !tr.isUserEvent("select.pointer")) held = false;
+    const para = held && !tr.docChanged
+      ? v.para
+      : paragraphAt(tr.state.doc, tr.state.selection.main.head);
     if (
-      tr.docChanged ||
+      tr.docChanged || para[0] !== v.para[0] || para[1] !== v.para[1] ||
       tr.effects.some((e) => e.is(turnsEffect) || e.is(imagesEffect))
     ) {
-      return draw(tr.state);
+      return draw(tr.state, para, held);
     }
-    if (!tr.selection) return v;
-    const [a, b] = paragraphAt(tr.state.doc, tr.state.selection.main.head);
-    return a === v.para[0] && b === v.para[1] ? v : draw(tr.state);
+    return held === v.held ? v : { ...v, held };
   },
   provide: (f) => EditorView.decorations.from(f, (v) => v.decos),
 });
@@ -320,6 +373,6 @@ const prosed = StateField.define<Drawn>({
 // an illustration is its rubric alone.
 export function prose(opts?: { images?: ImageHost }): Extension {
   return opts?.images
-    ? [imagesField, prosed, imageLister(opts.images)]
-    : prosed;
+    ? [imagesField, prosed, holdReveal, imageLister(opts.images)]
+    : [prosed, holdReveal];
 }

@@ -88,6 +88,37 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Prose: a click that reveals markup stays a click, not a drag",
+  ignore: !hasChrome || !appBuilt,
+  fn: async () => {
+    const { page, close } = await open(MANUSCRIPT);
+    try {
+      // The reveal (here of {dropcap} above) moves the text under the
+      // pointer; a hand that drifts a pixel between press and release must
+      // not select across the shift.
+      const box = (await page.locator("#editor .cm-line", {
+        hasText: "It was a bright",
+      }).boundingBox())!;
+      const x = box.x + 30, y = box.y + 5;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x, y + 1);
+      await page.mouse.up();
+      // the click reveals the block
+      await page.locator("#editor .cm-line", { hasText: "{dropcap}" })
+        .waitFor();
+      assertEquals(
+        await page.evaluate(() => getSelection()?.toString()),
+        "",
+        "and selects nothing",
+      );
+    } finally {
+      await close();
+    }
+  },
+});
+
 const LONG = `{chapter: one}
 {title}
 Chapter One
@@ -149,6 +180,10 @@ const ILLUSTRATIONS = `Opening words, where the cursor starts.
 {illustration: ornament}
 An ornament.
 
+{illustration: ornament}
+%% a folded note between the image and its caption
+Another ornament.
+
 {illustration: lost}
 Nowhere to be found.
 `;
@@ -160,19 +195,30 @@ Deno.test({
     const { page, close } = await open(ILLUSTRATIONS);
     try {
       const img = page.locator("#editor .cm-prose-illustration img");
-      await img.waitFor();
-      assertEquals(await img.count(), 1);
+      await img.first().waitFor();
       assert(
-        (await img.getAttribute("src"))!.endsWith("/ornament.svg"),
+        (await img.first().getAttribute("src"))!.endsWith("/ornament.svg"),
         "the present file's image",
       );
       const figure = page.locator("#editor .cm-prose-illustration");
       assertEquals(
-        await figure.locator(".cm-prose-rubric").getAttribute("data-slug"),
+        await figure.first().locator(".cm-prose-rubric").getAttribute(
+          "data-slug",
+        ),
         "ornament",
       );
+      assertEquals(await img.count(), 2);
       const caption = page.locator("#editor .cm-line.cm-prose-caption");
-      assertEquals(await caption.innerText(), "An ornament.");
+      assertEquals(await caption.allInnerTexts(), [
+        "An ornament.",
+        "Another ornament.",
+      ]);
+      // A folded note between the image and its caption: the caption's row
+      // still comes straight after the image.
+      assertEquals(
+        await figure.nth(1).evaluate((e) => e.nextElementSibling?.textContent),
+        "Another ornament.",
+      );
       const shown = () => page.locator("#editor .cm-content").innerText();
       let text = await shown();
       assert(!text.includes("{illustration: ornament}"), "folded");
@@ -212,16 +258,25 @@ Deno.test({
         (globalThis as any).setTurn(4, 7)
       );
       assertEquals(
-        await figure.locator('.cm-prose-turn[data-turn="7"]').count(),
+        await figure.first().locator('.cm-prose-turn[data-turn="7"]').count(),
         1,
         "the caption's turn beside the image",
       );
+      await page.evaluate(() =>
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).setTurn(8, 9)
+      );
+      assertEquals(
+        await figure.nth(1).locator('.cm-prose-turn[data-turn="9"]').count(),
+        1,
+        "past a folded note too",
+      );
 
       // A click on the image reveals its markup; the image stays.
-      await img.click();
+      await img.first().click();
       text = await shown();
       assert(text.includes("{illustration: ornament}"), "revealed");
-      assertEquals(await img.count(), 1);
+      assertEquals(await img.count(), 2);
     } finally {
       await close();
     }
