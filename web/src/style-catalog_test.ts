@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import {
   bookParts,
   catalogFor,
+  entryName,
   folioClash,
   getProps,
   inheritedFont,
@@ -489,4 +490,16 @@ Deno.test("sourceOf: set here, inherited from an ancestor or the body, or defaul
     kind: "set",
     label: "All page numbers",
   });
+});
+
+Deno.test("entryName: the source label, margin boxes by what they hold", () => {
+  const meta = {
+    running: { odd: [{ content: "book-title", area: "top-center" }] },
+  };
+  const cat = catalogFor(meta);
+  const name = (key: string) => entryName(byKey(cat, key), cat);
+  assertEquals(name("chapter.title"), "Chapter title");
+  assertEquals(name("paragraph"), "Paragraph");
+  assertEquals(name("numbering.pages.body"), "Page number");
+  assertEquals(name("running.top-center"), "Running head");
 });

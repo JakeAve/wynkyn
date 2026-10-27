@@ -182,3 +182,59 @@ export function groupLines(rects: Box[]): Box[] {
 export function endsMidWord(lineText: string, nextLineText: string): boolean {
   return /\p{L}­?$/u.test(lineText) && /^\p{L}/u.test(nextLineText);
 }
+
+/**
+ * An unzoomed CSS length in the book's unit (mm when its page size is
+ * metric, else inches), one decimal: 96 px to the inch.
+ */
+export function bookLength(px: number, unit: "in" | "mm"): string {
+  const inches = px / 96;
+  return String(+(unit === "mm" ? inches * 25.4 : inches).toFixed(1));
+}
+
+/** px → pt, one decimal. */
+export function points(px: number): string {
+  return String(+(px * 0.75).toFixed(1));
+}
+
+/** The face a computed font-family list asks for first, unquoted. */
+export function faceOf(family: string): string {
+  return (family.split(",")[0] ?? "").trim().replace(/^["']|["']$/g, "");
+}
+
+/** A measured distance: along `axis`, from → to, drawn across at `at`. */
+export interface Gap {
+  axis: "x" | "y";
+  from: number;
+  to: number;
+  at: number;
+}
+
+/**
+ * What ⌥ draws between the pinned box `a` and the hovered `b`, per axis: the
+ * gap between them when they don't overlap, the inset at both ends when one
+ * holds the other, nothing when they partly overlap. Under half a px is none.
+ */
+export function gaps(a: Box, b: Box): Gap[] {
+  const out: Gap[] = [];
+  for (const axis of ["y", "x"] as const) {
+    const [lo, hi, olo, ohi] = axis === "y"
+      ? ["top", "bottom", "left", "right"] as const
+      : ["left", "right", "top", "bottom"] as const;
+    const s = Math.max(a[olo], b[olo]);
+    const e = Math.min(a[ohi], b[ohi]);
+    const at = s <= e ? (s + e) / 2 : (b[olo] + b[ohi]) / 2;
+    const push = (from: number, to: number) => {
+      if (to - from > 0.5) out.push({ axis, from, to, at });
+    };
+    if (b[lo] >= a[hi]) push(a[hi], b[lo]);
+    else if (a[lo] >= b[hi]) push(b[hi], a[lo]);
+    else if (
+      (a[lo] <= b[lo] && b[hi] <= a[hi]) || (b[lo] <= a[lo] && a[hi] <= b[hi])
+    ) {
+      push(Math.min(a[lo], b[lo]), Math.max(a[lo], b[lo]));
+      push(Math.min(a[hi], b[hi]), Math.max(a[hi], b[hi]));
+    }
+  }
+  return out;
+}

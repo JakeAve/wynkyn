@@ -615,6 +615,14 @@ function sourceLabel(catalog: StyleEntry[], path: string[]): string {
   return below?.group ?? titleCase(path[path.length - 1] ?? "");
 }
 
+// The name Inspect shows for an entry: its source label, but a margin box by
+// what it holds ("Page number", never "Folio"; "Running head", not its area).
+export function entryName(entry: StyleEntry, catalog: StyleEntry[]): string {
+  if (entry.section === "numbering") return "Page number";
+  if (entry.section === "running") return "Running head";
+  return sourceLabel(catalog, entry.path);
+}
+
 export function sourceOf(
   metadata: Metadata,
   entry: StyleEntry,

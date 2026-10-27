@@ -387,7 +387,8 @@ export type Mode = "write" | "style" | "publish";
 // the entry from the target's class+tag chain, closest() finds the node its
 // selector matched. Nothing inside a staged (half-rendered) preview. Page
 // furniture (folios, running heads) has no source line, so it always styles.
-function resolveStyle(
+// Inspect (inspect.ts) names what it points at the same way.
+export function resolveStyle(
   target: Element | null,
   container: HTMLElement,
   catalog: StyleEntry[],
@@ -417,7 +418,8 @@ function resolveStyle(
 // on a placeholder in Write goes to `addImage` too (spec §7.6). Furniture
 // always goes to its style. A styled node is outlined until the next pick or
 // re-render; consumed clicks don't let the TOC's links navigate. `catalog` is
-// read per click — `is:` entries change with the metadata.
+// read per click — `is:` entries change with the metadata. While Inspect is on
+// (`inspecting`), clicks are its own and nothing here runs.
 export function installPreviewClicks(
   container: HTMLElement,
   catalog: () => StyleEntry[],
@@ -426,6 +428,7 @@ export function installPreviewClicks(
     style(key: string): void;
     source(line: number): void;
     addImage?(slug: string, file?: File): void;
+    inspecting(): boolean;
   },
 ): void {
   // The slug of the live placeholder at or above `target`, in Write only.
@@ -449,6 +452,7 @@ export function installPreviewClicks(
     on.addImage(slug, file);
   });
   container.addEventListener("click", (e) => {
+    if (on.inspecting()) return;
     const target = e.target as Element | null;
     const mode = on.mode();
     const hit = resolveStyle(target, container, catalog());
@@ -474,12 +478,13 @@ export function installPreviewClicks(
 }
 
 // Hover outline (spec R3): the node a click would style, once per frame —
-// everywhere in Style, only furniture in Write. A re-render replaces the
-// nodes, which takes the attribute with them.
+// everywhere in Style, only furniture in Write; nothing while Inspect is on.
+// A re-render replaces the nodes, which takes the attribute with them.
 export function installStyleHover(
   container: HTMLElement,
   catalog: () => StyleEntry[],
   mode: () => Mode,
+  inspecting: () => boolean,
 ): void {
   let raf = 0;
   let pointed: Element | null = null;
@@ -494,7 +499,9 @@ export function installStyleHover(
     pointed = e.target as Element | null;
     raf ||= requestAnimationFrame(() => {
       raf = 0;
-      const hit = resolveStyle(pointed, container, catalog());
+      const hit = inspecting()
+        ? null
+        : resolveStyle(pointed, container, catalog());
       set(hit && (hit.furniture || mode() === "style") ? hit.el : null);
     });
   }, { passive: true });
@@ -573,7 +580,7 @@ export function previewLink(
 // A margin box's text is CSS-generated (Paged.js puts the @page content on
 // its .pagedjs_margin-content::after, fed by --folio and friends), so
 // "non-empty" means that content is more than empty strings.
-function marginShows(box: Element): boolean {
+export function marginShows(box: Element): boolean {
   const inner = box.querySelector(".pagedjs_margin-content");
   if (!inner || !box.classList.contains("hasContent")) return false;
   const content = getComputedStyle(inner, "::after").content;

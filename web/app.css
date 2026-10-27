@@ -600,7 +600,7 @@ kbd {
 #pages {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: var(--desk);
@@ -623,7 +623,7 @@ kbd {
   min-width: 3.25rem;
   font-variant-numeric: tabular-nums;
 }
-:root[data-mode="publish"] #pages .zoom {
+:root[data-mode="publish"] #pages :is(.zoom, #inspect) {
   display: none;
 }
 /* Menu (§6.9) as a native popover; preview-zoom.ts sets top and right. */
@@ -1599,6 +1599,90 @@ body.typing #editor .pane-head {
 .pagedjs_page .bml *,
 .pagedjs_margin-content {
   cursor: pointer;
+}
+/* Inspect (§2.4, inspect.ts): the picker in the pages header, pressed like
+   any toggle; its marks in their own layer over #preview, never on the pages
+   print.ts clones. Screen only, and hidden outright in print. */
+#inspect[aria-pressed="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+@media screen {
+  #preview[data-inspect],
+  #preview[data-inspect] * {
+    cursor: crosshair;
+  }
+  #inspect-overlay {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  #inspect-overlay > * {
+    position: absolute;
+    box-sizing: border-box;
+  }
+  #inspect-overlay .space {
+    background: var(--inspect-space);
+  }
+  #inspect-overlay .indent {
+    background: var(--inspect-indent);
+  }
+  #inspect-overlay .content {
+    background: var(--inspect-content);
+  }
+  #inspect-overlay .ring {
+    outline: var(--hair) solid var(--inspect-hover);
+  }
+  #inspect-overlay .ring.pin {
+    outline: var(--ring) solid var(--pick);
+  }
+  #inspect-overlay .ring.within {
+    outline: var(--hair) dashed color-mix(in srgb, var(--pick) 55%,
+      transparent);
+  }
+  #inspect-overlay .ghost {
+    outline: var(--hair) dashed var(--inspect-ghost);
+  }
+  #inspect-overlay .gap {
+    background: var(--inspect-ink);
+  }
+  #inspect-overlay .pill {
+    transform: translate(-50%, -50%);
+    padding: 0 var(--s-2);
+    border-radius: var(--r);
+    corner-shape: var(--corner);
+    background: var(--inspect-ink);
+    color: var(--inspect-tag);
+    font: 500 var(--fs-2xs) / var(--lh) var(--f-ui);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  #inspect-overlay .tag {
+    margin-top: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-pop);
+    corner-shape: var(--corner);
+    background: var(--inspect-tag);
+    color: color-mix(in oklab, var(--inspect-ink) 62%, var(--inspect-tag));
+    box-shadow: var(--shadow-pop);
+    font: var(--fs-xs) / var(--lh-tight) var(--f-ui);
+    white-space: nowrap;
+  }
+  #inspect-overlay .tag.up {
+    margin-top: calc(-1 * var(--s-2));
+    transform: translateY(-100%);
+  }
+  #inspect-overlay .tag b {
+    color: var(--inspect-hover);
+  }
+}
+:root[data-mode="publish"] :is(#inspect-overlay, #inspect-drawer) {
+  display: none;
+}
+@media print {
+  :is(#inspect, #inspect-overlay, #inspect-drawer) {
+    display: none !important;
+  }
 }
 /* ---- style panel controls (web/src/panel-controls.ts), scoped so they cannot collide ---- */
 #config-overlay svg.i {

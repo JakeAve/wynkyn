@@ -1,7 +1,10 @@
 import { assert, assertEquals } from "@std/assert";
 import type { PageEntry } from "../../renderer/page-map-types.ts";
 import {
+  bookLength,
   endsMidWord,
+  faceOf,
+  gaps,
   groupLines,
   type InspectFacts,
   reasonsFor,
@@ -147,4 +150,31 @@ Deno.test("groupLines + endsMidWord: three lines, the second hyphenated", () => 
     facts({ kind: "line", line: { n: 2, of: 3, hyphenated: true } }),
     "Breaks the word with a hyphen",
   );
+});
+
+Deno.test("lengths in book units, faces, and the gaps ⌥ measures", () => {
+  assertEquals(bookLength(96, "in"), "1");
+  assertEquals(bookLength(37.8, "mm"), "10");
+  assertEquals(bookLength(10, "in"), "0.1");
+  assertEquals(faceOf('"IM Fell Great Primer", serif'), "IM Fell Great Primer");
+  const box = (top: number, bottom: number, left = 0, right = 100) => ({
+    top,
+    bottom,
+    left,
+    right,
+  });
+  // Stacked: the gap between them, drawn at the middle of their overlap,
+  // and the narrower one's inset, drawn across its middle.
+  assertEquals(gaps(box(0, 10), box(30, 40, 50, 100)), [
+    { axis: "y", from: 10, to: 30, at: 75 },
+    { axis: "x", from: 0, to: 50, at: 35 },
+  ]);
+  // Nested: the insets on all four sides that aren't flush.
+  assertEquals(gaps(box(0, 100), box(20, 90, 0, 60)), [
+    { axis: "y", from: 0, to: 20, at: 30 },
+    { axis: "y", from: 90, to: 100, at: 30 },
+    { axis: "x", from: 60, to: 100, at: 55 },
+  ]);
+  // Partly overlapping: nothing.
+  assertEquals(gaps(box(0, 50), box(25, 75, 50, 150)), []);
 });
