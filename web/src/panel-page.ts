@@ -42,8 +42,10 @@ import {
   FOLD_VALUES,
   isTrueFold,
   type PageSetup,
+  resolveMarks,
   TRUE_FOLDS,
 } from "../../metadata/page-setup.ts";
+import { marksFor } from "../../server/marks.ts";
 import { printSheets } from "./print.ts";
 
 const FOLD_LABELS: Record<Fold, string> = {
@@ -419,10 +421,12 @@ function printSection(
       pages.length,
       page.flip ?? "short-edge",
     );
-    printSheets(pages, sidesFor(imp, mode, page["reverse-backs"] === true), {
-      sheet: imp.sheet,
-      page: setup.page,
-    });
+    const marks = marksFor(imp, setup.page, resolveMarks(page.marks));
+    printSheets(
+      pages,
+      sidesFor(imp, mode, page["reverse-backs"] === true, marks),
+      { sheet: imp.sheet, page: setup.page },
+    );
   };
   const btn = (label: string, mode: "duplex" | "fronts" | "backs") => {
     // One primary on a screen: Print sheets.

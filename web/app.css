@@ -1453,6 +1453,12 @@ body.typing #editor .pane-head {
   overflow: hidden;
   break-after: page;
 }
+#print-sheets .print-marks {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
 #print-sheets .pagedjs_page {
   position: absolute;
   margin: 0;

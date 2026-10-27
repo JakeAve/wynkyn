@@ -5,6 +5,8 @@
 // Nothing runs on the server, so it needs no Chrome there. The layer and its
 // @page rule go away once the dialog closes.
 import type { Dims, Side } from "../../server/imposition.ts";
+import { MARK_STYLE } from "../../server/marks.ts";
+import type { SideMarks } from "../../server/marks.ts";
 
 export interface SheetLayout {
   sheet: Dims; // inches, oriented as the grid lays it out
@@ -42,6 +44,8 @@ export function printSheets(
       if (slot.rotate) clone.style.transform = "rotate(180deg)";
       sheet.append(clone);
     }
+    const marks = marksSvg(side.marks, W, H);
+    if (marks) sheet.append(marks); // after the clones, so it paints on top
     layer.append(sheet);
   }
   // Last in <head>, so it outranks the trim-size @page Paged.js wrote.
@@ -56,4 +60,48 @@ export function printSheets(
     document.body.classList.remove("printing");
   }, { once: true });
   print();
+}
+
+const SVG = "http://www.w3.org/2000/svg";
+
+// One SVG over the sheet, in inches (viewBox) so the geometry is used as-is;
+// MARK_STYLE's points become inches (÷ 72). Null when the side has no marks.
+function marksSvg(m: SideMarks, W: number, H: number): SVGSVGElement | null {
+  if (!m.dots.length && !m.lines.length) return null;
+  const pt = (n: number) => String(n / 72);
+  const grey = `rgb(${MARK_STYLE.grey * 100}%,${MARK_STYLE.grey * 100}%,${
+    MARK_STYLE.grey * 100
+  }%)`;
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("class", "print-marks");
+  svg.setAttribute("width", `${W}in`);
+  svg.setAttribute("height", `${H}in`);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const add = (tag: string, attrs: Record<string, string>) => {
+    const e = document.createElementNS(SVG, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    svg.append(e);
+  };
+  for (const l of m.lines) {
+    add("line", {
+      x1: String(l.x1),
+      y1: String(l.y1),
+      x2: String(l.x2),
+      y2: String(l.y2),
+      stroke: grey,
+      "stroke-width": pt(MARK_STYLE.line),
+      ...(l.kind === "fold"
+        ? { "stroke-dasharray": MARK_STYLE.dash.map(pt).join(" ") }
+        : {}),
+    });
+  }
+  for (const d of m.dots) {
+    add("circle", {
+      cx: String(d.x),
+      cy: String(d.y),
+      r: pt(MARK_STYLE.dot / 2),
+      fill: grey,
+    });
+  }
+  return svg;
 }
