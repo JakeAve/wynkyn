@@ -193,10 +193,15 @@ const TOC_NESTED: StyleEntry[] = (["toc-part", "toc-chapter"] as const).flatMap(
 );
 
 // Give each `{is: name}` the manuscript uses an entry, empty if unstyled, so
-// it can be picked and styled before it has any CSS. The panel's save drops
-// the empty ones again.
-export function addIsNames(metadata: Metadata, names: Iterable<string>): void {
-  for (const n of names) (metadata.is ??= {})[n] ??= {};
+// it can be picked and styled before it has any CSS. An empty entry whose name
+// left the manuscript goes (the half-typed `{is: fo}` on the way to `foo`).
+// The panel's save drops the empty ones again.
+export function syncIsNames(metadata: Metadata, names: Iterable<string>): void {
+  const used = new Set(names);
+  for (const [n, props] of Object.entries(metadata.is ?? {})) {
+    if (!used.has(n) && !Object.keys(props).length) delete metadata.is![n];
+  }
+  for (const n of used) (metadata.is ??= {})[n] ??= {};
 }
 
 export function catalogFor(metadata: Metadata): StyleEntry[] {

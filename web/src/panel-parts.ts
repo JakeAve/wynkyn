@@ -172,7 +172,8 @@ function isDetail(ctx: PanelContext, part: BookPart): Node[] {
     ctx.queueSave("is");
   }, []);
   box.open = true;
-  return [box];
+  const where = applies(ctx, entry.key); // the header shows it
+  return where ? [box, where] : [box];
 }
 
 function focusOf(key: string): string {

@@ -10,6 +10,7 @@ import {
 } from "@codemirror/autocomplete";
 import {
   ChangeSet,
+  EditorSelection,
   type EditorState,
   type Extension,
   Prec,
@@ -26,6 +27,7 @@ import {
 import {
   applySnippet,
   closingForm,
+  linkedClose,
   nextField,
   overSelection,
   type Snippet,
@@ -98,10 +100,19 @@ export function insertSnippet(
     step({ selection: over.selection });
   }
   step(applySnippet(state, used));
+  const { from: at, to: end } = state.selection.main;
+  // `{is: name}`'s name is selected in the closing tag too, so typing it
+  // renames both and one undo takes both back.
+  const close = linkedClose(used, at);
   view.dispatch({
     changes,
-    selection: state.selection,
-    effects: setStop.of(nextField(used, state.selection.main.from)),
+    selection: close
+      ? EditorSelection.create([
+        EditorSelection.range(at, end),
+        EditorSelection.range(close.from, close.to),
+      ])
+      : state.selection,
+    effects: setStop.of(nextField(used, at)),
     scrollIntoView: true,
     userEvent: "input",
   });
