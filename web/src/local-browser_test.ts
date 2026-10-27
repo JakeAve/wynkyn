@@ -348,8 +348,10 @@ Deno.test({
         tree.includes("The Start") && tree.includes("The End"),
         `the import landed: ${tree}`,
       );
-      const text = await page.locator("#editor .cm-content").innerText();
-      assert(text.includes("%% check:"), "guesses are flagged");
+      // In Prose a `%%` note is a ☞ in the margin, its text in the title.
+      const flags = await page.locator("#editor .cm-prose-note")
+        .evaluateAll((els) => els.map((e) => e.getAttribute("title") ?? ""));
+      assert(flags.some((t) => t.includes("check:")), "guesses are flagged");
       const notes = page.locator("#import-notes");
       await notes.waitFor({ state: "visible" });
       assert(
