@@ -71,8 +71,9 @@ Deno.test({
   ignore: !hasChrome || !appBuilt,
   fn: () =>
     withBook(async (page) => {
-      await page.getByRole("button", { name: "Zoom in" }).click();
-      await page.getByRole("button", { name: "Zoom in" }).click();
+      for (let i = 0; i < 10; i++) {
+        await page.getByRole("button", { name: "Zoom in" }).click();
+      }
       assertEquals(
         await page.locator('#zoom [data-zoom="menu"]').innerText(),
         "200%",
