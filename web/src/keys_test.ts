@@ -79,7 +79,10 @@ Deno.test("label is native to each platform", () => {
   assertEquals(label("ctrl+shift+f", false), "Ctrl+Shift+F");
   assertEquals(label("ctrl+enter", false), "Ctrl+Enter");
   assertEquals(label("alt+bracketright", false), "Alt+]");
-  assertEquals(label("ctrl+shift+slash", false), "Ctrl+?");
+  assertEquals(label("ctrl+shift+slash", false), "Ctrl+Shift+/");
+  assertEquals(label("ctrl+shift+1", false), "Ctrl+Shift+1");
+  assertEquals(label("alt+shift+bracketright", false), "Alt+Shift+]");
+  assertEquals(label("shift+cmd+slash", true), "⌘?");
   assertEquals(label("ctrl+1", false), "Ctrl+1");
   assertEquals(label("shift+cmd+f", true), "⇧⌘F");
   assertEquals(label("ctrl+alt+shift+cmd+f", true), "⌃⌥⇧⌘F");

@@ -113,7 +113,7 @@ const treeShown = (page: Page) =>
   page.locator("#tree-toggle").getAttribute("aria-pressed");
 
 Deno.test({
-  name: "Ctrl+? rebinds Contents to Ctrl+B, and it survives a reload",
+  name: "Ctrl+Shift+/ rebinds Contents to Ctrl+B, and it survives a reload",
   ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {

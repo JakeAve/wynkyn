@@ -137,7 +137,9 @@ const SHIFTED: Record<string, string> = {
 export function label(c: string, mac = isMac): string {
   const parts = norm(c, mac).split("+");
   let key = parts.pop() ?? "";
-  const shifted = SHIFTED[key];
+  // Mac menus fold Shift into the symbol (⌘?); Windows spells it out
+  // (Ctrl+Shift+1), and a US-only symbol would mislead other layouts there.
+  const shifted = mac ? SHIFTED[key] : undefined;
   if (shifted && parts.includes("shift")) {
     parts.splice(parts.indexOf("shift"), 1);
     key = shifted;
