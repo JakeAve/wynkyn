@@ -449,10 +449,12 @@ pill, whatever the corner shape.
   `--fs-xs` `--muted` beneath.
 - **Swatches** (`swatches`): `--h-md` colour chips with a hairline edge, each
   named in its tooltip, then a native colour picker the same size and its code
-  in a text field in `--f-hivis`; any CSS colour can be typed. The chosen chip,
-  or the picker when the value is none of them, sits in `--acc-wash` inside a
-  1px `--acc` frame (the wash alone is lost around a warm chip). An option
-  valued `""` means unset.
+  in a text field in `--f-hivis`; any CSS colour can be typed. Until a custom
+  colour is chosen the picker shows a soft hue wheel (oklch, lightness 0.82,
+  chroma 0.1), never white, so it can't pass for a white chip; this is the one
+  literal colour in the chrome. The chosen chip, or the picker when the value is
+  none of them, sits in `--acc-wash` inside a 1px `--acc` frame (the wash alone
+  is lost around a warm chip). An option valued `""` means unset.
 - **Tip line** (`.tip`): a red ☞ in Fell before `--fs-sm` `--muted` text.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.
