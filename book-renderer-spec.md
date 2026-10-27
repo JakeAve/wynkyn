@@ -1232,7 +1232,8 @@ in one section.
   author sees the book on the stock it will be printed on: print sheets, the PDF
   of the pages, `bml export` and the EPUB stay white, and nothing is written
   into the manuscript or the colophon. The panel offers Bright white (unset),
-  Natural, Ivory, Cream and Recycled grey, and a custom colour.
+  Natural, Ivory, Cream and Recycled grey, and a custom colour, over a hint that
+  the stock is for the preview only.
 
 CLI flags (`bml export --sheet/--fold/--folios/--duplex/--flip/--reverse-backs`)
 override any of these per run.

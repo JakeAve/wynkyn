@@ -175,6 +175,11 @@ export function buildPageTab(panel: PanelContext): Node[] {
         ),
         () => !!page.paper,
       ),
+      el(
+        "p",
+        "hint",
+        "For previewing purposes only. Print background will always be transparent.",
+      ),
     ]),
     section("Margins", "margins", [
       diag,

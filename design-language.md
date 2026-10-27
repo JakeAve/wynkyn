@@ -162,8 +162,9 @@ and upgraded like any other `page` key. Kept deliberately quiet:
 
 - One row in Style → Page size & margins, "Paper stock": `swatches` (§6.5) for
   Bright white (unset, the default `--stock`), Natural `#fbf8f1`, Ivory
-  `#f8f2e3`, Cream `#f3e9d2`, Recycled grey `#f1f0ec`, then a custom colour. No
-  prompt, banner or first-run question.
+  `#f8f2e3`, Cream `#f3e9d2`, Recycled grey `#f1f0ec`, then a custom colour.
+  Beneath it a hint: "For previewing purposes only. Print background will always
+  be transparent." No prompt, banner or first-run question.
 - `setPaperStock` (`preview.ts`) sets `--stock` on `#preview`, so only the live
   pages change. The pages are paper in both themes, so the stock is the same in
   dark: the five are all near-white, never a mood.
