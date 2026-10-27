@@ -376,7 +376,9 @@ shared CSS classes; this section is what each must look like.
 States, everywhere: **hover** `--hover` wash; **focus** 2px `--acc` ring offset
 1px (fields: border turns `--acc` plus a 1px `--acc` ring); **selected /
 pressed** `--acc-wash` + `--acc-ink`; **disabled** 45% opacity, no pointer
-events.
+events. The column gutters are the exception: focused (Tab), the hairline
+thickens to a 3px `--acc` bar instead of a ring, and ←/→ move it 1rem a press
+within the same limits as a drag.
 
 ### 6.1 Button
 

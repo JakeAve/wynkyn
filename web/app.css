@@ -567,6 +567,11 @@ kbd {
   background: linear-gradient(var(--line), var(--line)) 50% 0 / 1px 100%
     no-repeat;
 }
+.gutter:focus-visible {
+  outline: none; /* the bar below is its ring */
+  background: linear-gradient(var(--acc), var(--acc)) 50% 0 / 0.1875rem 100%
+    no-repeat;
+}
 .gutter:hover,
 .gutter.dragging {
   background: linear-gradient(var(--muted), var(--muted)) 50% 0 / 0.1875rem 100%

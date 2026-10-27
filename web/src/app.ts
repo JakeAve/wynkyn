@@ -689,22 +689,37 @@ function installGutters(): void {
     const saved = localStorage.getItem(cssVar);
     if (saved) root.style.setProperty(cssVar, saved);
     const gutter = $(id);
+    // Where the column starts, its width now, and the width the pointer and
+    // the keys share: at least `min`, and 12.5rem left for whatever pane sits
+    // to the right.
+    const left = () =>
+      (cssVar === "--w-tree"
+        ? panes
+        : mode === "write"
+        ? $("editor")
+        : $("config-overlay")).getBoundingClientRect().left;
+    const rem = () => parseFloat(getComputedStyle(root).fontSize);
+    const width = () => gutter.getBoundingClientRect().left - left();
+    const resize = (px: number) => {
+      const max = panes.getBoundingClientRect().right - left() - 12.5 * rem();
+      const w = Math.min(Math.max(px, min * rem()), max);
+      root.style.setProperty(cssVar, `${w}px`);
+      gutter.setAttribute("aria-valuenow", String(Math.round(w)));
+    };
+    gutter.onfocus = () =>
+      gutter.setAttribute("aria-valuenow", String(Math.round(width())));
+    gutter.onkeydown = (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      resize(width() + (e.key === "ArrowLeft" ? -rem() : rem()));
+      localStorage.setItem(cssVar, root.style.getPropertyValue(cssVar));
+    };
     gutter.onpointerdown = (e) => {
       e.preventDefault();
       gutter.setPointerCapture(e.pointerId);
       gutter.classList.add("dragging");
-      const work = mode === "write" ? $("editor") : $("config-overlay");
-      const left = (cssVar === "--w-tree" ? panes : work)
-        .getBoundingClientRect().left;
-      const rem = parseFloat(getComputedStyle(root).fontSize);
-      gutter.onpointermove = (m) => {
-        // Leave at least 12.5rem for whatever pane sits to the right.
-        const max = panes.getBoundingClientRect().right - left - 12.5 * rem;
-        root.style.setProperty(
-          cssVar,
-          `${Math.min(Math.max(m.clientX - left, min * rem), max)}px`,
-        );
-      };
+      const l = left();
+      gutter.onpointermove = (m) => resize(m.clientX - l);
       gutter.onpointerup = () => {
         gutter.onpointermove = gutter.onpointerup = null;
         gutter.classList.remove("dragging");
