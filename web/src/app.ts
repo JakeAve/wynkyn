@@ -899,7 +899,6 @@ async function main(): Promise<void> {
   $("inspect").addEventListener("click", () => void ensureConfigPanel());
   installShortcuts({
     mode: () => mode,
-    setMode,
     panes: installPanes({ mode: () => mode }),
     textView,
     inspect,

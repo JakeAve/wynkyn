@@ -2258,7 +2258,8 @@ Publish has no zoom.
 
 **Turning pages.** Alt+] and Alt+[ move to the next or previous page, the next
 spread when pages sit side by side; Alt+Shift+] and Alt+Shift+[ to the next or
-previous chapter or part opening. The page lands centred, so the footer's
+previous chapter or part opening. On a Mac they are ⌃] and ⌃[ (with ⇧ for
+chapters), since ⌥] and ⌥[ type ’ and ‘. The page lands centred, so the footer's
 indicator names it.
 
 **Inspect.** The header's Inspect toggle (Mod+'), after zoom, turns the pages

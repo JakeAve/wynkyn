@@ -173,6 +173,53 @@ Deno.test({
     }),
 });
 
+Deno.test({
+  name:
+    "a taken key comes back from a rebound command; an open dialog holds the keys",
+  ignore: !hasChrome || !appBuilt,
+  fn: () =>
+    withApp(async (page) => {
+      const row = (id: string) =>
+        page.locator(`#shortcuts-list [data-id="${id}"]`);
+      await page.keyboard.press("Control+Shift+Slash");
+      // Light / dark sits later in the table, so its rebind would win Ctrl+B.
+      await row("theme").click();
+      await page.keyboard.press("Control+B");
+      await row("toggle-tree").click();
+      await page.keyboard.press("Control+B");
+      assertEquals(await row("toggle-tree").locator("kbd").allTextContents(), [
+        "Ctrl+B",
+      ]);
+      assertEquals(
+        await row("theme").locator(".sc-hint").allTextContents(),
+        ["was Ctrl+B", "none"],
+      );
+      // The mode keys wait for the dialog to close.
+      await page.keyboard.press("Control+2");
+      assertEquals(await mode(page), "write");
+      await page.keyboard.press("Control+Shift+Slash");
+      await page.keyboard.press("Control+2");
+      assertEquals(await mode(page), "style");
+    }),
+});
+
+Deno.test({
+  name: "Writing keys leave a text field outside the editor alone",
+  ignore: !hasChrome || !appBuilt,
+  fn: () =>
+    withApp(async (page) => {
+      await page.evaluate(() => {
+        const i = document.body.appendChild(document.createElement("input"));
+        i.focus();
+      });
+      await page.keyboard.press("Control+K");
+      assertEquals(await page.locator(".cm-bml-palette").count(), 0);
+      await page.locator("#editor .cm-content").click();
+      await page.keyboard.press("Control+K");
+      await page.locator(".cm-bml-palette").waitFor();
+    }),
+});
+
 // Three chapters, each running over several pages.
 const long = (
   "The hallway smelt of boiled cabbage and old rag mats. ".repeat(10) + "\n\n"

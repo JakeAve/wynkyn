@@ -49,6 +49,18 @@ Deno.test("combo uses the physical key for digits, punctuation and dead keys", (
   );
 });
 
+Deno.test("combo folds the keypad's digits and Enter into the main keys", () => {
+  assertEquals(combo(ev("1", "Numpad1", { ctrlKey: true })), "ctrl+1");
+  assertEquals(
+    combo(ev("Enter", "NumpadEnter", { metaKey: true })),
+    "cmd+enter",
+  );
+  assertEquals(
+    combo(ev("+", "NumpadAdd", { ctrlKey: true })),
+    "ctrl+numpadadd",
+  );
+});
+
 Deno.test("combo ignores a lone modifier", () => {
   assertEquals(combo(ev("Control", "ControlLeft", { ctrlKey: true })), null);
   assertEquals(combo(ev("Shift", "ShiftRight", { shiftKey: true })), null);
@@ -74,6 +86,8 @@ Deno.test("label is native to each platform", () => {
   assertEquals(label("cmd+enter", true), "⌘↩");
   assertEquals(label("cmd+shift+slash", true), "⌘?");
   assertEquals(label("alt+bracketright", true), "⌥]");
+  assertEquals(label("mod+a", false), "Ctrl+A");
+  assertEquals(label("mod+c", true), "⌘C");
 });
 
 const cmds = [
@@ -143,10 +157,15 @@ Deno.test("reserved names the browser and OS combos", () => {
   assertEquals(reserved("ctrl+shift+f", false), null);
 });
 
-Deno.test("caution flags option plus a letter on a Mac only", () => {
-  assertEquals(typeof caution("alt+e", true), "string");
-  assertEquals(typeof caution("alt+shift+n", true), "string");
+Deno.test("caution flags option plus a printable key on a Mac only", () => {
+  for (
+    const c of ["alt+e", "alt+shift+n", "alt+bracketright", "alt+shift+1"]
+  ) {
+    assertEquals(typeof caution(c, true), "string", c);
+  }
   assertEquals(caution("alt+cmd+n", true), null);
-  assertEquals(caution("alt+bracketright", true), null);
+  assertEquals(caution("ctrl+alt+bracketright", true), null);
+  assertEquals(caution("alt+f5", true), null);
+  assertEquals(caution("alt+arrowup", true), null);
   assertEquals(caution("alt+e", false), null);
 });

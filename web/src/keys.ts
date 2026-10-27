@@ -41,13 +41,13 @@ const ALIAS: Record<string, string> = {
 
 // Letters follow the layout (Dvorak, AZERTY); everything else is the physical
 // key, which also keeps ⌥ from turning N into a dead key and a Russian "у"
-// into something other than E.
+// into something other than E. The keypad's digits and Enter are the main ones.
 // ponytail: on a German layout mod+backslash is the physical US `\` key,
 // labelled `#` there. Fix by reading the layout map if anyone binds it.
 export function combo(e: KeyLike): string | null {
   const key = /^[a-zA-Z]$/.test(e.key)
     ? e.key.toLowerCase()
-    : e.code.replace(/^(Key|Digit)/, "").toLowerCase();
+    : e.code.replace(/^(Key|Digit|Numpad(?=\d$|Enter$))/, "").toLowerCase();
   if (!key || /^(meta|os|alt|shift|control)(left|right)?$/.test(key)) {
     return null;
   }
@@ -133,8 +133,9 @@ const SHIFTED: Record<string, string> = {
   backquote: "~",
 };
 
+// Takes a combo or a default as written ("mod+a").
 export function label(c: string, mac = isMac): string {
-  const parts = c.split("+");
+  const parts = norm(c, mac).split("+");
   let key = parts.pop() ?? "";
   const shifted = SHIFTED[key];
   if (shifted && parts.includes("shift")) {
@@ -142,7 +143,7 @@ export function label(c: string, mac = isMac): string {
     key = shifted;
   } else {
     key = SYMBOL[key] ?? (mac ? MAC_KEY : WIN_KEY)[key] ??
-      key.replace(/^numpad(\d)$/, "$1").replace(/^./, (ch) => ch.toUpperCase());
+      key.replace(/^./, (ch) => ch.toUpperCase());
   }
   const mods = parts.map((p) => (mac ? MAC_MOD : WIN_MOD)[p] ?? p);
   return mac ? [...mods, key].join("") : [...mods, key].join("+");
@@ -198,11 +199,13 @@ export function reserved(c: string, mac = isMac): string | null {
   return why ? `${label(c, mac)} ${why}; the page can't use it.` : null;
 }
 
-// ⌥ plus a letter types an accent on a Mac (⌥E, ⌥N), so it clashes with text.
+// ⌥ plus a printable key types a character on a Mac (⌥E, ⌥N, ⌥] for ’), so it
+// clashes with text.
 export function caution(c: string, mac = isMac): string | null {
-  return mac && /^alt(\+shift)?\+[a-z]$/.test(c)
+  const key = (mac && /^alt(?:\+shift)?\+(.+)$/.exec(c)?.[1]) || "";
+  return /^[a-z]$/.test(key) || key in SHIFTED || key === "space"
     ? `${
       label(c, mac)
-    } types an accent in the editor on a Mac (⌥E, ⌥N for Spanish).`
+    } types a character in the editor on a Mac (⌥E, ⌥N for Spanish, ⌥] for ’).`
     : null;
 }

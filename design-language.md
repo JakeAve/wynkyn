@@ -563,9 +563,10 @@ control's tooltip and `kbd` show its key as the platform writes it
   Publish, where the zoom keys stay the browser's.
 - **Keys without a control of their own:** Alt+] and Alt+[ step the pages to the
   next or previous spread, Alt+Shift+] and Alt+Shift+[ to the next or previous
-  chapter or part opening; in Style, Mod+Shift+1–4 open Theme, Page size &
-  margins, Fonts and Body (⌥⌘1–4 on a Mac, where ⌘⇧3 and ⌘⇧4 take screenshots);
-  in Publish, Mod+P prints the pages and Mod+Shift+E exports the EPUB.
+  chapter or part opening (⌃ in place of Alt on a Mac, where ⌥] and ⌥[ type ’
+  and ‘); in Style, Mod+Shift+1–4 open Theme, Page size & margins, Fonts and
+  Body (⌥⌘1–4 on a Mac, where ⌘⇧3 and ⌘⇧4 take screenshots); in Publish, Mod+P
+  prints the pages and Mod+Shift+E exports the EPUB.
 - **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; the writer's
   cell opens with the stats line (§8.3), the session count in `--acc-ink` once
   non-zero, then Go to style with a dotted underline.

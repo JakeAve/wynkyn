@@ -82,7 +82,10 @@ export function installShortcutsDialog(s: Shortcuts): () => void {
     if (k && other && other !== id) {
       // An earlier rebind of `other` can still win the combo: take it back.
       if (s.keymap().byCombo.get(k) !== id) {
-        s.bind(other, (s.keymap().byId[other] ?? []).join(", "));
+        s.bind(
+          other,
+          (s.keymap().byId[other] ?? []).filter((o) => o !== k).join(", "),
+        );
       }
       was.set(other, label(k));
       const name = s.commands().find((c) => c.id === other)?.label;
@@ -103,12 +106,13 @@ export function installShortcutsDialog(s: Shortcuts): () => void {
     if (why) return say(why, "sw-err");
     if (
       k !== "escape" && k !== "delete" && k !== "backspace" &&
-      !/^(.*(ctrl|alt|cmd)\+.+|f\d+)$/.test(k)
+      !/^(.*(ctrl|alt|cmd)\+.+|(.+\+)?f\d+)$/.test(k)
     ) {
+      const add = isMac ? "⌘, ⌥ or ⌃" : "Ctrl or Alt";
       return say(
-        `${label(k)} types a character; add ${
-          isMac ? "⌘, ⌥ or ⌃" : "Ctrl or Alt"
-        }.`,
+        e.key.length === 1
+          ? `${label(k)} types a character; add ${add}.`
+          : `${label(k)} needs ${add}.`,
         "sw-err",
       );
     }

@@ -24,7 +24,6 @@ export interface Shortcuts {
 
 export interface ShortcutDeps {
   mode(): Mode;
-  setMode(mode: Mode): void;
   panes: Panes;
   textView: TextView;
   inspect: { escape(): boolean };
@@ -58,6 +57,14 @@ function button(sel: string): Pick<Command, "when" | "run"> {
 
 function table(d: ShortcutDeps): Command[] {
   const write = () => d.mode() === "write";
+  // A Writing key edits the manuscript, so another text field (the find bar,
+  // a filter) keeps it: only the editor or no field at all.
+  const writing = () => {
+    const a = document.activeElement;
+    return write() && (!(a instanceof HTMLElement) ||
+      d.editor().contentDOM.contains(a) ||
+      !(a.matches("input, textarea, select") || a.isContentEditable));
+  };
   const mode = (id: Mode, label: string, keys: string): Command => ({
     id: `mode-${id}`,
     label,
@@ -70,7 +77,7 @@ function table(d: ShortcutDeps): Command[] {
     label,
     section: "Writing",
     keys,
-    when: write,
+    when: writing,
     run: () => insertSnippet(d.editor(), SNIPPETS.find((s) => s.label === id)!),
   });
   const switcher = button("#book-switcher");
@@ -85,7 +92,8 @@ function table(d: ShortcutDeps): Command[] {
     id,
     label,
     section: "Preview",
-    keys,
+    keys: `alt+${keys}`,
+    mac: `ctrl+${keys}`,
     when: () => d.preview.checkVisibility(),
     run: () => stepPreview(d.preview, dir, unit),
   });
@@ -149,7 +157,7 @@ function table(d: ShortcutDeps): Command[] {
       label: "Insert sentinel (list)",
       section: "Writing",
       keys: "mod+k",
-      when: write,
+      when: writing,
       run: () => openPalette(d.editor()),
     },
     {
@@ -202,19 +210,14 @@ function table(d: ShortcutDeps): Command[] {
       run: () =>
         document.querySelector<HTMLElement>('[data-fit="spread"]')?.click(),
     },
-    step("page-next", "Next page", "alt+bracketright", 1, "page"),
-    step("page-prev", "Previous page", "alt+bracketleft", -1, "page"),
-    step(
-      "chapter-next",
-      "Next chapter",
-      "alt+shift+bracketright",
-      1,
-      "chapter",
-    ),
+    // ⌥] and ⌥[ type ’ and ‘ on a Mac, so the Mac steps with ⌃.
+    step("page-next", "Next page", "bracketright", 1, "page"),
+    step("page-prev", "Previous page", "bracketleft", -1, "page"),
+    step("chapter-next", "Next chapter", "shift+bracketright", 1, "chapter"),
     step(
       "chapter-prev",
       "Previous chapter",
-      "alt+shift+bracketleft",
+      "shift+bracketleft",
       -1,
       "chapter",
     ),
@@ -297,6 +300,10 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     const c = combo(e);
     const cmd = c ? byId.get(map.byCombo.get(c) ?? "") : undefined;
     if (!cmd || (cmd.when && !cmd.when())) return;
+    // A modal dialog owns the keys; only the shortcuts list still toggles.
+    if (cmd.id !== "shortcuts" && document.querySelector("dialog[open]")) {
+      return;
+    }
     cmd.run();
     e.preventDefault();
   }, true);
