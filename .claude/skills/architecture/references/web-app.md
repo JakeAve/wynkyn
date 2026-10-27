@@ -16,8 +16,9 @@ it are in `SKILL.md`, The web app; this is the map.
 | `switcher.ts` | `installSwitcher`: the crumb (Book / Edition · size) and the book/edition switcher — search, Rename, Delete, New edition, download as zip, Change library |
 | `create-book.ts` | `installCreateBook`: Create a new manuscript (import a file or web page, copy in from a folder, start blank), the title and web dialogs; `renderImportNotes` for the footer's import notes |
 | `theme-preview.ts` | `ThemePreview`: try a theme with nothing saved, hold pushed builds meanwhile, Apply |
-| `text-view.ts` | `installTextView`: the write pane's header — Prose \| Source (`#editor[data-view]`, `setWriteView`, ⌘/), the Aa menu (face, size, dim, page turns) and Spelling; a reader preference in localStorage `text-view`, not the book (`readPrefs` migrates the old `font`/`hide`) |
-| `panes.ts` | `installPanes`: the Contents toggle (pins the outline while expanded), Pages hidden by ⌘., and each pane's expand (`#panes.expand-writing` / `expand-pages`, localStorage `expanded:<mode>`); returns what the shortcuts call |
+| `text-view.ts` | `installTextView`: the write pane's header — Prose \| Source (`#editor[data-view]`, `setWriteView`, Mod+/), the Aa menu (face, size, dim, page turns) and Spelling; a reader preference in localStorage `text-view`, not the book (`readPrefs` migrates the old `font`/`hide`) |
+| `panes.ts` | `installPanes`: the Contents toggle (pins the outline while expanded), Pages hidden by Mod+., and each pane's expand (`#panes.expand-writing` / `expand-pages`, localStorage `expanded:<mode>`); returns what the shortcuts call |
+| `shortcuts.ts` | `installShortcuts`: every app shortcut — one command table (ids, sections, default keys), one capture-phase keydown with esc's order (popups, Inspect, an expanded pane), and the label pass that writes each `data-command` key into titles, `aria-keyshortcuts` and `kbd`; overrides in localStorage `keys`. The key model (combos, labels, resolve) is pure in `keys.ts` |
 | `dom.ts` | `$`, `brief` — the helpers every module shares |
 
 Editor side: `editor.ts` (the CodeMirror pane; `setWriteView` swaps Prose and

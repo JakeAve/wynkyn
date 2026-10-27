@@ -495,8 +495,8 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   kbd or detail. Current item: red wash and a red check. Separators are
   hairlines bleeding to the edges. Optional small-caps heading. Used by: the
   book and edition switcher (`#switcher`), the font picker (`.fontpop`), `{`
-  completions (`.cm-tooltip-autocomplete`), ⌘K (`.cm-bml-palette`), the wrap bar
-  and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write
+  completions (`.cm-tooltip-autocomplete`), Mod+K (`.cm-bml-palette`), the wrap
+  bar and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write
   pane's header (`.tvpop`); the pages' zoom menu (`.menu`, a native popover of
   `menuitemradio` rows). Fields inside a popover are §6.3 frames (focus: `--acc`
   border and ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but
@@ -531,10 +531,14 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
 
 ### 6.11 Chrome
 
-- **Toolbar** (`--h-toolbar`): left, the Contents toggle (⌘\) and the crumb
+Shortcuts are written Mod+key: Mod is Ctrl on Windows and Linux, ⌘ on Mac. A
+control's tooltip and `kbd` show its key as the platform writes it
+(Ctrl+Shift+F, ⌘⇧F), filled from its `data-command` (`web/src/shortcuts.ts`).
+
+- **Toolbar** (`--h-toolbar`): left, the Contents toggle (Mod+\) and the crumb
   (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`); centre,
-  Write / Style / Publish (⌘1–3); right, the theme toggle alone. The save status
-  sits after the crumb.
+  Write / Style / Publish (Mod+1–3); right, the theme toggle alone. The save
+  status sits after the crumb.
 - **Pane header** (`--h-pane` at least, `.pane-head`): the pane's own controls
   at left in small sizes, `--s-2` apart; its expand button
   (`.btn.sm.icon
@@ -605,19 +609,20 @@ changing, right is the result.
     (Write's outline, or the Style / Publish nav), with `--shadow-pop`; the
     Contents toggle pins it. While it is out, the pane header steps right of it
     so its controls stay reachable.
-  - Return with the same button or `esc`. `⌘⇧↩` expands the pane last used, or
-    returns. (`⌘⇧F` stays Footnote.)
+  - Return with the same button or `esc`. Mod+Shift+Enter expands the pane last
+    used, or returns. (Mod+Shift+F stays Footnote.)
   - Expanded state is per mode and persists. A hidden preview still lays out (it
     leaves the grid, never `display: none`).
-- **Gone from the toolbar:** the Pages toggle (⌘. stays as a shortcut), focus,
-  and every Write-only control. While the pages are hidden, the write pane's
-  corner button shows the return state, "Show the pages (⌘.)", and brings them
-  back. The pages hide in Write only; Style and Publish always show them.
+- **Gone from the toolbar:** the Pages toggle (Mod+. stays as a shortcut),
+  focus, and every Write-only control. While the pages are hidden, the write
+  pane's corner button shows the return state, "Show the pages (Mod+.)", and
+  brings them back. The pages hide in Write only; Style and Publish always show
+  them.
 
 ## 8. The write pane
 
-Two views of the same file, switched in the pane header or with `⌘/`. Nothing is
-stored differently.
+Two views of the same file, switched in the pane header or with Mod+/. Nothing
+is stored differently.
 
 ### 8.1 Prose (default)
 
@@ -699,7 +704,7 @@ outside its sentence, to opacity .28 over `--t` (instant under
 and an illustration's image fades with its caption. A sentence ends at `.`, `?`
 or `!` (and any closing quotes) before a space or the line's end, so an
 abbreviation ends one early. Spelling's popover lists the word lists and None as
-check items. Completions, the wrap bar, ⌘K, sentinel shortcuts, find and
+check items. Completions, the wrap bar, Mod+K, sentinel shortcuts, find and
 replace, image drops and the preview following the cursor work in both views and
 expanded. Footer (built): the writer's cell opens with "Chapter title · 41,210
 words · +512 this session", the chapter at the cursor (its slug in `--f-hivis`

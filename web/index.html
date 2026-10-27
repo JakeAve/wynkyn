@@ -79,7 +79,7 @@
         </symbol>
       </svg>
       <button id="tree-toggle" class="btn toggle" aria-pressed="true"
-        title="Contents" aria-label="Contents">
+        data-command="toggle-tree" title="Contents" aria-label="Contents">
         <svg>
           <use href="#side" />
         </svg>
@@ -111,9 +111,12 @@
       </span>
       <span id="status">Connecting…</span>
       <span id="modes" role="group" aria-label="Mode">
-        <button class="btn" data-mode="write" title="Write">Write</button>
-        <button class="btn" data-mode="style" title="Style">Style</button>
-        <button class="btn" data-mode="publish" title="Publish">Publish</button>
+        <button class="btn" data-mode="write" data-command="mode-write"
+          title="Write">Write</button>
+        <button class="btn" data-mode="style" data-command="mode-style"
+          title="Style">Style</button>
+        <button class="btn" data-mode="publish"
+          data-command="mode-publish" title="Publish">Publish</button>
       </span>
       <span class="spacer"></span>
       <button id="theme-toggle" class="btn" title="Switch light/dark">
@@ -140,7 +143,8 @@
         <div class="pane-head">
           <div id="text-view" role="toolbar" aria-label="Text view">
             <span id="tv-views" class="seg" role="radiogroup"
-              aria-label="View" title="Prose or source">
+              aria-label="View" data-command="prose-source"
+              title="Prose or source">
               <button type="button" role="radio"
                 data-view="prose">Prose</button>
               <button type="button" role="radio"
@@ -209,7 +213,8 @@
             </div>
           </div>
           <button class="btn sm icon expand" data-pane="writing"
-            aria-pressed="false" title="Expand the writing; esc returns"
+            data-command="expand" aria-pressed="false"
+            title="Expand the writing; esc returns"
             aria-label="Expand the writing">
             <svg class="out">
               <use href="#expand-out" />
@@ -243,13 +248,13 @@
         <div class="pane-head">
           <div id="zoom" class="zoom" role="group" aria-label="Zoom">
             <button type="button" class="btn sm icon" data-zoom="out"
-              title="Zoom out (⌘-scroll or pinch zooms too)"
+              title="Zoom out (Ctrl/⌘-scroll or pinch zooms too)"
               aria-label="Zoom out">−</button>
             <button type="button" class="btn sm" data-zoom="menu"
               popovertarget="zoom-menu" title="Zoom: fit the spread or a page"
               aria-haspopup="menu">100%</button>
             <button type="button" class="btn sm icon" data-zoom="in"
-              title="Zoom in (⌘-scroll or pinch zooms too)"
+              title="Zoom in (Ctrl/⌘-scroll or pinch zooms too)"
               aria-label="Zoom in">+</button>
             <div id="zoom-menu" class="menu" popover role="menu">
               <button type="button" role="menuitemradio" data-fit="spread">
@@ -273,7 +278,8 @@
             </svg>
           </button>
           <button class="btn sm icon expand" data-pane="pages"
-            aria-pressed="false" title="Expand the pages; esc returns"
+            data-command="expand" aria-pressed="false"
+            title="Expand the pages; esc returns"
             aria-label="Expand the pages">
             <svg class="out">
               <use href="#expand-out" />

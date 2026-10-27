@@ -1946,8 +1946,11 @@ exports anyway.
 
 Three columns under a fixed toolbar, decided by one rule: **left is where you
 are, middle is what you're changing, right is the result.** The toolbar's mode
-switch (Write ⌘1, Style ⌘2, Publish ⌘3; ⌘, also opens Style) picks all three,
-and the mode persists across reloads:
+switch (Write Mod+1, Style Mod+2, Publish Mod+3; Mod+, also opens Style) picks
+all three, and the mode persists across reloads. Shortcuts are written Mod+key:
+Mod is Ctrl on Windows and Linux, ⌘ on Mac. Every one comes from one command
+table (`web/src/shortcuts.ts`), and the chrome labels them for the platform
+(Ctrl+Shift+F, ⌘⇧F).
 
 | Mode    | Left                    | Middle                               | Right                            |
 | ------- | ----------------------- | ------------------------------------ | -------------------------------- |
@@ -1956,15 +1959,15 @@ and the mode persists across reloads:
 | Publish | print and e-book rows   | page setup, print and e-book exports | the first signature as it prints |
 
 The toolbar holds only what is global: the Contents toggle at the far left
-before the crumb (⌘\), drawn as a panel icon whose side is half filled while the
-left column shows; the crumb; the modes; and the light/dark toggle alone at the
-right. In Write the pages hide with ⌘. (no button; while they are hidden the
-write pane's corner button reads "Show the pages" and brings them back); Style
-and Publish always show them. Both choices persist. The crumb reads library /
-book / edition. The library step, muted so the title leads, is an icon for where
-the books live (a folder on this device, or this browser) and its name (the
-folder's, or "This browser"); its tooltip says where, and a click goes back to
-the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
+before the crumb (Mod+\), drawn as a panel icon whose side is half filled while
+the left column shows; the crumb; the modes; and the light/dark toggle alone at
+the right. In Write the pages hide with Mod+. (no button; while they are hidden
+the write pane's corner button reads "Show the pages" and brings them back);
+Style and Publish always show them. Both choices persist. The crumb reads
+library / book / edition. The library step, muted so the title leads, is an icon
+for where the books live (a folder on this device, or this browser) and its name
+(the folder's, or "This browser"); its tooltip says where, and a click goes back
+to the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
 there the crumb starts at the book. Gutters between the columns drag to resize
 them. A hidden preview still lays out (it leaves the grid, never
 `display: none`), since Paged.js paginates by measuring.
@@ -1982,8 +1985,8 @@ end in an expand button at the top right corner:
 - In either, the mouse at the left edge slides the left column in over the view,
   and the Contents toggle pins it there; the pane header moves right of it.
 - The same button or esc returns (esc first closes an open dialog, find bar or
-  menu). ⌘⇧↩ expands the pane last used, or returns (⌘⇧F stays Footnote). The
-  expanded pane is remembered per mode.
+  menu). Mod+Shift+Enter expands the pane last used, or returns (Mod+Shift+F
+  stays Footnote). The expanded pane is remembered per mode.
 
 ### 7.2 Project Tree
 
@@ -2022,12 +2025,12 @@ CodeMirror 6 over plain BML text.
 - The selection is a green-grey tint, distinct from the quieter active line.
 - The text view (in the write pane's header, §7.1) is a per-reader preference in
   localStorage, not part of the book. Two views of the same file, switched by
-  **Prose | Source** or ⌘/: **Source** sets every line in the system monospace
-  at 13/17 of the reader's size, with the sentinel treatments above; **Prose**
-  (the default, `web/src/prose.ts`, design-language.md §8.1) sets the writing in
-  the chosen face and draws the markup instead of showing it: each sentinel is a
-  red small-caps rubric in the left margin (a structural one with its slug
-  beneath and a hairline across the text), the line after `{title}` or
+  **Prose | Source** or Mod+/: **Source** sets every line in the system
+  monospace at 13/17 of the reader's size, with the sentinel treatments above;
+  **Prose** (the default, `web/src/prose.ts`, design-language.md §8.1) sets the
+  writing in the chosen face and draws the markup instead of showing it: each
+  sentinel is a red small-caps rubric in the left margin (a structural one with
+  its slug beneath and a hairline across the text), the line after `{title}` or
   `{heading}` is large, after `{subtitle}` italic, `{em}` text italic, quotes
   and poems indented, `{break}` a ⁂, and `%%` notes a ☞ in the right margin that
   reads on hover. Inline tags (`{em}`, `{footnote}`, `{ref}`) get rubrics too,
@@ -2096,15 +2099,16 @@ CodeMirror 6 over plain BML text.
     paragraph; each row shows the name, a description, and how it closes
     (`{/quote}`, "wraps", "point", or "—" for none). Blocks include `{only}`,
     marked experimental.
-  - A selection the writer makes shows a wrap bar above it: Emphasis (⌘I) wraps
-    it in `{em}…{/em}`, Quote encloses its lines in `{quote}`/`{/quote}`,
+  - A selection the writer makes shows a wrap bar above it: Emphasis (Mod+I)
+    wraps it in `{em}…{/em}`, Quote encloses its lines in `{quote}`/`{/quote}`,
     Footnote puts a `{footnote: slug}` anchor after it, and Wrap in… opens the
     full list.
-  - ⌘K lists every sentinel, filtered by name or description; Enter inserts it,
-    enclosing the selection for wraps and closed blocks, else placing it after
-    the selection.
-  - Per-sentinel shortcuts remain (em ⌘E, chapter ⌘⇧C, heading ⌘⇧H, footnote
-    ⌘⇧F, quote ⌘⇧Q, break ⌘⇧B), in Write only.
+  - Mod+K lists every sentinel, filtered by name or description; Enter inserts
+    it, enclosing the selection for wraps and closed blocks, else placing it
+    after the selection.
+  - Per-sentinel shortcuts remain (em Mod+E, chapter Mod+Shift+C, heading
+    Mod+Shift+H, footnote Mod+Shift+F, quote Mod+Shift+Q, break Mod+Shift+B), in
+    Write only.
 - Image files dropped or pasted on the editor go in the book's `images/`
   (`POST /api/books/:book/images`, named for the file, never over one already
   there) and come back as `{illustration: slug}` / `Caption` blocks, one per
@@ -2239,10 +2243,10 @@ width (§7.1).
 **Zoom.** At 100% a spread fits the pane's width (never larger than 1:1). The
 header's `−` `100%` `+`, just before the expand button, steps by 10% from 50% to
 400%; the percentage opens a menu with Fit spread (100%) and Fit page (one whole
-page fits the pane, centred). ⌘-scroll or a trackpad pinch over the pages zooms
-continuously between 50% and 400% around the pointer; the buttons and menu zoom
-around the pane's centre. Past 100% the spread stays side by side and the pane
-scrolls sideways. Zoom is the reader's own (remembered in the browser,
+page fits the pane, centred). Mod-scroll or a trackpad pinch over the pages
+zooms continuously between 50% and 400% around the pointer; the buttons and menu
+zoom around the pane's centre. Past 100% the spread stays side by side and the
+pane scrolls sideways. Zoom is the reader's own (remembered in the browser,
 `preview-zoom`), not the book's: it is CSS zoom over a layout made at 1:1, so it
 never re-renders and never reaches paper. The sheet view in Publish has no zoom.
 
