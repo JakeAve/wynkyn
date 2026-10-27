@@ -1,5 +1,9 @@
 // web/src/preview-cache.ts — pure hash + IndexedDB store for one cached render per book+edition.
-import type { PageProblem, Seed } from "../../renderer/page-map-types.ts";
+import type {
+  PageEntry,
+  PageProblem,
+  Seed,
+} from "../../renderer/page-map-types.ts";
 
 export interface CachedRender {
   hash: string;
@@ -9,6 +13,21 @@ export interface CachedRender {
   // Rows saved before the page map lack these two.
   seed: Seed;
   problems: PageProblem[];
+  // Rows saved before Inspect lack the map; a restore reads it as [].
+  map?: PageEntry[];
+}
+
+/** A row's page-map facts, with the defaults an older row needs. */
+export function restoredPageMap(
+  c: CachedRender,
+): { seed: Seed; problems: PageProblem[]; map: PageEntry[] } {
+  return { seed: c.seed ?? {}, problems: c.problems ?? [], map: c.map ?? [] };
+}
+
+/** The hash a restore stands for: none for a row without a page map, so the
+ * first update renders one even though its content is unchanged. */
+export function restoredHash(c: CachedRender): string | null {
+  return c.map ? c.hash : null;
 }
 
 const DB_NAME = "preview-cache";

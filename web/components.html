@@ -305,6 +305,8 @@
           <div
             class="cell"><span class="cap">.btn.sm</span><button class="btn sm">Load file from disk</button></div>
           <div
+            class="cell"><span class="cap">.btn.sm.outline</span><button class="btn sm outline">Open in Style</button></div>
+          <div
             class="cell"><span class="cap">disabled</span><button class="btn" disabled>Reset</button></div>
           <div
             class="cell"><span class="cap">.btn.primary</span><button class="btn primary">Create book</button></div>
@@ -614,6 +616,66 @@
           </div>
           <div class="surface" style="width: 15rem">
             <div class="book-empty">No books match</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>Inspect drawer <span>§6.13</span></h2>
+        <p>Under the pages while something is pinned: where it sits, why,
+          its box and its type. The diagram borrows the marks' colours.</p>
+        <div class="board">
+          <div class="surface" style="width: 100%; padding: 0">
+            <section id="inspect-drawer" aria-label="Inspect">
+              <header>
+                <nav class="crumbs" aria-label="Where this sits"><button
+                    type="button" class="off" disabled>Body</button><span
+                    class="sep">›</span><button type="button">Chapter
+                    II</button><span class="sep">›</span><button
+                    type="button">Paragraph</button><span
+                    class="sep">›</span><button type="button" class="on"
+                    disabled aria-current="location">Line 3</button></nav>
+                <div class="actions"><button type="button"
+                    class="btn sm outline">Show in manuscript</button><button
+                    type="button" class="btn sm outline">Open in
+                    Style</button></div>
+              </header>
+              <div class="body">
+                <section class="why">
+                  <h3>Why it's here</h3>
+                  <p>Line 3 of 7<span class="src">Layout</span></p>
+                  <p>Breaks the word with a hyphen<span class="src">Book
+                      default · hyphens: auto</span></p>
+                  <div class="lines"><span>Lines</span><button type="button"
+                      class="chip" aria-pressed="false">1</button><button
+                      type="button" class="chip"
+                      aria-pressed="false">2</button><button type="button"
+                      class="chip" aria-pressed="true">3</button><button
+                      type="button" class="chip"
+                      aria-pressed="false">4</button></div>
+                </section>
+                <section class="box">
+                  <h3>Box</h3>
+                  <div class="model">
+                    <div><span>space above</span><b>0 mm</b></div>
+                    <div class="mid"><b class="indent">0 mm</b><b
+                        class="inner">104 × 5 mm</b></div>
+                    <div><span>space below</span><b>0 mm</b></div>
+                  </div>
+                  <div class="key"><span class="indent">indent</span><span
+                      class="space">spacing</span></div>
+                </section>
+                <section class="type">
+                  <h3>Type</h3>
+                  <div class="row inherited"><span>Font</span><span><span
+                        class="v">Alegreya</span><span class="src">from
+                        Body</span></span></div>
+                  <div class="row"><span>Size</span><span><span
+                        class="v">10 pt</span><span class="src">Style ›
+                        Paragraph</span></span></div>
+                </section>
+              </div>
+            </section>
           </div>
         </div>
       </section>

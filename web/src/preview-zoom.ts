@@ -5,13 +5,13 @@
 // It is --preview-user on #preview, which app.css multiplies by --preview-fit:
 // only CSS zoom, so a zoom never re-renders and nothing lands on the pages.
 import { store } from "./dom.ts";
+import { LIVE_PAGE } from "./preview.ts";
 
 // 50% to 400% in tens.
 export const ZOOM_STEPS = Array.from({ length: 36 }, (_, i) => (i + 5) / 10);
 const MIN = 0.5;
 const MAX = 4;
 const clamp = (z: number) => Math.min(MAX, Math.max(MIN, z));
-const LIVE_PAGE = ":scope > :not(.preview-stage) .pagedjs_page";
 
 // The next step from `z` in that direction; from between steps, the nearest
 // one that way. At either end it stays at the end.
@@ -43,6 +43,11 @@ export function installPreviewZoom(
   const [minus, plus, pct] = [btn("out"), btn("in"), btn("menu")];
   const menu = out.querySelector<HTMLElement>("[popover]")!;
   let user = 1;
+  let saving: ReturnType<typeof setTimeout> | undefined;
+  const save = () => {
+    clearTimeout(saving);
+    store("preview-zoom", String(user));
+  };
 
   const fitPage = () => {
     const page = container.querySelector<HTMLElement>(LIVE_PAGE);
@@ -61,7 +66,8 @@ export function installPreviewZoom(
   // Keep the point at (x, y) — the pointer, or the pane's centre — over the
   // same spot on the pages: the pages box scales evenly, so its fraction
   // under the point is the anchor.
-  const set = (z: number, x?: number, y?: number) => {
+  // `wait`: a pinch saves once it rests, not on every wheel event.
+  const set = (z: number, x?: number, y?: number, wait = 0) => {
     user = clamp(z);
     const box = container.querySelector(
       ":scope > :not(.preview-stage) .pagedjs_pages",
@@ -74,7 +80,10 @@ export function installPreviewZoom(
     pct.textContent = `${Math.round(user * 100)}%`;
     minus.disabled = user <= MIN;
     plus.disabled = user >= MAX;
-    store("preview-zoom", String(user));
+    if (wait) {
+      clearTimeout(saving);
+      saving = setTimeout(save, wait);
+    } else save();
     if (!box || !r?.width || !r.height) return;
     const n = box.getBoundingClientRect();
     container.scrollLeft += n.left + (x - r.left) / r.width * n.width - x;
@@ -127,6 +136,7 @@ export function installPreviewZoom(
       user * Math.exp(-Math.max(-50, Math.min(50, d)) / 200),
       e.clientX,
       e.clientY,
+      250,
     );
   }, { passive: false });
 

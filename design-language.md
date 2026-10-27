@@ -141,6 +141,18 @@ The pages stay paper in both themes, so their marks use fixed values.
   theme, deeper on dark.
 - `--sheet-*`: the imposed sheet in Print (paper, edge, slot, blank, ink, fold,
   cut), unchanged, except `--sheet-cut` becomes the light `--acc`.
+- `--inspect-*`: Inspect's marks (spec §7.6), drawn in their own layer over the
+  pages, screen only. `--inspect-hover` `#2563eb` rings what the pointer is on
+  and draws a pinned line's baseline; the box model as DevTools shades it:
+  `--inspect-space` amber `rgb(245 158 11 / .22)` above and below,
+  `--inspect-indent` green `rgb(34 160 90 / .22)` for the first-line indent,
+  `--inspect-content` `rgb(37 99 235 / .10)` for the content box;
+  `--inspect-ghost` `rgb(11 107 79 / .6)` dashes a running head or page number
+  the page map dropped; `--inspect-ink` `#1b1b1b` draws ⌥'s measure lines and
+  pills (their text `--inspect-tag`) and the hover tag's text, on
+  `--inspect-tag` `#fafafa` with `--shadow-pop`, its name in `--inspect-hover`.
+  The pinned thing takes a 2px `--pick` ring, the block a pinned line or span is
+  in a dashed one; nothing else on the pages is minium.
 
 ### 2.5 Paper stock (per book)
 
@@ -386,7 +398,8 @@ reads as a control beside the fields, and drops it for the wash when pressed;
 `.tog.primary` and `.tog.outline` (`--fg` text) are the panel's actions, e.g.
 Publish's one primary "Print sheets" beside the outlined "Print pages" and
 "Export EPUB". `.btn.sm` (banners), `.btn.lg` (the empty state) and `.btn.icon`
-(with `.sm`, the pane headers' expand and the pages' zoom − and +) are built.
+(with `.sm`, the pane headers' expand and the pages' zoom − and +) are built;
+`.btn.outline` is the Inspect drawer's two actions.
 
 ### 6.2 Segmented control (`seg`)
 
@@ -524,7 +537,9 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   controls wrap. A hairline below; the pages pane's header sits on `--desk` with
   none. The pages pane's controls sit at the right instead, beside expand: zoom
   (`#zoom`), `−` and `+` as small icon buttons around the percentage, a small
-  ghost in tabular figures that opens the zoom menu (§6.9). Hidden in Publish.
+  ghost in tabular figures that opens the zoom menu (§6.9); then Inspect
+  (`#inspect`), a small icon toggle (DevTools' picker arrow) that takes the red
+  wash while on. Both hidden in Publish.
 - **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; Go to style
   with a dotted underline; the session count in `--acc-ink` once non-zero
   (planned: there is no session count yet).
@@ -538,6 +553,31 @@ in it says so in one centred `--muted` `--fs-sm` line (`.book-empty`). The empty
 library's create dialog takes `.empty` on its heading block ("Your library is
 empty").
 
+### 6.13 Inspect drawer
+
+Under the pages (`#inspect-drawer`, a row of `#pages`) while Inspect has
+something pinned, gone otherwise; at most 15.625rem tall, scrolling inside.
+Chrome on `--bg`, so it follows the theme; only its box diagram borrows the page
+marks' colours (§2.4).
+
+- **Header** (`--h-pane`, a hairline below): the breadcrumb at left, crumbs as
+  small `--muted` text buttons with a `--hover` wash, `›` between them; the
+  current one `--acc-ink` 500, a crumb that goes nowhere plain. At right, Show
+  in manuscript and Open in Style as small outline buttons (§6.1), each only
+  when it has somewhere to go.
+- **Body:** three columns, `--s-7` apart: Why it's here (1.55fr), Box
+  (14.375rem), Type (1fr), each under a small-caps label (§6.5). A reason is a
+  `--fs` line over its source in `--fs-xs` `--muted` with a dotted underline.
+  Lines: quiet chips (§6.10), numbered, a pinned line's in the red wash.
+- **Box:** the DevTools diagram: a dashed amber frame on `--inspect-space` with
+  space above and below, a green `--inspect-indent` cell for the first-line
+  indent, and the size in a `--inspect-content` box ringed in `--inspect-hover`,
+  all in `--fs-2xs` tabular figures; a key below. A span, ghost or empty space
+  shows its size alone, in a `--line` frame.
+- **Type:** label column 4rem; the value over where it comes from: "Style ›
+  Chapter title" when this element sets it, else the value `--muted` with "from
+  Body" or "Book default".
+
 ## 7. Layout and expanded views
 
 The three-column rule stands: left is where you are, middle is what you're
@@ -545,9 +585,9 @@ changing, right is the result.
 
 - **Pane headers.** Write pane: Prose | Source, Aa, Spelling at left; expand at
   right (until the Prose view lands, the text view's Serif/Sans/Mono, size, Hide
-  markup and Spelling sit there). Pages pane: zoom (`−` `100%` `+`) then expand,
-  at right; Publish shows the sheets, so expand alone. The style panel keeps its
-  view heading inside.
+  markup and Spelling sit there). Pages pane: zoom (`−` `100%` `+`), Inspect,
+  then expand, at right; Publish shows the sheets, so expand alone. The style
+  panel keeps its view heading inside.
 - **Expand.** The write pane and the pages pane each expand from their top-right
   corner (arrows out; arrows in, in `--acc-ink`, while expanded).
   - Expanding the **writing** hides the outline and the pages. The text keeps

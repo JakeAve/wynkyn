@@ -11,6 +11,7 @@ import {
   installStyleHover,
   markEdited,
   type Mode,
+  pageMap,
   previewLink,
   renderPreview,
   restoreCachedRender,
@@ -55,6 +56,7 @@ import { ThemePreview } from "./theme-preview.ts";
 import { installTextView } from "./text-view.ts";
 import { installPanes, type Panes } from "./panes.ts";
 import { installPreviewZoom } from "./preview-zoom.ts";
+import { installInspect } from "./inspect.ts";
 import { connect } from "./library.ts";
 import { $, brief } from "./dom.ts";
 import { h } from "./panel-controls.ts";
@@ -703,10 +705,14 @@ function chordOf(e: KeyboardEvent): string | null {
   }`;
 }
 // Open popups esc closes first: a dialog, the find bar, completions, the
-// sentinel palette and wrap bar, menus. Not hover tooltips (spelling, lint).
+// sentinel palette and wrap bar, menus (the zoom menu is a popover). Not
+// hover tooltips (spelling, lint).
 const POPUPS =
-  "dialog[open], .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop";
-function installShortcuts(panes: Panes): void {
+  "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop";
+function installShortcuts(
+  panes: Panes,
+  inspect: { escape(): boolean },
+): void {
   const bySnippet = new Map(
     SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((
       s,
@@ -714,7 +720,8 @@ function installShortcuts(panes: Panes): void {
   );
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !document.querySelector(POPUPS)) {
-      if (panes.returnFromExpand()) e.preventDefault();
+      // Inspect first: it unpins, then leaves; then an expanded pane returns.
+      if (inspect.escape() || panes.returnFromExpand()) e.preventDefault();
     }
     const chord = chordOf(e);
     if (!chord) return;
@@ -873,7 +880,22 @@ async function main(): Promise<void> {
   installTextView({ editor, backend, book, setStatus });
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
-  installShortcuts(installPanes({ mode: () => mode }));
+  const inspect = installInspect({
+    container: $("preview"),
+    catalog: styleCatalog,
+    metadata: () => metadata ?? {},
+    pageMap,
+    mode: () => mode,
+    style: pickStyle,
+    source: (line) => {
+      setMode("write");
+      scrollEditorToLine(editor, line);
+    },
+  });
+  // Inspect reads the book's metadata (running heads, units, where a value
+  // comes from), which is otherwise fetched only when Style or Publish opens.
+  $("inspect").addEventListener("click", () => void ensureConfigPanel());
+  installShortcuts(installPanes({ mode: () => mode }), inspect);
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
       .mode as Mode | undefined;
@@ -909,8 +931,9 @@ async function main(): Promise<void> {
     style: pickStyle,
     source: (line) => scrollEditorToLine(editor, line),
     addImage: (slug, file) => fillPlaceholder(images, slug, file),
+    inspecting: inspect.active,
   });
-  installStyleHover(previewEl, styleCatalog, () => mode);
+  installStyleHover(previewEl, styleCatalog, () => mode, inspect.active);
   // Restore before opening the socket so the previous render is on screen
   // when the first update lands, instead of a blank preview.
   const key = cacheId(book, edition);

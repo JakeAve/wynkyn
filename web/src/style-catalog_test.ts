@@ -2,12 +2,14 @@ import { assertEquals } from "@std/assert";
 import {
   bookParts,
   catalogFor,
+  entryName,
   folioClash,
   getProps,
   inheritedFont,
   matchKey,
   routeFor,
   setCount,
+  sourceOf,
   usedBy,
 } from "./style-catalog.ts";
 
@@ -436,4 +438,75 @@ Deno.test("toc: the Contents part lists outside in — title, entry, row levels,
     "toc.toc-chapter.label",
     "toc.toc-chapter.page",
   ]);
+});
+
+Deno.test("sourceOf: set here, inherited from an ancestor or the body, or default", () => {
+  const meta = {
+    elements: {
+      body: { "font-size": "11pt", color: "#222" },
+      chapter: { "font-family": "display", "margin-top": "2em", title: {} },
+      toc: { "toc-part": { "font-style": "italic", number: {} } },
+      paragraph: { "text-indent": "1em" },
+    },
+    numbering: { pages: { css: { color: "red" } } },
+  };
+  const cat = catalogFor(meta);
+  const at = (key: string) => byKey(cat, key);
+  // Set on the entry itself.
+  assertEquals(sourceOf(meta, at("paragraph"), "text-indent", cat), {
+    kind: "set",
+    label: "Paragraph",
+  });
+  // Inherited from the parent type, which has no entry of its own.
+  assertEquals(sourceOf(meta, at("chapter.title"), "font-family", cat), {
+    kind: "inherited",
+    label: "Chapter",
+  });
+  // Nearest ancestor with an entry: a TOC level, named group + label.
+  assertEquals(sourceOf(meta, at("toc.toc-part.number"), "font-style", cat), {
+    kind: "inherited",
+    label: "Contents part rows",
+  });
+  // Falls through to the body, then to the book default.
+  assertEquals(sourceOf(meta, at("chapter.title"), "font-size", cat), {
+    kind: "inherited",
+    label: "Body",
+  });
+  assertEquals(sourceOf(meta, at("chapter.title"), "line-height", cat), {
+    kind: "default",
+  });
+  assertEquals(sourceOf(meta, at("body"), "line-height", cat), {
+    kind: "default",
+  });
+  // A box prop is not inherited, even though the parent sets it.
+  assertEquals(sourceOf(meta, at("chapter.title"), "margin-top", cat), {
+    kind: "default",
+  });
+  // A margin box inherits nothing from the body.
+  assertEquals(sourceOf(meta, at("numbering.pages.body"), "color", cat), {
+    kind: "default",
+  });
+  assertEquals(sourceOf(meta, at("numbering.pages"), "color", cat), {
+    kind: "set",
+    label: "All page numbers",
+  });
+});
+
+Deno.test("entryName: the source label, margin boxes by what they hold", () => {
+  const meta = {
+    running: { odd: [{ content: "book-title", area: "top-center" }] },
+  };
+  const cat = catalogFor(meta);
+  const name = (key: string) => entryName(byKey(cat, key), cat);
+  assertEquals(name("chapter.title"), "Chapter title");
+  assertEquals(name("paragraph"), "Paragraph");
+  assertEquals(name("numbering.pages.body"), "Page number");
+  assertEquals(name("running.top-center"), "Running head");
+  const head = {
+    running: { odd: [{ content: "", area: "top-center", "font-size": "8pt" }] },
+  };
+  assertEquals(
+    sourceOf(head, byKey(cat, "running.top-center"), "font-size", cat),
+    { kind: "set", label: "Running heads" },
+  );
 });

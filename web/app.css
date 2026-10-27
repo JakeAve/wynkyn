@@ -112,6 +112,11 @@ summary {
 .btn.sm.icon {
   width: var(--h-sm);
 }
+/* Outline (§6.1): a secondary action that must read as a button. */
+.btn.outline {
+  box-shadow: inset 0 0 0 var(--hair) var(--line);
+  color: var(--fg);
+}
 .btn svg,
 .tico {
   display: block;
@@ -600,7 +605,7 @@ kbd {
 #pages {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: var(--desk);
@@ -623,7 +628,7 @@ kbd {
   min-width: 3.25rem;
   font-variant-numeric: tabular-nums;
 }
-:root[data-mode="publish"] #pages .zoom {
+:root[data-mode="publish"] #pages :is(.zoom, #inspect) {
   display: none;
 }
 /* Menu (§6.9) as a native popover; preview-zoom.ts sets top and right. */
@@ -1599,6 +1604,316 @@ body.typing #editor .pane-head {
 .pagedjs_page .bml *,
 .pagedjs_margin-content {
   cursor: pointer;
+}
+/* Inspect (§2.4, inspect.ts): the picker in the pages header, pressed like
+   any toggle; its marks in their own layer over #preview, never on the pages
+   print.ts clones. Screen only, and hidden outright in print. */
+#inspect[aria-pressed="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+@media screen {
+  #preview[data-inspect],
+  #preview[data-inspect] * {
+    cursor: crosshair;
+  }
+  #inspect-overlay {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  #inspect-overlay > * {
+    position: absolute;
+    box-sizing: border-box;
+  }
+  #inspect-overlay .space {
+    background: var(--inspect-space);
+  }
+  #inspect-overlay .indent {
+    background: var(--inspect-indent);
+  }
+  #inspect-overlay .content {
+    background: var(--inspect-content);
+  }
+  #inspect-overlay .ring {
+    outline: var(--hair) solid var(--inspect-hover);
+  }
+  #inspect-overlay .ring.pin {
+    outline: var(--ring) solid var(--pick);
+  }
+  #inspect-overlay .ring.within {
+    outline: var(--hair) dashed color-mix(in srgb, var(--pick) 55%,
+      transparent);
+  }
+  #inspect-overlay .ghost {
+    outline: var(--hair) dashed var(--inspect-ghost);
+  }
+  #inspect-overlay .gap {
+    background: var(--inspect-ink);
+  }
+  #inspect-overlay .pill {
+    transform: translate(-50%, -50%);
+    padding: 0 var(--s-2);
+    border-radius: var(--r);
+    corner-shape: var(--corner);
+    background: var(--inspect-ink);
+    color: var(--inspect-tag);
+    font: 500 var(--fs-2xs) / var(--lh) var(--f-ui);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  #inspect-overlay .tag {
+    margin-top: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-pop);
+    corner-shape: var(--corner);
+    background: var(--inspect-tag);
+    color: color-mix(in oklab, var(--inspect-ink) 62%, var(--inspect-tag));
+    box-shadow: var(--shadow-pop);
+    font: var(--fs-xs) / var(--lh-tight) var(--f-ui);
+    white-space: nowrap;
+  }
+  #inspect-overlay .tag.up {
+    margin-top: calc(-1 * var(--s-2));
+    transform: translateY(-100%);
+  }
+  #inspect-overlay .tag b {
+    color: var(--inspect-hover);
+  }
+  #inspect-overlay .base {
+    background: color-mix(in srgb, var(--inspect-hover) 35%, transparent);
+  }
+  #inspect-overlay .base.on {
+    background: var(--inspect-hover);
+  }
+  #inspect-overlay .hyphen {
+    /* the spacing amber, three coats deep */
+    background:
+      linear-gradient(var(--inspect-space), var(--inspect-space)),
+      linear-gradient(var(--inspect-space), var(--inspect-space)),
+      var(--inspect-space);
+  }
+  /* The drawer (§6.13, inspect-drawer.ts): under the pages, the pinned
+     target's crumbs and actions, then why / box / type. Chrome, so it takes
+     the theme; its box diagram borrows the marks' colours. */
+  #inspect-drawer {
+    grid-row: 3;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    max-height: 15.625rem;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--fg);
+  }
+  #inspect-drawer[hidden] {
+    display: none;
+  }
+  #inspect-drawer header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4);
+    min-height: var(--h-pane);
+    padding: 0 var(--s-4) 0 var(--s-5);
+    border-bottom: 1px solid var(--line);
+  }
+  #inspect-drawer .crumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    min-width: 0;
+    overflow: hidden;
+  }
+  #inspect-drawer .crumbs button {
+    padding: var(--s-1) var(--s-2);
+    border: none;
+    border-radius: var(--r);
+    corner-shape: var(--corner);
+    background: none;
+    color: var(--muted);
+    font: var(--fs-sm) / var(--lh-tight) var(--f-ui);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  #inspect-drawer .crumbs button:hover:enabled {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  #inspect-drawer .crumbs button:disabled {
+    cursor: default;
+  }
+  #inspect-drawer .crumbs button.on {
+    color: var(--acc-ink);
+    font-weight: 500;
+  }
+  #inspect-drawer .crumbs .sep {
+    color: color-mix(in oklab, var(--muted) 60%, var(--bg));
+    font-size: var(--fs-xs);
+  }
+  #inspect-drawer .actions {
+    display: flex;
+    gap: var(--s-3);
+    flex: none;
+  }
+  #inspect-drawer .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) 14.375rem minmax(0, 1fr);
+    gap: var(--s-7);
+    padding: var(--s-5) var(--s-6);
+    overflow: auto;
+  }
+  #inspect-drawer section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+  }
+  #inspect-drawer h3 {
+    margin: 0;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    font-variant-caps: all-small-caps;
+    letter-spacing: var(--track-caps);
+    color: var(--muted);
+  }
+  #inspect-drawer .why p {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    margin: 0;
+    font-size: var(--fs);
+    line-height: var(--lh-tight);
+  }
+  #inspect-drawer .src {
+    font-size: var(--fs-xs);
+    color: var(--muted);
+    text-decoration: underline dotted;
+    text-underline-offset: 0.1875rem;
+  }
+  #inspect-drawer .lines {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    font-size: var(--fs-xs);
+    color: var(--muted);
+  }
+  #inspect-drawer .lines > span {
+    margin-right: var(--s-2);
+  }
+  /* Chip (§6.10), quiet: a pinned line's is the red wash. */
+  #inspect-drawer .chip {
+    min-width: var(--h-sm);
+    height: var(--h-sm);
+    padding: 0 var(--s-3);
+    border: none;
+    border-radius: var(--r);
+    corner-shape: var(--corner);
+    background: var(--hover);
+    color: var(--fg);
+    font: 500 var(--fs-2xs) var(--f-ui);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  #inspect-drawer .chip:hover {
+    background: var(--line);
+  }
+  #inspect-drawer .chip[aria-pressed="true"] {
+    background: var(--acc-wash);
+    color: var(--acc-ink);
+  }
+  #inspect-drawer .model {
+    padding: var(--s-1) var(--s-4);
+    border: 1px dashed color-mix(in srgb, var(--inspect-space), var(--muted));
+    border-radius: var(--r);
+    corner-shape: var(--corner);
+    background: var(--inspect-space);
+    font-size: var(--fs-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+  #inspect-drawer .model > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-3);
+  }
+  #inspect-drawer .model .mid {
+    margin: var(--s-2) 0;
+  }
+  #inspect-drawer .model .indent {
+    padding: var(--s-5) var(--s-2);
+    border-radius: var(--r);
+    background: var(--inspect-indent);
+  }
+  #inspect-drawer .model .inner {
+    flex: 1;
+    padding: var(--s-5) var(--s-2);
+    border: 1px solid color-mix(in srgb, var(--inspect-hover) 55%, transparent);
+    background: var(--inspect-content);
+    text-align: center;
+  }
+  #inspect-drawer .key {
+    display: flex;
+    gap: var(--s-4);
+    font-size: var(--fs-2xs);
+    color: var(--muted);
+  }
+  #inspect-drawer .key span::before {
+    content: "";
+    display: inline-block;
+    width: 0.5625rem;
+    height: 0.5625rem;
+    margin-right: var(--s-2);
+    background: var(--inspect-space);
+  }
+  #inspect-drawer .key .indent::before {
+    background: var(--inspect-indent);
+  }
+  #inspect-drawer .plain {
+    padding: var(--s-5) var(--s-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    corner-shape: var(--corner);
+    text-align: center;
+    font-size: var(--fs-xs);
+    color: var(--muted);
+  }
+  #inspect-drawer .row {
+    display: grid;
+    grid-template-columns: 4rem minmax(0, 1fr);
+    gap: var(--s-4);
+    align-items: baseline;
+  }
+  #inspect-drawer .row > span:first-child {
+    font-size: var(--fs-xs);
+    color: var(--muted);
+  }
+  #inspect-drawer .row > span:last-child {
+    display: flex;
+    flex-direction: column;
+  }
+  #inspect-drawer .row .v {
+    font-size: var(--fs-sm);
+  }
+  #inspect-drawer .row.inherited .v {
+    color: var(--muted);
+  }
+  #inspect-drawer .row .src {
+    text-decoration: none;
+  }
+  #inspect-drawer .none {
+    margin: 0;
+    font-size: var(--fs-xs);
+    color: var(--muted);
+  }
+}
+:root[data-mode="publish"] :is(#inspect-overlay, #inspect-drawer) {
+  display: none;
+}
+@media print {
+  :is(#inspect, #inspect-overlay, #inspect-drawer) {
+    display: none !important;
+  }
 }
 /* ---- style panel controls (web/src/panel-controls.ts), scoped so they cannot collide ---- */
 #config-overlay svg.i {
