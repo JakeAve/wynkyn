@@ -56,6 +56,31 @@ drives the built `dist/` with no server, so `deno task build:site` first or it
 is skipped. Chrome tests gate on `hasChrome` from `testing/chrome.ts`, which
 launches Chrome once and skips them only if that fails.
 
+### Waiting without a clock
+
+CI's runners are slower than a laptop, so a test that passes here can still
+read the page mid-change there. Wait for the state the assertion is about,
+never a guessed number of milliseconds:
+
+- **A transition or fade:** wait for its class or attribute to land, then
+  `el.getAnimations()` and `Promise.all(… .map((a) => a.finished))`. Read
+  straight after the class lands and the value is still the start of it.
+- **Something that goes on the next frame** (⌥ released, a hover left): read
+  what you need *before* the action that clears it.
+- **A push or a save:** match the one you caused (`nextMessageWhere` on its
+  version), not merely the next; a write truncates first, so the watch can
+  push a half-written file ahead of it.
+- **A debounced value** (the `#line=` hash, the save): compare what the test
+  is about, or poll it with a bound.
+- **Polling:** check, then sleep, and return on the first match; a second read
+  for the assertion can catch a different moment.
+
+A fixed pause is fine only where slowness makes it pass more easily ("no
+second push arrives"), or where there is nothing to wait on (a fresh FSEvents
+watch has no ready signal). To check a fix, stretch the app's own `--t` and
+`--t-fast` to 1 s: the old wait should fail and the new one pass. Forcing
+`transition-duration` on `*` animates everything and proves nothing.
+
 ## Fixtures
 
 - `server/testdata/demo-book` — the fixture book most tests build.
