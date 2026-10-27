@@ -97,6 +97,16 @@ Deno.test({
         .click();
       text = await shown();
       assert(!text.includes("{chapter"), "leaving the block folds it");
+
+      // Inline tags have rubrics too, under the line's own; a click on
+      // one opens its paragraph.
+      const tags = page.locator(
+        '#editor .cm-prose-rubric[data-label="Drop cap"] .cm-prose-tags',
+      );
+      assertEquals(await tags.getAttribute("data-tags"), "Em");
+      await tags.click();
+      text = await shown();
+      assert(text.includes("{em}striking{/em}"), "the em rubric opens it");
     } finally {
       await close();
     }

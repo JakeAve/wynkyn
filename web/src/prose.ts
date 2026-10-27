@@ -38,21 +38,27 @@ class Marks extends WidgetType {
   override eq(o: Marks): boolean {
     const a = this.p, b = o.p;
     return this.turn === o.turn && a.fold === b.fold &&
-      a.standIn === b.standIn &&
+      a.standIn === b.standIn && a.tags?.join() === b.tags?.join() &&
       a.note === b.note && a.rubric?.label === b.rubric?.label &&
       a.rubric?.slug === b.rubric?.slug;
   }
   toDOM(): HTMLElement {
-    const { fold, rubric, standIn, note } = this.p;
+    const { fold, rubric, standIn, note, tags } = this.p;
     const el = document.createElement("span");
     el.className = "cm-prose-marks";
     // Labels are drawn by CSS from data attributes, so a line's text stays
     // the document's text.
-    if (rubric) {
+    if (rubric || tags) {
       const r = el.appendChild(document.createElement("span"));
       r.className = "cm-prose-rubric";
-      r.dataset.label = rubric.label;
-      if (rubric.slug) r.dataset.slug = r.title = rubric.slug;
+      if (rubric) r.dataset.label = rubric.label;
+      if (rubric?.slug) r.dataset.slug = r.title = rubric.slug;
+      // the inline tags' rubrics, stacked under the line's own
+      if (tags) {
+        const t = r.appendChild(document.createElement("span"));
+        t.className = "cm-prose-tags";
+        t.dataset.tags = tags.join("\n");
+      }
     }
     if (fold && standIn === "break") el.append("⁂");
     if (this.turn === undefined && note === undefined) return el;
@@ -327,7 +333,16 @@ function draw(
     if (text.startsWith("%%") || parseSentinelLine(text)) {
       decos.push(LINES.src.range(l.from));
     }
-    if (p.rubric || p.note !== undefined || turn !== undefined) {
+    // A text line whose margin stacks tag rubrics grows to hold them.
+    const marks = (p.rubric ? 1 : 0) + (p.rubric?.slug ? 1 : 0) +
+      (p.tags?.length ?? 0);
+    if (p.tags && marks > 1) {
+      decos.push(
+        Decoration.line({ attributes: { style: `--marks: ${marks}` } })
+          .range(l.from),
+      );
+    }
+    if (p.rubric || p.tags || p.note !== undefined || turn !== undefined) {
       decos.push(
         Decoration.widget({ widget: new Marks(p, turn), side: -1 }).range(
           l.from,

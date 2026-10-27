@@ -27,7 +27,14 @@ export interface ProseLine {
   standIn?: "break" | "illustration";
   note?: string; // folded `%%` lines beside this one, joined by "\n"
   slug?: string; // the stand-in's slug: the image, the kind of break
+  tags?: string[]; // its inline tags' rubrics, once each: Em, Footnote, Ref
 }
+
+const TAG_LABEL: Record<string, string> = {
+  em: "Em",
+  footnote: "Footnote",
+  ref: "Ref",
+};
 
 const NEXT_KIND: Record<string, "title" | "subtitle" | "caption"> = {
   title: "title",
@@ -119,6 +126,14 @@ export function proseLines(
     while (j < lines.length && !blank(j) && !tags[j]) j++;
     return j;
   };
+
+  // Inline tags get rubrics too (decided 2026-10-26: the margin names
+  // every tag, so a reader new to them sees what each one is).
+  lines.forEach((line, i) => {
+    if (!isText(i)) return;
+    const names = new Set(wrapRanges(line).map((w) => TAG_LABEL[w.name]!));
+    if (names.size) at(i).tags = [...names];
+  });
 
   tags.forEach((t, i) => {
     if (!t) {

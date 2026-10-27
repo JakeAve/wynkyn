@@ -877,6 +877,26 @@ body.typing #editor .pane-head {
 #editor .cm-prose-rubric::before {
   content: attr(data-label);
 }
+/* the label, the slug, then the inline tags' rubrics (Em, Footnote, Ref),
+   one per row */
+#editor .cm-prose-rubric {
+  display: flex;
+  flex-direction: column;
+}
+#editor .cm-prose-rubric::after {
+  order: 1;
+}
+#editor .cm-prose-tags {
+  order: 2;
+  white-space: pre-line;
+}
+#editor .cm-prose-tags::before {
+  content: attr(data-tags);
+}
+/* a text line whose margin stacks rubrics grows to hold them (prose.ts) */
+#editor[data-view="prose"] .cm-line[style*="--marks"] {
+  min-height: calc(var(--s-2) + var(--marks) * var(--fs-xs) * var(--lh));
+}
 #editor .cm-prose-rubric[data-slug]::after {
   content: attr(data-slug);
   display: block;

@@ -275,3 +275,15 @@ Deno.test("proseLines: `line` reveals that line alone", () => {
   const p = proseLines(lines, -1, undefined, 0);
   assertEquals(p.map((l) => l.fold), [false, true, false]);
 });
+
+Deno.test("proseLines: inline tags get rubrics, once each", () => {
+  const lines = [
+    "{dropcap}",
+    "A {em}very{/em} {em}odd{/em} day.{footnote: n1} See {ref: p2}.",
+    "Plain.",
+  ];
+  const p = proseLines(lines, -1);
+  assertEquals(p[1]!.tags, ["Em", "Footnote", "Ref"]);
+  assertEquals(p[1]!.rubric?.label, "Drop cap");
+  assertEquals(p[2]!.tags, undefined);
+});

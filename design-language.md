@@ -584,6 +584,10 @@ default).
   Structural blocks (matter, part, chapter) also draw a hairline (`--line`)
   across the text column. A rubric is a widget against `.cm-content`'s padding,
   not a gutter; Prose has no line numbers. A click on it opens its markup.
+  Inline tags have rubrics too, `Em`, `Footnote`, `Ref`, once each beneath the
+  line's own rubric and slug (decided 2026-10-26: the margin names every tag, so
+  a writer new to them learns what each one is); a line with a stack grows to
+  hold it.
 - **Text as text.** The line after `{title}` / `{heading}` is set large in Fell
   (2rem at normal width); `{subtitle}`'s line is italic; `{em}` is italic;
   `{break}` is ⁂, centred and muted; quotes, epigraphs, poems and pullquotes
