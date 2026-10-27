@@ -79,23 +79,34 @@ Deno.test({
         timeout: 30_000,
       });
       await stage.waitFor({ state: "detached", timeout: 30_000 });
-      // Every 10ms while a render is staged: the face of the pages on screen.
+      // While a render is staged — the moment it is added, then every 10ms —
+      // the face of the pages on screen. Recorded in the page, so a render
+      // that comes and goes between two polls from here is still caught.
       await page.evaluate(() => {
+        const el = document.getElementById("preview")!;
         const seen = new Set<string>();
-        Object.assign(globalThis, { seen });
-        setInterval(() => {
-          const el = document.getElementById("preview")!;
+        const sample = () => {
           if (!el.querySelector(".preview-stage")) return;
+          Object.assign(globalThis, { staged: true });
           const p = el.querySelector(":scope > :not(.preview-stage) p");
           if (p) seen.add(getComputedStyle(p).fontFamily);
-        }, 10);
+        };
+        Object.assign(globalThis, { seen, staged: false });
+        new MutationObserver(sample).observe(el, { childList: true });
+        setInterval(sample, 10);
       });
 
       const meta = JSON.parse(await Deno.readTextFile(metaPath));
       meta.fonts.body = "Libre Caslon Text";
       await Deno.writeTextFile(metaPath, JSON.stringify(meta, null, 2));
-      await stage.waitFor({ timeout: 30_000 });
-      await stage.waitFor({ state: "detached", timeout: 30_000 });
+      await page.waitForFunction(
+        () =>
+          // deno-lint-ignore no-explicit-any
+          (globalThis as any).staged &&
+          !document.querySelector("#preview .preview-stage"),
+        undefined,
+        { timeout: 30_000 },
+      );
       const seen = await page.evaluate(() => // deno-lint-ignore no-explicit-any
       [...(globalThis as any).seen as Set<string>]);
       assert(seen.length > 0, "sampled the pages mid-render");

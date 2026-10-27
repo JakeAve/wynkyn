@@ -234,6 +234,29 @@
         aria-orientation="vertical" title="Drag to resize"></div>
       <div id="pages">
         <div class="pane-head">
+          <div id="zoom" class="zoom" role="group" aria-label="Zoom">
+            <button type="button" class="btn sm icon" data-zoom="out"
+              title="Zoom out (⌘-scroll or pinch zooms too)"
+              aria-label="Zoom out">−</button>
+            <button type="button" class="btn sm" data-zoom="menu"
+              popovertarget="zoom-menu" title="Zoom: fit the spread or a page"
+              aria-haspopup="menu">100%</button>
+            <button type="button" class="btn sm icon" data-zoom="in"
+              title="Zoom in (⌘-scroll or pinch zooms too)"
+              aria-label="Zoom in">+</button>
+            <div id="zoom-menu" class="menu" popover role="menu">
+              <button type="button" role="menuitemradio" data-fit="spread">
+                <svg>
+                  <use href="#check" />
+                </svg>Fit spread<span class="d">100%</span>
+              </button>
+              <button type="button" role="menuitemradio" data-fit="page">
+                <svg>
+                  <use href="#check" />
+                </svg>Fit page
+              </button>
+            </div>
+          </div>
           <button class="btn sm icon expand" data-pane="pages"
             aria-pressed="false" title="Expand the pages; esc returns"
             aria-label="Expand the pages">

@@ -614,6 +614,77 @@ kbd {
   justify-content: flex-end;
   border-bottom-color: transparent;
 }
+/* Zoom (§6.11, preview-zoom.ts): − 100% + just left of expand; Publish shows
+   the sheets, which don't zoom. */
+#pages .zoom {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+#pages .expand {
+  margin-left: var(--s-2);
+}
+#pages .zoom [data-zoom="menu"] {
+  min-width: 3.25rem;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-mode="publish"] #pages .zoom {
+  display: none;
+}
+/* Menu (§6.9) as a native popover; preview-zoom.ts sets top and right. */
+.menu {
+  position: fixed;
+  inset: auto;
+  margin: var(--s-1) 0 0;
+  padding: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+  corner-shape: var(--corner);
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: var(--shadow-pop);
+}
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: var(--h-md);
+  padding: 0 var(--s-4) 0 var(--s-3);
+  border: none;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  text-align: left;
+  cursor: pointer;
+}
+.menu button:hover {
+  background: var(--hover);
+}
+.menu button svg {
+  width: var(--icon);
+  height: var(--icon);
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.4;
+  visibility: hidden;
+}
+.menu button[aria-checked="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+.menu button[aria-checked="true"] svg {
+  visibility: visible;
+}
+.menu .d {
+  margin-left: auto;
+  padding-left: var(--s-5);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
 /* Pane header (§6.11): the pane's own controls at left, expand at right. */
 .pane-head {
   display: flex;
@@ -1626,14 +1697,16 @@ body.typing #editor .pane-head {
   overflow: auto;
   padding: var(--s-6);
   position: relative;
-  --preview-zoom: var(--preview-fit, 1); /* --preview-fit: fitPreview() */
+  /* --preview-fit: fitPreview(), a spread across the pane; --preview-user:
+     the reader's zoom (preview-zoom.ts), 1 at fit */
+  --preview-zoom: calc(var(--preview-fit, 1) * var(--preview-user, 1));
 }
 /* A new render is staged over the live pages and swapped in when complete,
    so the preview never flashes empty mid-render. Paged.js paginates by
    measuring rects, and a zoomed page fits twice as much text, so the stage's
    page container stays 1:1 — but Paged.js only ever measures the page it is
    filling, the stage's last. Every page before it is finished, so it takes
-   the fit zoom and lands exactly over the old page it replaces; the page
+   the full zoom and lands exactly over the old page it replaces; the page
    being filled stays 1:1 and out of sight. */
 /* Progress while a render is staged (data-rendering, set by preview.ts —
    never :has(> .preview-stage), which Chrome re-evaluates on every node
@@ -1681,23 +1754,32 @@ body.typing #editor .pane-head {
   --preview-zoom: 1;
 }
 #preview .preview-stage .pagedjs_pages {
-  gap: 0 calc(8px * var(--preview-fit,
-    1)); /* as the live gap is, once zoomed */
+  /* as the live box, gap and width are, once zoomed */
+  gap: 0 calc(8px * var(--preview-fit, 1) * var(--preview-user, 1));
+  width: calc((2 * var(--pagedjs-width) + 8px) * var(--preview-fit, 1) *
+    var(--preview-user, 1));
 }
 #preview .preview-stage .pagedjs_page:not(:last-child) {
-  zoom: var(--preview-fit, 1);
+  zoom: calc(var(--preview-fit, 1) * var(--preview-user, 1));
 }
 #preview .preview-stage .pagedjs_page:last-child {
   visibility: hidden;
 }
 /* Spread layout (spec §7.6): two book pages per row, page 1 recto-alone.
-   --preview-zoom is set by fitPreview() so a full spread always fits the pane. */
+   --preview-zoom is fit × the reader's zoom, so at 100% a spread fits the pane.
+   The box is one spread wide and centred, so zoomed past the pane it scrolls
+   sideways instead of wrapping to a page per row; a last verso sits left. */
 .pagedjs_pages {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0 8px;
   zoom: var(--preview-zoom, 1);
+}
+#preview .pagedjs_pages {
+  justify-content: flex-start;
+  width: calc(2 * var(--pagedjs-width) + 8px);
+  margin-inline: auto;
 }
 /* Pages are paper: ink black, never the chrome's text color — even in dark mode. */
 .pagedjs_page {

@@ -47,7 +47,7 @@ Visual references (private artifacts; this document stands without them):
 2. **As minimal or as powerful as you need.** Every pane opens in its simple
    form; depth is one control away in the pane it belongs to, never a separate
    screen. Power is ordered, not hidden.
-3. **One red.** A single red-orange printer's ink (minium) marks structure,
+3. **One red.** A single vermilion-red printer's ink (minium) marks structure,
    position and the one action that matters. Everything else is ink on paper.
 4. **Plain words first, winks second.** Every label is the plain word. The
    period flavour lives in glyphs, small caps, tooltips, status lines and empty
@@ -83,13 +83,13 @@ possible later; it is not a setting.
 
 ### 2.2 The red: minium
 
-Red lead, the orange-red of early printed rubrics. Two strengths, because the
+Red lead, the vermilion-red of early printed rubrics. Two strengths, because the
 bright pigment is too light to carry small text.
 
 | Token        | Use                                  | Light                    | Dark        |
 | ------------ | ------------------------------------ | ------------------------ | ----------- |
-| `--acc`      | marks and fills: cursor, dots, rules | `#e2582b`                | `#f58a5f`   |
-| `--acc-ink`  | red text, red icons                  | `#b53e18`                | `#f8a07a`   |
+| `--acc`      | marks and fills: cursor, dots, rules | `#db3834`                | `#ef6d62`   |
+| `--acc-ink`  | red text, red icons                  | `#b12926`                | `#f49287`   |
 | `--acc-wash` | the selected thing's background      | `--acc` 10%, transparent | `--acc` 16% |
 | `--acc-btn`  | primary button fill                  | `--acc-ink`              | `--acc`     |
 | `--on-acc`   | text on the primary button           | `#ffffff`                | `--bg`      |
@@ -386,7 +386,7 @@ reads as a control beside the fields, and drops it for the wash when pressed;
 `.tog.primary` and `.tog.outline` (`--fg` text) are the panel's actions, e.g.
 Publish's one primary "Print sheets" beside the outlined "Print pages" and
 "Export EPUB". `.btn.sm` (banners), `.btn.lg` (the empty state) and `.btn.icon`
-(with `.sm`, the pane headers' expand) are built.
+(with `.sm`, the pane headers' expand and the pages' zoom − and +) are built.
 
 ### 6.2 Segmented control (`seg`)
 
@@ -479,9 +479,10 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   book and edition switcher (`#switcher`), the font picker (`.fontpop`), `{`
   completions (`.cm-tooltip-autocomplete`), ⌘K (`.cm-bml-palette`), the wrap bar
   and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write
-  pane's header (`.tvpop`). Fields inside a popover are §6.3 frames (focus:
-  `--acc` border and ring). The find bar (`.cm-bml-find`) is a panel, not a
-  popover, but its fields and pressed options follow the same rules.
+  pane's header (`.tvpop`); the pages' zoom menu (`.menu`, a native popover of
+  `menuitemradio` rows). Fields inside a popover are §6.3 frames (focus: `--acc`
+  border and ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but
+  its fields and pressed options follow the same rules.
 - **Completion row:** a sentinel's name in `--f-mono` `--fs-sm` `--acc-ink`, a
   7rem column; description `--muted`; how it closes (`{/quote}`, "wraps", "—")
   in mono `--fs-2xs` `--muted` at the right. An image's row is a thumbnail, its
@@ -521,7 +522,9 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   (`.btn.sm.icon
   .expand`) pinned to the top-right corner even when the
   controls wrap. A hairline below; the pages pane's header sits on `--desk` with
-  none.
+  none. The pages pane's controls sit at the right instead, beside expand: zoom
+  (`#zoom`), `−` and `+` as small icon buttons around the percentage, a small
+  ghost in tabular figures that opens the zoom menu (§6.9). Hidden in Publish.
 - **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; the writer's
   cell opens with the stats line (§8.3), the session count in `--acc-ink` once
   non-zero, then Go to style with a dotted underline.
@@ -542,8 +545,8 @@ changing, right is the result.
 
 - **Pane headers.** Write pane: Prose | Source (a small seg), Aa and Spelling
   (small ghost buttons opening §6.9 popovers) at left; expand at right. Pages
-  pane, in every mode: expand at right (room later for zoom or spread/single).
-  The style panel keeps its view heading inside.
+  pane: zoom (`−` `100%` `+`) then expand, at right; Publish shows the sheets,
+  so expand alone. The style panel keeps its view heading inside.
 - **Expand.** The write pane and the pages pane each expand from their top-right
   corner (arrows out; arrows in, in `--acc-ink`, while expanded).
   - Expanding the **writing** hides the outline and the pages. The text keeps
@@ -684,11 +687,18 @@ Out of scope unless asked: illustrations, woodcut empty states, blackletter.
 ## 10. The mark
 
 The existing sun (`web/brand/mark.svg`), rays and disc, drawn in `--acc`: the
-SVG sets its own `color` (`#e2582b`, `#f58a5f` under
+SVG sets its own `color` (`#db3834`, `#ef6d62` under
 `prefers-color-scheme:
 dark`), since an `<img>` or favicon cannot read the
-page's tokens. Favicon and app icons keep their artwork until re-exported in
-minium.
+page's tokens. The PNG icons (`icon-32`, `apple-touch-icon`, `icon-512`) are the
+same sun in the light `--acc` on the manifest's cream `#f4efe4`, filling 81%,
+86% and 62% of the square (the 512 leaves the maskable safe zone); re-export
+them from `mark.svg` whenever the red changes.
+
+The share card (`og.svg`, exported to `og.png` at 1200×630) is a black woodcut
+title page rubricated in light `--acc`: the sun and the inner hairline rule are
+red, the outer frame, hatching, stars and banner stay black. Re-export it with
+the icons.
 
 ## 11. The hosted site
 
@@ -753,4 +763,3 @@ Everything scales with the browser's text size.
 ## 15. Open
 
 - Whether the UI paper ever becomes a setting.
-- Favicon and app icons re-exported in minium.
