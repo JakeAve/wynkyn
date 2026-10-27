@@ -800,7 +800,7 @@ body.typing #editor .pane-head {
   padding: var(--s-4);
 }
 /* Lists (§6.6): a small-caps group label, then rows --s-1 apart. */
-:is(#tree, #style-nav) .nh {
+:is(#tree, #style-nav, #shortcuts-list) .nh {
   font-size: var(--fs-sm);
   font-variant-caps: all-small-caps;
   letter-spacing: var(--track-caps);
@@ -808,7 +808,7 @@ body.typing #editor .pane-head {
   color: var(--muted);
   padding: var(--s-5) var(--s-4) var(--s-1);
 }
-:is(#tree, #style-nav) .nh:first-child {
+:is(#tree, #style-nav, #shortcuts-list) .nh:first-child {
   padding-top: 0;
 }
 #tree :is(ul.tree-list, li) {
@@ -3551,6 +3551,52 @@ body.typing #editor .pane-head {
 }
 #title-source {
   font-size: var(--fs-sm);
+}
+/* Keyboard shortcuts: list rows (§6.6) of a label and its keys; a row being
+   recorded is pressed (the red wash) and says which keys do what. */
+#shortcuts-list {
+  display: grid;
+  gap: var(--s-1);
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 0 calc(var(--s-4) * -1);
+}
+.sc-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4);
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sc-row:hover {
+  background: var(--hover);
+}
+.sc-row[aria-pressed="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+.sc-label {
+  margin-right: auto;
+}
+.sc-hint {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.sc-row[aria-pressed="true"] .sc-hint {
+  color: inherit;
+}
+#shortcuts-note {
+  flex: 1;
+}
+#shortcuts-note.warn {
+  color: var(--warn);
 }
 /* The title dialog's theme picker: a row of five small cards, wide enough
    for them. */

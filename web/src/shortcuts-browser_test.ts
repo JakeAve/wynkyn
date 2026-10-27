@@ -102,3 +102,68 @@ Deno.test({
       await saved("{footnote: name}");
     }),
 });
+
+// The Contents pane's shown state, as the toolbar toggle reports it.
+const treeShown = (page: Page) =>
+  page.locator("#tree-toggle").getAttribute("aria-pressed");
+
+Deno.test({
+  name: "Ctrl+? rebinds Contents to Ctrl+B, and it survives a reload",
+  ignore: !hasChrome || !appBuilt,
+  fn: () =>
+    withApp(async (page) => {
+      const row = page.locator('#shortcuts-list [data-id="toggle-tree"]');
+      await page.keyboard.press("Control+Shift+Slash");
+      await row.click();
+      await page.keyboard.press("Control+B");
+      assertEquals(await row.locator("kbd").allTextContents(), ["Ctrl+B"]);
+      await page.keyboard.press("Escape");
+      assert(
+        !(await page.locator("#shortcuts").evaluate((d) =>
+          (d as HTMLDialogElement).open
+        )),
+      );
+      const before = await treeShown(page);
+      await page.keyboard.press("Control+B");
+      assert((await treeShown(page)) !== before, "Ctrl+B toggles Contents");
+      assert(
+        (await page.locator("#tree-toggle").getAttribute("title"))?.endsWith(
+          "(Ctrl+B)",
+        ),
+      );
+
+      await page.reload();
+      await page.locator("#editor .cm-content").waitFor();
+      const after = await treeShown(page);
+      await page.keyboard.press("Control+B");
+      assert((await treeShown(page)) !== after, "still Ctrl+B after a reload");
+
+      // Backspace on the row restores the default.
+      await page.keyboard.press("Control+Shift+Slash");
+      await row.click();
+      await page.keyboard.press("Backspace");
+      assertEquals(await row.locator("kbd").allTextContents(), ["Ctrl+\\"]);
+    }),
+});
+
+Deno.test({
+  name: "recording Ctrl+W says why and binds nothing",
+  ignore: !hasChrome || !appBuilt,
+  fn: () =>
+    withApp(async (page) => {
+      const row = page.locator('#shortcuts-list [data-id="toggle-tree"]');
+      await page.keyboard.press("Control+Shift+Slash");
+      await row.click();
+      await page.keyboard.press("Control+W");
+      assertEquals(
+        await page.locator("#shortcuts-note").textContent(),
+        "Ctrl+W closes the browser tab; the page can't use it.",
+      );
+      await page.keyboard.press("Escape");
+      assertEquals(await row.locator("kbd").allTextContents(), ["Ctrl+\\"]);
+      assertEquals(
+        await page.evaluate(() => localStorage.getItem("keys")),
+        null,
+      );
+    }),
+});

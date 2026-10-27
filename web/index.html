@@ -481,6 +481,18 @@
         <button id="theme-cancel" class="btn" type="button">Cancel</button>
       </div>
     </dialog>
+    <dialog id="shortcuts" class="ask" aria-labelledby="shortcuts-title">
+      <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+      <div class="field"><input id="shortcuts-filter" type="search"
+          placeholder="Filter shortcuts…" autocomplete="off" spellcheck="false"
+          aria-label="Filter shortcuts"></div>
+      <div id="shortcuts-list"></div>
+      <div class="ask-foot">
+        <p id="shortcuts-note" class="hint" aria-live="polite">Click a shortcut
+          to change it.</p>
+        <button id="shortcuts-done" class="btn" type="button">Done</button>
+      </div>
+    </dialog>
     <script src="/vendor/paged.js"></script>
     <script type="module" src="/web/app.js"></script>
   </body>

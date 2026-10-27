@@ -488,6 +488,16 @@ right-aligned, `--s-3` apart, ghost first, primary last. `esc` closes it unless
 it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
 `.ask` with `.ask-foot`; fields in a dialog (`.ask .field`) are §6.3 frames.
 
+**Keyboard shortcuts** (`#shortcuts`, Ctrl+? or ⌘?): an `.ask` with a filter
+field, then every command under its section's small-caps group label (§6.6), a
+row each (`.sc-row`): the name left, its keys as `kbd` right, "none" in
+`--fs-xs` `--muted` when unbound. Clicking a row records: it takes the red wash
+and its keys give way to "Press keys · Esc cancels · Backspace default · Delete
+none". A row that lost its key to another shows "was Ctrl+B" before its keys.
+The footer line (`#shortcuts-note`, `--fs-xs` `--muted`) tips, then reports: a
+refused combo in `--err`, an accent clash on a Mac in `--warn`; Done at the
+right.
+
 ### 6.9 Menu, popover, tooltip
 
 - **Menu / popover:** `--bg`, 1px `--line`, `--r-pop` + corner, `--shadow-pop`,

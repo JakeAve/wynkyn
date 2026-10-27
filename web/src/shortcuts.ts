@@ -10,6 +10,8 @@ import type { Mode } from "./preview.ts";
 import type { Panes } from "./panes.ts";
 import type { TextView } from "./text-view.ts";
 import { store } from "./dom.ts";
+// The dialog imports only this module's types, so there is no runtime cycle.
+import { installShortcutsDialog } from "./shortcuts-dialog.ts";
 
 export interface Shortcuts {
   commands(): Command[];
@@ -142,7 +144,17 @@ const aria = (c: string) =>
   ).join("+");
 
 export function installShortcuts(deps: ShortcutDeps): Shortcuts {
-  const commands = table(deps);
+  let openDialog = () => {};
+  const commands: Command[] = [
+    {
+      id: "shortcuts",
+      label: "Keyboard shortcuts",
+      section: "App",
+      keys: "mod+shift+slash",
+      run: () => openDialog(),
+    },
+    ...table(deps),
+  ];
   const byId = new Map(commands.map((c) => [c.id, c]));
   let map = resolve(commands, overrides());
 
@@ -200,7 +212,7 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     attributeFilter: ["data-command", "data-title"],
   });
 
-  return {
+  const api: Shortcuts = {
     commands: () => commands,
     keymap: () => map,
     keyLabel,
@@ -213,4 +225,6 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
       relabel(document.body);
     },
   };
+  openDialog = installShortcutsDialog(api);
+  return api;
 }
