@@ -377,7 +377,13 @@ Deno.test({
       // The pinned outline slides in over the view; the pane's header
       // steps right of it, so Prose | Source and Aa stay reachable.
       await page.locator("#tree-toggle").click();
-      await page.waitForTimeout(400); // the slide and the header's step
+      // Measure once the slide and the header's step have finished, not after
+      // a guess at how long they take: a slow runner lands mid-transition.
+      for (const el of ["#tree", "#editor .pane-head"]) {
+        await page.locator(el).evaluate((e) =>
+          Promise.all(e.getAnimations().map((a) => a.finished))
+        );
+      }
       const tree = (await page.locator("#tree").boundingBox())!;
       const source = (await page.locator("#editor .pane-head").getByText(
         "Source",
@@ -403,6 +409,14 @@ Deno.test({
         page.locator("#editor .cm-text", { hasText: t }).evaluate((e) =>
           Number(getComputedStyle(e).opacity)
         );
+      // Once `dimmed` marks it, the fade has run its course: read straight
+      // after the class lands, the opacity is still the fade's starting 1.
+      const faded = async (dimmed: string, t: string) => {
+        await page.locator(dimmed, { hasText: t }).waitFor();
+        await page.locator("#editor .cm-text", { hasText: t }).evaluate((e) =>
+          Promise.all(e.getAnimations().map((a) => a.finished))
+        );
+      };
       // the Aa menu's Dim seg; a lint tooltip may cover the menu's button
       const dim = (d: string) =>
         page.locator(`[data-dim="${d}"]`).evaluate((b) =>
@@ -415,14 +429,14 @@ Deno.test({
       );
       await dim("paragraph");
       await line("Second sentence").click();
-      await page.waitForTimeout(400); // the fade
+      await faded("#editor .cm-line.cm-dim", "Another paragraph");
       assert(await opacity("Another paragraph") < 1, "another paragraph fades");
       assertEquals(await opacity("Second sentence"), 1);
 
       await dim("sentence");
       await line("Second sentence").click();
       await page.keyboard.press("End");
-      await page.waitForTimeout(400);
+      await faded("#editor .cm-text.cm-off", "First sentence");
       assert(await opacity("First sentence") < 1, "another sentence fades");
       assertEquals(await opacity("Second sentence"), 1);
     } finally {
