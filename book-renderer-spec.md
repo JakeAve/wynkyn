@@ -2209,6 +2209,16 @@ The right column in Write and Style (§7.1): the live, print-accurate spread
 view, under the pages pane's header, whose corner button expands it to the whole
 width (§7.1).
 
+**Zoom.** At 100% a spread fits the pane's width (never larger than 1:1). The
+header's `−` `100%` `+`, just before the expand button, steps by 10% from 50% to
+400%; the percentage opens a menu with Fit spread (100%) and Fit page (one whole
+page fits the pane, centred). ⌘-scroll or a trackpad pinch over the pages zooms
+continuously between 50% and 400% around the pointer; the buttons and menu zoom
+around the pane's centre. Past 100% the spread stays side by side and the pane
+scrolls sideways. Zoom is the reader's own (remembered in the browser,
+`preview-zoom`), not the book's: it is CSS zoom over a layout made at 1:1, so it
+never re-renders and never reaches paper. The sheet view in Publish has no zoom.
+
 ```
 +-------------------+  +--------------------+
 |                    |  |                    |

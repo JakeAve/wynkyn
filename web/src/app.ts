@@ -54,6 +54,7 @@ import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
 import { installTextView } from "./text-view.ts";
 import { installPanes, type Panes } from "./panes.ts";
+import { installPreviewZoom } from "./preview-zoom.ts";
 import { connect } from "./library.ts";
 import { $, brief } from "./dom.ts";
 import { h } from "./panel-controls.ts";
@@ -898,6 +899,7 @@ async function main(): Promise<void> {
 
   const previewEl = $("preview");
   new ResizeObserver(() => fitPreview(previewEl)).observe(previewEl);
+  installPreviewZoom({ container: previewEl, out: $("zoom") });
   const refreshPageIndicator = installPageIndicator(
     previewEl,
     $("page-indicator"),
