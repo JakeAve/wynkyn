@@ -459,30 +459,34 @@ export function setCount(
 // `chain[0]` is the clicked node's classes, `chain[n]` its n-th ancestor's.
 // A selector's tokens must appear in order walking outward; the entry whose
 // innermost token matches nearest the click wins, so ".chapter .number" beats
-// ".chapter" for a click on the number. Multi-selector entries (prose-matter)
+// ".chapter" for a click on the number; at the same depth the more specific
+// selector wins, classes over tags, as in CSS: ".matter-title-page .author"
+// beats ".bml p". Multi-selector entries (prose-matter)
 // are comma-separated; any alternative may match. An `{is}` class beats all of
 // that: wrapping text in one is how the author asks to style it apart.
 export function matchKey(
   chain: string[][],
   catalog: StyleEntry[],
 ): string | null {
-  let best: { key: string; is: boolean; depth: number; tokens: number } | null =
+  let best: { key: string; is: boolean; depth: number; spec: number } | null =
     null;
   for (const entry of catalog) {
     const is = entry.section === "is";
     for (const alt of entry.selector.split(", ")) {
       // ".class" tokens match a class, bare ones ("p", "em") a tag name.
-      const tokens = alt.trim().split(/\s+/)
-        .map((t) => t.startsWith(".") ? t.slice(1) : t).reverse(); // innermost first
+      const raw = alt.trim().split(/\s+/);
+      const tokens = raw.map((t) => t.startsWith(".") ? t.slice(1) : t)
+        .reverse(); // innermost first
+      const spec = raw.reduce((n, t) => n + (t.startsWith(".") ? 100 : 1), 0);
       const depth = matchDepth(chain, tokens);
       if (depth === null) continue;
       if (
         !best || (is && !best.is) ||
         (is === best.is &&
           (depth < best.depth ||
-            (depth === best.depth && tokens.length >= best.tokens)))
+            (depth === best.depth && spec >= best.spec)))
       ) {
-        best = { key: entry.key, is, depth, tokens: tokens.length };
+        best = { key: entry.key, is, depth, spec };
       }
     }
   }

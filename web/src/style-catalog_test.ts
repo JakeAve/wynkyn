@@ -219,6 +219,18 @@ Deno.test("nested matter sub-elements use the matter type", () => {
   );
 });
 
+Deno.test("a classed <p> goes to its own entry, not Paragraph", () => {
+  const tp = ["matter", "matter-title-page", "section"];
+  for (const sub of ["author", "subtitle", "edition"]) {
+    assertEquals(
+      matchKey([[sub, "p"], tp, ["bml", "article"]], catalog),
+      `title-page.${sub}`,
+    );
+  }
+  // The "By" line has no class of its own: a paragraph.
+  assertEquals(matchKey([["p"], tp, ["bml", "article"]], catalog), "paragraph");
+});
+
 Deno.test("page numbers resolve by zone via Paged.js margin-box classes", () => {
   const chain = [["pagedjs_margin-content"], [
     "pagedjs_margin",
