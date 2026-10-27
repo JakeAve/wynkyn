@@ -2491,14 +2491,13 @@ user lands in Write mode looking at their own words wrapped in the tags,
 paginated in the house template, with the importer's notes in the footer. There
 is no settings form; the editor is the review step.
 
-**Welcome — where books live.** Shown when the app has no library. Four rows,
+**Welcome — where books live.** Shown when the app has no library. Three rows,
 each one line of explanation, in the manner of a session-type picker:
 
 1. Create a new folder on my device — Wynkyn creates a Books folder.
 2. Select an existing folder on my device — the user already has one.
 3. Keep books in this browser — works anywhere, but browsers clear site storage,
    so download what you want to keep.
-4. Save books in the cloud — paid, coming soon, disabled.
 
 Under the rows, the privacy line: _Your books are yours. Wynkyn never reads,
 analyses, trains on, shares or sells your manuscripts, and never will. Free

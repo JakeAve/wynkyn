@@ -3477,13 +3477,6 @@ body.typing #editor .pane-head {
 .pill[hidden] {
   display: none;
 }
-.choice:disabled {
-  cursor: default;
-  opacity: .55;
-}
-.choice:disabled:hover {
-  background: none;
-}
 .ask .privacy {
   margin: var(--s-5) 0 0;
   padding-top: var(--s-5);
