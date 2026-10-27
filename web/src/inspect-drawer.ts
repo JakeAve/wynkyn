@@ -152,16 +152,12 @@ const pagesOf = (page: Element) =>
     p.classList.contains("pagedjs_page")
   );
 
-// The page's first piece of text: what "first on the page" means.
-function firstText(page: Element): Node | null {
-  const content = page.querySelector(".pagedjs_page_content");
-  if (!content) return null;
-  const walk = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
-    if (n.textContent?.trim()) return n;
-  }
-  return null;
-}
+// The page's first block: what "first on the page" means. Not its first
+// text, which on an opener is the chapter's number, no block of its own.
+const firstBlock = (page: Element) =>
+  [...page.querySelectorAll(".pagedjs_page_content [data-line]")].find((el) =>
+    !el.querySelector("[data-line]")
+  ) ?? null;
 
 // Paged.js turns a page break into data-break-before on the element; an
 // unconverted one is still in the computed style.
@@ -186,7 +182,7 @@ function factsFor(t: Target, deps: Deps, lines: Line[]): InspectFacts {
   const el = t.kind === "furniture" || t.kind === "ghost" || t.kind === "space"
     ? null
     : blockOf(t);
-  const first = firstText(t.page);
+  const first = firstBlock(t.page);
   const ref = el?.getAttribute("data-ref");
   const next = pages[i + 1];
   const continues = !!(ref && el?.hasAttribute("data-split-to") &&

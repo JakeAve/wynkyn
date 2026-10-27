@@ -507,6 +507,13 @@ export function installInspect(deps: {
     }
     schedule();
   }).observe(container, { childList: true, attributes: true });
+  // A face arriving late reflows the pages with no mutation to see: redraw,
+  // and measure the pinned block's lines again.
+  document.fonts.addEventListener("loadingdone", () => {
+    measured = null;
+    showDrawer();
+    schedule();
+  });
   new MutationObserver(() => {
     showDrawer();
     schedule();

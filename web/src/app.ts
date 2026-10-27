@@ -891,6 +891,9 @@ async function main(): Promise<void> {
       scrollEditorToLine(editor, line);
     },
   });
+  // Inspect reads the book's metadata (running heads, units, where a value
+  // comes from), which is otherwise fetched only when Style or Publish opens.
+  $("inspect").addEventListener("click", () => void ensureConfigPanel());
   installShortcuts(installPanes({ mode: () => mode }), inspect);
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
