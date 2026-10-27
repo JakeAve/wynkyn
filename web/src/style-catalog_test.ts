@@ -502,4 +502,11 @@ Deno.test("entryName: the source label, margin boxes by what they hold", () => {
   assertEquals(name("paragraph"), "Paragraph");
   assertEquals(name("numbering.pages.body"), "Page number");
   assertEquals(name("running.top-center"), "Running head");
+  const head = {
+    running: { odd: [{ content: "", area: "top-center", "font-size": "8pt" }] },
+  };
+  assertEquals(
+    sourceOf(head, byKey(cat, "running.top-center"), "font-size", cat),
+    { kind: "set", label: "Running heads" },
+  );
 });

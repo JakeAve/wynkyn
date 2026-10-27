@@ -2234,9 +2234,23 @@ holding ⌥ while pointing at something else draws the distances between them. A
 running head or page number the page map dropped (a chapter opening, a display
 or blank page) shows as a dashed ghost in its margin box, and can be pinned too.
 A click on the desk unpins; esc unpins, then leaves Inspect, then returns an
-expanded pane. Every mark is drawn in a layer of its own over the pages, never
-in them, and only on screen: nothing of Inspect reaches the print sheets or a
-PDF. Publish has no Inspect.
+expanded pane.
+
+What is pinned opens the drawer under the pages: a breadcrumb of where it sits
+(Body › the chapter's title › Paragraph › Line 3; each crumb pins that), the
+reasons it sits where it does, each with where the reason comes from (a Style
+setting, the page map, the layout, the book's defaults: "Starts a new page",
+"Continues on page 29", "Not printed: this page opens a chapter"), its box
+(space above and below, first-line indent, width × height) and its type (face,
+size, leading, alignment, hyphenation), a value the element doesn't set itself
+greyed with where it comes from. A block lists its lines as numbered chips; a
+chip pins that line, drawing every line's baseline and marking a word the line
+breaks with a hyphen. Show in manuscript and Open in Style go where a click
+would in Write and Style. The drawer only explains; changing a value is Style's.
+
+Every mark is drawn in a layer of its own over the pages, never in them, and
+only on screen: nothing of Inspect reaches the print sheets or a PDF. Publish
+has no Inspect.
 
 ```
 +-------------------+  +--------------------+

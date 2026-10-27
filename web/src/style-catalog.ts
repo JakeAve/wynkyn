@@ -632,6 +632,17 @@ export function sourceOf(
   if (prop in getProps(metadata, entry)) {
     return { kind: "set", label: sourceLabel(catalog, entry.path) };
   }
+  // A running head's type is set on its odd/even entries for that area.
+  if (entry.section === "running") {
+    const area = entry.key.slice("running.".length);
+    const heads = [
+      ...metadata.running?.odd ?? [],
+      ...metadata.running?.even ?? [],
+    ];
+    if (heads.some((e) => e.area === area && prop in e)) {
+      return { kind: "set", label: entry.group };
+    }
+  }
   // Margin boxes sit outside the book body and inherit nothing from it.
   if (
     !INHERITED_PROPS.has(prop) || entry.section === "numbering" ||

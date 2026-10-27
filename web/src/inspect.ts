@@ -6,10 +6,18 @@
 // are drawn in their own layer (#inspect-overlay, a sibling of #preview), so
 // print.ts, which clones the pages, never carries any of it.
 import type { Metadata } from "../../metadata/types.ts";
-import { DEFAULT_SIZE, unitOf } from "../../metadata/page-setup.ts";
 import type { PageEntry } from "../../renderer/page-map-types.ts";
 import { marginShows, type Mode, resolveStyle } from "./preview.ts";
-import { entryName, type StyleEntry } from "./style-catalog.ts";
+import type { StyleEntry } from "./style-catalog.ts";
+import {
+  type Line,
+  measureLines,
+  nameOf,
+  renderDrawer,
+  spaceRect,
+  unitFor,
+  zoomOf,
+} from "./inspect-drawer.ts";
 import {
   bookLength,
   faceOf,
@@ -36,26 +44,6 @@ type Rect = { top: number; bottom: number; left: number; right: number };
 const within = (r: Rect, x: number, y: number) =>
   x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 
-/** On-screen px per unzoomed CSS px on this page: fit × the reader's zoom. */
-export function zoomOf(page: Element): number {
-  return page.getBoundingClientRect().width /
-    (parseFloat(getComputedStyle(page).width) || 1);
-}
-
-/** What Inspect calls a target. */
-export function nameOf(t: Target, catalog: StyleEntry[]): string {
-  if (t.kind === "space") return "Empty space";
-  if (t.el?.matches("a.ref")) return "Cross-reference";
-  if (t.el?.matches(".footnote-anchor")) return "Footnote reference";
-  const name = t.entry ? entryName(t.entry, catalog) : "";
-  return t.kind === "ghost" ? `${name} (not printed)` : name;
-}
-
-/** The book's unit for lengths: mm when its page size is metric. */
-export function unitFor(metadata: Metadata): "in" | "mm" {
-  return unitOf(metadata.page?.size ?? DEFAULT_SIZE);
-}
-
 export function installInspect(deps: {
   container: HTMLElement;
   catalog(): StyleEntry[];
@@ -68,6 +56,7 @@ export function installInspect(deps: {
   const { container } = deps;
   const button = document.getElementById("inspect")!;
   const host = document.getElementById("inspect-overlay")!;
+  const drawer = document.getElementById("inspect-drawer")!;
   let on = false;
   let pinned: Target | null = null;
   let hover: Target | null = null;
@@ -142,27 +131,6 @@ export function installInspect(deps: {
     return { left: mid - w, right: mid + w, top: r.top, bottom: r.bottom };
   };
 
-  // The text block below the page's last block, when at least a line of it
-  // is left: why the page is short.
-  const spaceRect = (page: Element): Rect | null => {
-    const content = page.querySelector(".pagedjs_page_content");
-    const leaves = [...page.querySelectorAll("[data-line]")].filter((el) =>
-      !el.querySelector("[data-line]")
-    );
-    const last = leaves.at(-1);
-    if (!content || !last) return null;
-    const c = content.getBoundingClientRect();
-    const top = Math.max(
-      ...leaves.map((el) => el.getBoundingClientRect().bottom),
-    );
-    const cs = getComputedStyle(last);
-    const line = (parseFloat(cs.lineHeight) ||
-      1.2 * parseFloat(cs.fontSize)) * zoomOf(page);
-    return c.bottom - top < line
-      ? null
-      : { left: c.left, right: c.right, top, bottom: c.bottom };
-  };
-
   // What the pointer is on: a ghost, a span clicked directly, the styled
   // block, printed furniture, or the empty space below the last block.
   const targetAt = (el: Element | null, x: number, y: number) => {
@@ -220,7 +188,44 @@ export function installInspect(deps: {
       return r ? [r] : [];
     }
     if (t.kind === "span") return [...t.el!.getClientRects()];
+    if (t.kind === "line") {
+      const l = linesOf(t.el!, t.page)[(t.line ?? 1) - 1];
+      return l ? [l] : [];
+    }
     return [t.el!.getBoundingClientRect()];
+  };
+
+  // The pinned block's lines, measured once per block and zoom and moved
+  // with its page as the pane scrolls.
+  let measured: {
+    block: Element;
+    z: number;
+    left: number;
+    top: number;
+    lines: Line[];
+  } | null = null;
+  const linesOf = (block: Element, page: Element): Line[] => {
+    const p = page.getBoundingClientRect();
+    const z = zoomOf(page);
+    if (measured?.block !== block || measured.z !== z) {
+      measured = {
+        block,
+        z,
+        left: p.left,
+        top: p.top,
+        lines: measureLines(block),
+      };
+    }
+    const dx = p.left - measured.left;
+    const dy = p.top - measured.top;
+    return measured.lines.map((l) => ({
+      ...l,
+      left: l.left + dx,
+      right: l.right + dx,
+      top: l.top + dy,
+      bottom: l.bottom + dy,
+      baseline: l.baseline + dy,
+    }));
   };
   const union = (rs: Rect[]): Rect | null =>
     rs.length
@@ -279,6 +284,23 @@ export function installInspect(deps: {
       else for (const r of rectsOf(hovered)) mark("content", r);
       for (const r of rectsOf(hovered)) mark("ring", r);
       tag(hovered, unit, h, marks);
+    }
+    if (pinned?.kind === "line") {
+      // Every line's baseline, the pinned one's strong, and where the
+      // browser hyphenated it.
+      const lines = linesOf(pinned.el!, pinned.page);
+      lines.forEach((l, i) => {
+        const on = i + 1 === pinned!.line;
+        mark(on ? "base on" : "base", {
+          ...l,
+          top: l.baseline,
+          bottom: l.baseline + 1,
+        });
+        if (on && l.hyphenated) {
+          const w = (l.bottom - l.top) / 3;
+          mark("hyphen", { ...l, left: l.right, right: l.right + w });
+        }
+      });
     }
     if (pinned) {
       for (const r of rectsOf(pinned)) mark("ring pin", r);
@@ -389,8 +411,11 @@ export function installInspect(deps: {
 
   const pin = (t: Target | null) => {
     pinned = t;
+    showDrawer();
     schedule();
   };
+  const showDrawer = () =>
+    renderDrawer(drawer, active() ? pinned : null, { ...deps, pin });
 
   // After a re-render the pinned node is gone; the same block (by its
   // manuscript line and entry) is pinned again if it's still there.
@@ -475,11 +500,17 @@ export function installInspect(deps: {
     if (records.some((r) => r.type === "childList")) {
       donors.clear();
       hover = null;
-      repin();
+      if (pinned && !pinned.page.isConnected) {
+        repin();
+        showDrawer();
+      }
     }
     schedule();
   }).observe(container, { childList: true, attributes: true });
-  new MutationObserver(schedule).observe(document.documentElement, {
+  new MutationObserver(() => {
+    showDrawer();
+    schedule();
+  }).observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["data-mode"],
   });

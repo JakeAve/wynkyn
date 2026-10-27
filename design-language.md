@@ -398,7 +398,8 @@ reads as a control beside the fields, and drops it for the wash when pressed;
 `.tog.primary` and `.tog.outline` (`--fg` text) are the panel's actions, e.g.
 Publish's one primary "Print sheets" beside the outlined "Print pages" and
 "Export EPUB". `.btn.sm` (banners), `.btn.lg` (the empty state) and `.btn.icon`
-(with `.sm`, the pane headers' expand and the pages' zoom − and +) are built.
+(with `.sm`, the pane headers' expand and the pages' zoom − and +) are built;
+`.btn.outline` is the Inspect drawer's two actions.
 
 ### 6.2 Segmented control (`seg`)
 
@@ -551,6 +552,31 @@ sentence, one large primary button (`.btn.primary.lg`). `--s-8` padding. In
 in it says so in one centred `--muted` `--fs-sm` line (`.book-empty`). The empty
 library's create dialog takes `.empty` on its heading block ("Your library is
 empty").
+
+### 6.13 Inspect drawer
+
+Under the pages (`#inspect-drawer`, a row of `#pages`) while Inspect has
+something pinned, gone otherwise; at most 15.625rem tall, scrolling inside.
+Chrome on `--bg`, so it follows the theme; only its box diagram borrows the page
+marks' colours (§2.4).
+
+- **Header** (`--h-pane`, a hairline below): the breadcrumb at left, crumbs as
+  small `--muted` text buttons with a `--hover` wash, `›` between them; the
+  current one `--acc-ink` 500, a crumb that goes nowhere plain. At right, Show
+  in manuscript and Open in Style as small outline buttons (§6.1), each only
+  when it has somewhere to go.
+- **Body:** three columns, `--s-7` apart: Why it's here (1.55fr), Box
+  (14.375rem), Type (1fr), each under a small-caps label (§6.5). A reason is a
+  `--fs` line over its source in `--fs-xs` `--muted` with a dotted underline.
+  Lines: quiet chips (§6.10), numbered, a pinned line's in the red wash.
+- **Box:** the DevTools diagram: a dashed amber frame on `--inspect-space` with
+  space above and below, a green `--inspect-indent` cell for the first-line
+  indent, and the size in a `--inspect-content` box ringed in `--inspect-hover`,
+  all in `--fs-2xs` tabular figures; a key below. A span, ghost or empty space
+  shows its size alone, in a `--line` frame.
+- **Type:** label column 4rem; the value over where it comes from: "Style ›
+  Chapter title" when this element sets it, else the value `--muted` with "from
+  Body" or "Book default".
 
 ## 7. Layout and expanded views
 
