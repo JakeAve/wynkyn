@@ -241,10 +241,18 @@ function onDocChanged(text: string): void {
 
 let isNames: string[] = []; // `{is}` classes in the manuscript, from reparse
 
-// Words in the manuscript now, and when this book was opened (a book switch
-// reloads the page, so that is the session's start).
+// Words in the manuscript now, and the session's baseline: the count when
+// the page opened (a book switch reloads the page), moved by every reload
+// from disk, since words that arrive from outside weren't written here.
 let words = 0;
 let wordsAtOpen: number | null = null;
+
+// The buffer becomes the disk's text (a reload, another writer's change).
+function takeDiskText(text: string): void {
+  if (wordsAtOpen !== null) wordsAtOpen += wordCount(text.split("\n")) - words;
+  replaceBuffer(editor, text);
+  reparse(text);
+}
 
 // The writer's footer: the chapter at the cursor, the words, the words added.
 function showStats(lines: string[], line: number): void {
@@ -259,7 +267,7 @@ function showStats(lines: string[], line: number): void {
   }
   const added = Math.max(0, words - wordsAtOpen);
   const gain = document.createElement("span");
-  gain.textContent = `+${added.toLocaleString()} today`;
+  gain.textContent = `+${added.toLocaleString()} this session`;
   if (added) gain.className = "gain";
   parts.push(
     `${words.toLocaleString()} ${words === 1 ? "word" : "words"} · `,
@@ -473,7 +481,7 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
 // The live pages, both set in main. A null cacheKey paints without touching
 // the book's cached render.
 let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {};
-let restore: (cached: CachedRender) => void = () => {};
+let restore: (cached: CachedRender, version?: string) => void = () => {};
 
 // The edition's metadata with every style edit landed, so a theme goes over
 // what the author sees. The held copy is current unless another writer changed
@@ -495,7 +503,7 @@ const themes = new ThemePreview({
   setMetadata: (m) => metadata = m,
   saveSections: saveMetadataSections,
   paint: (msg, cacheKey) => paint(msg, cacheKey),
-  restore: (cached) => restore(cached),
+  restore: (cached, version) => restore(cached, version),
   leave,
   setStatus,
 });
@@ -588,8 +596,7 @@ async function refreshFromRemote(): Promise<void> {
     showDiskBanner(disk);
     return;
   }
-  replaceBuffer(editor, disk.text);
-  reparse(disk.text);
+  takeDiskText(disk.text);
   sync.rebase(disk.version);
   hideDiskBanner();
 }
@@ -600,8 +607,7 @@ async function refreshFromRemote(): Promise<void> {
 async function rebaseAfterRename(): Promise<void> {
   const disk = await fetchManuscript(book);
   if (!sync.manuscriptDirty() && !sync.manuscriptBusy()) {
-    replaceBuffer(editor, disk.text);
-    reparse(disk.text);
+    takeDiskText(disk.text);
   }
   sync.rebase(disk.version);
   if (diskOffer?.version === sync.base) hideDiskBanner();
@@ -621,8 +627,7 @@ function reloadFromDisk(): void {
   if (!diskOffer) return;
   const { text, version } = diskOffer;
   sync.dropManuscript(version);
-  replaceBuffer(editor, text);
-  reparse(text);
+  takeDiskText(text);
   hideDiskBanner();
   editor.focus();
 }
@@ -959,16 +964,7 @@ async function main(): Promise<void> {
     addImage: (slug, file) => fillPlaceholder(images, slug, file),
   });
   installStyleHover(previewEl, styleCatalog, () => mode);
-  // Restore before opening the socket so the previous render is on screen
-  // when the first update lands, instead of a blank preview.
   const key = cacheId(book, edition);
-  const cached = await loadCachedRender(key);
-  if (cached) {
-    restoreCachedRender(cached, previewEl);
-    refreshPageIndicator();
-    followCursor(cursorLine);
-    setPageTurns(editor, pageTurns(previewEl));
-  }
   const onClose = () => {
     // `deno task dev` restarts the server when app code changes; follow it
     // back with a fresh page, unless that would drop an unsaved edit.
@@ -983,31 +979,41 @@ async function main(): Promise<void> {
       } else location.reload();
     }, 500);
   };
+  // Everything that reads the pages, once a layout is on screen. Its page
+  // turns are lines of the text it was built from (`version`), so they're
+  // taken only while the buffer is that text; otherwise the turns shown,
+  // mapped through each edit since, stay until a layout that matches.
+  const afterLayout = (version?: string) => {
+    refreshPageIndicator();
+    configPanel?.pagesChanged();
+    followCursor(cursorLine);
+    if (version === sync.base && !sync.manuscriptDirty()) {
+      setPageTurns(editor, pageTurns(previewEl));
+    }
+    textView.refresh();
+  };
   paint = (msg, cacheKey: string | null = key) => {
     renderPreview(msg, previewEl, cacheKey).then((problems) => {
       delete previewEl.dataset.stale;
       showPageProblems(problems);
-      refreshPageIndicator();
-      configPanel?.pagesChanged();
-      followCursor(cursorLine);
-      setPageTurns(editor, pageTurns(previewEl));
-      textView.refresh();
+      afterLayout(msg.manuscriptVersion);
     }, (err) => {
       // The old pages stay up; their problems no longer describe this book.
       setStatus("error", `preview: ${brief(err)}`);
       showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
     });
   };
-  restore = (cached) => {
+  restore = (cached, version) => {
     restoreCachedRender(cached, previewEl);
     delete previewEl.dataset.stale;
     showPageProblems(cached.problems ?? []);
-    refreshPageIndicator();
-    configPanel?.pagesChanged();
-    followCursor(cursorLine);
-    setPageTurns(editor, pageTurns(previewEl));
-    textView.refresh();
+    afterLayout(version);
   };
+  // Restore before opening the socket so the previous render is on screen
+  // when the first update lands, instead of a blank preview. Its text may be
+  // older than the buffer's, so its page turns wait for that update.
+  const cached = await loadCachedRender(key);
+  if (cached) restore(cached);
   themes.installApply();
   const onMessage = (msg: ServerMessage) => {
     if (msg.type === "error") {

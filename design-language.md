@@ -644,11 +644,12 @@ abbreviation ends one early. Spelling's popover lists the word lists and None as
 check items. Completions, the wrap bar, ⌘K, sentinel shortcuts, find and
 replace, image drops and the preview following the cursor work in both views and
 expanded. Footer (built): the writer's cell opens with "Chapter title · 41,210
-words · +512 today", the chapter at the cursor (its slug in `--f-hivis` when it
-has no title; left out before the first chapter), the manuscript's words and the
-words added since the book was opened (never below 0, in `--acc-ink` once above
-it), recounted with the parse; then Go to style. No goals or streaks. Typewriter
-scrolling and writing on the book's paper were considered and dropped.
+words · +512 this session", the chapter at the cursor (its slug in `--f-hivis`
+when it has no title; left out before the first chapter), the manuscript's words
+and the words added since the book was opened (never below 0, in `--acc-ink`
+once above it; words a reload from disk brings in don't count), recounted with
+the parse; then Go to style. No goals or streaks. Typewriter scrolling and
+writing on the book's paper were considered and dropped.
 
 ## 9. Winks
 

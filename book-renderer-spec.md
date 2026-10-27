@@ -2054,14 +2054,14 @@ CodeMirror 6 over plain BML text.
   view, so the writer sees where they are on the page. The footer is split by
   column: under the editor, the writer's cell (the chapter at the cursor, the
   word count and the words added this session — "Marley's Ghost · 41,210 words ·
-  +512 today", the last in red once it is above 0 — then parse warnings, import
-  notes, and "Go to style:" naming the style that block belongs to — "Chapter ·
-  Title", "Body text · Paragraph", a custom `{is}` name); under the pages, the
-  page count and page problems. Go to style opens that style in Style mode, the
-  way a preview click does (§7.4), and leaves a history entry, so Back returns
-  to Write with the cursor where it was. The style is read from the enclosing
-  matter type, part or chapter, the enclosing block, and the field sentinel
-  whose text runs on to the line.
+  +512 this session", the last in red once it is above 0 — then parse warnings,
+  import notes, and "Go to style:" naming the style that block belongs to —
+  "Chapter · Title", "Body text · Paragraph", a custom `{is}` name); under the
+  pages, the page count and page problems. Go to style opens that style in Style
+  mode, the way a preview click does (§7.4), and leaves a history entry, so Back
+  returns to Write with the cursor where it was. The style is read from the
+  enclosing matter type, part or chapter, the enclosing block, and the field
+  sentinel whose text runs on to the line.
 - Find and replace is a bar pinned to the top of the editor, in the chrome's
   colors: find and replace fields, match case / whole word / regex toggles, an
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"

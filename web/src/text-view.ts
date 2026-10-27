@@ -27,7 +27,6 @@ export interface TextPrefs {
 
 export interface TextView {
   toggleView(): void;
-  prefs(): TextPrefs;
   refresh(): void; // the book's body face may have changed: after a layout
 }
 
@@ -191,17 +190,22 @@ export function installTextView(d: TextViewDeps): TextView {
   }
   const spells = [...spellPop.querySelectorAll<HTMLElement>("[data-spell]")];
 
-  const apply = () => {
-    ed.dataset.view = prefs.view;
-    ed.dataset.turns = prefs.turns ? "on" : "off"; // app.css hides them
-    // Source's size follows from this one in app.css (13/17 of it).
-    ed.style.setProperty("--ed-size", `${prefs.size / 16}rem`); // px at the default root
+  const face = () =>
     ed.style.setProperty(
       "--ed-face",
       prefs.face === "book"
         ? [d.bodyFace(), FACES.alegreya].filter(Boolean).join(", ")
         : FACES[prefs.face],
     );
+  // What the editor was last configured with: a reconfigure redraws the
+  // whole document (and Prose refetches its images), so only on a change.
+  let view: WriteView | null = null, dim: Dim | null = null;
+  const apply = () => {
+    ed.dataset.view = prefs.view;
+    ed.dataset.turns = prefs.turns ? "on" : "off"; // app.css hides them
+    // Source's size follows from this one in app.css (13/17 of it).
+    ed.style.setProperty("--ed-size", `${prefs.size / 16}rem`); // px at the default root
+    face();
     editor.requestMeasure(); // a CSS-only size change: re-align line numbers
     check(views, "view", prefs.view);
     check(faces, "face", prefs.face);
@@ -209,8 +213,8 @@ export function installTextView(d: TextViewDeps): TextView {
     check(spells, "spell", prefs.spell);
     size.textContent = String(prefs.size);
     turns.checked = prefs.turns;
-    setWriteView(editor, prefs.view);
-    setDim(editor, prefs.dim);
+    if (view !== prefs.view) setWriteView(editor, view = prefs.view);
+    if (dim !== prefs.dim) setDim(editor, dim = prefs.dim);
     try {
       localStorage.setItem("text-view", JSON.stringify(prefs));
     } catch {
@@ -249,9 +253,10 @@ export function installTextView(d: TextViewDeps): TextView {
   return {
     toggleView: () =>
       set({ view: prefs.view === "prose" ? "source" : "prose" }),
-    prefs: () => ({ ...prefs }),
     refresh: () => {
-      if (prefs.face === "book") apply();
+      if (prefs.face !== "book") return;
+      face();
+      editor.requestMeasure();
     },
   };
 }
