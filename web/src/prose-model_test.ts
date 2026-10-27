@@ -269,3 +269,9 @@ Deno.test("chapterAt: title, slug fallback, before any chapter", () => {
   assertEquals(chapterAt(lines, 8), { slug: "two", title: null });
   assertEquals(chapterAt(lines, 10), null);
 });
+
+Deno.test("proseLines: `line` reveals that line alone", () => {
+  const lines = ["{chapter: one}", "{title}", "Marley's Ghost"];
+  const p = proseLines(lines, -1, undefined, 0);
+  assertEquals(p.map((l) => l.fold), [false, true, false]);
+});

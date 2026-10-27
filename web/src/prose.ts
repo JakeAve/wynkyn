@@ -2,8 +2,8 @@
 // draws prose-model.ts over the CodeMirror document. Rubrics sit in the left
 // margin and notes behind a ☞ in the right, as widgets positioned against
 // .cm-content's padding (app.css, `.cm-prose-*`), so they wrap with their line.
-// The cursor's paragraph shows its markup in place; every other paragraph
-// folds it. Page turns from the last layout sit in the right margin too
+// Markup stays folded until its margin mark is clicked: then that
+// paragraph shows it in place until the cursor leaves. Page turns from the last layout sit in the right margin too
 // (setPageTurns). An illustration whose file exists draws its image as a
 // block above its line, its rubric beside it. Nothing changes in the document.
 import {
@@ -14,7 +14,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import {
-  type EditorState,
+  EditorState,
   type Extension,
   type Range,
   StateEffect,
@@ -76,15 +76,15 @@ class Marks extends WidgetType {
     }
     return el;
   }
-  // A click on a mark goes to the editor, so it lands on the mark's line
-  // and reveals that block.
+  // A click on a mark goes to the editor, so it lands on the mark's line;
+  // holdReveal opens that block.
   override ignoreEvent(): boolean {
     return false;
   }
 }
 
 // An illustration's image, a block above its line, with the line's marks
-// beside it. A click puts the cursor on its line, which reveals the markup.
+// beside it. A click on it opens its markup, as a mark's does.
 class Picture extends WidgetType {
   constructor(readonly url: string, readonly marks: Marks) {
     super();
@@ -170,8 +170,8 @@ const LINES = {
   slugged: lineClass("cm-prose-slugged"),
 };
 
-// The cursor's paragraph as 1-based [first, last] lines; [0, 0] on a blank
-// line, where nothing is revealed. Dim (editor.ts) keeps the same paragraph.
+// The paragraph at `pos` as 1-based [first, last] lines; [0, 0] on a blank
+// line. Dim (editor.ts) uses it for the cursor's paragraph.
 export function paragraphAt(doc: Text, pos: number): [number, number] {
   const n = doc.lineAt(pos).number;
   const full = (i: number) => doc.line(i).text.trim() !== "";
@@ -223,15 +223,27 @@ export function setPageTurns(view: EditorView, turns: PageTurn[] | null): void {
 
 interface Drawn {
   decos: DecorationSet;
-  para: [number, number];
-  held: boolean; // a mouse button is down: the reveal waits for its release
+  open: [number, number]; // the paragraph showing its markup; [0, 0] none
+  line: number; // the cursor's line, 1-based: a markup line shows there
+  held: boolean; // a mouse button is down: opening and closing wait for it
+  hidden: Hidden[]; // folded markup, which an edit must not cut into
+}
+
+// A folded line (its line, from just before to just after its newlines) or
+// a folded inline tag; `from`..`to` is the markup itself.
+interface Hidden {
+  s: number;
+  e: number;
+  from: number;
+  to: number;
 }
 
 // ponytail: rescans the whole document on every edit and paragraph change;
 // rescan only the changed blocks if long books lag.
 function draw(
   state: EditorState,
-  para: [number, number],
+  open: [number, number],
+  line: number,
   held: boolean,
 ): Drawn {
   const doc = state.doc;
@@ -239,11 +251,18 @@ function draw(
   const images = state.field(imagesField, false) ?? null;
   const model = proseLines(
     lines,
-    para[0] - 1,
+    open[0] - 1,
     images ? (slug) => images.has(slug) : undefined,
+    line - 1,
   );
   const turns = state.field(turnsField, false);
   const decos: Range<Decoration>[] = [];
+  const hidden: Hidden[] = [];
+  model.forEach((p, i) => {
+    if (!p.fold) return;
+    const l = doc.line(i + 1);
+    hidden.push({ s: l.from - 1, e: l.to + 1, from: l.from, to: l.to });
+  });
   let carried: number | undefined; // a turn on a line folded into the next
   let taken = -1; // a caption's line whose turn went beside its image
   let skip = -1; // the last line an illustration's fold took in
@@ -315,27 +334,46 @@ function draw(
         ),
       );
     }
-    if (i + 1 < para[0] || i + 1 > para[1]) {
+    if (i + 1 < open[0] || i + 1 > open[1]) {
       for (const w of wrapRanges(text)) {
         if (w.name !== "em") continue;
-        const [a, b, c, d] = w.at;
-        decos.push(hide.range(l.from + a, l.from + b));
-        decos.push(hide.range(l.from + c, l.from + d));
+        for (const [a, b] of [w.at.slice(0, 2), w.at.slice(2)]) {
+          const from = l.from + a!, to = l.from + b!;
+          decos.push(hide.range(from, to));
+          hidden.push({ s: from, e: to, from, to });
+        }
       }
     }
   });
-  return { decos: Decoration.set(decos, true), para, held };
+  return { decos: Decoration.set(decos, true), open, line, held, hidden };
 }
 
-// A click on a folded paragraph reveals its markup, which moves the text
-// under the pointer; were that at mousedown, a pixel of drift before mouseup
-// would select across the shift. So the reveal waits for the release, after
-// CodeMirror's own mouseup (a click inside a selection selects then).
+// A click on a margin mark (a rubric, ⁂, ☞) or an illustration's image
+// puts the cursor on its line and opens its paragraph's markup, and is
+// handled here so CodeMirror doesn't select the mark's widget. Any other
+// click may close an open paragraph, which moves the text under the pointer;
+// were that at mousedown, a pixel of drift before mouseup would select across
+// the shift. So the closing waits for the release, after CodeMirror's own
+// mouseup.
 const heldEffect = StateEffect.define<boolean>();
+const openEffect = StateEffect.define<number>(); // a position in the paragraph
 const holdReveal = ViewPlugin.define(() => ({}), {
   eventHandlers: {
     mousedown(e, view) {
       if (e.button !== 0) return;
+      const mark = e.target instanceof Element &&
+        !e.target.closest(".cm-prose-turn") &&
+        e.target.closest(".cm-prose-marks, .cm-prose-illustration");
+      if (mark) {
+        e.preventDefault();
+        const at = view.posAtDOM(mark);
+        view.focus();
+        view.dispatch({
+          selection: { anchor: at },
+          effects: openEffect.of(at),
+        });
+        return true;
+      }
       view.dispatch({ effects: heldEffect.of(true) });
       // On the window, so it runs after CodeMirror's listener on the document.
       view.dom.ownerDocument.defaultView?.addEventListener(
@@ -347,24 +385,69 @@ const holdReveal = ViewPlugin.define(() => ({}), {
   },
 });
 
-const prosed = StateField.define<Drawn>({
+// Typing or deleting into folded markup (a backspace at the start of a
+// chapter's title, a key on a rubric row) would change what can't be seen.
+// It opens that paragraph instead, so the next key does what it shows. An
+// edit that takes in all of it, a whole line or tag, goes ahead.
+const guardHidden = EditorState.transactionFilter.of((tr) => {
+  if (
+    !tr.docChanged || !(tr.isUserEvent("input") || tr.isUserEvent("delete"))
+  ) {
+    return tr;
+  }
+  const drawn = tr.startState.field(prosed, false);
+  let cut: Hidden | undefined;
+  tr.changes.iterChangedRanges((a, b) => {
+    cut ??= drawn?.hidden.find((h) =>
+      (a === b ? h.s < a && a < h.e : a < h.e && b > h.s) &&
+      !(a <= h.from && b >= h.to)
+    );
+  });
+  return cut ? { effects: openEffect.of(cut.from) } : tr;
+});
+
+const prosed: StateField<Drawn> = StateField.define<Drawn>({
   create: (state) =>
-    draw(state, paragraphAt(state.doc, state.selection.main.head), false),
+    draw(
+      state,
+      [0, 0],
+      state.doc.lineAt(state.selection.main.head).number,
+      false,
+    ),
   update(v, tr) {
     let held = v.held;
-    for (const e of tr.effects) if (e.is(heldEffect)) held = e.value;
-    // Only the pointer holds: a key that moves the cursor reveals at once.
+    let open = v.open;
+    if (tr.docChanged && open[0]) {
+      const from = tr.startState.doc.line(open[0]).from;
+      open = paragraphAt(tr.state.doc, tr.changes.mapPos(from));
+    }
+    for (const e of tr.effects) {
+      if (e.is(heldEffect)) held = e.value;
+      if (e.is(openEffect)) open = paragraphAt(tr.state.doc, e.value);
+    }
+    // Only the pointer holds: a key that moves the cursor closes at once.
     if (tr.selection && !tr.isUserEvent("select.pointer")) held = false;
-    const para = held && !tr.docChanged
-      ? v.para
-      : paragraphAt(tr.state.doc, tr.state.selection.main.head);
+    // Once released: the cursor outside the open paragraph closes it, and
+    // a markup line under the cursor (one being typed, a rubric row arrowed
+    // onto) shows; it folds again when the cursor leaves.
+    const doc = tr.state.doc;
+    const n = doc.lineAt(tr.state.selection.main.head).number;
+    const line = held ? v.line : n;
+    if (!held && open[0] && (tr.selection || v.held)) {
+      if (n < open[0] || n > open[1]) open = [0, 0];
+    }
+    const markup = (k: number) => {
+      const t = k <= doc.lines ? doc.line(k).text : "";
+      return t.startsWith("%%") || !!parseSentinelLine(t);
+    };
     if (
-      tr.docChanged || para[0] !== v.para[0] || para[1] !== v.para[1] ||
+      tr.docChanged || open[0] !== v.open[0] || open[1] !== v.open[1] ||
+      line !== v.line && (markup(line) || markup(v.line)) ||
       tr.effects.some((e) => e.is(turnsEffect) || e.is(imagesEffect))
     ) {
-      return draw(tr.state, para, held);
+      return draw(tr.state, open, line, held);
     }
-    return held === v.held ? v : { ...v, held };
+    return held === v.held && line === v.line ? v : { ...v, held, line };
   },
   provide: (f) => EditorView.decorations.from(f, (v) => v.decos),
 });
@@ -373,6 +456,6 @@ const prosed = StateField.define<Drawn>({
 // an illustration is its rubric alone.
 export function prose(opts?: { images?: ImageHost }): Extension {
   return opts?.images
-    ? [imagesField, prosed, holdReveal, imageLister(opts.images)]
-    : [prosed, holdReveal];
+    ? [imagesField, prosed, holdReveal, guardHidden, imageLister(opts.images)]
+    : [prosed, holdReveal, guardHidden];
 }

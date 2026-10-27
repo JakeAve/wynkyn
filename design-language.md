@@ -555,7 +555,8 @@ changing, right is the result.
     and Publish.
   - In either, the mouse at the left edge slides the outline in over the view
     (Write's outline, or the Style / Publish nav), with `--shadow-pop`; the
-    Contents toggle pins it.
+    Contents toggle pins it. While it is out, the pane header steps right of it
+    so its controls stay reachable.
   - Return with the same button or `esc`. `⌘⇧↩` expands the pane last used, or
     returns. (`⌘⇧F` stays Footnote.)
   - Expanded state is per mode and persists. A hidden preview still lays out (it
@@ -582,21 +583,25 @@ default).
   `Drop cap`, `Quote`, `Poem`, `Illustration`, an `{is}` name, `Break`.
   Structural blocks (matter, part, chapter) also draw a hairline (`--line`)
   across the text column. A rubric is a widget against `.cm-content`'s padding,
-  not a gutter; Prose has no line numbers. A click on it goes to its line.
+  not a gutter; Prose has no line numbers. A click on it opens its markup.
 - **Text as text.** The line after `{title}` / `{heading}` is set large in Fell
   (2rem at normal width); `{subtitle}`'s line is italic; `{em}` is italic;
   `{break}` is ⁂, centred and muted; quotes, epigraphs, poems and pullquotes
   indent 2em. Not a page preview: no page size, no book styles.
-- **Markup at the cursor.** The paragraph the cursor is in shows its sentinel
-  lines and inline tags in place (`--f-mono` at .75em, muted, names in red), so
-  everything stays editable as plain text. Leaving it folds them away: a
-  sentinel line folds into the line above, or into its rubric row or stand-in.
-  Clicking or arrowing onto a rubric row or ⁂ puts the cursor in that block,
-  which reveals it. This replaces Hide markup. Plates, drop-cap images,
-  illustrations whose file is missing, and footnote and ref tags stay as markup.
+- **Markup on a click.** Markup stays folded while the cursor moves and types: a
+  sentinel line folds into the line above, or into its rubric row or stand-in. A
+  click on a rubric, ⁂, ☞ or an illustration's image opens that paragraph's
+  sentinel lines and inline tags in place (`--f-mono` at .75em, muted, names in
+  red), editable as plain text, until the cursor leaves it. Selecting text never
+  opens it (decided 2026-10-26: it felt like noise); a sentinel or `%%` line
+  alone shows while the cursor is on it (one being typed, a rubric row arrowed
+  onto). A key that would change folded markup (a backspace at a title's start)
+  opens its paragraph instead, so nothing hidden changes. This replaces Hide
+  markup. Plates, drop-cap images, illustrations whose file is missing, and
+  footnote and ref tags stay as markup.
 - **Notes, right margin.** `%%` comments, including import's `%% check:` notes,
   sit behind a red ☞ as marginalia; the note reads on hover (a native title
-  until §6.9's tooltip). At the cursor the `%%` line shows in place instead.
+  until §6.9's tooltip). Opened, the `%%` line shows in place instead.
   Box-drawing `%%` rules are dropped.
 - **Page turns, right margin.** Where a printed page begins: a short rule
   (`--s-5`, `--hair`) and the number in `--muted`, above any ☞, from the last
@@ -607,11 +612,11 @@ default).
 - **Images.** An `{illustration}` whose file is in `images/` draws as a block
   above its line: the image at most 12rem tall and no wider than the text column
   (corners `--r`), its caption beneath in italics at .85em, `--muted`, and the
-  `Illustration` rubric with its slug in the margin beside the image. At the
-  cursor the markup shows under the image, which stays drawn; a click on the
-  image puts the cursor there. Decided 2026-10-26: plates, drop-cap images and
-  illustrations whose file is missing stay plain markup lines (shown even
-  outside the cursor's paragraph, so an unresolved one is seen).
+  `Illustration` rubric with its slug in the margin beside the image. A click on
+  the image opens the markup under it, and the image stays drawn. Decided
+  2026-10-26: plates, drop-cap images and illustrations whose file is missing
+  stay plain markup lines (shown even without a click, so an unresolved one is
+  seen).
 - **`{only}`** (experimental) is a rubric `Only` with its editions beneath, the
   way `{is}` shows its name (decided 2026-10-26).
 - **Margins.** Left 6rem and right 3rem at normal width, 9.5rem and 10.5rem

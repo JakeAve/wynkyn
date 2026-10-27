@@ -1,6 +1,6 @@
 // web/src/prose-browser_test.ts — the Prose view in the real app
-// (design-language.md §8.1): rubrics in the margin, markup folded outside the
-// cursor's block and revealed at it, ⁂ for a break, ☞ for a note, page
+// (design-language.md §8.1): rubrics in the margin, markup folded until a
+// click on its mark opens the block, ⁂ for a break, ☞ for a note, page
 // turns from the last layout, the expanded margins and Dim.
 import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
@@ -51,7 +51,7 @@ async function open(manuscript: string) {
 }
 
 Deno.test({
-  name: "Prose draws rubrics, ⁂ and ☞, and reveals markup at the cursor",
+  name: "Prose draws rubrics, ⁂ and ☞, and a click on a rubric opens markup",
   ignore: !hasChrome || !appBuilt,
   fn: async () => {
     const { page, close } = await open(MANUSCRIPT);
@@ -79,9 +79,24 @@ Deno.test({
       await page.locator("#editor .cm-line", { hasText: "Chapter One" })
         .click();
       text = await shown();
-      assert(text.includes("{chapter: one}"), "the cursor reveals the block");
+      assert(!text.includes("{chapter"), "the cursor alone reveals nothing");
+      assert(!text.includes("{em}"));
+
+      await chapter.click();
+      text = await shown();
+      assert(text.includes("{chapter: one}"), "the rubric opens the block");
+      assertEquals(
+        await page.evaluate(() => getSelection()?.toString()),
+        "",
+        "and selects nothing",
+      );
       assert(text.includes("{title}"));
       assert(!text.includes("{break}"), "other blocks stay folded");
+
+      await page.locator("#editor .cm-line", { hasText: "After the break" })
+        .click();
+      text = await shown();
+      assert(!text.includes("{chapter"), "leaving the block folds it");
     } finally {
       await close();
     }
@@ -94,13 +109,13 @@ Deno.test({
   fn: async () => {
     const { page, close } = await open(MANUSCRIPT);
     try {
-      // The reveal (here of {dropcap} above) moves the text under the
+      // The reveal (here of {dropcap} above) moves the rubric under the
       // pointer; a hand that drifts a pixel between press and release must
       // not select across the shift.
-      const box = (await page.locator("#editor .cm-line", {
-        hasText: "It was a bright",
-      }).boundingBox())!;
-      const x = box.x + 30, y = box.y + 5;
+      const box = (await page.locator(
+        '#editor .cm-prose-rubric[data-label="Drop cap"]',
+      ).boundingBox())!;
+      const x = box.x + box.width / 2, y = box.y + box.height / 2;
       await page.mouse.move(x, y);
       await page.mouse.down();
       await page.mouse.move(x, y + 1);
@@ -113,6 +128,33 @@ Deno.test({
         "",
         "and selects nothing",
       );
+    } finally {
+      await close();
+    }
+  },
+});
+
+Deno.test({
+  name: "Prose: an edit into folded markup opens it instead",
+  ignore: !hasChrome || !appBuilt,
+  fn: async () => {
+    const { page, close } = await open(MANUSCRIPT);
+    try {
+      const shown = () => page.locator("#editor .cm-content").innerText();
+      // A backspace at the title's start would join it to the hidden
+      // {title} line; it opens the block and changes nothing.
+      await page.locator("#editor .cm-line", { hasText: "Chapter One" })
+        .click();
+      await page.keyboard.press("Home");
+      await page.keyboard.press("Backspace");
+      const text = await shown();
+      assert(text.includes("{title}\nChapter One"), "opened, unchanged");
+      // Typing in plain text, outside any markup, goes ahead.
+      await page.locator("#editor .cm-line", { hasText: "After the break" })
+        .click();
+      await page.keyboard.press("End");
+      await page.keyboard.type("!");
+      assert((await shown()).includes("After the break.!"));
     } finally {
       await close();
     }
@@ -272,7 +314,7 @@ Deno.test({
         "past a folded note too",
       );
 
-      // A click on the image reveals its markup; the image stays.
+      // A click on the image opens its markup; the image stays.
       await img.first().click();
       text = await shown();
       assert(text.includes("{illustration: ornament}"), "revealed");
@@ -310,6 +352,16 @@ Deno.test({
         "the note written out",
       );
       assert((await note.boundingBox())!.width > 100, "and shown");
+
+      // The pinned outline slides in over the view; the pane's header
+      // steps right of it, so Prose | Source and Aa stay reachable.
+      await page.locator("#tree-toggle").click();
+      await page.waitForTimeout(400); // the slide and the header's step
+      const tree = (await page.locator("#tree").boundingBox())!;
+      const source = (await page.locator("#editor .pane-head").getByText(
+        "Source",
+      ).boundingBox())!;
+      assert(source.x >= tree.x + tree.width, "the header clears the outline");
     } finally {
       await close();
     }

@@ -71,10 +71,12 @@ function rubricOf(t: SentinelTag): Rubric {
 
 // `cursor` is a 0-based line; its paragraph reveals its markup. `hasImage`
 // says whether an illustration's file exists, once the book's images are known.
+// `line`, if given, reveals that one line alone (the cursor's, in prose.ts).
 export function proseLines(
   lines: string[],
   cursor: number,
   hasImage?: (slug: string) => boolean,
+  line = -1,
 ): ProseLine[] {
   const tags = lines.map((l) => parseSentinelLine(l));
   const blank = (i: number) => lines[i]!.trim() === "";
@@ -90,7 +92,7 @@ export function proseLines(
     p1 = cursor;
     while (p1 < lines.length - 1 && !blank(p1 + 1)) p1++;
   }
-  const revealed = (i: number) => i >= p0 && i <= p1;
+  const revealed = (i: number) => i >= p0 && i <= p1 || i === line;
 
   // The first text line `t` (on line i) opens, or -1: within its paragraph,
   // past `%%` lines, and past nested tags only for an explicit-close block.

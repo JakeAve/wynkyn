@@ -697,6 +697,13 @@ kbd {
   visibility: visible;
   box-shadow: var(--shadow-pop);
 }
+/* ...and the expanded pane's header steps right of it, so it stays reachable. */
+#panes:is(.expand-writing, .expand-pages) .pane-head {
+  transition: padding-left var(--t);
+}
+#panes:is(.expand-writing, .expand-pages):is(.pin-outline, :has(#outline-edge:hover, #tree:hover, #style-nav:hover)) .pane-head {
+  padding-left: calc(var(--w-tree) + var(--s-5));
+}
 /* Writing expanded: the chrome fades while typing, back on a mouse move. */
 :is(#toolbar, #footer, #editor .pane-head > :not(.expand)) {
   transition: opacity var(--t);
@@ -850,6 +857,10 @@ body.typing #editor .pane-head {
   letter-spacing: 0;
   user-select: none;
   cursor: default;
+}
+/* a click on a mark opens its paragraph's markup (prose.ts) */
+#editor :is(.cm-prose-rubric, .cm-prose-note, .cm-prose-break .cm-prose-marks, .cm-prose-illustration img) {
+  cursor: pointer;
 }
 /* a red small-caps rubric, the slug beneath it right-aligned and truncated,
    inset from the pane's edge */

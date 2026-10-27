@@ -1979,7 +1979,7 @@ end in an expand button at the top right corner:
 - **Pages expanded** (any mode): the pages, or Publish's sheet view, take the
   whole width; the middle column leaves.
 - In either, the mouse at the left edge slides the left column in over the view,
-  and the Contents toggle pins it there.
+  and the Contents toggle pins it there; the pane header moves right of it.
 - The same button or esc returns (esc first closes an open dialog, find bar or
   menu). ⌘⇧↩ expands the pane last used, or returns (⌘⇧F stays Footnote). The
   expanded pane is remembered per mode.
@@ -2029,26 +2029,28 @@ CodeMirror 6 over plain BML text.
   beneath and a hairline across the text), the line after `{title}` or
   `{heading}` is large, after `{subtitle}` italic, `{em}` text italic, quotes
   and poems indented, `{break}` a ⁂, and `%%` notes a ☞ in the right margin that
-  reads on hover. Outside the paragraph holding the cursor the sentinel lines,
-  `%%` lines and `{em}` tags fold away; in it they show in place, in monospace,
-  so everything stays editable. Clicking or arrowing onto a rubric row or a ⁂
-  moves the cursor into that block and so reveals it. An `{illustration}` whose
-  file is in `images/` draws its image (at most 12rem tall) above its line, its
-  caption in italics beneath, and stays drawn while its markup shows. Plates,
-  drop-cap images, illustrations whose file is missing, and footnote and ref
-  tags stay as markup. This replaces Hide markup. The **Aa** menu holds the face
-  (Alegreya, Alegreya Sans, or the book's body face), the size (12–24px, default
-  17), dim (Off, Paragraph, Sentence) and page turns (on). Dim, in either view,
-  fades all the text but the cursor's paragraph, or but its sentence (one ends
-  at `.`, `?` or `!`, with any closing quotes, before a space or the line's
-  end); the margins stay. Page turns put a short rule and the page number in the
-  right margin beside the block each printed page begins in, from the last
-  layout; a paragraph edited since hides its turn until the next layout lands.
-  The text holds a reading measure of about 70 characters (36em), centred in the
-  pane while the pages are hidden or the writing expanded. Expanded, the writing
-  grows by 19/17 and the measure with it, and Prose's margins widen so notes are
-  written out beside their line (which grows to hold them), page turns read "p.
-  12" and slugs show in full on up to two lines.
+  reads on hover. The sentinel lines, `%%` lines and `{em}` tags fold away; a
+  click on a rubric, ⁂, ☞ or image shows that paragraph's markup in place, in
+  monospace and editable, until the cursor leaves it. Moving or selecting into
+  text never shows them, though a sentinel or `%%` line shows while the cursor
+  is on it; a key that would change folded markup shows its paragraph instead.
+  An `{illustration}` whose file is in `images/` draws its image (at most 12rem
+  tall) above its line, its caption in italics beneath, and stays drawn while
+  its markup shows. Plates, drop-cap images, illustrations whose file is
+  missing, and footnote and ref tags stay as markup. This replaces Hide markup.
+  The **Aa** menu holds the face (Alegreya, Alegreya Sans, or the book's body
+  face), the size (12–24px, default 17), dim (Off, Paragraph, Sentence) and page
+  turns (on). Dim, in either view, fades all the text but the cursor's
+  paragraph, or but its sentence (one ends at `.`, `?` or `!`, with any closing
+  quotes, before a space or the line's end); the margins stay. Page turns put a
+  short rule and the page number in the right margin beside the block each
+  printed page begins in, from the last layout; a paragraph edited since hides
+  its turn until the next layout lands. The text holds a reading measure of
+  about 70 characters (36em), centred in the pane while the pages are hidden or
+  the writing expanded. Expanded, the writing grows by 19/17 and the measure
+  with it, and Prose's margins widen so notes are written out beside their line
+  (which grows to hold them), page turns read "p. 12" and slugs show in full on
+  up to two lines.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The footer is split by
