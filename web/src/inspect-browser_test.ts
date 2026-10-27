@@ -149,7 +149,8 @@ Deno.test({
       await page.keyboard.down("Alt");
       await page.mouse.move(title.x + 4, title.y + title.height / 2);
       await page.locator("#inspect-overlay .pill").first().waitFor();
-      await page.keyboard.up("Alt");
+      // Read the marks before letting go: the keyup redraws without the pills
+      // on the next frame, which a slow runner reaches before the evaluate.
       const marks = await page.evaluate(() => [
         ...new Set(
           [...document.querySelectorAll("#inspect-overlay *")].flatMap((
@@ -157,6 +158,7 @@ Deno.test({
           ) => [...el.classList]),
         ),
       ]);
+      await page.keyboard.up("Alt");
       assert(marks.includes("ring") && marks.includes("pill"), `${marks}`);
 
       // Printing the app itself: the button, layer and drawer are screen-only.
