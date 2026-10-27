@@ -5,8 +5,7 @@
 // Nothing runs on the server, so it needs no Chrome there. The layer and its
 // @page rule go away once the dialog closes.
 import type { Dims, Side } from "../../server/imposition.ts";
-import { MARK_STYLE } from "../../server/marks.ts";
-import type { SideMarks } from "../../server/marks.ts";
+import { MARK_STYLE, type SideMarks } from "../../server/marks.ts";
 
 export interface SheetLayout {
   sheet: Dims; // inches, oriented as the grid lays it out

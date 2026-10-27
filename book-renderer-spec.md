@@ -1241,9 +1241,10 @@ in one section.
   head and tail of the page to its kettle-stitch hole (default `"0.5in"`), and
   `stations` is the number of holes evenly spaced between the two kettle holes
   (a whole number ≥ 0, default 3); an unparseable value falls back to the
-  default. The sub-settings persist while `show` is off. Marks are drawn only on
-  the imposed sheets (§7.7), never in the preview or the page PDF. `sewing.type`
-  is reserved for future sewing station types.
+  default; a `kettle` too large for the page (2 × kettle ≥ page height) draws no
+  stations. The sub-settings persist while `show` is off. Marks are drawn only
+  on the imposed sheets (§7.7), never in the preview or the page PDF.
+  `sewing.type` is reserved for future sewing station types.
 
 CLI flags (`bml export --sheet/--fold/--folios/--duplex/--flip/--reverse-backs`)
 override any of these per run.

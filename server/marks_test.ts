@@ -111,6 +111,26 @@ Deno.test("marksFor: sewing stations on each signature's centre spread, at the s
       stations,
     ]);
   }
+  // A kettle too large for the page draws no stations.
+  {
+    const imp = impose(16, {
+      ...base,
+      folios: 2,
+      fold: "folio",
+      sheet: parseDims("letter"),
+      page,
+    });
+    const big = resolveMarks({
+      show: true,
+      sewing: { stations: 3, kettle: "4in" },
+    });
+    assertEquals(
+      marksFor(imp, page, big).flatMap((
+        m,
+      ) => [...m.front.dots, ...m.back.dots]),
+      [],
+    );
+  }
   // A quarto's centre recto (page 5) is upside down on the front's top row.
   const [q] = marks(8, {
     ...base,

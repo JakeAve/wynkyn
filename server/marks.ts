@@ -103,7 +103,7 @@ export function marksFor(
   // its spine edge; its own slot coordinates already carry any back mirroring.
   const sewing = (slots: Imposition["sheets"][number]["front"]): MarkDot[] => {
     const s = marks?.sewing;
-    if (!s) return [];
+    if (!s || 2 * s.kettle >= page.h) return []; // kettle holes don't fit
     const dots: MarkDot[] = [];
     for (const slot of slots.filter((sl) => sl.centre)) {
       const x = slot.rotate === 0 ? slot.x : slot.x + page.w;
