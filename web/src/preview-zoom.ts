@@ -43,7 +43,7 @@ export function installPreviewZoom(
   const [minus, plus, pct] = [btn("out"), btn("in"), btn("menu")];
   const menu = out.querySelector<HTMLElement>("[popover]")!;
   let user = 1;
-  let saving = 0;
+  let saving: ReturnType<typeof setTimeout> | undefined;
   const save = () => {
     clearTimeout(saving);
     store("preview-zoom", String(user));
