@@ -175,14 +175,16 @@ export function proseLines(
 
 // The text of a prose line without its inline tags: `{em}`/`{/em}` and
 // `{footnote: x}` / `{ref: x}` are cut (so `wo{em}rd{/em}` is one word), and
-// an escaped character stands for itself.
+// an escaped character stands for itself. A footnote inside an em is cut too.
 function plainText(line: string): string {
+  const cuts = wrapRanges(line).flatMap((
+    { name, at: [a, s, e, b] },
+  ): [number, number][] => name === "em" ? [[a, s], [e, b]] : [[a, b]])
+    .sort((x, y) => x[0] - y[0]);
   let out = "", at = 0;
-  for (const { name, at: [a, s, e, b] } of wrapRanges(line)) {
-    if (a < at) continue;
-    out += line.slice(at, a);
-    if (name === "em") out += line.slice(s, e);
-    at = b;
+  for (const [a, b] of cuts) {
+    if (a > at) out += line.slice(at, a);
+    at = Math.max(at, b);
   }
   return (out + line.slice(at)).replace(/\\(.)/g, "$1");
 }

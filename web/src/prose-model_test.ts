@@ -245,6 +245,9 @@ Deno.test("wordCount: skips sentinels, comments and tags", () => {
     ]),
     2 + 4 + 5 + 4,
   );
+  // a footnote or ref inside an em is still cut
+  assertEquals(wordCount(["{em}a fine day{footnote: n1}{/em} ok"]), 4);
+  assertEquals(wordCount(["{em}see {ref: fig}{/em}"]), 1);
 });
 
 Deno.test("chapterAt: title, slug fallback, before any chapter", () => {
