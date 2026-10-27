@@ -511,6 +511,7 @@ function pagesSection(ctx: PanelContext): HTMLElement {
     const sides = pages.map((_, i) => ({
       label: `page ${i + 1}`,
       slots: [{ page: i, rotate: 0 as const, folio: 0, x: 0, y: 0 }],
+      marks: { dots: [], lines: [] }, // book pages never carry binding marks
     }));
     printSheets(pages, sides, { sheet: size, page: size });
   };

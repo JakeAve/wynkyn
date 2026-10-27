@@ -2413,6 +2413,27 @@ Example, on US Legal: a 3.5in × 4.25in page is an octavo (16 pages a sheet); a
    per sheet side, at the sheet's physical dimensions, with the
    already-paginated book pages positioned at their exact trim size.
 
+**Binding marks** (`page.marks`, §4.3; `server/marks.ts`) are computed once per
+sheet face, in inches in the face's printed frame, and both renderers only draw
+that list: dots about 1pt, hairlines, mid grey. Nothing is drawn within 0.2in of
+the sheet edge, where home printers can't print.
+
+- **Fold lines** (dashed): a true fold's folds take each half behind the rest,
+  so what faces the folder stays printed-front-up and every fold line is on the
+  **front**, across only the region the earlier folds left — folio: the spine,
+  full height; quarto: the head fold full width, then the spine on the bottom
+  half; octavo: the first spine fold full height, the head fold on the right
+  half, the last spine fold on the bottom-right quarter. `cut`: one line per
+  folio at its spine, on the front. None for `leaves`.
+- **Cut marks** (`cut` and `leaves` only, front): short ticks on each cut line
+  where it meets the sheet edges — every row edge, and the folio edges (`cut`)
+  or every column edge (`leaves`). True folds have none; their slits are trimmed
+  after sewing.
+- **Sewing stations** (not `leaves`): dots at the spine edge of each signature's
+  centre recto (the inside of its innermost folio, whichever face of whichever
+  sheet that lands on) — two kettle holes `kettle` from the head and tail of the
+  page, and `stations` holes evenly spaced between them.
+
 **Output:** one `sheets.pdf` (or `sheets-fronts.pdf` + `sheets-backs.pdf` for
 `duplex: none`), built by embedding `book.pdf` pages onto sheet-sized PDF pages;
 `--proof` emits numbered placeholders for a one-sheet printer check (a booklet's
