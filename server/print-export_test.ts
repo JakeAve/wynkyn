@@ -221,6 +221,35 @@ Deno.test("exportBook: upgrades a legacy print section when no flags are given",
   );
 });
 
+Deno.test("exportBook --proof: binding marks add drawing to the sheets", async () => {
+  // Total bytes of every content stream on the first sheet page.
+  const contentSize = async (marks: boolean) => {
+    const root = await Deno.makeTempDir();
+    const bookDir = `${root}/book`;
+    await Deno.mkdir(bookDir, { recursive: true });
+    await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
+    await Deno.writeTextFile(
+      `${bookDir}/metadata.json`,
+      JSON.stringify({
+        page: {
+          size: "3.5in 8.5in",
+          sheet: "legal",
+          "folios-per-signature": 2,
+          ...(marks ? { marks: { show: true } } : {}),
+        },
+      }),
+    );
+    const s = await exportBook(root, "book", { proof: true });
+    const doc = await PDFDocument.load(await Deno.readFile(s.files[0]!));
+    const contents = doc.getPage(0).node.Contents();
+    const streams = contents instanceof PDFStream
+      ? [contents]
+      : contents?.asArray().map((r) => doc.context.lookup(r, PDFStream)) ?? [];
+    return streams.reduce((n, c) => n + c.getContents().length, 0);
+  };
+  assertEquals(await contentSize(true) > await contentSize(false), true);
+});
+
 Deno.test("export reads the page setup from the page section", async () => {
   const root = await Deno.makeTempDir();
   const bookDir = `${root}/book`;
