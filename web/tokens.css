@@ -107,6 +107,14 @@
   --sheet-ink: #161616;
   --sheet-fold: #8f8f8a;
   --sheet-cut: #db3834; /* the light --acc */
+  /* Inspect's marks on the pages (inspect.ts); its pinned ring is --pick. */
+  --inspect-hover: #2563eb; /* the pointed-at ring, a pinned line's baseline */
+  --inspect-space: rgb(245 158 11 / .22); /* space above and below */
+  --inspect-indent: rgb(34 160 90 / .22); /* first-line indent */
+  --inspect-content: rgb(37 99 235 / .10); /* the content box */
+  --inspect-ghost: rgb(11 107 79 / .6); /* furniture the page map dropped */
+  --inspect-ink: #1b1b1b; /* ⌥ measure lines and pills, the tag's text */
+  --inspect-tag: #fafafa; /* the hover tag's paper */
 
   /* The Source view (§2.6). */
   --syn-k: var(--acc-ink);

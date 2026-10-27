@@ -459,30 +459,34 @@ export function setCount(
 // `chain[0]` is the clicked node's classes, `chain[n]` its n-th ancestor's.
 // A selector's tokens must appear in order walking outward; the entry whose
 // innermost token matches nearest the click wins, so ".chapter .number" beats
-// ".chapter" for a click on the number. Multi-selector entries (prose-matter)
+// ".chapter" for a click on the number; at the same depth the more specific
+// selector wins, classes over tags, as in CSS: ".matter-title-page .author"
+// beats ".bml p". Multi-selector entries (prose-matter)
 // are comma-separated; any alternative may match. An `{is}` class beats all of
 // that: wrapping text in one is how the author asks to style it apart.
 export function matchKey(
   chain: string[][],
   catalog: StyleEntry[],
 ): string | null {
-  let best: { key: string; is: boolean; depth: number; tokens: number } | null =
+  let best: { key: string; is: boolean; depth: number; spec: number } | null =
     null;
   for (const entry of catalog) {
     const is = entry.section === "is";
     for (const alt of entry.selector.split(", ")) {
       // ".class" tokens match a class, bare ones ("p", "em") a tag name.
-      const tokens = alt.trim().split(/\s+/)
-        .map((t) => t.startsWith(".") ? t.slice(1) : t).reverse(); // innermost first
+      const raw = alt.trim().split(/\s+/);
+      const tokens = raw.map((t) => t.startsWith(".") ? t.slice(1) : t)
+        .reverse(); // innermost first
+      const spec = raw.reduce((n, t) => n + (t.startsWith(".") ? 100 : 1), 0);
       const depth = matchDepth(chain, tokens);
       if (depth === null) continue;
       if (
         !best || (is && !best.is) ||
         (is === best.is &&
           (depth < best.depth ||
-            (depth === best.depth && tokens.length >= best.tokens)))
+            (depth === best.depth && spec >= best.spec)))
       ) {
-        best = { key: entry.key, is, depth, tokens: tokens.length };
+        best = { key: entry.key, is, depth, spec };
       }
     }
   }
@@ -566,4 +570,98 @@ export function inheritedFont(
   return family(
     getProps(metadata, { path: ["elements", "body"] })["font-family"],
   ) ?? "serif";
+}
+
+// ---- Inspect: where a value comes from ----
+
+export type ValueSource =
+  | { kind: "set"; label: string } // this entry sets it
+  | { kind: "inherited"; label: string } // an ancestor entry sets it
+  | { kind: "default" }; // nothing does — the book's default
+
+// Props the browser passes down to descendants; every other prop (margins,
+// padding, text-indent, width, break-*) applies to its own box only.
+const INHERITED_PROPS = new Set([
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "font-variant",
+  "font-variant-caps",
+  "font-variant-numeric",
+  "font-variant-ligatures",
+  "font-feature-settings",
+  "line-height",
+  "color",
+  "text-align",
+  "text-align-last",
+  "hyphens",
+  "letter-spacing",
+  "word-spacing",
+]);
+
+// The name a reader knows an entry by, as the panel shows it: group + label
+// ("Chapter title"), or the group alone for a type's own box ("Chapter",
+// "Copyright" for "Everything"). A path with no entry of its own (chapter
+// has only sub-elements) borrows the group of any entry beneath it.
+function sourceLabel(catalog: StyleEntry[], path: string[]): string {
+  const same = (a: string[], b: string[]) => a.join("/") === b.join("/");
+  const e = catalog.find((c) => same(c.path, path));
+  if (e) {
+    if (e.label === "Everything") return e.group;
+    return e.section === "elements" && e.path.length > 2
+      ? `${e.group} ${e.label.toLowerCase()}`
+      : e.label;
+  }
+  const below = catalog.find((c) =>
+    c.path.length > path.length && same(c.path.slice(0, path.length), path)
+  );
+  return below?.group ?? titleCase(path[path.length - 1] ?? "");
+}
+
+// The name Inspect shows for an entry: its source label, but a margin box by
+// what it holds ("Page number", never "Folio"; "Running head", not its area).
+export function entryName(entry: StyleEntry, catalog: StyleEntry[]): string {
+  if (entry.section === "numbering") return "Page number";
+  if (entry.section === "running") return "Running head";
+  return sourceLabel(catalog, entry.path);
+}
+
+export function sourceOf(
+  metadata: Metadata,
+  entry: StyleEntry,
+  prop: string,
+  catalog: StyleEntry[],
+): ValueSource {
+  if (prop in getProps(metadata, entry)) {
+    return { kind: "set", label: sourceLabel(catalog, entry.path) };
+  }
+  // A running head's type is set on its odd/even entries for that area.
+  if (entry.section === "running") {
+    const area = entry.key.slice("running.".length);
+    const heads = [
+      ...metadata.running?.odd ?? [],
+      ...metadata.running?.even ?? [],
+    ];
+    if (heads.some((e) => e.area === area && prop in e)) {
+      return { kind: "set", label: entry.group };
+    }
+  }
+  // Margin boxes sit outside the book body and inherit nothing from it.
+  if (
+    !INHERITED_PROPS.has(prop) || entry.section === "numbering" ||
+    entry.section === "running"
+  ) return { kind: "default" };
+  // Nearest ancestor entry first, then the body (as inheritedFont does).
+  const ancestors = [];
+  for (let i = entry.path.length - 1; i > 1; i--) {
+    ancestors.push(entry.path.slice(0, i));
+  }
+  if (entry.key !== "body") ancestors.push(["elements", "body"]);
+  for (const path of ancestors) {
+    if (prop in getProps(metadata, { path })) {
+      return { kind: "inherited", label: sourceLabel(catalog, path) };
+    }
+  }
+  return { kind: "default" };
 }

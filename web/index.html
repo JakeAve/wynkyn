@@ -66,6 +66,11 @@
           <circle cx="3.6" cy="4.5" r=".35" style="fill: currentColor" />
           <circle cx="5.2" cy="4.5" r=".35" style="fill: currentColor" />
         </symbol>
+        <symbol id="inspect-icon" viewBox="0 0 16 16">
+          <path
+            d="M6.5 13.5H3.5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V6" />
+          <path d="M8 8l6.5 2.4-2.8 1.1-1.1 2.8z" />
+        </symbol>
         <symbol id="expand-out" viewBox="0 0 16 16">
           <path d="M9.5 1.5h5v5M14.5 1.5 9 7M6.5 14.5h-5v-5M1.5 14.5 7 9" />
         </symbol>
@@ -257,6 +262,14 @@
               </button>
             </div>
           </div>
+          <button type="button" id="inspect" class="btn sm icon"
+            aria-pressed="false"
+            title="Inspect: point at anything on the pages to see what it is; esc leaves"
+            aria-label="Inspect">
+            <svg>
+              <use href="#inspect-icon" />
+            </svg>
+          </button>
           <button class="btn sm icon expand" data-pane="pages"
             aria-pressed="false" title="Expand the pages; esc returns"
             aria-label="Expand the pages">
@@ -269,6 +282,8 @@
           </button>
         </div>
         <div id="preview"></div>
+        <div id="inspect-overlay" hidden aria-hidden="true"></div>
+        <section id="inspect-drawer" hidden aria-label="Inspect"></section>
         <div id="sheet-view"></div>
       </div>
     </div>

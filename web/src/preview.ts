@@ -11,12 +11,19 @@ import {
 import {
   type CachedRender,
   renderHash,
+  restoredHash,
+  restoredPageMap,
   saveCachedRender,
 } from "./preview-cache.ts";
 import { scopeSheet } from "./scope-css.ts";
-import type { PageProblem, Seed } from "../../renderer/page-map-types.ts";
+import type {
+  PageEntry,
+  PageProblem,
+  Seed,
+} from "../../renderer/page-map-types.ts";
 
 interface RenderResult {
+  map: PageEntry[];
   seed: Seed;
   problems: PageProblem[];
 }
@@ -98,6 +105,9 @@ function renderTick(cb: () => void): void {
   tickPort.port2.postMessage(null);
 }
 
+/** The pages on screen, not a render being staged beside them. */
+export const LIVE_PAGE = ":scope > :not(.preview-stage) .pagedjs_page";
+
 let currentBlobUrl: string | null = null;
 let rendering = false;
 // Abandons the render under way: a newer update has made it pointless.
@@ -114,6 +124,18 @@ let restoredStyles: Element[] = [];
 // settles in one pass.
 let seed: Seed = {};
 let problems: PageProblem[] = [];
+// The on-screen render's page map, for Inspect; [] when unknown.
+let map: PageEntry[] = [];
+
+/** The page map of the pages on screen: index = physical page − 1. */
+export function pageMap(): PageEntry[] {
+  return map;
+}
+
+/** Anchor id → refText of the pages on screen (cross-references). */
+export function pageSeed(): Seed {
+  return seed;
+}
 // The render for targetHash (in flight, queued or done); null after a restore.
 let pending: Promise<PageProblem[]> | null = null;
 let queuedUpdate: {
@@ -232,7 +254,7 @@ async function runRender(
     fitPreview(container);
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
-    ({ seed, problems } = result);
+    ({ seed, problems, map } = result);
     if (cacheKey !== null) {
       const { styleEl, inserted } = livePreviewer.polisher;
       // Head order is cascade order: the base sheet, styleEl, then the book CSS.
@@ -248,6 +270,7 @@ async function runRender(
         fontLinks: update.fontLinks,
         seed,
         problems,
+        map,
       }); // fire-and-forget: never throws, and the render shouldn't wait on it
     }
     return problems;
@@ -271,7 +294,9 @@ async function runRender(
 
 // Put a cached render on screen without Paged.js: its pages plus the sheets
 // Paged.js had inserted for them. targetHash is set so the first WebSocket
-// update, which carries the same content, is skipped. A render under way or
+// update, which carries the same content, is skipped — unless the row has no
+// page map (saved before Inspect): then that update renders, the restored
+// pages on screen meanwhile. A render under way or
 // queued is dropped, and the sheets of the pages it replaces come down.
 export function restoreCachedRender(
   cached: CachedRender,
@@ -291,10 +316,9 @@ export function restoreCachedRender(
     return el;
   });
   container.innerHTML = cached.pages;
-  targetHash = cached.hash;
+  targetHash = restoredHash(cached);
   pending = null;
-  seed = cached.seed ?? {};
-  problems = cached.problems ?? [];
+  ({ seed, problems, map } = restoredPageMap(cached));
   fitPreview(container);
   dropped?.done.resolve(problems);
 }
@@ -369,7 +393,8 @@ export type Mode = "write" | "style" | "publish";
 // the entry from the target's class+tag chain, closest() finds the node its
 // selector matched. Nothing inside a staged (half-rendered) preview. Page
 // furniture (folios, running heads) has no source line, so it always styles.
-function resolveStyle(
+// Inspect (inspect.ts) names what it points at the same way.
+export function resolveStyle(
   target: Element | null,
   container: HTMLElement,
   catalog: StyleEntry[],
@@ -399,7 +424,8 @@ function resolveStyle(
 // on a placeholder in Write goes to `addImage` too (spec §7.6). Furniture
 // always goes to its style. A styled node is outlined until the next pick or
 // re-render; consumed clicks don't let the TOC's links navigate. `catalog` is
-// read per click — `is:` entries change with the metadata.
+// read per click — `is:` entries change with the metadata. While Inspect is on
+// (`inspecting`), clicks are its own and nothing here runs.
 export function installPreviewClicks(
   container: HTMLElement,
   catalog: () => StyleEntry[],
@@ -408,6 +434,7 @@ export function installPreviewClicks(
     style(key: string): void;
     source(line: number): void;
     addImage?(slug: string, file?: File): void;
+    inspecting(): boolean;
   },
 ): void {
   // The slug of the live placeholder at or above `target`, in Write only.
@@ -431,6 +458,7 @@ export function installPreviewClicks(
     on.addImage(slug, file);
   });
   container.addEventListener("click", (e) => {
+    if (on.inspecting()) return;
     const target = e.target as Element | null;
     const mode = on.mode();
     const hit = resolveStyle(target, container, catalog());
@@ -456,12 +484,13 @@ export function installPreviewClicks(
 }
 
 // Hover outline (spec R3): the node a click would style, once per frame —
-// everywhere in Style, only furniture in Write. A re-render replaces the
-// nodes, which takes the attribute with them.
+// everywhere in Style, only furniture in Write; nothing while Inspect is on.
+// A re-render replaces the nodes, which takes the attribute with them.
 export function installStyleHover(
   container: HTMLElement,
   catalog: () => StyleEntry[],
   mode: () => Mode,
+  inspecting: () => boolean,
 ): void {
   let raf = 0;
   let pointed: Element | null = null;
@@ -476,7 +505,9 @@ export function installStyleHover(
     pointed = e.target as Element | null;
     raf ||= requestAnimationFrame(() => {
       raf = 0;
-      const hit = resolveStyle(pointed, container, catalog());
+      const hit = inspecting()
+        ? null
+        : resolveStyle(pointed, container, catalog());
       set(hit && (hit.furniture || mode() === "style") ? hit.el : null);
     });
   }, { passive: true });
@@ -555,7 +586,7 @@ export function previewLink(
 // A margin box's text is CSS-generated (Paged.js puts the @page content on
 // its .pagedjs_margin-content::after, fed by --folio and friends), so
 // "non-empty" means that content is more than empty strings.
-function marginShows(box: Element): boolean {
+export function marginShows(box: Element): boolean {
   const inner = box.querySelector(".pagedjs_margin-content");
   if (!inner || !box.classList.contains("hasContent")) return false;
   const content = getComputedStyle(inner, "::after").content;

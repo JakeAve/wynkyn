@@ -73,7 +73,7 @@ export function isValidSize(value: string): boolean {
 }
 
 /** The unit a size reads back in — metric for named metric sheets and mm values. */
-function unitOf(size: string): Unit {
+export function unitOf(size: string): Unit {
   const key = size.trim().toLowerCase();
   const named = Object.hasOwn(NAMED, key) ? NAMED[key] : undefined;
   if (named) return named.unit;

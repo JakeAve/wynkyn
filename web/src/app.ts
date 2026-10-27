@@ -11,6 +11,7 @@ import {
   installStyleHover,
   markEdited,
   type Mode,
+  pageMap,
   pageTurns,
   previewLink,
   renderPreview,
@@ -58,6 +59,7 @@ import { ThemePreview } from "./theme-preview.ts";
 import { installTextView, type TextView } from "./text-view.ts";
 import { installPanes, type Panes } from "./panes.ts";
 import { installPreviewZoom } from "./preview-zoom.ts";
+import { installInspect } from "./inspect.ts";
 import { connect } from "./library.ts";
 import { $, brief } from "./dom.ts";
 import { h } from "./panel-controls.ts";
@@ -743,10 +745,15 @@ function chordOf(e: KeyboardEvent): string | null {
   }`;
 }
 // Open popups esc closes first: a dialog, the find bar, completions, the
-// sentinel palette and wrap bar, menus. Not hover tooltips (spelling, lint).
+// sentinel palette and wrap bar, menus (the zoom menu is a popover). Not
+// hover tooltips (spelling, lint).
 const POPUPS =
-  "dialog[open], .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
-function installShortcuts(panes: Panes, textView: TextView): void {
+  "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
+function installShortcuts(
+  panes: Panes,
+  textView: TextView,
+  inspect: { escape(): boolean },
+): void {
   const bySnippet = new Map(
     SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((
       s,
@@ -754,7 +761,8 @@ function installShortcuts(panes: Panes, textView: TextView): void {
   );
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !document.querySelector(POPUPS)) {
-      if (panes.returnFromExpand()) e.preventDefault();
+      // Inspect first: it unpins, then leaves; then an expanded pane returns.
+      if (inspect.escape() || panes.returnFromExpand()) e.preventDefault();
     }
     const chord = chordOf(e);
     if (!chord) return;
@@ -928,7 +936,22 @@ async function main(): Promise<void> {
   });
   $("disk-reload").onclick = reloadFromDisk;
   $("disk-keep").onclick = keepMine;
-  installShortcuts(installPanes({ mode: () => mode }), textView);
+  const inspect = installInspect({
+    container: $("preview"),
+    catalog: styleCatalog,
+    metadata: () => metadata ?? {},
+    pageMap,
+    mode: () => mode,
+    style: pickStyle,
+    source: (line) => {
+      setMode("write");
+      scrollEditorToLine(editor, line);
+    },
+  });
+  // Inspect reads the book's metadata (running heads, units, where a value
+  // comes from), which is otherwise fetched only when Style or Publish opens.
+  $("inspect").addEventListener("click", () => void ensureConfigPanel());
+  installShortcuts(installPanes({ mode: () => mode }), textView, inspect);
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
       .mode as Mode | undefined;
@@ -964,8 +987,9 @@ async function main(): Promise<void> {
     style: pickStyle,
     source: (line) => scrollEditorToLine(editor, line),
     addImage: (slug, file) => fillPlaceholder(images, slug, file),
+    inspecting: inspect.active,
   });
-  installStyleHover(previewEl, styleCatalog, () => mode);
+  installStyleHover(previewEl, styleCatalog, () => mode, inspect.active);
   const key = cacheId(book, edition);
   const onClose = () => {
     // `deno task dev` restarts the server when app code changes; follow it

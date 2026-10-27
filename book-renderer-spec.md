@@ -2245,6 +2245,38 @@ scrolls sideways. Zoom is the reader's own (remembered in the browser,
 `preview-zoom`), not the book's: it is CSS zoom over a layout made at 1:1, so it
 never re-renders and never reaches paper. The sheet view in Publish has no zoom.
 
+**Inspect.** The header's Inspect toggle, after zoom, turns the pages into
+something to point at, as a browser's element picker does; it starts off and
+isn't remembered, and clicks on the pages then belong to it rather than going to
+the source line or the style. Pointing at a block outlines it in blue, shades
+its space above and below (amber), its first-line indent (green) and its content
+(light blue), and tags it with its name, its size in the book's own units (mm
+when the page size is metric, else inches) and its face and size of type. A
+click pins it, with a minium outline: the block, or a span clicked directly (an
+italic, a cross-reference, a drop cap, a footnote reference), or, below a page's
+last block, the empty space that makes the page short. With something pinned,
+holding ⌥ while pointing at something else draws the distances between them. A
+running head or page number the page map dropped (a chapter opening, a display
+or blank page) shows as a dashed ghost in its margin box, and can be pinned too.
+A click on the desk unpins; esc unpins, then leaves Inspect, then returns an
+expanded pane.
+
+What is pinned opens the drawer under the pages: a breadcrumb of where it sits
+(Body › the chapter's title › Paragraph › Line 3; each crumb pins that), the
+reasons it sits where it does, each with where the reason comes from (a Style
+setting, the page map, the layout, the book's defaults: "Starts a new page",
+"Continues on page 29", "Not printed: this page opens a chapter"), its box
+(space above and below, first-line indent, width × height) and its type (face,
+size, leading, alignment, hyphenation), a value the element doesn't set itself
+greyed with where it comes from. A block lists its lines as numbered chips; a
+chip pins that line, drawing every line's baseline and marking a word the line
+breaks with a hyphen. Show in manuscript and Open in Style go where a click
+would in Write and Style. The drawer only explains; changing a value is Style's.
+
+Every mark is drawn in a layer of its own over the pages, never in them, and
+only on screen: nothing of Inspect reaches the print sheets or a PDF. Publish
+has no Inspect.
+
 ```
 +-------------------+  +--------------------+
 |                    |  |                    |

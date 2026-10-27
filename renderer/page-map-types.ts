@@ -1,6 +1,23 @@
 // renderer/page-map-types.ts — the page map's shapes shared by the export
 // (server/) and the preview (web/); renderer/folios.js produces them.
 
+/** One physical page of a settled render; see the PageEntry JSDoc in folios.js. */
+export interface PageEntry {
+  index: number;
+  zone: "front" | "body" | "back";
+  display: boolean;
+  blank: boolean;
+  empty: boolean;
+  opener: boolean;
+  head: boolean;
+  folio: number;
+  folioText: string;
+  refText: string;
+  chapterTitle: string;
+  partTitle: string;
+  anchors: string[];
+}
+
 /** Anchor id → the page number printed for it (TOC rows, `{ref}`). */
 export type Seed = Record<string, string>;
 
