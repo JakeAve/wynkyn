@@ -150,20 +150,18 @@ Deno.test("websocket: initial build on connect, rebuild pushed on file change", 
 
     // Give the fresh FSEvents watch a beat before the write it must see.
     await new Promise((r) => setTimeout(r, 300));
-    const pushed = nextMessage(ws);
     const manuscript = `${root}/demo-book/manuscript.md`;
     const src = await Deno.readTextFile(manuscript);
-    await Deno.writeTextFile(
-      manuscript,
-      src.replace("Chapter One", "Chapter Won"),
-    );
+    const changed = src.replace("Chapter One", "Chapter Won");
+    // The push of this text, not merely the next one: the write truncates
+    // first, so the watch can fire mid-write and push a build of the empty or
+    // half-written file ahead of it.
+    const version = await contentVersion(changed);
+    const pushed = nextMessageWhere(ws, (m) => m.manuscriptVersion === version);
+    await Deno.writeTextFile(manuscript, changed);
 
     const msg = await pushed;
     assertEquals(msg.type, "update");
-    assertEquals(
-      msg.manuscriptVersion,
-      await contentVersion(src.replace("Chapter One", "Chapter Won")),
-    );
     assertEquals(msg.metadataVersion, first.metadataVersion);
     assert((msg.html as string).includes("Chapter Won"));
   } finally {
@@ -517,8 +515,13 @@ Deno.test("metadata: the write broadcasts an update with the POSTed version", as
   );
   try {
     await nextMessage(ws); // initial build
-    await new Promise((r) => setTimeout(r, 300)); // let the watch warm up
-    const pushed = nextMessage(ws);
+    // The save's own broadcast, not a stray build from the fixture's copy.
+    const pushed = nextMessageWhere(
+      ws,
+      (m) =>
+        (m.pagedCss as string | undefined)?.includes("float: footnote") ??
+          false,
+    );
 
     const post = await fetch(
       `http://localhost:${server.port}/api/books/demo-book/metadata`,
