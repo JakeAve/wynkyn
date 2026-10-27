@@ -1,7 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import type { PageEntry } from "../../renderer/page-map-types.ts";
 import {
-  bookLength,
   endsMidWord,
   faceOf,
   gaps,
@@ -152,10 +151,7 @@ Deno.test("groupLines + endsMidWord: three lines, the second hyphenated", () => 
   );
 });
 
-Deno.test("lengths in book units, faces, and the gaps ⌥ measures", () => {
-  assertEquals(bookLength(96, "in"), "1");
-  assertEquals(bookLength(37.8, "mm"), "10");
-  assertEquals(bookLength(10, "in"), "0.1");
+Deno.test("faces, and the gaps ⌥ measures", () => {
   assertEquals(faceOf('"IM Fell Great Primer", serif'), "IM Fell Great Primer");
   const box = (top: number, bottom: number, left = 0, right = 100) => ({
     top,

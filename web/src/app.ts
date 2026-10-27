@@ -705,9 +705,10 @@ function chordOf(e: KeyboardEvent): string | null {
   }`;
 }
 // Open popups esc closes first: a dialog, the find bar, completions, the
-// sentinel palette and wrap bar, menus. Not hover tooltips (spelling, lint).
+// sentinel palette and wrap bar, menus (the zoom menu is a popover). Not
+// hover tooltips (spelling, lint).
 const POPUPS =
-  "dialog[open], .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop";
+  "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop";
 function installShortcuts(
   panes: Panes,
   inspect: { escape(): boolean },

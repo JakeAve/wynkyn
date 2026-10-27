@@ -183,15 +183,6 @@ export function endsMidWord(lineText: string, nextLineText: string): boolean {
   return /\p{L}­?$/u.test(lineText) && /^\p{L}/u.test(nextLineText);
 }
 
-/**
- * An unzoomed CSS length in the book's unit (mm when its page size is
- * metric, else inches), one decimal: 96 px to the inch.
- */
-export function bookLength(px: number, unit: "in" | "mm"): string {
-  const inches = px / 96;
-  return String(+(unit === "mm" ? inches * 25.4 : inches).toFixed(1));
-}
-
 /** px → pt, one decimal. */
 export function points(px: number): string {
   return String(+(px * 0.75).toFixed(1));

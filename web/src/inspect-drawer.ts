@@ -4,7 +4,12 @@
 // to its source and its style. It reads the live pages and the page map; the
 // wording of the reasons is inspect-facts.ts's.
 import type { Metadata } from "../../metadata/types.ts";
-import { DEFAULT_SIZE, unitOf } from "../../metadata/page-setup.ts";
+import {
+  DEFAULT_SIZE,
+  fmtLength,
+  type Unit,
+  unitOf,
+} from "../../metadata/page-setup.ts";
 import type { PageEntry } from "../../renderer/page-map-types.ts";
 import type { Target } from "./inspect.ts";
 import { h } from "./panel-controls.ts";
@@ -16,7 +21,6 @@ import {
   type ValueSource,
 } from "./style-catalog.ts";
 import {
-  bookLength,
   endsMidWord,
   faceOf,
   groupLines,
@@ -26,7 +30,6 @@ import {
 } from "./inspect-facts.ts";
 
 type Rect = { top: number; bottom: number; left: number; right: number };
-type Unit = "in" | "mm";
 
 /** On-screen px per unzoomed CSS px on this page: fit × the reader's zoom. */
 export function zoomOf(page: Element): number {
@@ -241,6 +244,8 @@ interface Deps {
   catalog(): StyleEntry[];
   pageMap(): PageEntry[];
   pin(t: Target): void;
+  /** The block's lines as on screen now (inspect.ts measures them once). */
+  lines(block: Element, page: Element): Line[];
   style(key: string): void;
   source(line: number): void;
 }
@@ -276,9 +281,9 @@ export function renderDrawer(
   const entry = deps.pageMap()[pageIdx];
   const block = blockOf(t);
   const text = t.kind === "block" || t.kind === "line" || t.kind === "span";
-  const lines = text && block ? measureLines(block) : [];
+  const lines = text && block ? deps.lines(block, t.page) : [];
   const z = zoomOf(t.page);
-  const len = (px: number) => `${bookLength(px, unit)} ${unit}`;
+  const len = (px: number) => fmtLength(px / 96, unit);
   const blockEntry = (el: Element) => {
     const container = el.closest<HTMLElement>("#preview");
     const key = container && resolveStyle(el, container, catalog)?.key;
@@ -426,7 +431,7 @@ export function renderDrawer(
     ? null
     : t.el?.getBoundingClientRect();
   const size = rect
-    ? `${bookLength((rect.right - rect.left) / z, unit)} × ${
+    ? `${len((rect.right - rect.left) / z)} × ${
       len((rect.bottom - rect.top) / z)
     }`
     : "";

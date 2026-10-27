@@ -3,6 +3,7 @@ import {
   type CachedRender,
   cacheId,
   renderHash,
+  restoredHash,
   restoredPageMap,
 } from "./preview-cache.ts";
 
@@ -73,4 +74,11 @@ Deno.test("restoredPageMap: a row's map comes back as saved", () => {
     map: [entry],
   };
   assertEquals(restoredPageMap(row).map, [entry]);
+});
+
+Deno.test("restoredHash: a row without a map doesn't stand for its hash", () => {
+  const old = { hash: "h", pages: "", styles: [], fontLinks: "" };
+  assertEquals(restoredHash(old as unknown as CachedRender), null);
+  const row = { ...old, seed: {}, problems: [], map: [] } as CachedRender;
+  assertEquals(restoredHash(row), "h");
 });

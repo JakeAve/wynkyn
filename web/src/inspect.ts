@@ -7,7 +7,8 @@
 // print.ts, which clones the pages, never carries any of it.
 import type { Metadata } from "../../metadata/types.ts";
 import type { PageEntry } from "../../renderer/page-map-types.ts";
-import { marginShows, type Mode, resolveStyle } from "./preview.ts";
+import { fmtLength } from "../../metadata/page-setup.ts";
+import { LIVE_PAGE, marginShows, type Mode, resolveStyle } from "./preview.ts";
 import type { StyleEntry } from "./style-catalog.ts";
 import {
   type Line,
@@ -18,13 +19,7 @@ import {
   unitFor,
   zoomOf,
 } from "./inspect-drawer.ts";
-import {
-  bookLength,
-  faceOf,
-  gaps,
-  type Pinned,
-  points,
-} from "./inspect-facts.ts";
+import { faceOf, gaps, type Pinned, points } from "./inspect-facts.ts";
 
 export interface Target {
   kind: Pinned;
@@ -36,7 +31,6 @@ export interface Target {
   entry: StyleEntry | null;
 }
 
-const LIVE_PAGE = ":scope > :not(.preview-stage) .pagedjs_page";
 // Spans a click pins apart from their block.
 const SPAN = "em, a.ref, .dropcap, .footnote-anchor";
 
@@ -62,16 +56,31 @@ export function installInspect(deps: {
   let hover: Target | null = null;
   let alt = false;
 
-  const active = () => on && deps.mode() !== "publish";
+  // Off while the pages aren't shown: Publish, or hidden or covered by the
+  // writing in Write (app.css hides #pages; #preview inherits it).
+  const active = () =>
+    on && deps.mode() !== "publish" &&
+    getComputedStyle(container).visibility !== "hidden";
   const livePages = () => [...container.querySelectorAll(LIVE_PAGE)];
   const entryAt = (page: Element) => deps.pageMap()[livePages().indexOf(page)];
 
   // Running heads and page numbers the page map dropped on this page: the
   // margin box is there (its @page area has content), it shows nothing.
+  // Kept per page until the pages or the metadata (fetched when Inspect is
+  // first turned on) change.
+  const ghostsOf = new Map<Element, Target[]>();
+  let ghostsMeta: Metadata | null = null;
   const ghosts = (page: Element): Target[] => {
-    const e = entryAt(page);
-    if (!e) return [];
+    if (ghostsMeta !== deps.metadata()) {
+      ghostsMeta = deps.metadata();
+      ghostsOf.clear();
+    }
+    const known = ghostsOf.get(page);
+    if (known) return known;
     const out: Target[] = [];
+    ghostsOf.set(page, out);
+    const e = entryAt(page);
+    if (!e) return out;
     const seen = new Set<Element>();
     for (const entry of deps.catalog()) {
       const head = entry.section === "running";
@@ -89,22 +98,26 @@ export function installInspect(deps: {
   };
 
   // An empty margin box has no width, so a ghost borrows the place its area's
-  // text takes on the first page that prints it. Kept until the pages change.
+  // text takes on the first page of the same hand that prints it (margins
+  // may mirror). Kept until the pages change.
   const donors = new Map<string, Rect | null>();
   const ghostRect = (t: Target): Rect => {
     const box = t.el!;
     const area =
       [...box.classList].find((c) => c.startsWith("pagedjs_margin-")) ?? "";
-    if (!donors.has(area)) {
-      donors.set(area, null);
+    const left = t.page.classList.contains("pagedjs_left_page");
+    const key = `${area} ${left}`;
+    if (!donors.has(key)) {
+      donors.set(key, null);
       for (const page of livePages()) {
+        if (page.classList.contains("pagedjs_left_page") !== left) continue;
         const shown = page.querySelector(`.${area}`);
         const text = shown?.querySelector(".pagedjs_margin-content");
         if (!shown || !text || !marginShows(shown)) continue;
         const p = page.getBoundingClientRect();
         const r = text.getBoundingClientRect();
         const z = zoomOf(page);
-        donors.set(area, {
+        donors.set(key, {
           left: (r.left - p.left) / z,
           right: (r.right - p.left) / z,
           top: (r.top - p.top) / z,
@@ -113,7 +126,7 @@ export function installInspect(deps: {
         break;
       }
     }
-    const d = donors.get(area);
+    const d = donors.get(key);
     const p = t.page.getBoundingClientRect();
     if (d) {
       const z = zoomOf(t.page);
@@ -328,7 +341,7 @@ export function installInspect(deps: {
           bottom: y ? (g.from + g.to) / 2 : g.at,
         });
         pill.style.width = pill.style.height = "";
-        pill.textContent = `${bookLength((g.to - g.from) / z, unit)} ${unit}`;
+        pill.textContent = fmtLength((g.to - g.from) / z / 96, unit);
       }
     }
     host.replaceChildren(...marks);
@@ -385,9 +398,9 @@ export function installInspect(deps: {
     const name = document.createElement("b");
     name.textContent = nameOf(t, deps.catalog());
     const size = document.createElement("span");
-    size.textContent = ` ${bookLength((r.right - r.left) / z, unit)} × ${
-      bookLength((r.bottom - r.top) / z, unit)
-    } ${unit}`;
+    size.textContent = ` ${fmtLength((r.right - r.left) / z / 96, unit)} × ${
+      fmtLength((r.bottom - r.top) / z / 96, unit)
+    }`;
     d.append(name, size);
     const type = t.el && t.kind !== "ghost"
       ? t.el.querySelector(".pagedjs_margin-content") ?? t.el
@@ -415,43 +428,48 @@ export function installInspect(deps: {
     schedule();
   };
   const showDrawer = () =>
-    renderDrawer(drawer, active() ? pinned : null, { ...deps, pin });
+    renderDrawer(drawer, active() ? pinned : null, {
+      ...deps,
+      pin,
+      lines: linesOf,
+    });
 
-  // After a re-render the pinned node is gone; the same block (by its
-  // manuscript line and entry) is pinned again if it's still there.
+  // After a re-render the pinned node is gone; the same target is pinned
+  // again if it's still there: found by the manuscript line of its nearest
+  // element that has one, then by its selector and place within that.
   const repin = () => {
     if (!pinned || pinned.page.isConnected) return;
     const t = pinned;
-    const block = t.kind === "span" ? t.el?.closest("[data-line]") : t.el;
-    const line = block?.getAttribute("data-line");
-    const pageIdx = Number(t.page.getAttribute("data-page-number")) - 1;
     pinned = null;
     if (
-      !line || !(t.kind === "block" || t.kind === "line" || t.kind === "span")
+      !t.el || !(t.kind === "block" || t.kind === "line" || t.kind === "span")
     ) {
       return;
     }
-    const spanIdx = t.kind === "span"
-      ? [...block!.querySelectorAll(SPAN)].indexOf(t.el!)
-      : -1;
-    const sel = t.kind === "span" || !t.entry
-      ? "[data-line]"
-      : t.entry.selector;
-    const found = [...container.querySelectorAll(`[data-line="${line}"]`)]
-      .filter((el) => !el.closest(".preview-stage") && el.matches(sel));
+    const anchor = t.el.closest("[data-line]");
+    const line = anchor?.getAttribute("data-line");
+    const sel = t.kind === "span"
+      ? SPAN
+      : t.entry?.selector ?? (t.el === anchor ? "[data-line]" : undefined);
+    if (!anchor || !line || !sel) return;
+    const idx = t.el === anchor
+      ? -1
+      : [...anchor.querySelectorAll(sel)].indexOf(t.el);
+    if (t.el !== anchor && idx < 0) return;
     const pages = livePages();
+    const pageIdx = Number(t.page.getAttribute("data-page-number")) - 1;
+    const found = [...container.querySelectorAll(`[data-line="${line}"]`)]
+      .map((a) => idx < 0 ? a : a.querySelectorAll(sel)[idx])
+      .filter((el): el is Element =>
+        !!el && el.matches(sel) &&
+        pages.includes(el.closest(".pagedjs_page")!)
+      );
     const el =
       found.find((el) =>
         pages.indexOf(el.closest(".pagedjs_page")!) === pageIdx
       ) ?? found[0];
     const page = el?.closest(".pagedjs_page");
-    if (!el || !page) return;
-    if (t.kind !== "span") {
-      pinned = { ...t, el, page };
-      return;
-    }
-    const span = el.querySelectorAll(SPAN)[spanIdx];
-    if (span) pinned = { ...t, el: span, page };
+    if (el && page) pinned = { ...t, el, page };
   };
 
   // ---- events ----
@@ -492,6 +510,14 @@ export function installInspect(deps: {
     if (t) pin(t);
     else if (!el?.closest(".pagedjs_page")) pin(null); // the desk
   });
+  // ⌥ pressed or let go with the pointer still: measure, or stop.
+  const altKey = (e: KeyboardEvent) => {
+    if (e.key !== "Alt" || !active()) return;
+    alt = e.type === "keydown";
+    schedule();
+  };
+  addEventListener("keydown", altKey);
+  addEventListener("keyup", altKey);
   container.addEventListener("scroll", schedule, { passive: true });
   new ResizeObserver(schedule).observe(container);
   // A render swapping the pages (children of #preview), a zoom or fit (its
@@ -499,6 +525,7 @@ export function installInspect(deps: {
   new MutationObserver((records) => {
     if (records.some((r) => r.type === "childList")) {
       donors.clear();
+      ghostsOf.clear();
       hover = null;
       if (pinned && !pinned.page.isConnected) {
         repin();
@@ -511,16 +538,26 @@ export function installInspect(deps: {
   // and measure the pinned block's lines again.
   document.fonts.addEventListener("loadingdone", () => {
     measured = null;
+    donors.clear();
     showDrawer();
     schedule();
   });
-  new MutationObserver(() => {
+  // The mode, or the pages hidden or covered (Inspect is off while they are).
+  const modeOrPanes = new MutationObserver(() => {
     showDrawer();
     schedule();
-  }).observe(document.documentElement, {
+  });
+  modeOrPanes.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["data-mode"],
   });
+  const panes = document.getElementById("panes");
+  if (panes) {
+    modeOrPanes.observe(panes, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+  }
 
   return {
     active,

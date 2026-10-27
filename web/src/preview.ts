@@ -11,6 +11,7 @@ import {
 import {
   type CachedRender,
   renderHash,
+  restoredHash,
   restoredPageMap,
   saveCachedRender,
 } from "./preview-cache.ts";
@@ -103,6 +104,9 @@ function renderTick(cb: () => void): void {
   tickPort.port1.onmessage = cb;
   tickPort.port2.postMessage(null);
 }
+
+/** The pages on screen, not a render being staged beside them. */
+export const LIVE_PAGE = ":scope > :not(.preview-stage) .pagedjs_page";
 
 let currentBlobUrl: string | null = null;
 let rendering = false;
@@ -290,7 +294,9 @@ async function runRender(
 
 // Put a cached render on screen without Paged.js: its pages plus the sheets
 // Paged.js had inserted for them. targetHash is set so the first WebSocket
-// update, which carries the same content, is skipped. A render under way or
+// update, which carries the same content, is skipped — unless the row has no
+// page map (saved before Inspect): then that update renders, the restored
+// pages on screen meanwhile. A render under way or
 // queued is dropped, and the sheets of the pages it replaces come down.
 export function restoreCachedRender(
   cached: CachedRender,
@@ -310,7 +316,7 @@ export function restoreCachedRender(
     return el;
   });
   container.innerHTML = cached.pages;
-  targetHash = cached.hash;
+  targetHash = restoredHash(cached);
   pending = null;
   ({ seed, problems, map } = restoredPageMap(cached));
   fitPreview(container);

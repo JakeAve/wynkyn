@@ -24,6 +24,12 @@ export function restoredPageMap(
   return { seed: c.seed ?? {}, problems: c.problems ?? [], map: c.map ?? [] };
 }
 
+/** The hash a restore stands for: none for a row without a page map, so the
+ * first update renders one even though its content is unchanged. */
+export function restoredHash(c: CachedRender): string | null {
+  return c.map ? c.hash : null;
+}
+
 const DB_NAME = "preview-cache";
 const STORE = "renders";
 const SEP = "\x1f"; // ASCII unit separator; cannot appear in HTML/CSS.
