@@ -565,9 +565,10 @@ function marginShows(box: Element): boolean {
 
 // Where each printed page begins in the manuscript (design-language.md §8.1
 // page turns), 1-based lines, read from the live pages of the last layout.
+// `page` is its printed folio ("vii", "12"), as numbered even when hidden.
 export interface PageTurn {
   line: number;
-  page: number;
+  page: string;
 }
 export function pageTurns(container: HTMLElement): PageTurn[] {
   const out: PageTurn[] = [];
@@ -585,7 +586,7 @@ export function pageTurns(container: HTMLElement): PageTurn[] {
       p.querySelector("[data-line]:not(:has([data-line]))")
         ?.getAttribute("data-line"),
     );
-    const page = Number(p.dataset.pageNumber);
+    const page = p.dataset.folio;
     // One turn per line: the first page that begins in it.
     if (!(line > last)) continue;
     last = line;

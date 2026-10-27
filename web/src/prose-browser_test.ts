@@ -171,7 +171,11 @@ Deno.test({
   },
 });
 
-const LONG = `{chapter: one}
+const LONG = `{matter: half-title}
+{title}
+A Long Book
+
+{chapter: one}
 {title}
 Chapter One
 
@@ -203,6 +207,13 @@ Deno.test({
         await page.waitForTimeout(50);
       }
       assertEquals(await turn.getAttribute("data-long"), "p. 2");
+      // The printed folio, not the count of pages: the body starts at 1
+      // after the half-title.
+      assertEquals(
+        await page.locator("#editor .cm-line", { hasText: "Chapter One" })
+          .locator(".cm-prose-turn").getAttribute("data-turn"),
+        "1",
+      );
       const line = page.locator("#editor .cm-line", {
         has: page.locator('.cm-prose-turn[data-turn="2"]'),
       });
@@ -296,7 +307,7 @@ Deno.test({
           }
           return dispatch(...specs);
         };
-        g.setTurn = (line: number, page: number) =>
+        g.setTurn = (line: number, page: string) =>
           dispatch({ effects: g.turns.of([{ line, page }]) });
       });
       await page.locator("#editor .cm-line", { hasText: "Opening words" })
@@ -307,7 +318,7 @@ Deno.test({
       });
       await page.evaluate(() =>
         // deno-lint-ignore no-explicit-any
-        (globalThis as any).setTurn(4, 7)
+        (globalThis as any).setTurn(4, "7")
       );
       assertEquals(
         await figure.first().locator('.cm-prose-turn[data-turn="7"]').count(),
@@ -316,7 +327,7 @@ Deno.test({
       );
       await page.evaluate(() =>
         // deno-lint-ignore no-explicit-any
-        (globalThis as any).setTurn(8, 9)
+        (globalThis as any).setTurn(8, "9")
       );
       assertEquals(
         await figure.nth(1).locator('.cm-prose-turn[data-turn="9"]').count(),

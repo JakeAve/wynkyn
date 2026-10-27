@@ -32,7 +32,7 @@ import type { PageTurn } from "./preview.ts";
 // the stand-in that takes the line's place (⁂), and on the right its page
 // turn and notes.
 class Marks extends WidgetType {
-  constructor(readonly p: ProseLine, readonly turn?: number) {
+  constructor(readonly p: ProseLine, readonly turn?: string) {
     super();
   }
   override eq(o: Marks): boolean {
@@ -69,7 +69,7 @@ class Marks extends WidgetType {
       // the margins widen.
       const t = side.appendChild(document.createElement("span"));
       t.className = "cm-prose-turn";
-      t.dataset.turn = String(this.turn);
+      t.dataset.turn = this.turn;
       t.dataset.long = `p. ${this.turn}`;
       t.title = `Page ${this.turn} begins here`;
     }
@@ -193,7 +193,7 @@ export function paragraphAt(doc: Text, pos: number): [number, number] {
 // is unknown until the next layout lands and replaces them all. Kept in both
 // views (editor.ts), so they survive a trip through Source.
 const turnsEffect = StateEffect.define<PageTurn[] | null>();
-export const turnsField = StateField.define<Map<number, number>>({
+export const turnsField = StateField.define<Map<number, string>>({
   create: () => new Map(),
   update(v, tr) {
     for (const e of tr.effects) {
@@ -213,7 +213,7 @@ export const turnsField = StateField.define<Map<number, number>>({
       const to = old.line(p1 || old.lineAt(b).number).to;
       touched.push([from, to]);
     });
-    const out = new Map<number, number>();
+    const out = new Map<number, string>();
     for (const [pos, page] of v) {
       if (touched.some(([a, b]) => pos >= a && pos <= b)) continue;
       out.set(tr.changes.mapPos(pos), page);
@@ -269,7 +269,7 @@ function draw(
     const l = doc.line(i + 1);
     hidden.push({ s: l.from - 1, e: l.to + 1, from: l.from, to: l.to });
   });
-  let carried: number | undefined; // a turn on a line folded into the next
+  let carried: string | undefined; // a turn on a line folded into the next
   let taken = -1; // a caption's line whose turn went beside its image
   let skip = -1; // the last line an illustration's fold took in
   model.forEach((p, i) => {

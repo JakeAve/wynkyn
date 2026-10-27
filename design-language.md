@@ -609,9 +609,10 @@ default).
   Box-drawing `%%` rules are dropped.
 - **Page turns, right margin.** Where a printed page begins: a short rule
   (`--s-5`, `--hair`) and the number in `--muted`, above any ☞, from the last
-  layout (the live pages' `data-page-number`). It sits on the block the page
-  begins in, not the exact line. Hidden for a paragraph edited since, until the
-  next layout lands; Aa's Page turns switch hides them all. Each carries its
+  layout: the page's printed folio (`data-folio`, as the contents would cite it,
+  "vii" or "12"), not its count from the first page. It sits on the block the
+  page begins in, not the exact line. Hidden for a paragraph edited since, until
+  the next layout lands; Aa's Page turns switch hides them all. Each carries its
   long form, "p. 12" (`data-long`), for the expanded margins.
 - **Images.** An `{illustration}` whose file is in `images/` draws as a block
   above its line: the image at most 12rem tall and no wider than the text column
