@@ -201,7 +201,6 @@ Deno.test({
         `${before + rem}px`,
       );
       // The minimum holds: 7.5rem, however many presses.
-      await page.keyboard.press("ArrowLeft", { delay: 0 });
       for (let i = 0; i < 40; i++) await page.keyboard.press("ArrowLeft");
       assertEquals(await tree(), Math.round(7.5 * rem));
     }),
