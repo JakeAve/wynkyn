@@ -228,14 +228,8 @@ function table(d: ShortcutDeps): Command[] {
       keys: "mod+quote",
       ...button("#inspect"),
     },
-    // The buttons exist only in Publish, so being shown scopes them.
-    {
-      id: "print-pages",
-      label: "Print pages",
-      section: "Publish",
-      keys: "mod+p",
-      ...button('[data-command="print-pages"]'),
-    },
+    // Mod+P stays the browser's print: a second print key would confuse.
+    // The button exists only in Publish, so being shown scopes it.
     {
       id: "export-epub",
       label: "Export EPUB",

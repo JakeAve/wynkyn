@@ -2198,9 +2198,9 @@ Includes:
   derives to), Signatures (hidden for loose leaves), and Print (auto duplex or
   by hand, the by-hand flip and back order, and the Print sheets buttons, §7.7);
   **PDF**, the pages in reading order at the page size, one per printed page
-  (Print pages, Mod+P; Save as PDF gives the file `book.pdf` would be); and
-  **E-book** (Export EPUB, Mod+Shift+E, §7.8). All printing runs in the browser;
-  proofs and the sheet PDFs on disk are `bml
+  (Print pages; Save as PDF gives the file `book.pdf` would be); and **E-book**
+  (Export EPUB, Mod+Shift+E, §7.8). All printing runs in the browser; proofs and
+  the sheet PDFs on disk are `bml
   export`'s
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a

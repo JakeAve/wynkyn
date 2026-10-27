@@ -296,10 +296,8 @@ Deno.test({
       await page.locator('#style-nav [aria-current="true"]', {
         hasText: "Body",
       }).waitFor();
-      // Print pages and Export EPUB exist only in Publish, labelled there.
+      // Export EPUB exists only in Publish, labelled there.
       await page.keyboard.press("Control+3");
-      await page.locator('[data-command="print-pages"][title="Ctrl+P"]')
-        .waitFor();
       await page.locator('[data-command="export-epub"][title="Ctrl+Shift+E"]')
         .waitFor();
     }, chapters),
