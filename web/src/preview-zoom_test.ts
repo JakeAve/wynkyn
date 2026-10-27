@@ -2,15 +2,14 @@ import { assertAlmostEquals, assertEquals } from "@std/assert";
 import { fitPageZoom, stepZoom } from "./preview-zoom.ts";
 
 Deno.test("stepZoom walks the steps, from between them to the next one", () => {
-  assertEquals(stepZoom(1, 1), 1.5);
-  assertEquals(stepZoom(1, -1), 0.5);
-  assertEquals(stepZoom(2, 1), 3);
-  assertEquals(stepZoom(1.2, 1), 1.5);
-  assertEquals(stepZoom(1.2, -1), 1);
-  assertEquals(stepZoom(2.5, -1), 2);
+  assertEquals(stepZoom(1, 1), 1.1);
+  assertEquals(stepZoom(1, -1), 0.9);
+  assertEquals(stepZoom(2, 1), 2.1);
+  assertEquals(stepZoom(1.25, 1), 1.3);
+  assertEquals(stepZoom(1.25, -1), 1.2);
   assertEquals(stepZoom(4, 1), 4);
   assertEquals(stepZoom(0.5, -1), 0.5);
-  assertEquals(stepZoom(0.6, -1), 0.5);
+  assertEquals(stepZoom(0.55, -1), 0.5);
 });
 
 Deno.test("fitPageZoom fits one page by its tighter side", () => {

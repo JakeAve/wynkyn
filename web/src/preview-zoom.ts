@@ -6,7 +6,8 @@
 // only CSS zoom, so a zoom never re-renders and nothing lands on the pages.
 import { store } from "./dom.ts";
 
-export const ZOOM_STEPS = [0.5, 1, 1.5, 2, 3, 4];
+// 50% to 400% in tens.
+export const ZOOM_STEPS = Array.from({ length: 36 }, (_, i) => (i + 5) / 10);
 const MIN = 0.5;
 const MAX = 4;
 const clamp = (z: number) => Math.min(MAX, Math.max(MIN, z));
