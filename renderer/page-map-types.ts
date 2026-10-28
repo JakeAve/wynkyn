@@ -41,6 +41,26 @@ export interface Segment {
   ids: string[]; // every id it renders
 }
 
+/** A segment laid out by its own Previewer (`pageMap.segment: true`): its
+ * pages, their raw facts and its layout problems (pages numbered within the
+ * segment), and its stylesheet text, which every segment must share. */
+export interface Laid {
+  segment: Segment;
+  pages: Element[];
+  facts: PageFacts[];
+  problems: PageProblem[];
+  sheet: string;
+}
+
+/** `BookPageMap.planAssembly`: the book's pages in order, each a segment's
+ * page or `null` for a blank, and the page map they make. */
+export interface AssemblyPlan {
+  slots: Array<{ part: number; page: number } | null>;
+  map: PageEntry[];
+  seed: Seed;
+  problems: PageProblem[];
+}
+
 /** Anchor id → the page number printed for it (TOC rows, `{ref}`). */
 export type Seed = Record<string, string>;
 

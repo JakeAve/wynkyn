@@ -24,6 +24,9 @@
  * @typedef {Record<string, string>} Seed anchor id → refText
  * @typedef {{ page: number | null; message: string; warn?: true }} PageProblem
  * @typedef {{ map: PageEntry[]; seed: Seed; problems: PageProblem[] }} RenderResult
+ * @typedef {import("./page-map-types.ts").Segment} Segment
+ * @typedef {import("./page-map-types.ts").Laid} Laid
+ * @typedef {import("./page-map-types.ts").AssemblyPlan} AssemblyPlan
  */
 
 (() => {
@@ -303,6 +306,115 @@
     }
   }
 
+  /** What `pageFacts` reads off a blank Paged.js adds before a forced side. */
+  /** @type {PageFacts} */
+  const BLANK = {
+    zone: null,
+    display: false,
+    blank: true,
+    empty: true,
+    opener: false,
+    chapterTitles: [],
+    partTitles: [],
+    anchors: [],
+  };
+
+  /**
+   * The book's page order from its segments, laid out alone: each segment's
+   * pages in turn, a blank before one that opens on the side it would miss
+   * (never before page 1, as Paged.js), then the page map. Problems move from
+   * segment pages to book pages; every id a segment renders must land.
+   * @param {Array<{ opens: "page" | "right" | "left"; facts: PageFacts[]; problems: PageProblem[]; ids: string[] }>} parts
+   * @param {PageNumberingConfig} numbering
+   * @returns {AssemblyPlan}
+   */
+  function planAssembly(parts, numbering) {
+    /** @type {Array<{ part: number; page: number } | null>} */
+    const slots = [];
+    /** @type {PageFacts[]} */
+    const facts = [];
+    /** @type {PageProblem[]} */
+    const problems = [];
+    parts.forEach((part, p) => {
+      const recto = slots.length % 2 === 0; // the next page, 1-based, is odd
+      if (
+        slots.length &&
+        (part.opens === "right" && !recto || part.opens === "left" && recto)
+      ) {
+        slots.push(null);
+        facts.push(BLANK);
+      }
+      const first = slots.length;
+      part.facts.forEach((f, page) => {
+        slots.push({ part: p, page });
+        facts.push(f);
+      });
+      for (const pr of part.problems) {
+        problems.push(pr.page === null ? pr : { ...pr, page: pr.page + first });
+      }
+    });
+    const map = buildPageMap(facts, numbering);
+    return {
+      slots,
+      map,
+      seed: anchorFolios(map),
+      problems: [
+        ...problems,
+        ...checkPageMap(map, parts.flatMap((p) => p.ids)),
+      ],
+    };
+  }
+
+  /**
+   * `settle` over segments: lay each out, assemble, and re-lay only the
+   * segments that print a number the assembly changed (`reads`) until the
+   * folios hold. null when the segments' stylesheets differ: their pages
+   * can't share one set of sheets, so the caller lays the book out whole.
+   * @param {Segment[]} segments
+   * @param {(s: Segment, seed: Seed) => Promise<Laid>} layOut
+   * @param {(laid: Laid[]) => RenderResult} assembleAll
+   * @param {Seed} seed
+   * @param {number} [maxPasses]
+   * @returns {Promise<(RenderResult & { passes: number }) | null>}
+   */
+  async function settleSegments(
+    segments,
+    layOut,
+    assembleAll,
+    seed,
+    maxPasses = 3,
+  ) {
+    /** @type {Laid[]} */
+    const laid = [];
+    for (const s of segments) laid.push(await layOut(s, seed));
+    for (let passes = 1;; passes++) {
+      if (laid.some((l) => l.sheet !== laid[0]?.sheet)) return null;
+      const result = assembleAll(laid);
+      if (sameSeed(result.seed, seed)) return { ...result, passes };
+      if (passes >= maxPasses) {
+        return {
+          ...result,
+          problems: [...result.problems, {
+            page: null,
+            message: `no fixed point after ${maxPasses} passes`,
+          }],
+          passes,
+        };
+      }
+      const was = seed;
+      seed = result.seed;
+      let relaid = false;
+      for (const [i, s] of segments.entries()) {
+        if (s.reads.some((id) => was[id] !== seed[id])) {
+          laid[i] = await layOut(s, seed);
+          relaid = true;
+        }
+      }
+      // Nothing printed a changed number: assembling again gives these pages.
+      if (!relaid) return { ...result, passes };
+    }
+  }
+
   // An image's print resolution at its laid-out size: pixels over CSS inches
   // (96 px each). The computed width is the unzoomed CSS length, so it holds
   // in the preview's zoomed pages. null for a broken image (no pixels) and for
@@ -328,6 +440,8 @@
     checkPageMap,
     digest,
     settle,
+    planAssembly,
+    settleSegments,
     printDpi,
   };
 
@@ -471,6 +585,128 @@
     return problems;
   }
 
+  // A page that changed side (or stopped being first, or is a blank we made)
+  // still has the margin boxes Paged.js's Margins.finalizePage set for its old
+  // place. Redo them as it does (paged.js:29502): a box has content when some
+  // @page rule gives it a `content` other than none, whatever the variable it
+  // reads holds, so an empty folio keeps its box; then each row's template
+  // from which of its boxes have content. Where Paged.js writes none (no box
+  // at all: its template string comes out invalid) the stylesheet's stands,
+  // and a centre beside a side box is base.css's (!important).
+  // ponytail: assumes margin boxes with no width or height, as css-generator
+  // writes them, and gives a row with both side boxes and no centre 1fr 0 1fr
+  // where Paged.js measures the two; port that if a book needs it.
+  /** @param {Element} page */
+  function redoMargins(page) {
+    for (const box of page.querySelectorAll(".pagedjs_margin")) {
+      const inner = box.querySelector(".pagedjs_margin-content");
+      const content = inner
+        ? getComputedStyle(inner, "::after").content
+        : "none";
+      box.classList.toggle(
+        "hasContent",
+        content !== "none" && content !== "normal",
+      );
+    }
+    for (
+      const [group, prop, boxes] of /** @type {const} */ ([
+        ["top", "grid-template-columns", ["left", "center", "right"]],
+        ["bottom", "grid-template-columns", ["left", "center", "right"]],
+        ["left", "grid-template-rows", ["top", "middle", "bottom"]],
+        ["right", "grid-template-rows", ["top", "middle", "bottom"]],
+      ])
+    ) {
+      const [a, mid, b] = boxes.map((box) =>
+        !!page.querySelector(`.pagedjs_margin-${group}-${box}.hasContent`)
+      );
+      const template = mid
+        ? (a || b ? "" : "0 1fr 0")
+        : a
+        ? (b ? "1fr 0 1fr" : "1fr 0 0")
+        : b
+        ? "0 0 1fr"
+        : "";
+      const style = /** @type {HTMLElement | null} */ (
+        page.querySelector(`.pagedjs_margin-${group}`)
+      )?.style;
+      if (template) style?.setProperty(prop, template);
+      else style?.removeProperty(prop);
+    }
+  }
+
+  /**
+   * A blank like Paged.js's `addPage(true)` (paged.js:3153): the page
+   * template with `pagedjs_blank_page` and no named page, its content area
+   * given the column width every page's has.
+   * @param {HTMLTemplateElement} pageTemplate @param {Element | undefined} like
+   */
+  function blankPage(pageTemplate, like) {
+    const page = /** @type {HTMLElement} */ (
+      document.importNode(pageTemplate.content, true).firstElementChild
+    );
+    page.classList.add("pagedjs_blank_page");
+    const area = /** @type {HTMLElement | null} */ (
+      page.querySelector(".pagedjs_page_content")
+    );
+    const from = /** @type {HTMLElement | null | undefined} */ (
+      like?.querySelector(".pagedjs_page_content")
+    );
+    if (area && from) {
+      area.style.columnWidth = from.style.columnWidth;
+      area.style.columnGap = from.style.columnGap;
+    }
+    return page;
+  }
+
+  /**
+   * Lay the segments' pages into `pagesArea` as one book (spec: segmented
+   * layout, Assembly): blanks where a side is forced, each page renumbered
+   * and given its side, its page-map entry written, the margin boxes of moved
+   * pages redone, then the checks a whole-flow render runs after layout.
+   * @param {Laid[]} laid
+   * @param {PageNumberingConfig} numbering
+   * @param {Element} pagesArea in the document: margins are read off styles
+   * @param {HTMLTemplateElement} pageTemplate
+   * @returns {RenderResult}
+   */
+  function assemble(laid, numbering, pagesArea, pageTemplate) {
+    const plan = planAssembly(
+      laid.map((l) => ({
+        opens: l.segment.opens,
+        facts: l.facts,
+        problems: l.problems,
+        ids: l.segment.ids,
+      })),
+      numbering,
+    );
+    const like = laid.find((l) => l.pages.length)?.pages[0];
+    const pages = plan.slots.map((s) =>
+      s
+        ? /** @type {Element} */ (laid[s.part]?.pages[s.page])
+        : blankPage(pageTemplate, like)
+    );
+    pagesArea.replaceChildren(...pages);
+    /** @type {PageProblem[]} */
+    const problems = [...plan.problems];
+    pages.forEach((page, i) => {
+      const was = page.className;
+      page.classList.toggle("pagedjs_first_page", i === 0);
+      page.classList.toggle("pagedjs_right_page", i % 2 === 0);
+      page.classList.toggle("pagedjs_left_page", i % 2 === 1);
+      page.id = `page-${i + 1}`;
+      /** @type {HTMLElement} */ (page).dataset.pageNumber = String(i + 1);
+      writeEntry(page, /** @type {PageEntry} */ (plan.map[i]), numbering);
+      if (!plan.slots[i] || page.className !== was) redoMargins(page);
+      problems.push(
+        ...wrappedMargins(page, i + 1),
+        ...imageProblems(page, i + 1),
+      );
+    });
+    return { map: plan.map, seed: plan.seed, problems };
+  }
+
+  /** @type {any} */ (globalThis).BookPageMap.assemble = assemble;
+
   Paged.registerHandlers(
     class Folios extends Paged.Handler {
       /** @param {any[]} args */
@@ -482,6 +718,10 @@
         /** @type {PageNumberingConfig} */
         this.numbering = settings.numbering ??
           { front: ARABIC, body: ARABIC, back: ARABIC };
+        // A segment laid out alone: the after-layout checks wait for
+        // assembly, where its pages have their book sides and neighbours.
+        /** @type {boolean} */
+        this.segment = settings.segment ?? false;
         /** @type {string[]} */
         this.expected = [];
         /** @type {PageProblem[]} */
@@ -593,16 +833,20 @@
           else {
             this.problems.push({ page: i + 1, message: "no page-map entry" });
           }
+          if (this.segment) return;
           this.problems.push(
             ...wrappedMargins(page, i + 1),
             ...imageProblems(page, i + 1),
           );
         });
-        /** @type {RenderResult} */
+        /** @type {RenderResult & { facts: PageFacts[] }} */
         this.chunker.pageMapResult = {
           map,
           seed: anchorFolios(map),
-          problems: [...this.problems, ...checkPageMap(map, this.expected)],
+          problems: this.segment
+            ? this.problems
+            : [...this.problems, ...checkPageMap(map, this.expected)],
+          facts: [...pages].map(pageFacts),
         };
       }
     },
