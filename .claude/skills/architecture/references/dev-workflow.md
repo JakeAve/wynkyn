@@ -58,9 +58,19 @@ launches Chrome once and skips them only if that fails.
 
 ### Waiting without a clock
 
-CI's runners are slower than a laptop, so a test that passes here can still
-read the page mid-change there. Wait for the state the assertion is about,
-never a guessed number of milliseconds:
+CI's runners are slower than a laptop, and unevenly so: a step that takes
+40 ms here took 45 s there. A test that passes here can still read the page
+mid-change there. Wait for the state the assertion is about, never a guessed
+number of milliseconds. `testing/clock_test.ts` fails any `setTimeout` or
+`waitForTimeout` in a test that isn't labelled `// clock: <why>` (on its line
+or the one above), so a guess can't land unnoticed. Use `testing/wait.ts`:
+`until(ok, what)` polls with a 30 s deadline that only a hang reaches, and
+`quietFor(ms)` is the pause before asserting that nothing happened.
+
+- **The signal, not an earlier sign of it:** wait on what the assertion
+  reads. Page 2 in the preview is not "the layout is done": Paged.js draws
+  page by page, and the editor's page turns land only when the last page does
+  (a scroll that started at page 2 ran past the line before its turn existed).
 
 - **A transition or fade:** wait for its class or attribute to land, then
   `el.getAnimations()` and `Promise.all(… .map((a) => a.finished))`. Read
@@ -71,15 +81,29 @@ never a guessed number of milliseconds:
   version), not merely the next; a write truncates first, so the watch can
   push a half-written file ahead of it.
 - **A debounced value** (the `#line=` hash, the save): compare what the test
-  is about, or poll it with a bound.
+  is about, or poll it with `until`.
 - **Polling:** check, then sleep, and return on the first match; a second read
-  for the assertion can catch a different moment.
+  for the assertion can catch a different moment. Bound it by a deadline, not
+  a count of short steps: "40 tries × 50 ms" is a 2 s clock in disguise.
+- **Scrolling a CodeMirror line into view:** step less than a screen and wait
+  two `requestAnimationFrame`s after each step, so the redraw has run before
+  you look.
+- **Counting events** (pushes, saves): count the ones your action caused, by
+  version, not "all since I reset the counter after a pause".
 
 A fixed pause is fine only where slowness makes it pass more easily ("no
 second push arrives"), or where there is nothing to wait on (a fresh FSEvents
 watch has no ready signal). To check a fix, stretch the app's own `--t` and
 `--t-fast` to 1 s: the old wait should fail and the new one pass. Forcing
-`transition-duration` on `*` animates everything and proves nothing.
+`transition-duration` on `*` animates everything and proves nothing. CPU
+throttling (`Emulation.setCPUThrottlingRate`) slows the test's own steps as
+much as the app, so it rarely opens a race: log what the test sees at the
+moment it starts waiting (here, "0 page turns at page 2") instead.
+
+**A red CI run on `main` that passed on the PR is a race, not bad luck.**
+Never re-run it to green, add retries or raise a timeout. Read the failing
+line, find what the test waited on instead of the state it asserts, fix that,
+and check the rest of the file for the same pattern.
 
 ## Fixtures
 
