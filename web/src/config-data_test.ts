@@ -3,6 +3,7 @@ import type { RunningEntry } from "../../metadata/types.ts";
 import {
   bumpLength,
   convertLength,
+  emphasisOf,
   formatCssLines,
   headPosition,
   isValidFolios,
@@ -168,6 +169,8 @@ Deno.test("runningSummary reports mixed sizes", () => {
     right: "book-title",
     size: "mixed",
     italic: "mixed",
+    bold: false,
+    underline: false,
     font: "mixed",
     color: undefined,
   });
@@ -178,6 +181,8 @@ Deno.test("runningSummary reports mixed sizes", () => {
     right: "none",
     size: undefined,
     italic: false,
+    bold: false,
+    underline: false,
     font: undefined,
     color: undefined,
   });
@@ -198,6 +203,13 @@ Deno.test("setRunningShared writes every entry", () => {
   assertEquals(runningSummary(running).color, "mixed"); // only even sets one
   setRunningShared(running, "color", "ink");
   assertEquals(runningSummary(running).color, "ink");
+  // Any mix of Italic, Bold and Underline, on every entry at once.
+  setRunningShared(running, "font-weight", "bold");
+  setRunningShared(running, "text-decoration", "underline");
+  const s = runningSummary(running);
+  assertEquals([s.italic, s.bold, s.underline], [false, true, true]);
+  delete odd[0]!["font-weight"];
+  assertEquals(runningSummary(running).bold, "mixed");
 });
 
 Deno.test("headPosition reads and setHeadPosition moves the first heads", () => {
@@ -239,4 +251,21 @@ Deno.test("renameColor renames the color and every reference to it (§4.15)", ()
   assertEquals(meta.elements.sidebar.content, "rubric"); // not a color
   assertEquals(meta.is.note.color, "red");
   assertEquals(meta.running.odd[0]!.color, "red");
+});
+
+Deno.test("emphasisOf reads Italic, Bold and Underline independently", () => {
+  assertEquals(emphasisOf({}), {
+    italic: false,
+    bold: false,
+    underline: false,
+  });
+  assertEquals(
+    emphasisOf({
+      "font-style": "italic",
+      "font-weight": "700",
+      "text-decoration": "underline dotted",
+    }),
+    { italic: true, bold: true, underline: true },
+  );
+  assertEquals(emphasisOf({ "font-weight": "400" }).bold, false);
 });

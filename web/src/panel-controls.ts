@@ -377,6 +377,29 @@ export function addNew(ctx: PanelContext, what: "font" | "color"): HTMLElement {
   return b;
 }
 
+export type Emphasis = "font-style" | "font-weight" | "text-decoration";
+
+// The Italic, Bold and Underline toggles: one key each, set when pressed and
+// cleared when released, so any mix of the three can be on.
+export function emphasisToggles(
+  on: { italic: boolean; bold: boolean; underline: boolean },
+  set: (prop: Emphasis, v: string | undefined) => void,
+): HTMLElement[] {
+  return [
+    toggle(
+      "Italic",
+      on.italic,
+      (o) => set("font-style", o ? "italic" : undefined),
+    ),
+    toggle("Bold", on.bold, (o) => set("font-weight", o ? "bold" : undefined)),
+    toggle(
+      "Underline",
+      on.underline,
+      (o) => set("text-decoration", o ? "underline" : undefined),
+    ),
+  ];
+}
+
 // A pick from the book's colors (§4.15), as Font picks from its fonts: a chip
 // of the color the text sets in now, a select ("Inherited · …" first, then
 // the book's colors, plus a color already set that isn't one), then "Add new

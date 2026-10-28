@@ -147,11 +147,28 @@ export function makeRunningEntry(form: RunningEntryForm): RunningEntry {
 // The running heads' simple view (spec R5): what the first entry on each side
 // shows, and the shared size / italic / font across every entry. A property
 // the entries disagree on reads "mixed".
+// Which of Italic, Bold and Underline a set of props turns on.
+export function emphasisOf(props: Record<string, string | undefined>): {
+  italic: boolean;
+  bold: boolean;
+  underline: boolean;
+} {
+  return {
+    italic: props["font-style"] === "italic",
+    bold: ["bold", "bolder", "600", "700", "800", "900"].includes(
+      props["font-weight"] ?? "",
+    ),
+    underline: (props["text-decoration"] ?? "").includes("underline"),
+  };
+}
+
 export function runningSummary(running: Running | undefined): {
   left: string;
   right: string;
   size: string | "mixed" | undefined;
   italic: boolean | "mixed";
+  bold: boolean | "mixed";
+  underline: boolean | "mixed";
   font: string | "mixed" | undefined;
   color: string | "mixed" | undefined;
 } {
@@ -162,7 +179,9 @@ export function runningSummary(running: Running | undefined): {
     left: running?.even?.[0]?.content ?? "none",
     right: running?.odd?.[0]?.content ?? "none",
     size: agree((e) => e["font-size"]),
-    italic: agree((e) => e["font-style"] === "italic") ?? false,
+    italic: agree((e) => emphasisOf(e).italic) ?? false,
+    bold: agree((e) => emphasisOf(e).bold) ?? false,
+    underline: agree((e) => emphasisOf(e).underline) ?? false,
     font: agree((e) => e["font-family"]),
     color: agree((e) => e.color),
   };
@@ -198,9 +217,18 @@ export function setHeadPosition(running: Running, at: FolioPosition): void {
 }
 
 // Write one shared property to every entry on both sides; undefined deletes.
+// The keys the running heads' shared type rows write to every entry.
+export type SharedProp =
+  | "font-size"
+  | "font-style"
+  | "font-family"
+  | "font-weight"
+  | "text-decoration"
+  | "color";
+
 export function setRunningShared(
   running: Running,
-  prop: "font-size" | "font-style" | "font-family" | "color",
+  prop: SharedProp,
   value: string | undefined,
 ): void {
   for (const e of [...(running.odd ?? []), ...(running.even ?? [])]) {

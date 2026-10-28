@@ -7,12 +7,13 @@ import type {
   NumberingStyle,
   StructureNumbering,
 } from "../../metadata/types.ts";
-import { parseLength } from "./config-data.ts";
+import { emphasisOf, parseLength } from "./config-data.ts";
 import { buildFurniture } from "./panel-furniture.ts";
 import {
   addNew,
   applies,
   colorPick,
+  emphasisToggles,
   icon,
   makeView,
   moreCss,
@@ -22,7 +23,6 @@ import {
   select,
   stepper,
   switchInput,
-  toggle,
   type View,
 } from "./panel-controls.ts";
 import {
@@ -356,23 +356,7 @@ function block(
         el(
           "span",
           "ctl",
-          toggle(
-            "Italic",
-            props["font-style"] === "italic",
-            (on) => set("font-style")(on ? "italic" : undefined),
-          ),
-          toggle(
-            "Bold",
-            ["bold", "bolder", "600", "700", "800", "900"].includes(
-              props["font-weight"] ?? "",
-            ),
-            (on) => set("font-weight")(on ? "bold" : undefined),
-          ),
-          toggle(
-            "Underline",
-            (props["text-decoration"] ?? "").includes("underline"),
-            (on) => set("text-decoration")(on ? "underline" : undefined),
-          ),
+          ...emphasisToggles(emphasisOf(props), (p, x) => set(p)(x)),
           seg(
             [
               { label: "Aa", value: "none", aria: "Normal case" },

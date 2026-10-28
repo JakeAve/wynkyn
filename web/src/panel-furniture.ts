@@ -16,6 +16,7 @@ import {
   MARGIN_AREAS,
 } from "../../metadata/css-generator.ts";
 import {
+  emphasisOf,
   formatCssLines,
   HEAD_AREAS,
   headPosition,
@@ -25,6 +26,7 @@ import {
   runningSummary,
   setHeadPosition,
   setRunningShared,
+  type SharedProp,
   splitRunningEntry,
 } from "./config-data.ts";
 import {
@@ -37,6 +39,7 @@ import {
   addNew,
   applies,
   colorPick,
+  emphasisToggles,
   icon,
   makeView,
   moreCss,
@@ -46,7 +49,6 @@ import {
   select,
   stepper,
   switchInput,
-  toggle,
   type View,
 } from "./panel-controls.ts";
 import {
@@ -305,7 +307,14 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
     openerWhere,
   ];
 
-  const FOLIO = ["font-size", "font-family", "font-style", "color"];
+  const FOLIO = [
+    "font-size",
+    "font-family",
+    "font-style",
+    "font-weight",
+    "text-decoration",
+    "color",
+  ];
   const zones = ZONES.map(([zone, label]) => {
     const cfg = pages[zone] ?? {};
     const current = cfg.show === false || cfg.style === "none"
@@ -406,13 +415,12 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
       view.mark(
         row(
           "Style",
-          toggle(
-            "Italic",
-            css["font-style"] === "italic",
-            (on) => setCss("font-style", on ? "italic" : undefined),
-          ),
+          el("span", "ctl", ...emphasisToggles(emphasisOf(css), setCss)),
         ),
-        () => !!live()?.css?.["font-style"],
+        () =>
+          ["font-style", "font-weight", "text-decoration"].some((k) =>
+            live()?.css?.[k]
+          ),
       ),
       moreCss("More CSS for page numbers", css, (next) => {
         if (!Object.keys(next).length && !numbering.pages?.css) return;
@@ -568,7 +576,7 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
   const drawSimple = () => {
     const s = runningSummary(running);
     const shared = (
-      prop: "font-size" | "font-style" | "font-family" | "color",
+      prop: SharedProp,
       v: string | undefined,
     ) => {
       setRunningShared(running, prop, v);
@@ -633,15 +641,20 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
         view.mark(
           row(
             "Style",
-            toggle(
-              "Italic",
-              s.italic === true,
-              (on) => shared("font-style", on ? "italic" : undefined),
+            el(
+              "span",
+              "ctl",
+              ...emphasisToggles({
+                italic: s.italic === true,
+                bold: s.bold === true,
+                underline: s.underline === true,
+              }, shared),
             ),
           ),
-          () => now().italic === true,
+          () =>
+            [now().italic, now().bold, now().underline].some((x) => x === true),
         ),
-        s.italic === "mixed",
+        [s.italic, s.bold, s.underline].includes("mixed"),
       ),
     );
   };

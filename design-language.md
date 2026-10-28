@@ -474,8 +474,10 @@ pill, whatever the corner shape.
   the color the text sets in now, inside a `--s-1` `--stock` paper ring and a
   hairline. Page numbers and Running heads have the same Color pick
   (`colorPick`). Anything else goes in More CSS.
-- **Style row**: the part's Italic, Bold and Underline `toggle`s, then the case
-  `seg`; each toggle stores one key and clears it when released.
+- **Style row**: the part's Italic, Bold and Underline `toggle`s
+  (`emphasisToggles`), then the case `seg`; each toggle stores one key and
+  clears it when released, so any mix can be on. Page numbers and Running heads
+  have the same three toggles, without the case.
 - **Tip line** (`.tip`): a red ☞ in Fell before `--fs-sm` `--muted` text.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.
