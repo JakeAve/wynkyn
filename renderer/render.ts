@@ -32,6 +32,7 @@ export interface RenderOptions {
   language?: string; // BCP 47 (spec §4.2); stamped on the article as `lang`
   bookTitle?: string; // set above the first chapter's number (`openers`, §4.14)
   elements?: Metadata["elements"]; // read for breaks only, by renderSegments
+  is?: Metadata["is"]; // ditto: an {is} block's forced break-after
 }
 
 // folios.js is a classic script (toHtml inlines it), so its formatter hangs
@@ -733,7 +734,12 @@ const forcesAfter = (s: ElementStyle): boolean =>
 function deepBreakAfter(
   pieces: Piece[],
   elements: Metadata["elements"],
+  is: Metadata["is"],
 ): boolean {
+  // {is} blocks only sit inside sections (`<div class="is …">`).
+  if (Object.values(is ?? {}).some((s) => breakSide(s["break-after"]))) {
+    return true;
+  }
   const inner = new Set(["bml"]);
   for (const p of pieces) {
     [...p.html.matchAll(/<(\w+) class="([^"]*)"/g)].slice(1).forEach((m) => {
@@ -823,7 +829,7 @@ export function renderSegments(
   // ponytail: a deep forced break-after merges the whole book into one
   // segment; check whether the previous piece ends in what it reaches if such
   // books need the speed.
-  const deep = deepBreakAfter(pieces, opts.elements);
+  const deep = deepBreakAfter(pieces, opts.elements, opts.is);
   let after: Side = null; // the previous section's break-after
   let partAfter: Side = null; // the open part's, owed where the part ends
   for (const p of pieces) {

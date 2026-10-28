@@ -201,6 +201,7 @@ export async function buildBook(
     language: m.language ?? m.ebook?.language,
     bookTitle: m.openers?.["book-title"] ? bookTitle : undefined,
     elements: m.elements,
+    is: m.is,
   };
   return {
     book,

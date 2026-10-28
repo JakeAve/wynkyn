@@ -925,6 +925,13 @@ Deno.test("renderSegments: a forced break-after below a section merges", () => {
   assertEquals(ids({ paragraph: { "break-after": "avoid" } }), all);
   assertEquals(ids({ chapter: { "break-after": "page" } }), all);
   assertEquals(ids({ p: { "break-after": "page" } }), all); // reaches nothing
+  // An {is} block sits inside a section, so its forced break-after merges too.
+  const isIds = (is: Metadata["is"]) =>
+    renderSegments(doc, { is }).map((s) => s.id);
+  assertEquals(isIds({ verse: { "break-after": "right" } }), [
+    "matter-half-title",
+  ]);
+  assertEquals(isIds({ verse: { "break-before": "right" } }), all);
 });
 
 Deno.test("renderSegments: run-on chapters merge into the segment before", () => {
