@@ -2170,17 +2170,18 @@ Includes:
   per signature, leftover paper) shown live as those change, and an unprintable
   combination reported here rather than at export time
 - The first signature drawn as it prints: each sheet's front and back with the
-  book pages that land on it, folds dashed, cuts solid, from the same `impose()`
-  export uses
+  book pages that land on it, from the same `impose()` export uses, and lines
+  only where binding marks will print them (§7.7), so the drawing and the paper
+  agree; with marks off the note beneath says how to fold
 - The Publish view grouped by what the author is making: **Binding** — Paper
   (the page size, with a link to Style's Page view that Back returns from, and
   the sheet), Folding (the fold, Auto naming its pick, and what the setup
-  derives to), Signatures (hidden for loose leaves), and Print (auto duplex or
-  by hand, the by-hand flip and back order, and the Print sheets buttons, §7.7);
-  **PDF**, the pages in reading order at the page size, one per printed page
-  (Print pages; Save as PDF gives the file `book.pdf` would be); and **E-book**
-  (Export EPUB, §7.8). All printing runs in the browser; proofs and the sheet
-  PDFs on disk are `bml
+  derives to), Signatures (hidden for loose leaves), Binding marks (§4.3), and
+  Print (auto duplex or by hand, the by-hand flip and back order, and the Print
+  sheets buttons, §7.7); **PDF**, the pages in reading order at the page size,
+  one per printed page (Print pages; Save as PDF gives the file `book.pdf` would
+  be); and **E-book** (Export EPUB, §7.8). All printing runs in the browser;
+  proofs and the sheet PDFs on disk are `bml
   export`'s
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a

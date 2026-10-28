@@ -2913,17 +2913,7 @@ body.typing #editor .pane-head {
   dominant-baseline: central;
   font-variant-numeric: tabular-nums;
 }
-#sheet-view .sheet .fold {
-  stroke: var(--sheet-fold);
-  stroke-width: .06;
-  stroke-dasharray: .25 .18;
-}
-#sheet-view .sheet .cut {
-  stroke: var(--sheet-cut);
-  stroke-width: 1.5px;
-  vector-effect: non-scaling-stroke;
-}
-/* The binding marks that print (page.marks), in ink over the guides. */
+/* Every line on the sheet is a binding mark that prints (page.marks). */
 #sheet-view .sheet line.mark {
   stroke: var(--sheet-ink);
   stroke-width: 1px;

@@ -813,28 +813,7 @@ function drawSignature(
   const sheetMarks = marksFor(imp, setup.page, marks);
   const { w: W, h: H } = imp.sheet;
   const { w: pw, h: ph } = setup.page;
-  const { origin: o, cell } = imp;
   const folded = isTrueFold(imp.fold);
-  // Grid lines: a folded sheet folds at every cell edge; loose leaves cut at
-  // every one; a cut sheet folds each column pair and cuts the rest.
-  const lines: Array<
-    { cls: string; x1: number; y1: number; x2: number; y2: number }
-  > = [];
-  for (let c = 1; c < imp.cols; c++) {
-    const x = o.x + c * cell.w;
-    const cls = folded || (imp.fold === "cut" && c % 2) ? "fold" : "cut";
-    lines.push({ cls, x1: x, x2: x, y1: o.y, y2: o.y + imp.rows * cell.h });
-  }
-  for (let r = 1; r < imp.rows; r++) {
-    const y = o.y + r * cell.h;
-    lines.push({
-      cls: folded ? "fold" : "cut",
-      x1: o.x,
-      x2: o.x + imp.cols * cell.w,
-      y1: y,
-      y2: y,
-    });
-  }
   const side = (slots: Slot[], label: string, m?: SideMarks) => {
     const s = svg("svg", {
       viewBox: `0 0 ${W} ${H}`,
@@ -861,11 +840,9 @@ function drawSignature(
         transform: slot.rotate ? `rotate(180 ${cx} ${cy})` : "",
       }, String(slot.page + 1)));
     }
-    for (const { cls, ...at } of lines) {
-      s.append(svg("line", { class: cls, ...at }));
-    }
-    // The binding marks that print, in ink over the guides above. A dot is
-    // drawn bigger than it prints (1pt) so it can be seen at this scale.
+    // The sheet as it prints: every line is a binding mark, and with marks off
+    // there are none. A dot is drawn bigger than it prints (1pt) so it can be
+    // seen at this scale. The page outlines stand for the printed pages.
     for (const { kind, ...at } of m?.lines ?? []) {
       s.append(svg("line", { class: `mark ${kind}`, ...at }));
     }
@@ -898,10 +875,10 @@ function drawSignature(
         : ""
     }`
     : imp.fold === "leaves"
-    ? "Solid lines cut. Cut the stack and pile the pieces in reading order, top row first."
+    ? "Cut the stack between the pages and pile the pieces in reading order, top row first."
     : setup.cutsPerSheet
-    ? "Dashed lines fold, solid lines cut."
-    : "Dashed lines fold.";
+    ? "Cut the sheet between the folios, then fold each one at its spine."
+    : "Fold each sheet at its spine.";
   // Where the sewing stations land: the innermost sheet, which may be past
   // the ones shown.
   const sewn = first.findIndex((_, i) =>
@@ -915,7 +892,9 @@ function drawSignature(
   const notes = [
     more > 0 ? `And ${more} more sheet${more === 1 ? "" : "s"}.` : "",
     how,
-    marks ? "Binding marks print in ink." : "",
+    marks
+      ? "Every line here prints."
+      : "Switch on Binding marks to print fold and cut lines.",
     sewn < 0
       ? ""
       : `Sewing stations: sheet ${sewn + 1} ${sewnFace}, on the fold.`,
