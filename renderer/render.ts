@@ -1,6 +1,8 @@
 // renderer/render.ts — BmlDocument → semantic HTML (spec §5.3). Pure, no I/O.
 import "./folios.js";
 import { matterType } from "../parser/types.ts";
+import { selectorFor } from "../metadata/css-generator.ts";
+import type { Segment } from "./page-map-types.ts";
 import type {
   BmlDocument,
   Chapter,
@@ -13,6 +15,7 @@ import type {
   Part,
 } from "../parser/types.ts";
 import type {
+  Metadata,
   NotesConfig,
   Numbering,
   NumberingStyle,
@@ -27,6 +30,7 @@ export interface RenderOptions {
   images?: Record<string, string>; // slug → relative path; resolved by the caller
   language?: string; // BCP 47 (spec §4.2); stamped on the article as `lang`
   bookTitle?: string; // set above the first chapter's number (`openers`, §4.14)
+  elements?: Metadata["elements"]; // read for breaks only, by renderSegments
 }
 
 // folios.js is a classic script (toHtml inlines it), so its formatter hangs
@@ -587,10 +591,10 @@ function generateToc(doc: BmlDocument, opts: RenderOptions): string {
   return `<nav class="toc">${tocRows(doc, opts).map(tocRow).join("")}</nav>`;
 }
 
-function renderPart(
+// The part's own content, its section left open for its chapters.
+function partOpener(
   part: Part,
   partNo: number,
-  chapterNo: { n: number },
   opts: RenderOptions,
   zone: Zone,
   start = false,
@@ -603,15 +607,28 @@ function renderPart(
     opts,
     (ctx) => renderChildren(contentKids, ctx, opts),
   );
-  const chapters = part.children
-    .filter((c): c is Chapter => c.kind === "chapter")
-    .map((ch) => renderChapter(ch, ++chapterNo.n, opts))
-    .join("");
   return `<section class="part${zoneClass(zone)}${
     start ? " body-start" : ""
   }" id="${escapeHtml(part.slug)}"${dl(part)}>${
     numberDiv(partNo, opts.numbering?.parts)
-  }${head}${chapters}</section>`;
+  }${head}`;
+}
+
+const partChapters = (part: Part) =>
+  part.children.filter((c): c is Chapter => c.kind === "chapter");
+
+function renderPart(
+  part: Part,
+  partNo: number,
+  chapterNo: { n: number },
+  opts: RenderOptions,
+  zone: Zone,
+  start = false,
+): string {
+  const chapters = partChapters(part)
+    .map((ch) => renderChapter(ch, ++chapterNo.n, opts))
+    .join("");
+  return `${partOpener(part, partNo, opts, zone, start)}${chapters}</section>`;
 }
 
 export function render(doc: BmlDocument, opts: RenderOptions = {}): string {
@@ -635,4 +652,177 @@ export function render(doc: BmlDocument, opts: RenderOptions = {}): string {
   }
   out.push(`</article>`);
   return out.join("");
+}
+
+// ── segments ────────────────────────────────────────────────────────────────
+// One top-level section of the flow. `part` marks a chapter inside that part;
+// `opensPart` a part opener, whose section the html leaves open.
+interface Piece {
+  id: string;
+  html: string;
+  line: number;
+  part?: string;
+  opensPart?: string;
+}
+
+type Side = Segment["opens"] | null; // null: no forced break, runs on
+
+// A break value as the side it forces; undefined for one CSS would drop.
+function breakSide(v: unknown): Side | undefined {
+  switch (v) {
+    case "page":
+    case "always":
+    case "all":
+      return "page";
+    case "right":
+    case "recto":
+      return "right";
+    case "left":
+    case "verso":
+      return "left";
+    case "auto":
+    case "avoid":
+    case "avoid-page":
+    case "column":
+    case "avoid-column":
+      return null;
+  }
+}
+
+// `prop` on a section with these classes: the last `elements` key whose
+// selector names one of them wins (all one class, so order decides), over
+// base.css's zero-specificity rule.
+function breakProp(
+  cls: Set<string>,
+  prop: "break-before" | "break-after",
+  elements: Metadata["elements"],
+  base: Side,
+): Side {
+  let side = base;
+  for (const [key, style] of Object.entries(elements ?? {})) {
+    if (!selectorFor(key).split(", ").some((s) => cls.has(s.slice(1)))) {
+      continue;
+    }
+    const v = breakSide(style[prop]);
+    if (v !== undefined) side = v;
+  }
+  return side;
+}
+
+const classesOf = (html: string) =>
+  new Set(html.match(/^<section class="([^"]*)"/)?.[1]?.split(" ") ?? []);
+
+// base.css: matter, parts and the body's start on a recto; chapters, the
+// copyright page and the colophon on the next page.
+function baseOpens(cls: Set<string>): Side {
+  return cls.has("part") || cls.has("body-start") ||
+      (cls.has("matter") && !cls.has("matter-copyright") &&
+        !cls.has("matter-colophon"))
+    ? "right"
+    : "page";
+}
+
+const unescapeHtml = (s: string) =>
+  s.replaceAll("&quot;", '"').replaceAll("&lt;", "<").replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+
+const matchAll = (html: string, re: RegExp) => [
+  ...new Set([...html.matchAll(re)].map((m) => unescapeHtml(m[1]!))),
+];
+
+/** The book cut where pages are forced to break (each section's `opens`),
+ * in book order; joined, their sections are render()'s. A chapter in a part
+ * sits in a `.part` wrapper marked `data-split-from`, which the page map
+ * doesn't count as an opener. `data-line`s stay absolute. */
+export function renderSegments(
+  doc: BmlDocument,
+  opts: RenderOptions = {},
+): Segment[] {
+  const pieces: Piece[] = [];
+  const ids = matterIds(doc);
+  const matter = (blocks: MatterBlock[], zone: Zone) => {
+    for (const m of blocks) {
+      const id = ids.get(m)!;
+      pieces.push({
+        id,
+        line: m.line,
+        html: renderMatter(m, doc, opts, zone, id),
+      });
+    }
+  };
+  matter(doc.frontMatter, "front");
+  let partNo = 0;
+  let chapterNo = 0;
+  doc.body.forEach((b, i) => {
+    if (b.kind === "chapter") {
+      pieces.push({
+        id: b.slug,
+        line: b.line,
+        html: renderChapter(b, ++chapterNo, opts, "body", i === 0),
+      });
+      return;
+    }
+    pieces.push({
+      id: b.slug,
+      line: b.line,
+      opensPart: b.slug,
+      html: partOpener(b, ++partNo, opts, "body", i === 0),
+    });
+    for (const ch of partChapters(b)) {
+      pieces.push({
+        id: ch.slug,
+        line: ch.line,
+        part: b.slug,
+        html: renderChapter(ch, ++chapterNo, opts),
+      });
+    }
+  });
+  matter(doc.backMatter, "back");
+
+  const groups: { opens: Segment["opens"]; pieces: Piece[] }[] = [];
+  let after: Side = null; // the previous section's break-after
+  let partAfter: Side = null; // the open part's, owed where the part ends
+  for (const p of pieces) {
+    const cls = classesOf(p.html);
+    if (p.part === undefined) [after, partAfter] = [after ?? partAfter, null];
+    const before = breakProp(
+      cls,
+      "break-before",
+      opts.elements,
+      baseOpens(cls),
+    );
+    // A forced side beats a plain page break, from either end.
+    const opens = before && before !== "page" ? before : after ?? before;
+    after = breakProp(cls, "break-after", opts.elements, null);
+    if (p.opensPart) [partAfter, after] = [after, null];
+    const last = groups.at(-1);
+    if (!opens && last) last.pieces.push(p);
+    else groups.push({ opens: opens ?? "page", pieces: [p] });
+  }
+
+  const lang = opts.language ? ` lang="${escapeHtml(opts.language)}"` : "";
+  return groups.map(({ opens, pieces }) => {
+    let body = "";
+    let inPart: string | undefined; // the part whose section is open
+    for (const p of pieces) {
+      if (inPart !== undefined && p.part !== inPart) body += "</section>";
+      if (p.part !== undefined && p.part !== inPart) {
+        body += `<section class="part zone-body" data-split-from="${
+          escapeHtml(p.part)
+        }">`;
+      }
+      body += p.html;
+      inPart = p.opensPart ?? p.part;
+    }
+    if (inPart !== undefined) body += "</section>";
+    const first = pieces[0]!;
+    return {
+      id: first.id,
+      html: `<article class="bml"${lang}>${body}</article>`,
+      line: first.line,
+      opens,
+      reads: matchAll(body, /<a class="(?:page|ref)" href="#([^"]*)"/g),
+      ids: matchAll(body, / id="([^"]*)"/g),
+    };
+  });
 }

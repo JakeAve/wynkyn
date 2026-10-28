@@ -28,6 +28,27 @@ Deno.test("buildBook produces html, css, font links, and title", async () => {
   assertEquals(b.diagnostics, []);
 });
 
+Deno.test("buildBook carries segments of the same html and the image URLs it used", async () => {
+  const b = await buildBook(ROOT, "demo-book", {
+    imageUrl: (book, name) => `blob:${book}/${name}`,
+    metadata: { elements: { chapter: { "break-before": "left" } } },
+  });
+  assert(b.segments.length > 1);
+  const strip = (h: string) =>
+    h.replace(/^<article[^>]*>|<\/article>$/g, "").replace(
+      /<\/section><section class="part zone-body" data-split-from="[^"]*">/g,
+      "",
+    );
+  assertEquals(b.segments.map((s) => strip(s.html)).join(""), strip(b.html));
+  // metadata elements reach opens
+  assert(
+    b.segments.some((s) => s.opens === "left"),
+    "a chapter opens on a verso",
+  );
+  assertEquals(b.imageUrls["ornament.svg"], "blob:demo-book/ornament.svg");
+  assert(b.html.includes("blob:demo-book/ornament.svg"));
+});
+
 Deno.test("openers.book-title sets the title over the first chapter only (§4.14)", async () => {
   const off = await buildBook(ROOT, "demo-book");
   assert(!off.html.includes('class="book-title"'));

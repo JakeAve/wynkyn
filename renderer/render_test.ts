@@ -1,6 +1,10 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { parse } from "../parser/parser.ts";
-import { formatNumber, render as renderLined } from "./render.ts";
+import {
+  formatNumber,
+  render as renderLined,
+  renderSegments,
+} from "./render.ts";
 
 // Existing tests assert markup shape; data-line has its own test at the bottom.
 const render: typeof renderLined = (doc, opts) =>
@@ -673,4 +677,207 @@ Deno.test("toc: a titled colophon is not listed (§3.7); an open matter type is"
   assertStringIncludes(html, 'href="#matter-afterword">Afterword</a>');
   assert(!html.includes('href="#matter-colophon"'));
   assert(!html.includes("matter-afterword matter-display"));
+});
+
+// ── segments ────────────────────────────────────────────────────────────────
+const SEGMENT_BOOK = [
+  "{matter: half-title}",
+  "{title}",
+  "Orchard",
+  "{matter: copyright}",
+  "Copyright 1900.",
+  "{matter: toc}",
+  "{title}",
+  "Contents",
+  "{matter: preface}",
+  "{title}",
+  "Preface",
+  "",
+  "See {ref: crossing}.",
+  "{chapter: prelude}",
+  "Before.",
+  "{part: one}",
+  "{title}",
+  "Before the Frost",
+  "{chapter: thaw}",
+  "{title}",
+  "The First Thaw",
+  "",
+  "x{footnote: n1}",
+  "",
+  "{note: n1}",
+  "A note.",
+  "{chapter: crossing}",
+  "",
+  "y",
+  "{matter: appendix}",
+  "{title}",
+  "Family Tree",
+  "{matter: colophon}",
+  "Set by hand.",
+].join("\n");
+
+// Undo the wrappers: joined, the segments' sections are render()'s.
+const joined = (segs: { html: string }[]) =>
+  segs.map((s) => s.html.replace(/^<article[^>]*>|<\/article>$/g, "")).join("")
+    .replace(
+      /<\/section><section class="part zone-body" data-split-from="[^"]*">/g,
+      "",
+    );
+
+Deno.test("renderSegments: one per section in book order; joined they are render()'s", () => {
+  const doc = parse(SEGMENT_BOOK);
+  const segs = renderSegments(doc, { language: "en" });
+  assertEquals(segs.map((s) => s.id), [
+    "matter-half-title",
+    "matter-copyright",
+    "matter-toc",
+    "matter-preface",
+    "prelude",
+    "one",
+    "thaw",
+    "crossing",
+    "matter-appendix",
+    "matter-colophon",
+  ]);
+  assertEquals(segs.map((s) => s.line), [1, 4, 6, 9, 14, 16, 19, 27, 30, 33]);
+  for (const s of segs) {
+    assert(s.html.startsWith('<article class="bml" lang="en">'), s.id);
+  }
+  const whole = renderLined(doc, { language: "en" });
+  assertEquals(
+    joined(segs),
+    whole.replace(/^<article[^>]*>|<\/article>$/g, ""),
+  );
+  // Lines stay absolute.
+  assertStringIncludes(segs[7]!.html, 'data-line="29"');
+});
+
+Deno.test("renderSegments: a chapter in a part sits in a split-from part wrapper", () => {
+  const segs = renderSegments(parse(SEGMENT_BOOK));
+  const part = segs.find((s) => s.id === "one")!;
+  assert(part.html.startsWith(
+    '<article class="bml"><section class="part zone-body" id="one" data-line="16">',
+  ));
+  assert(part.html.endsWith("</section></article>"));
+  const thaw = segs.find((s) => s.id === "thaw")!;
+  assert(thaw.html.startsWith(
+    '<article class="bml"><section class="part zone-body" data-split-from="one"><section class="chapter" id="thaw" data-line="19">',
+  ));
+  // The chapter's endnotes stay inside the wrapper.
+  assert(thaw.html.endsWith("</aside></section></article>"));
+  // A chapter outside a part is not wrapped.
+  const prelude = segs.find((s) => s.id === "prelude")!;
+  assert(!prelude.html.includes("data-split-from"));
+});
+
+Deno.test("renderSegments: reads lists TOC and {ref} targets; ids every rendered id", () => {
+  const segs = renderSegments(parse(SEGMENT_BOOK));
+  const byId = (id: string) => segs.find((s) => s.id === id)!;
+  assertEquals(byId("matter-toc").reads, [
+    "matter-preface",
+    "prelude",
+    "one",
+    "thaw",
+    "crossing",
+    "matter-appendix",
+  ]);
+  assertEquals(byId("matter-preface").reads, ["crossing"]);
+  assertEquals(byId("thaw").reads, []);
+  assertEquals(byId("thaw").ids, ["thaw", "fnref-n1", "note-n1"]);
+  assertEquals(byId("one").ids, ["one"]);
+  assertEquals(
+    segs.flatMap((s) => s.ids).sort(),
+    [...renderLined(parse(SEGMENT_BOOK)).matchAll(/ id="([^"]*)"/g)]
+      .map((m) => m[1]!).sort(),
+  );
+});
+
+Deno.test("renderSegments: opens follows base.css per section type", () => {
+  const segs = renderSegments(parse(SEGMENT_BOOK));
+  assertEquals(
+    Object.fromEntries(segs.map((s) => [s.id, s.opens])),
+    {
+      "matter-half-title": "right",
+      "matter-copyright": "page",
+      "matter-toc": "right",
+      "matter-preface": "right",
+      prelude: "right", // body-start
+      one: "right",
+      thaw: "page",
+      crossing: "page",
+      "matter-appendix": "right",
+      "matter-colophon": "page",
+    },
+  );
+});
+
+Deno.test("renderSegments: elements keys override opens, later keys winning", () => {
+  const doc = parse(SEGMENT_BOOK);
+  const opens = (elements: Record<string, Record<string, string>>) =>
+    Object.fromEntries(
+      renderSegments(doc, { elements }).map((s) => [s.id, s.opens]),
+    );
+  const a = opens({
+    matter: { "break-before": "page" },
+    preface: { "break-before": "verso" },
+    chapter: { "break-before": "recto" },
+    colophon: { "break-before": "left" },
+  });
+  assertEquals(a["matter-half-title"], "page");
+  assertEquals(a["matter-preface"], "left");
+  assertEquals(a["crossing"], "right");
+  assertEquals(a["matter-colophon"], "left");
+  // prose-matter reaches the preface; a later `matter` key wins over it.
+  assertEquals(
+    opens({
+      "prose-matter": { "break-before": "left" },
+      matter: { "break-before": "page" },
+    })["matter-preface"],
+    "page",
+  );
+  // The previous section's break-after forces a side onto a plain break.
+  assertEquals(
+    opens({ prelude: { "break-after": "right" } })["one"],
+    "right",
+  );
+  assertEquals(
+    opens({ copyright: { "break-after": "left" } })["matter-toc"],
+    "right",
+  );
+  assertEquals(
+    opens({ "half-title": { "break-after": "left" } })["matter-copyright"],
+    "left",
+  );
+});
+
+Deno.test("renderSegments: run-on chapters merge into the segment before", () => {
+  const doc = parse(SEGMENT_BOOK);
+  const segs = renderSegments(doc, {
+    elements: { chapter: { "break-before": "auto" } },
+  });
+  assertEquals(segs.map((s) => s.id), [
+    "matter-half-title",
+    "matter-copyright",
+    "matter-toc",
+    "matter-preface", // the body's first chapter runs on too: `.chapter` outranks base.css
+    "one",
+    "matter-appendix",
+    "matter-colophon",
+  ]);
+  // The part's chapters run on inside the part's own section, no wrapper.
+  const part = segs.find((s) => s.id === "one")!;
+  assert(!part.html.includes("data-split-from"));
+  assertEquals(part.ids, ["one", "thaw", "fnref-n1", "note-n1", "crossing"]);
+  assertEquals(joined(segs), joined(renderSegments(doc)));
+  // Everything run on: the book is one segment, render() itself.
+  const one = renderSegments(doc, {
+    elements: {
+      chapter: { "break-before": "avoid" },
+      part: { "break-before": "auto" },
+      matter: { "break-before": "auto" },
+    },
+  });
+  assertEquals(one.length, 1);
+  assertEquals(one[0]!.html, renderLined(doc));
 });

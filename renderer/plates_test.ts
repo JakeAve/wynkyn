@@ -73,6 +73,8 @@ Deno.test({
         fontLinks: "",
         diagnostics: [],
         html: body,
+        segments: [],
+        imageUrls: {},
         baseCss,
         domCss: "",
         pagedCss,

@@ -18,6 +18,17 @@ export interface PageEntry {
   anchors: string[];
 }
 
+/** A run of the book laid out alone: where pages are forced to break
+ * (renderer/render.ts `renderSegments`). */
+export interface Segment {
+  id: string; // the first section's slug or matter id: stable across edits
+  html: string; // a whole <article class="bml">; data-line absolute
+  line: number; // the first section's manuscript line
+  opens: "page" | "right" | "left"; // the forced break at its start
+  reads: string[]; // anchors whose page numbers it prints (TOC, {ref})
+  ids: string[]; // every id it renders
+}
+
 /** Anchor id → the page number printed for it (TOC rows, `{ref}`). */
 export type Seed = Record<string, string>;
 

@@ -12,7 +12,12 @@ import {
   type PageNumberingConfig,
   pageNumberingConfig,
 } from "../metadata/css-generator.ts";
-import { render } from "../renderer/render.ts";
+import {
+  render,
+  type RenderOptions,
+  renderSegments,
+} from "../renderer/render.ts";
+import type { Segment } from "../renderer/page-map-types.ts";
 import {
   editionSlugs,
   editionToken,
@@ -46,6 +51,8 @@ export interface BuildResult {
   bookTitle: string;
   doc: BmlDocument; // the parsed tree the html was rendered from
   html: string; // render() output — body content only, no <html> wrapper
+  segments: Segment[]; // the same book cut where pages break (renderSegments)
+  imageUrls: Record<string, string>; // image file name → the URL html uses
   baseCss: string;
   domCss: string;
   pagedCss: string;
@@ -123,15 +130,26 @@ export async function resolveImages(
   urlPrefix: string,
   imageUrl?: BuildOptions["imageUrl"],
 ): Promise<Record<string, string>> {
+  return (await imageUrlMaps(root, book, urlPrefix, imageUrl)).images;
+}
+
+// slug → URL for the renderer, and file name → URL for whoever rewrites them.
+async function imageUrlMaps(
+  root: string | BookStore,
+  book: string,
+  urlPrefix: string,
+  imageUrl?: BuildOptions["imageUrl"],
+) {
   const images: Record<string, string> = {};
+  const imageUrls: Record<string, string> = {};
   for (
     const [slug, name] of Object.entries(await imageFiles(asStore(root), book))
   ) {
-    images[slug] = imageUrl
+    images[slug] = imageUrls[name] = imageUrl
       ? await imageUrl(book, name)
       : `${urlPrefix}/${encodeURIComponent(name)}`;
   }
-  return images;
+  return { images, imageUrls };
 }
 
 // Deno callers (CLI, exports, tests) don't carry base.css around; read it once.
@@ -165,26 +183,30 @@ export async function buildBook(
     throw new NotFoundError(`no such edition: ${book}/${edition}`);
   }
   const m = opts.metadata ?? loaded?.meta ?? {};
-  const images = await resolveImages(
+  const { images, imageUrls } = await imageUrlMaps(
     store,
     book,
     imageUrlPrefix,
     opts.imageUrl,
   );
   const bookTitle = extractBookTitle(doc, book);
+  const renderOpts: RenderOptions = {
+    numbering: m.numbering,
+    notes: opts.notes ?? m.notes,
+    toc: m.toc,
+    images,
+    language: m.language ?? m.ebook?.language,
+    bookTitle: m.openers?.["book-title"] ? bookTitle : undefined,
+    elements: m.elements,
+  };
   return {
     book,
     edition,
     bookTitle,
     doc,
-    html: render(doc, {
-      numbering: m.numbering,
-      notes: opts.notes ?? m.notes,
-      toc: m.toc,
-      images,
-      language: m.language ?? m.ebook?.language,
-      bookTitle: m.openers?.["book-title"] ? bookTitle : undefined,
-    }),
+    html: render(doc, renderOpts),
+    segments: renderSegments(doc, renderOpts),
+    imageUrls,
     baseCss: opts.baseCss ?? await defaultBaseCss(),
     domCss: generateDomCSS(m),
     pagedCss: generatePagedCSS(m, { bookTitle }),
