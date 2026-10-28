@@ -253,7 +253,13 @@ function runningEntries(metadata: Metadata): StyleEntry[] {
 
 // ---- Style panel: tabs, book parts, routes (spec R1) ----
 
-export type TabId = "themes" | "page" | "fonts" | "parts" | "publish";
+export type TabId =
+  | "themes"
+  | "page"
+  | "fonts"
+  | "colours"
+  | "parts"
+  | "publish";
 
 export interface Route {
   tab: TabId;
@@ -374,39 +380,40 @@ function aliasOf(
   metadata: Metadata,
   path: string[],
   bodyAlias: string,
+  prop: string,
 ): string {
   for (let i = path.length; i > 1; i--) {
-    const ff = getProps(metadata, { path: path.slice(0, i) })["font-family"];
-    if (ff) return ff;
+    const v = getProps(metadata, { path: path.slice(0, i) })[prop];
+    if (v) return v;
   }
   return bodyAlias;
 }
 
 // Every part, page numbers and running heads set in `alias` (Fonts tab chips).
+// `prop` "color" lists a colour alias's users (§4.15) the same way.
 export function usedBy(
   metadata: Metadata,
   alias: string,
+  prop: "font-family" | "color" = "font-family",
 ): Array<{ label: string; route: Route }> {
   const catalog = new Map(catalogFor(metadata).map((e) => [e.key, e]));
-  const bodyAlias =
-    getProps(metadata, { path: ["elements", "body"] })["font-family"] ?? "body";
+  const bodyAlias = getProps(metadata, { path: ["elements", "body"] })[prop] ??
+    (prop === "font-family" ? "body" : "");
   const out: Array<{ label: string; route: Route }> = [];
   for (const part of bookParts(metadata)) {
     if (part.group === "furniture") continue; // margin boxes: below
     const uses = part.keys.some((k) =>
-      aliasOf(metadata, catalog.get(k)!.path, bodyAlias) === alias
+      aliasOf(metadata, catalog.get(k)!.path, bodyAlias, prop) === alias
     );
     if (uses) {
       out.push({ label: part.name, route: { tab: "parts", part: part.id } });
     }
   }
-  // Margin boxes take the body's font unless they name their own (§4.7,
-  // §4.8); a zone's folio takes the shared one first.
+  // Margin boxes take the body's font and colour unless they name their own
+  // (§4.7, §4.8); a zone's folio takes the shared one first.
   const p = metadata.numbering?.pages;
-  const shared = p?.css?.["font-family"] ?? bodyAlias;
-  const pages = ZONES.some(([z]) =>
-    (p?.[z]?.css?.["font-family"] ?? shared) === alias
-  );
+  const shared = p?.css?.[prop] ?? bodyAlias;
+  const pages = ZONES.some(([z]) => (p?.[z]?.css?.[prop] ?? shared) === alias);
   if (pages) {
     out.push({
       label: "Page numbers",
@@ -417,7 +424,7 @@ export function usedBy(
     ...(metadata.running?.odd ?? []),
     ...(metadata.running?.even ?? []),
   ]
-    .some((e) => (e["font-family"] ?? bodyAlias) === alias);
+    .some((e) => (e[prop] ?? bodyAlias) === alias);
   if (heads) {
     out.push({
       label: "Running heads",
@@ -578,36 +585,37 @@ export function ensureProps(
   return node;
 }
 
-// What an entry's font actually falls back to when it sets none — shown in the
-// picker: the nearest ancestor's, the body's (a margin box, outside the body,
-// is given the body's fonts), and base.css's generic serif for the body.
+// The raw value (an alias or CSS) an entry gets for `prop` when it sets none:
+// the nearest ancestor entry's (.toc .toc-part .number → .toc), else the
+// body's. A margin box is outside the body but given its fonts and colour, a
+// zone's folio the shared folio style's first. Undefined when nothing sets it.
+export function inheritedValue(
+  metadata: Metadata,
+  entry: Pick<StyleEntry, "key" | "path" | "section">,
+  prop: string,
+): string | undefined {
+  const body = () => getProps(metadata, { path: ["elements", "body"] })[prop];
+  if (entry.section === "numbering" || entry.section === "running") {
+    const shared = entry.key.startsWith("numbering.pages.")
+      ? metadata.numbering?.pages?.css?.[prop]
+      : undefined;
+    return shared ?? body();
+  }
+  for (let i = entry.path.length - 1; i > 1; i--) {
+    const at = getProps(metadata, { path: entry.path.slice(0, i) })[prop];
+    if (at) return at;
+  }
+  return entry.key === "body" ? undefined : body();
+}
+
+// What an entry's font actually falls back to when it sets none, shown in the
+// picker; the body itself falls back to base.css's generic serif.
 export function inheritedFont(
   metadata: Metadata,
   entry: Pick<StyleEntry, "key" | "path" | "section">,
 ): string {
-  const family = (v: string | undefined) =>
-    v ? (metadata.fonts?.[v] ?? v) : undefined;
-  if (entry.section === "numbering" || entry.section === "running") {
-    const shared = entry.key.startsWith("numbering.pages.")
-      ? metadata.numbering?.pages?.css?.["font-family"]
-      : undefined;
-    return family(shared) ??
-      family(
-        getProps(metadata, { path: ["elements", "body"] })["font-family"],
-      ) ??
-      "serif";
-  }
-  // Nearest ancestor entry that names a font: .toc .toc-part .number → .toc.
-  for (let i = entry.path.length - 1; i > 1; i--) {
-    const at = family(
-      getProps(metadata, { path: entry.path.slice(0, i) })["font-family"],
-    );
-    if (at) return at;
-  }
-  if (entry.key === "body") return "serif";
-  return family(
-    getProps(metadata, { path: ["elements", "body"] })["font-family"],
-  ) ?? "serif";
+  const v = inheritedValue(metadata, entry, "font-family");
+  return v ? (metadata.fonts?.[v] ?? v) : "serif";
 }
 
 // ---- Inspect: where a value comes from ----
@@ -685,8 +693,8 @@ export function sourceOf(
       return { kind: "set", label: entry.group };
     }
   }
-  // Margin boxes sit outside the book body; they take only its fonts, and a
-  // zone's folio everything the shared folio style sets.
+  // Margin boxes sit outside the book body; they take only its fonts and
+  // colour, and a zone's folio everything the shared folio style sets.
   const box = entry.section === "numbering" || entry.section === "running";
   const ancestors = [];
   if (entry.key.startsWith("numbering.pages.")) {
@@ -701,7 +709,10 @@ export function sourceOf(
       ancestors.push(entry.path.slice(0, i));
     }
   }
-  if (entry.key !== "body" && (!box || prop.startsWith("font-"))) {
+  if (
+    entry.key !== "body" &&
+    (!box || prop.startsWith("font-") || prop === "color")
+  ) {
     ancestors.push(["elements", "body"]);
   }
   for (const path of ancestors) {

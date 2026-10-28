@@ -70,18 +70,30 @@ export function subSelector(parent: string, sub: string): string {
     .join(", ");
 }
 
-function resolveFontValue(
-  value: string,
-  fonts: Record<string, string> | undefined,
-): string {
-  if (fonts && Object.hasOwn(fonts, value)) return JSON.stringify(fonts[value]);
+type Aliases = Pick<Metadata, "fonts" | "colors">;
+
+// A font alias (§4.4) in `font-family`, or a colour alias (§4.15) in `color`
+// or any `*-color`, becomes what it names; any other value is CSS as written.
+function resolve(prop: string, value: string, aliases: Aliases): string {
+  const { fonts, colors } = aliases;
+  if (prop === "font-family") {
+    return fonts && Object.hasOwn(fonts, value)
+      ? JSON.stringify(fonts[value])
+      : value;
+  }
+  const colour = colors && Object.hasOwn(colors, value)
+    ? colors[value]
+    : undefined;
+  if ((prop === "color" || prop.endsWith("-color")) && safeValue(colour)) {
+    return colour;
+  }
   return value;
 }
 
 function rule(
   selector: string,
   props: CssProps,
-  fonts?: Record<string, string>,
+  aliases: Aliases,
 ): string {
   const decls: string[] = [];
   const pseudo: string[] = [];
@@ -102,10 +114,8 @@ function rule(
       decls.push(`  --leader: ${JSON.stringify(padded)};`);
     } else if (prop === "content") {
       pseudo.push(`  content: ${JSON.stringify(value)};`);
-    } else if (prop === "font-family") {
-      decls.push(`  font-family: ${resolveFontValue(value, fonts)};`);
     } else {
-      decls.push(`  ${prop}: ${value};`);
+      decls.push(`  ${prop}: ${resolve(prop, value, aliases)};`);
     }
   }
   let out = "";
@@ -120,7 +130,7 @@ function rule(
 function emitStyle(
   selector: string,
   style: ElementStyle,
-  fonts: Record<string, string> | undefined,
+  aliases: Aliases,
   out: string[],
 ): void {
   const flat: CssProps = {};
@@ -131,14 +141,14 @@ function emitStyle(
       nested.push([prop, value]);
     }
   }
-  if (Object.keys(flat).length) out.push(rule(selector, flat, fonts));
+  if (Object.keys(flat).length) out.push(rule(selector, flat, aliases));
   for (const [sub, subStyle] of nested) {
     // `em` is the emphasis element ({em}, §3.2.7); every other key a class.
     const part = sub === "em" ? "em" : `.${sub}`;
     emitStyle(
       subSelector(selector, part),
       subStyle,
-      fonts,
+      aliases,
       out,
     );
   }
@@ -146,12 +156,11 @@ function emitStyle(
 
 export function generateDomCSS(metadata: Metadata): string {
   const out: string[] = [];
-  const fonts = metadata.fonts;
   for (const [key, style] of Object.entries(metadata.elements ?? {})) {
-    if (KEY_RE.test(key)) emitStyle(selectorFor(key), style, fonts, out);
+    if (KEY_RE.test(key)) emitStyle(selectorFor(key), style, metadata, out);
   }
   for (const [cls, props] of Object.entries(metadata.is ?? {})) {
-    if (CLASS_NAME_RE.test(cls)) out.push(rule(`.is-${cls}`, props, fonts));
+    if (CLASS_NAME_RE.test(cls)) out.push(rule(`.is-${cls}`, props, metadata));
   }
   return out.join("");
 }
@@ -279,20 +288,18 @@ export function generatePagedCSS(
     }
   }
 
-  // 1b. Margin boxes sit outside the book body but set in its type: every
-  // `font-*` key of `body` (§4.7, §4.8). The rules below, more specific and
-  // later, let a folio's or head's own keys win.
-  const fonts = Object.entries(metadata.elements?.body ?? {}).filter((
+  // 1b. Margin boxes sit outside the book body but set in its type and ink:
+  // every `font-*` key of `body`, and its `color` (§4.7, §4.8). The rules
+  // below, more specific and later, let a folio's or head's own keys win.
+  const type = Object.entries(metadata.elements?.body ?? {}).filter((
     e,
-  ): e is [string, string] => e[0].startsWith("font-") && safeProp(e[0], e[1]));
-  if (fonts.length) {
+  ): e is [string, string] =>
+    (e[0].startsWith("font-") || e[0] === "color") && safeProp(e[0], e[1])
+  );
+  if (type.length) {
     out.push(
       `.pagedjs_margin {\n${
-        fonts.map(([k, v]) =>
-          `  ${k}: ${
-            k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
-          };`
-        ).join("\n")
+        type.map(([k, v]) => `  ${k}: ${resolve(k, v, metadata)};`).join("\n")
       }\n}\n`,
     );
   }
@@ -331,9 +338,7 @@ export function generatePagedCSS(
         ) {
           if (!safeProp(k, v)) continue;
           decls.push(
-            `    ${k}: ${
-              k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
-            };`,
+            `    ${k}: ${resolve(k, v, metadata)};`,
           );
         }
         out.push(
@@ -360,9 +365,7 @@ export function generatePagedCSS(
       for (const [k, v] of Object.entries(props)) {
         if (k === "content" || k === "area" || !safeProp(k, v)) continue;
         decls.push(
-          `    ${k}: ${
-            k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
-          };`,
+          `    ${k}: ${resolve(k, v, metadata)};`,
         );
       }
       out.push(

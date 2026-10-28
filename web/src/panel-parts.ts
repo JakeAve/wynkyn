@@ -19,6 +19,7 @@ import {
   seg,
   select,
   stepper,
+  swatches,
   switchInput,
   toggle,
   type View,
@@ -30,6 +31,7 @@ import {
   ensureProps,
   getProps,
   inheritedFont,
+  inheritedValue,
   type PanelContext,
   setCount,
   type StyleEntry,
@@ -137,8 +139,11 @@ const GENERIC = [
   "font-family",
   "font-size",
   "font-style",
+  "font-weight",
+  "text-decoration",
   "text-transform",
   "font-variant-caps",
+  "color",
   "text-align",
   "letter-spacing",
   "margin-top",
@@ -300,6 +305,31 @@ function block(
       has(prop),
     );
 
+  // The book's colours (§4.15) by name, so changing one recolours its users.
+  // Unset, the row says what the text inherits; clicking the chosen chip
+  // again unsets it.
+  const inherits = inheritedValue(meta, entry, "color");
+  const inhInk = `Inherited · ${
+    !inherits ? "black" : meta.colors?.[inherits] ? cap(inherits) : inherits
+  }`;
+  const ink = swatches(
+    Object.entries(meta.colors ?? {}).map(([name, colour]) => ({
+      value: name,
+      label: cap(name),
+      colour,
+    })),
+    props.color,
+    (c) => {
+      inkFrom.textContent = c ? "" : inhInk;
+      set("color")(c);
+    },
+    `${label} colour`,
+  );
+  ink.classList.add("ink");
+  const colourRow = row("Colour", ink, { note: inhInk });
+  const inkFrom = colourRow.querySelector(".from")!;
+  if (props.color) inkFrom.textContent = "";
+
   return section(label, focusOf(entry.key), [
     ...extraRows,
     v.mark(
@@ -337,6 +367,18 @@ function block(
             props["font-style"] === "italic",
             (on) => set("font-style")(on ? "italic" : undefined),
           ),
+          toggle(
+            "Bold",
+            ["bold", "bolder", "600", "700", "800", "900"].includes(
+              props["font-weight"] ?? "",
+            ),
+            (on) => set("font-weight")(on ? "bold" : undefined),
+          ),
+          toggle(
+            "Underline",
+            (props["text-decoration"] ?? "").includes("underline"),
+            (on) => set("text-decoration")(on ? "underline" : undefined),
+          ),
           seg(
             [
               { label: "Aa", value: "none", aria: "Normal case" },
@@ -369,8 +411,15 @@ function block(
           ),
         ),
       ),
-      has("font-style", "text-transform", "font-variant-caps"),
+      has(
+        "font-style",
+        "font-weight",
+        "text-decoration",
+        "text-transform",
+        "font-variant-caps",
+      ),
     ),
+    v.mark(colourRow, has("color")),
     v.mark(alignRow, has("text-align")),
     length("Letter spacing", "letter-spacing", "0em"),
     length("Space above", "margin-top", "0pt"),

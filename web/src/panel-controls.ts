@@ -265,10 +265,13 @@ export function switchInput(
 
 // Colour swatches, then a custom colour: a picker beside its code (any CSS
 // colour can be typed). An option whose value is "" means unset; its chip
-// shows the default `--stock` (app.css). The chosen chip takes the red wash,
-// or the picker does when the value is none of the options.
+// shows `colour`, else the default `--stock` (app.css). An option's `colour`
+// also draws a value that is a name, not a colour (a book colour, §4.15),
+// which can be typed too. With no unset option, clicking the chosen chip
+// again unsets. The chosen chip takes the red wash, or the picker does when
+// the value is none of the options.
 export function swatches(
-  options: Array<{ value: string; label: string }>,
+  options: Array<{ value: string; label: string; colour?: string }>,
   value: string | undefined,
   onChange: (v: string | undefined) => void,
   label: string,
@@ -285,16 +288,22 @@ export function swatches(
     spellcheck: "false",
     autocomplete: "off",
   });
+  const unsets = !options.some((o) => o.value === "");
   const btns = options.map((o) => {
     const chip = h("i");
-    chip.style.background = o.value;
+    chip.style.background = o.colour ?? o.value;
     const b = h("button", {
       type: "button",
       class: "colour",
       "aria-label": o.label,
       title: o.label,
     }, chip);
-    b.onclick = () => set(o.value || undefined);
+    b.onclick = () =>
+      set(
+        unsets && b.getAttribute("aria-pressed") === "true"
+          ? undefined
+          : o.value || undefined,
+      );
     return [b, o.value] as const;
   });
   const paint = (v: string | undefined) => {
@@ -307,7 +316,8 @@ export function swatches(
     picker.classList.toggle("on", own);
     code.value = v ?? "";
     // The picker only takes #rrggbb; unset is the white it means.
-    picker.value = /^#[0-9a-f]{6}$/i.test(v ?? "") ? v! : "#ffffff";
+    const hex = options.find((o) => o.value === v)?.colour ?? v ?? "";
+    picker.value = /^#[0-9a-f]{6}$/i.test(hex) ? hex : "#ffffff";
   };
   const set = (v: string | undefined) => {
     value = v;
@@ -317,7 +327,8 @@ export function swatches(
   picker.onchange = () => set(picker.value); // on release: one save, not one per drag tick
   code.onchange = () => {
     const t = code.value.trim();
-    if (t && !CSS.supports("color", t)) return paint(value); // not a colour
+    const named = options.some((o) => o.value === t);
+    if (t && !named && !CSS.supports("color", t)) return paint(value); // not a colour
     set(t || undefined);
   };
   paint(value);

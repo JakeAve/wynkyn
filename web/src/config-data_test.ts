@@ -13,6 +13,7 @@ import {
   parseCssLines,
   parseLength,
   presetFor,
+  renameColour,
   renameKey,
   runningSummary,
   setHeadPosition,
@@ -213,4 +214,24 @@ Deno.test("headPosition reads and setHeadPosition moves the first heads", () => 
   ]);
   running.odd[0]!.area = "left-middle"; // hand-placed in the advanced editor
   assertEquals(headPosition(running), undefined);
+});
+
+Deno.test("renameColour renames the colour and every reference to it (§4.15)", () => {
+  const meta = {
+    colors: { ink: "#000", rubric: "#9e2a1e" },
+    elements: {
+      chapter: { number: { color: "rubric" }, title: { color: "ink" } },
+      sidebar: { "border-left-color": "rubric", content: "rubric" },
+    },
+    is: { note: { color: "rubric" } },
+    running: { odd: [{ content: "x", area: "top-right", color: "rubric" }] },
+  };
+  renameColour(meta, "rubric", "red");
+  assertEquals(Object.keys(meta.colors), ["ink", "red"]);
+  assertEquals(meta.elements.chapter.number.color, "red");
+  assertEquals(meta.elements.chapter.title.color, "ink");
+  assertEquals(meta.elements.sidebar["border-left-color"], "red");
+  assertEquals(meta.elements.sidebar.content, "rubric"); // not a colour
+  assertEquals(meta.is.note.color, "red");
+  assertEquals(meta.running.odd[0]!.color, "red");
 });

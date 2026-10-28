@@ -1156,6 +1156,7 @@ books/
   "language": "en",
   "page": { ... },
   "fonts": { ... },
+  "colors": { ... },
   "elements": { ... },
   "is": { ... },
   "numbering": { ... },
@@ -1530,10 +1531,11 @@ offer it there.
 - `css` on pages styles the folio's margin box (CSS properties, font aliases
   resolved like §4.5). `pages.css` applies to every zone; a zone's own `css`
   overrides it property by property. Margin boxes are not descendants of the
-  book body, but they set in its type: every `font-*` key of `elements.body`
-  reaches them, and `pages.css` or a zone's `css` overrides it (§4.8). No book
-  font falls back to the system's. Edited by the Styles panel (§7.4), which
-  lists "All page numbers" alongside the three zones.
+  book body, but they set in its type and ink: every `font-*` key of
+  `elements.body` and its `color` reach them, and `pages.css` or a zone's `css`
+  overrides them (§4.8). No book font or colour falls back to the system's.
+  Edited by the Styles panel (§7.4), which lists "All page numbers" alongside
+  the three zones.
 - `position` on pages places the folio: `"bottom-center"` (default),
   `"bottom-outside"`, `"top-center"` or `"top-outside"`. Outside is the
   fore-edge: `bottom-right`/`top-right` on recto (`:right`), `-left` on verso
@@ -1599,10 +1601,10 @@ box — is handled automatically by `numbering.pages`, not by a `running` entry.
 All other properties in an entry are CSS and apply to that margin box.
 `font-family` accepts a font alias and is resolved like §4.5. A margin box is
 not a descendant of the book body, and takes nothing else from it, but it sets
-in the book's type: every `font-*` key of `elements.body` (face, size, style,
-figures) reaches each margin box, and the entry's own keys override them. The
-configuration panel offers the same font picker as the Styles panel on each
-running entry (§7.5).
+in the book's type and ink: every `font-*` key of `elements.body` (face, size,
+style, figures) and its `color` reach each margin box, and the entry's own keys
+override them. The configuration panel offers the same font picker as the Styles
+panel on each running entry (§7.5).
 
 **`gap`** (on `running`, default `4mm`) — the clear space between a head and the
 text block, whatever the head's size: to its baseline above the text block, to
@@ -1775,7 +1777,9 @@ strings replace, and `null` deletes the House key.
 rather than mixing with the book's:
 
 - `fonts` — the look's aliases are set; the book's other aliases (`mono`, any
-  alias an `is` style uses) stay.
+  alias an `is` style uses) stay. `colors` (§4.15) are the book's, never a
+  theme's: a look's elements may name them, and applying one leaves them as they
+  are.
 - `elements` — each element the look names replaces the book's entry for it
   wholesale. Elements it doesn't name stay.
 - `numbering` — `chapters` and `parts` `style`/`prefix`/`suffix`; `pages`
@@ -1806,6 +1810,24 @@ text, so the manuscript says nothing about it.
   the text. It renders as `<p class="book-title">`, first in that chapter,
   styled by `elements.chapter.book-title` (centred by default). Default `false`.
   Only the first chapter of the body carries it, inside a part or not.
+
+### 4.15 Section: `colors`
+
+Named book colours, like font aliases (§4.4): a name → any CSS colour.
+
+```json
+"colors": { "ink": "#000000", "rubric": "#9e2a1e" }
+```
+
+- A `color` or any `*-color` value (`border-left-color`,
+  `text-decoration-color`) that is one of these names becomes its colour, in
+  `elements`, `is`, page numbers and running heads. Any other value is CSS as
+  written; so are shorthands (`border: 1px solid rubric` is left alone).
+- `ink` is the text colour: the template sets `elements.body.color` to `"ink"`,
+  so every part, running head and folio inherits it (§4.7, §4.8) unless it names
+  another. Changing a colour recolours everything that names it.
+- The template ships `ink` and `rubric`, the red of a printed rubric. A book
+  without `colors` sets in the browser's black.
 
 ## 5. Module Contracts
 
@@ -2241,6 +2263,13 @@ Includes:
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a
   warning under a family that is neither; §4.4)
+- Book colours (§4.15), after Fonts in Style's Book group: one section per
+  colour with its swatches (suggested inks, then any colour picked or typed),
+  "Used by" chips, and for any but `ink` a name and Remove; Add a colour. A
+  rename follows every style that names the colour. Every part's style has a
+  Colour row whose chips are the book's colours by name (unset, it names the
+  colour the part inherits; clicking the chosen chip again unsets), and a Style
+  row of Italic, Bold and Underline toggles beside the case.
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)

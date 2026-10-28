@@ -461,7 +461,17 @@ pill, whatever the corner shape.
   chroma 0.1), never white, so it can't pass for a white chip; this is the one
   literal colour in the chrome. The chosen chip, or the picker when the value is
   none of them, sits in `--acc-wash` inside a 1px `--acc` frame (the wash alone
-  is lost around a warm chip). An option valued `""` means unset.
+  is lost around a warm chip). An option valued `""` means unset. An option may
+  carry a chip colour apart from its value, so a book colour (spec §4.15) is
+  chosen and stored by name and drawn in its colour; its name can be typed in
+  the code field too. Used for Paper stock (§2.5), each part's Colour row (an
+  book's colours; unset, the label carries "Inherited · Ink" beneath and
+  clicking the chosen chip again unsets) and the Colours view (suggested inks:
+  black, warm black, rubric red, ultramarine, sepia, grey). Ink swatches
+  (`.colours.ink`) sit on a `--stock` paper ground so a black chip reads in the
+  dark theme; chosen, the 1px `--acc` frame alone marks them.
+- **Style row**: the part's Italic, Bold and Underline `toggle`s, then the case
+  `seg`; each toggle stores one key and clears it when released.
 - **Tip line** (`.tip`): a red ☞ in Fell before `--fs-sm` `--muted` text.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.

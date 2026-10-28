@@ -141,6 +141,7 @@ export interface Metadata {
   language?: string; // BCP 47 (§4.2), default "en"; `ebook.language` is the older spelling
   page?: PageConfig;
   fonts?: Record<string, string>;
+  colors?: Record<string, string>; // colour aliases (§4.15): name → any CSS colour
   elements?: Record<string, ElementStyle>;
   is?: Record<string, CssProps>;
   numbering?: Numbering;

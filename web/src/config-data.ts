@@ -3,6 +3,7 @@
 import type {
   CssProps,
   FolioPosition,
+  Metadata,
   NumberingStyle,
   Running,
   RunningEntry,
@@ -215,6 +216,23 @@ export function renameKey<T>(
   const out: Record<string, T> = {};
   for (const [k, v] of Object.entries(obj)) out[k === from ? to : k] = v;
   return out;
+}
+
+// Renames a book colour (§4.15) and every `color` / `*-color` value that names
+// it, in elements, `is` styles, page numbers and running heads, so nothing
+// left pointing at the old name falls back to black.
+export function renameColour(meta: Metadata, from: string, to: string): void {
+  meta.colors = renameKey(meta.colors ?? {}, from, to);
+  const walk = (o: unknown): void => {
+    if (!o || typeof o !== "object") return;
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (
+        v === from && (k === "color" || k.endsWith("-color"))
+      ) (o as Record<string, unknown>)[k] = to;
+      else walk(v);
+    }
+  };
+  walk([meta.elements, meta.is, meta.numbering, meta.running]);
 }
 
 // ---------- style panel (spec §7.4) ----------

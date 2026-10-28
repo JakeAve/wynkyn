@@ -15,10 +15,15 @@
     "body": "Crimson Pro",
     "display": "Cormorant Garamond"
   },
+  "colors": {
+    "ink": "#000000",
+    "rubric": "#9e2a1e"
+  },
   "elements": {
     "body": {
       "font-family": "body",
       "font-size": "11pt",
+      "color": "ink",
       "line-height": "1.5",
       "text-align": "justify",
       "hyphens": "auto"

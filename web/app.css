@@ -2702,6 +2702,11 @@ body.typing #editor .pane-head {
   background: var(--stock); /* the unset option: the default stock */
   box-shadow: inset 0 0 0 1px var(--line);
 }
+/* Inks sit on paper, so black reads in the dark theme too; chosen, the red
+   frame alone marks it. */
+#config-overlay .colours.ink .colour {
+  background: var(--stock);
+}
 #config-overlay .colour[aria-pressed="true"],
 #config-overlay .colours input[type="color"].on {
   background: var(--acc-wash);
