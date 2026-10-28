@@ -37,6 +37,18 @@ export interface PageConfig {
   flip?: Flip; // which edge the stack turns over on for its backs, duplex "none"
   "reverse-backs"?: boolean; // backs file in reverse sheet order, duplex "none"
   paper?: string; // the paper stock, any CSS colour; tints the preview only (§4.3)
+  marks?: PageMarks; // binding marks, imposed sheets only (§4.3)
+}
+
+// Binding marks (§4.3): fold lines, cut marks and sewing stations, drawn only
+// on the imposed sheets, never in the preview or the page PDF. Off unless
+// `show` is true; the rest persist while it is off. `sewing.type` is reserved
+// for future sewing station types.
+export interface PageMarks {
+  show?: boolean;
+  folds?: boolean; // default on
+  cuts?: boolean; // default on
+  sewing?: boolean | { stations?: number; kettle?: string }; // default on
 }
 
 export type NumberingStyle =

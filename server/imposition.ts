@@ -11,6 +11,7 @@ import {
   TRUE_FOLDS,
 } from "../metadata/page-setup.ts";
 import type { Flip, Fold } from "../metadata/types.ts";
+import type { SheetMarks, SideMarks } from "./marks.ts";
 
 export { type Dims, fmtDims, gridFor };
 export { parseDims } from "../metadata/page-setup.ts";
@@ -33,6 +34,7 @@ export interface Slot {
   folio: number; // 1 = outermost in its signature; 0 for a loose leaf
   x: number; // the page's top-left corner on its side as printed, inches
   y: number;
+  centre?: boolean; // its signature's centre recto, where the sewing stations go
 }
 
 export interface Sheet {
@@ -59,6 +61,7 @@ export interface Imposition {
 export interface Side {
   label: string; // "sig 1 · sheet 2 · back"
   slots: Slot[];
+  marks: SideMarks; // this face's binding marks (server/marks.ts)
 }
 
 /** Order the sheet sides for one print run: duplex interleaves fronts and
@@ -67,16 +70,29 @@ export function sidesFor(
   imp: Imposition,
   mode: "duplex" | "fronts" | "backs",
   reverseBacks: boolean,
+  sheetMarks: SheetMarks[] = [],
 ): Side[] {
   const sides: Side[] = [];
   imp.sheets.forEach((sh, i) => {
     const n = (i % imp.sheetsPerSignature) + 1;
     const label = (face: string) =>
       `sig ${sh.signature + 1} · sheet ${n} · ${face}`;
+    const marks = (face: "front" | "back") =>
+      sheetMarks[i]?.[face] ?? { dots: [], lines: [] };
     if (mode !== "backs") {
-      sides.push({ label: label("front"), slots: sh.front });
+      sides.push({
+        label: label("front"),
+        slots: sh.front,
+        marks: marks("front"),
+      });
     }
-    if (mode !== "fronts") sides.push({ label: label("back"), slots: sh.back });
+    if (mode !== "fronts") {
+      sides.push({
+        label: label("back"),
+        slots: sh.back,
+        marks: marks("back"),
+      });
+    }
   });
   return mode === "backs" && reverseBacks ? sides.reverse() : sides;
 }
@@ -242,7 +258,13 @@ export function impose(pageCount: number, cfg: ImposeConfig): Imposition {
         ? g
         : null;
       const folio = Math.floor(Math.min(local, P - 1 - local) / 2) + 1;
-      return { page, rotate: 0, folio, recto: local % 2 === 0 };
+      return {
+        page,
+        rotate: 0,
+        folio,
+        recto: local % 2 === 0,
+        centre: local === P / 2,
+      };
     };
 
     if (isTrueFold(fold)) {

@@ -34,6 +34,8 @@ so older books still work and rewrite themselves on the next save.
 | **n-up** | pages per sheet side: `cols × rows`, with `cols` always even |
 | **Quarter** | halving *both* sheet dimensions (2 × 2): quarter legal is 4.25 × 7 in, a scaled sheet, never a 4-across strip |
 | **Display page** | half title, title page, copyright, dedication, epigraph…: carries no folio or running head |
+| **Kettle stitch** | the stitch that links each signature to the next at head and tail; its hole sits `sewing.kettle` in from the page's head and tail |
+| **Sewing station** | a hole punched along the spine fold for the thread; `sewing.stations` of them sit evenly between the two kettle holes |
 | **Furniture** | folios and running heads; sits in Paged.js margin boxes, outside the text block |
 
 ## The binding model
@@ -66,6 +68,17 @@ so older books still work and rewrite themselves on the next save.
   about the top/bottom edge mirrors rows (= 180° of the whole). Which edge is
   "short" depends on the orientation the grid chose, so a quartered portrait job
   and a 2-up landscape job mirror differently for the same setting.
+
+## Binding marks
+
+`page.marks` draws guides on the imposed sheets only, never the book pages:
+`server/marks.ts` computes them per sheet face (inches, the face's printed
+frame) and `sidesFor` hands each `Side` its `marks`, so both renderers just
+draw them. Fold lines all go on the front (each fold takes a half behind, so
+what still faces you is the printed front), each across only what the earlier
+folds left; cut ticks only for `cut` and `leaves`; sewing dots at the spine of
+each signature's centre recto, wherever imposition put it. Everything stays
+0.2in inside the sheet edge (printer dead zone). Spec §7.7 has the details.
 
 ## Page furniture rules (Chicago)
 

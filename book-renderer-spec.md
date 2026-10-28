@@ -1234,6 +1234,18 @@ in one section.
   into the manuscript or the colophon. The panel offers Bright white (unset),
   Natural, Ivory, Cream and Recycled grey, and a custom colour, over a hint that
   the stock is for the preview only.
+- `marks` — binding marks: `{ "show", "folds", "cuts", "sewing" }`. Unset or
+  `show` not `true` means no marks, so existing books print unchanged. With
+  `show` on, `folds` (fold lines), `cuts` (cut marks) and `sewing` (sewing
+  stations) each default to on; `false` turns one off. `sewing` is `true` or
+  `{ "stations", "kettle" }`: `kettle` is a CSS length, the distance from the
+  head and tail of the page to its kettle-stitch hole (default `"0.5in"`), and
+  `stations` is the number of holes evenly spaced between the two kettle holes
+  (a whole number ≥ 0, default 3); an unparseable value falls back to the
+  default; a `kettle` too large for the page (2 × kettle ≥ page height) draws no
+  stations. The sub-settings persist while `show` is off. Marks are drawn only
+  on the imposed sheets (§7.7), never in the preview or the page PDF.
+  `sewing.type` is reserved for future sewing station types.
 
 CLI flags (`bml export --sheet/--fold/--folios/--duplex/--flip/--reverse-backs`)
 override any of these per run.
@@ -2190,17 +2202,18 @@ Includes:
   per signature, leftover paper) shown live as those change, and an unprintable
   combination reported here rather than at export time
 - The first signature drawn as it prints: each sheet's front and back with the
-  book pages that land on it, folds dashed, cuts solid, from the same `impose()`
-  export uses
+  book pages that land on it, from the same `impose()` export uses, and lines
+  only where binding marks will print them (§7.7), so the drawing and the paper
+  agree; with marks off the note beneath says how to fold
 - The Publish view grouped by what the author is making: **Binding** — Paper
   (the page size, with a link to Style's Page view that Back returns from, and
   the sheet), Folding (the fold, Auto naming its pick, and what the setup
-  derives to), Signatures (hidden for loose leaves), and Print (auto duplex or
-  by hand, the by-hand flip and back order, and the Print sheets buttons, §7.7);
-  **PDF**, the pages in reading order at the page size, one per printed page
-  (Print pages; Save as PDF gives the file `book.pdf` would be); and **E-book**
-  (Export EPUB, Mod+Shift+E, §7.8). All printing runs in the browser; proofs and
-  the sheet PDFs on disk are `bml
+  derives to), Signatures (hidden for loose leaves), Binding marks (§4.3), and
+  Print (auto duplex or by hand, the by-hand flip and back order, and the Print
+  sheets buttons, §7.7); **PDF**, the pages in reading order at the page size,
+  one per printed page (Print pages; Save as PDF gives the file `book.pdf` would
+  be); and **E-book** (Export EPUB, Mod+Shift+E, §7.8). All printing runs in the
+  browser; proofs and the sheet PDFs on disk are `bml
   export`'s
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a
@@ -2444,6 +2457,27 @@ Example, on US Legal: a 3.5in × 4.25in page is an octavo (16 pages a sheet); a
 5. Emit the final print file via `print-export.ts` (§5.4, §6) — one output page
    per sheet side, at the sheet's physical dimensions, with the
    already-paginated book pages positioned at their exact trim size.
+
+**Binding marks** (`page.marks`, §4.3; `server/marks.ts`) are computed once per
+sheet face, in inches in the face's printed frame, and both renderers only draw
+that list: dots about 1pt, hairlines, mid grey. Nothing is drawn within 0.2in of
+the sheet edge, where home printers can't print.
+
+- **Fold lines** (dashed): a true fold's folds take each half behind the rest,
+  so what faces the folder stays printed-front-up and every fold line is on the
+  **front**, across only the region the earlier folds left — folio: the spine,
+  full height; quarto: the head fold full width, then the spine on the bottom
+  half; octavo: the first spine fold full height, the head fold on the right
+  half, the last spine fold on the bottom-right quarter. `cut`: one line per
+  folio at its spine, on the front. None for `leaves`.
+- **Cut marks** (`cut` and `leaves` only, front): short ticks on each cut line
+  where it meets the sheet edges — every row edge, and the folio edges (`cut`)
+  or every column edge (`leaves`). True folds have none; their slits are trimmed
+  after sewing.
+- **Sewing stations** (not `leaves`): dots at the spine edge of each signature's
+  centre recto (the inside of its innermost folio, whichever face of whichever
+  sheet that lands on) — two kettle holes `kettle` from the head and tail of the
+  page, and `stations` holes evenly spaced between them.
 
 **Output:** one `sheets.pdf` (or `sheets-fronts.pdf` + `sheets-backs.pdf` for
 `duplex: none`), built by embedding `book.pdf` pages onto sheet-sized PDF pages;
