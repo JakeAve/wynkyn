@@ -32,11 +32,13 @@
   margin-top: 0;
 }
 /* Lines, not prose: title-page, copyright and colophon lines, stanzas and
-   verses never take paragraph space. Each selector here outranks `.bml p`
-   (0,1,1); quote paragraphs keep the spacing. */
-.bml .matter-title-page p,
-.bml .matter-copyright p,
-.bml .matter-colophon p,
+   verses never take paragraph space. The matter selectors are (0,1,2): above
+   `.bml p` (0,1,1), below a book's own `.matter-x .line` (0,2,0), so
+   `title-page → author → margin-top` still works. Quote paragraphs keep the
+   spacing. */
+section.matter-title-page p,
+section.matter-copyright p,
+section.matter-colophon p,
 .bml .stanza,
 .bml .verse {
   margin-top: 0;
