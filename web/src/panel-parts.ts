@@ -305,7 +305,7 @@ function block(
       has(prop),
     );
 
-  // The book's colours (§4.15) by name, so changing one recolours its users.
+  // The book's colors (§4.15) by name, so changing one recolors its users.
   // Unset, the row says what the text inherits; clicking the chosen chip
   // again unsets it.
   const inherits = inheritedValue(meta, entry, "color");
@@ -313,21 +313,21 @@ function block(
     !inherits ? "black" : meta.colors?.[inherits] ? cap(inherits) : inherits
   }`;
   const ink = swatches(
-    Object.entries(meta.colors ?? {}).map(([name, colour]) => ({
+    Object.entries(meta.colors ?? {}).map(([name, color]) => ({
       value: name,
       label: cap(name),
-      colour,
+      color,
     })),
     props.color,
     (c) => {
       inkFrom.textContent = c ? "" : inhInk;
       set("color")(c);
     },
-    `${label} colour`,
+    `${label} color`,
   );
   ink.classList.add("ink");
-  const colourRow = row("Colour", ink, { note: inhInk });
-  const inkFrom = colourRow.querySelector(".from")!;
+  const colorRow = row("Color", ink, { note: inhInk });
+  const inkFrom = colorRow.querySelector(".from")!;
   if (props.color) inkFrom.textContent = "";
 
   return section(label, focusOf(entry.key), [
@@ -419,7 +419,7 @@ function block(
         "font-variant-caps",
       ),
     ),
-    v.mark(colourRow, has("color")),
+    v.mark(colorRow, has("color")),
     v.mark(alignRow, has("text-align")),
     length("Letter spacing", "letter-spacing", "0em"),
     length("Space above", "margin-top", "0pt"),

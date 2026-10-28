@@ -218,10 +218,10 @@ export function renameKey<T>(
   return out;
 }
 
-// Renames a book colour (§4.15) and every `color` / `*-color` value that names
+// Renames a book color (§4.15) and every `color` / `*-color` value that names
 // it, in elements, `is` styles, page numbers and running heads, so nothing
 // left pointing at the old name falls back to black.
-export function renameColour(meta: Metadata, from: string, to: string): void {
+export function renameColor(meta: Metadata, from: string, to: string): void {
   meta.colors = renameKey(meta.colors ?? {}, from, to);
   const walk = (o: unknown): void => {
     if (!o || typeof o !== "object") return;

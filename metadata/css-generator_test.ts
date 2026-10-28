@@ -587,7 +587,7 @@ Deno.test("margin boxes take the body's fonts, and nothing else of it (§4.7, §
   assertEquals(generatePagedCSS({}).includes(".pagedjs_margin {"), false);
 });
 
-Deno.test("colour aliases resolve in color and *-color, everywhere (§4.15)", () => {
+Deno.test("color aliases resolve in color and *-color, everywhere (§4.15)", () => {
   const meta = {
     colors: { ink: "#111111", rubric: "#9e2a1e", bad: "red; } body {" },
     elements: {
@@ -607,11 +607,11 @@ Deno.test("colour aliases resolve in color and *-color, everywhere (§4.15)", ()
   assertStringIncludes(dom, ".chapter > .number {\n  color: #9e2a1e;");
   assertStringIncludes(dom, "border-left-color: #9e2a1e;");
   assertStringIncludes(dom, "border: 1px solid rubric;"); // shorthands as written
-  assertStringIncludes(dom, "color: navy;"); // not a book colour: CSS as written
+  assertStringIncludes(dom, "color: navy;"); // not a book color: CSS as written
   assertStringIncludes(dom, "background-color: bad;"); // an unsafe value never resolves
   assertStringIncludes(dom, ".is-note {\n  color: #9e2a1e;");
   const paged = generatePagedCSS(meta);
-  // Margin boxes take the body's ink; a folio or head its own colour.
+  // Margin boxes take the body's ink; a folio or head its own color.
   assertStringIncludes(paged, ".pagedjs_margin {\n  color: #111111;");
   assertEquals(paged.split("color: #9e2a1e;").length - 1 >= 2, true);
 });

@@ -6,7 +6,7 @@ disagree, ask.
 
 Named for rubrication: the scribe's and early printer's practice of picking out
 headings, initials and structure in red ink. That is exactly what the one accent
-colour does here.
+color does here.
 
 A heading marked **(planned)** describes agreed design that is not built yet;
 the chrome still looks the old way there. Unmarked sections are built (or, like
@@ -57,11 +57,11 @@ Visual references (private artifacts; this document stands without them):
 6. **Sizes follow the reader.** Everything is in rem off the browser's own text
    size, so a reader who sets larger text gets a larger app, not clipped labels.
 
-## 2. Colour
+## 2. Color
 
 ### 2.1 Paper and ink (neutrals)
 
-The interface is drawn on one **UI paper** colour and one ink. Every other
+The interface is drawn on one **UI paper** color and one ink. Every other
 neutral is mixed from those two in OKLab, so the chrome stays in key and dark
 mode needs no hand-tuned greys. UI paper is neutral `#fafafa`.
 
@@ -161,12 +161,12 @@ The pages stay paper in both themes, so their marks use fixed values.
 ### 2.5 Paper stock (per book)
 
 The preview pages take the book's paper stock, saved in `metadata.json` as
-`page.paper` (any CSS colour; absent = the default stock, Bright white), merged
+`page.paper` (any CSS color; absent = the default stock, Bright white), merged
 and upgraded like any other `page` key. Kept deliberately quiet:
 
 - One row in Style → Page size & margins, "Paper stock": `swatches` (§6.5) for
   Bright white (unset, the default `--stock`), Natural `#fbf8f1`, Ivory
-  `#f8f2e3`, Cream `#f3e9d2`, Recycled grey `#f1f0ec`, then a custom colour.
+  `#f8f2e3`, Cream `#f3e9d2`, Recycled grey `#f1f0ec`, then a custom color.
   Beneath it a hint: "For previewing purposes only. Print background will always
   be transparent." No prompt, banner or first-run question.
 - `setPaperStock` (`preview.ts`) sets `--stock` on `#preview`, so only the live
@@ -179,7 +179,7 @@ and upgraded like any other `page` key. Kept deliberately quiet:
 
 ### 2.6 Source view syntax
 
-| Part                         | Token                     | Colour                  |
+| Part                         | Token                     | Color                   |
 | ---------------------------- | ------------------------- | ----------------------- |
 | sentinel name                | `--syn-k`                 | `--acc-ink`, 500        |
 | braces, colons, pipes, slugs | `--syn-p`                 | `--muted`               |
@@ -235,7 +235,7 @@ else.
 ### 3.1 High-visibility strings
 
 Wherever a reader must tell I from l from 1 or O from 0 with no words around to
-help, the text is set in `--f-hivis` (at `--fs-sm`, the interface's colour).
+help, the text is set in `--f-hivis` (at `--fs-sm`, the interface's color).
 Today that is the system monospace; it can become Atkinson Hyperlegible Mono or
 Next by changing that one token.
 
@@ -245,7 +245,7 @@ Always `--f-hivis`:
 - chapter and part slugs (the outline's fallback label, the Prose margin);
 - `{is}` style names in the style nav and panel;
 - a book folder name shown as typed (the title dialog's folder);
-- typed codes: the web-address field, a hex colour field, More CSS.
+- typed codes: the web-address field, a hex color field, More CSS.
 
 Never: labels, menus, numbers, words. Context reads those.
 
@@ -454,22 +454,25 @@ pill, whatever the corner shape.
   `--h-md` minimum, `--s-4` gap. A 0.375rem `--acc` dot before the label marks a
   value this view set; an inherited value's label carries "from Body text" in
   `--fs-xs` `--muted` beneath.
-- **Swatches** (`swatches`): `--h-md` colour chips with a hairline edge, each
-  named in its tooltip, then a native colour picker the same size and its code
-  in a text field in `--f-hivis`; any CSS colour can be typed. Until a custom
-  colour is chosen the picker shows a soft hue wheel (oklch, lightness 0.82,
-  chroma 0.1), never white, so it can't pass for a white chip; this is the one
-  literal colour in the chrome. The chosen chip, or the picker when the value is
-  none of them, sits in `--acc-wash` inside a 1px `--acc` frame (the wash alone
-  is lost around a warm chip). An option valued `""` means unset. An option may
-  carry a chip colour apart from its value, so a book colour (spec §4.15) is
-  chosen and stored by name and drawn in its colour; its name can be typed in
-  the code field too. Used for Paper stock (§2.5), each part's Colour row (an
-  book's colours; unset, the label carries "Inherited · Ink" beneath and
-  clicking the chosen chip again unsets) and the Colours view (suggested inks:
-  black, warm black, rubric red, ultramarine, sepia, grey). Ink swatches
-  (`.colours.ink`) sit on a `--stock` paper ground so a black chip reads in the
-  dark theme; chosen, the 1px `--acc` frame alone marks them.
+- **Swatches** (`swatches`): `--h-md` color chips with a hairline edge, each
+  named in its tooltip, then a native color picker the same size and its code in
+  a text field in `--f-hivis`; any CSS color can be typed. Until a custom color
+  is chosen the picker shows a soft hue wheel (oklch, lightness 0.82, chroma
+  0.1), never white, so it can't pass for a white chip; this is the one literal
+  color in the chrome. The chosen chip, or the picker when the value is none of
+  them, sits in `--acc-wash` inside a 1px `--acc` frame (the wash alone is lost
+  around a warm chip). An option valued `""` means unset. An option may carry a
+  chip color apart from its value, so a book color (spec §4.15) is chosen and
+  stored by name and drawn in its color; its name can be typed in the code field
+  too. Used for Paper stock (§2.5) and each part's Color row (the book's colors;
+  unset, the label carries "Inherited · Ink" beneath and clicking the chosen
+  chip again unsets). Ink swatches (`.colors.ink`) sit on a `--stock` paper
+  ground so a black chip reads in the dark theme; chosen, the 1px `--acc` frame
+  alone marks them.
+- **Color picker** (`.color-pick`): the Colors view's one control per book
+  color, a native picker the swatches' size and edge, on the same `--stock`
+  paper ground as ink swatches, showing the color itself; no suggested chips, no
+  code field, no hue wheel.
 - **Style row**: the part's Italic, Bold and Underline `toggle`s, then the case
   `seg`; each toggle stores one key and clears it when released.
 - **Tip line** (`.tip`): a red ☞ in Fell before `--fs-sm` `--muted` text.
@@ -528,7 +531,7 @@ at the right.
 - **Completion row:** a sentinel's name in `--f-mono` `--fs-sm` `--acc-ink`, a
   7rem column; description `--muted`; how it closes (`{/quote}`, "wraps", "—")
   in mono `--fs-2xs` `--muted` at the right. An image's row is a thumbnail, its
-  slug or filename in `--f-hivis` in the row's colour, and its note.
+  slug or filename in `--f-hivis` in the row's color, and its note.
 - **Tooltip** (planned): inverted, `--bg` text on an `--fg` fill, `--fs-xs`,
   `--r-pop`, padding `--s-2 --s-3`. Winks go here (§9). Native `title` tooltips
   until then.
@@ -542,8 +545,8 @@ at the right.
   with its lead in `--err`, because saving has stopped; the spec-version banner
   (`#spec-banner`) is the warning.
 - **Status** (planned): icon + bold lead word + plain sentence in the status
-  colour: "Can't save: the folder is read-only." Never colour alone. Today's
-  lines are the sentence in the status colour (`.sw-err`, `#image-note.warn`).
+  color: "Can't save: the folder is read-only." Never color alone. Today's lines
+  are the sentence in the status color (`.sw-err`, `#image-note.warn`).
 - **Busy** (planned, with §9's "Setting type…"): a pulsing 6px `--acc` dot +
   "Setting type… 30 pages" in `--fs-xs` `--muted`.
 - **Chip:** `--h-sm`, `--fs-xs`, 1px `--line` inset ring, `--r` + corner (quiet
@@ -599,7 +602,7 @@ empty").
 Under the pages (`#inspect-drawer`, a row of `#pages`) while Inspect has
 something pinned, gone otherwise; at most 15.625rem tall, scrolling inside.
 Chrome on `--bg`, so it follows the theme; only its box diagram borrows the page
-marks' colours (§2.4).
+marks' colors (§2.4).
 
 - **Header** (`--h-pane`, a hairline below): the breadcrumb at left, crumbs as
   small `--muted` text buttons with a `--hover` wash, `›` between them; the
@@ -719,7 +722,7 @@ default).
 ### 8.2 Source
 
 Every mark as typed, all in `--f-mono` at 13/17 of the reader's size (line
-numbers too), coloured per §2.6, with today's sentinel treatments (structural
+numbers too), colored per §2.6, with today's sentinel treatments (structural
 band and hairline, rails joining explicit-close pairs, comment rules as
 hairlines), scoped to `#editor[data-view="source"]`; Prose has its own (§8.1).
 
@@ -835,7 +838,7 @@ Everything scales with the browser's text size.
 - **Components:** the wash replaces the black pill (§6.1, §6.7), including
   `toggle` buttons; fields, menus and dialogs per §6.
 - **Skills:** `ink-design` is rewritten as `rubric-design` from this document
-  (its "no coloured accents" rule is reversed); `ux-principles` gains "controls
+  (its "no colored accents" rule is reversed); `ux-principles` gains "controls
   live with what they control" and drops Hide markup and the Pages toggle.
 - **Spec** (`book-renderer-spec.md`): §7.1 (toolbar, pane headers, expand), §7.3
   (Prose / Source, Aa), §4.3 (`page.paper`), §7.6 (expanded pages).

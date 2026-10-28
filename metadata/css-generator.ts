@@ -72,7 +72,7 @@ export function subSelector(parent: string, sub: string): string {
 
 type Aliases = Pick<Metadata, "fonts" | "colors">;
 
-// A font alias (§4.4) in `font-family`, or a colour alias (§4.15) in `color`
+// A font alias (§4.4) in `font-family`, or a color alias (§4.15) in `color`
 // or any `*-color`, becomes what it names; any other value is CSS as written.
 function resolve(prop: string, value: string, aliases: Aliases): string {
   const { fonts, colors } = aliases;
@@ -81,11 +81,11 @@ function resolve(prop: string, value: string, aliases: Aliases): string {
       ? JSON.stringify(fonts[value])
       : value;
   }
-  const colour = colors && Object.hasOwn(colors, value)
+  const color = colors && Object.hasOwn(colors, value)
     ? colors[value]
     : undefined;
-  if ((prop === "color" || prop.endsWith("-color")) && safeValue(colour)) {
-    return colour;
+  if ((prop === "color" || prop.endsWith("-color")) && safeValue(color)) {
+    return color;
   }
   return value;
 }

@@ -62,6 +62,6 @@ Skills live in `.claude/skills/`; read the one that fits before the first edit.
 | Metadata keys, the `spec` version, upgrades of old books                   | `architecture` (Where a change goes, Standing rules)                  |
 | Printing, binding, the `page` section, imposition, folios, proofs          | `bookbinding`                                                         |
 | UI behaviour, modes, panels, wording, status messages                      | `ux-principles`                                                       |
-| Chrome and site visuals: tokens, type, colours, components, dark mode      | `rubric-design` (then `design-language.md`)                           |
+| Chrome and site visuals: tokens, type, colors, components, dark mode       | `rubric-design` (then `design-language.md`)                           |
 | Source text (Gutenberg, pasted, OCR) → BML `manuscript.md`                 | `convert-manuscript`                                                  |
 | The `bml` CLI: adding, importing, checking, exporting a book, editions     | `bml`                                                                 |

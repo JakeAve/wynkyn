@@ -58,7 +58,7 @@ header nav a:hover,
 header nav a[aria-current] {
   color: var(--fg);
 }
-/* GitHub's mark, coloured by the link like the text links beside it. */
+/* GitHub's mark, colored by the link like the text links beside it. */
 header nav a.github {
   width: 1.25rem;
   height: 1.25rem;

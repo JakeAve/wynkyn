@@ -263,15 +263,15 @@ export function switchInput(
   return input;
 }
 
-// Colour swatches, then a custom colour: a picker beside its code (any CSS
-// colour can be typed). An option whose value is "" means unset; its chip
-// shows `colour`, else the default `--stock` (app.css). An option's `colour`
-// also draws a value that is a name, not a colour (a book colour, §4.15),
+// Color swatches, then a custom color: a picker beside its code (any CSS
+// color can be typed). An option whose value is "" means unset; its chip
+// shows `color`, else the default `--stock` (app.css). An option's `color`
+// also draws a value that is a name, not a color (a book color, §4.15),
 // which can be typed too. With no unset option, clicking the chosen chip
 // again unsets. The chosen chip takes the red wash, or the picker does when
 // the value is none of the options.
 export function swatches(
-  options: Array<{ value: string; label: string; colour?: string }>,
+  options: Array<{ value: string; label: string; color?: string }>,
   value: string | undefined,
   onChange: (v: string | undefined) => void,
   label: string,
@@ -279,22 +279,22 @@ export function swatches(
   const picker = h("input", {
     type: "color",
     "aria-label": `Custom ${label.toLowerCase()}`,
-    title: "Custom colour",
+    title: "Custom color",
   });
   const code = h("input", {
     type: "text",
     class: "txt",
-    "aria-label": `${label} colour code`,
+    "aria-label": `${label} color code`,
     spellcheck: "false",
     autocomplete: "off",
   });
   const unsets = !options.some((o) => o.value === "");
   const btns = options.map((o) => {
     const chip = h("i");
-    chip.style.background = o.colour ?? o.value;
+    chip.style.background = o.color ?? o.value;
     const b = h("button", {
       type: "button",
-      class: "colour",
+      class: "color",
       "aria-label": o.label,
       title: o.label,
     }, chip);
@@ -316,7 +316,7 @@ export function swatches(
     picker.classList.toggle("on", own);
     code.value = v ?? "";
     // The picker only takes #rrggbb; unset is the white it means.
-    const hex = options.find((o) => o.value === v)?.colour ?? v ?? "";
+    const hex = options.find((o) => o.value === v)?.color ?? v ?? "";
     picker.value = /^#[0-9a-f]{6}$/i.test(hex) ? hex : "#ffffff";
   };
   const set = (v: string | undefined) => {
@@ -328,13 +328,13 @@ export function swatches(
   code.onchange = () => {
     const t = code.value.trim();
     const named = options.some((o) => o.value === t);
-    if (t && !named && !CSS.supports("color", t)) return paint(value); // not a colour
+    if (t && !named && !CSS.supports("color", t)) return paint(value); // not a color
     set(t || undefined);
   };
   paint(value);
   return h(
     "span",
-    { class: "colours", role: "group", "aria-label": label },
+    { class: "colors", role: "group", "aria-label": label },
     ...btns.map(([b]) => b),
     picker,
     code,

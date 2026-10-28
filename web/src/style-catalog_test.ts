@@ -582,7 +582,7 @@ Deno.test("syncIsNames: adds the manuscript's names, drops unstyled stale ones",
   assertEquals(none, {}); // no `is` section conjured
 });
 
-Deno.test("book colours: what a part inherits, and who uses each (§4.15)", () => {
+Deno.test("book colors: what a part inherits, and who uses each (§4.15)", () => {
   const meta = {
     colors: { ink: "#111111", rubric: "#9e2a1e" },
     elements: {
@@ -603,6 +603,6 @@ Deno.test("book colours: what a part inherits, and who uses each (§4.15)", () =
   const users = usedBy(meta, "ink", "color").map((u) => u.label);
   assertEquals(users.includes("Body text"), true);
   assertEquals(users.includes("Running heads"), true);
-  // Fonts are unchanged by the colour form.
+  // Fonts are unchanged by the color form.
   assertEquals(usedBy(meta, "rubric").length, 0);
 });

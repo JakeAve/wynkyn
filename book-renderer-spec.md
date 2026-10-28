@@ -1229,12 +1229,12 @@ in one section.
   as §7.7 step 3 does for `duplex`.
 - `reverse-backs` — with `duplex: none`, `true` writes the backs file last sheet
   first, for printers that stack face up. Default `false`.
-- `paper` — the paper stock, any CSS colour (`"#f3e9d2"`); unset is the default
+- `paper` — the paper stock, any CSS color (`"#f3e9d2"`); unset is the default
   page stock, shown as Bright white. It tints the preview's pages only, so the
   author sees the book on the stock it will be printed on: print sheets, the PDF
   of the pages, `bml export` and the EPUB stay white, and nothing is written
   into the manuscript or the colophon. The panel offers Bright white (unset),
-  Natural, Ivory, Cream and Recycled grey, and a custom colour, over a hint that
+  Natural, Ivory, Cream and Recycled grey, and a custom color, over a hint that
   the stock is for the preview only.
 - `marks` — binding marks: `{ "show", "folds", "cuts", "sewing" }`. Unset or
   `show` not `true` means no marks, so existing books print unchanged. With
@@ -1533,7 +1533,7 @@ offer it there.
   overrides it property by property. Margin boxes are not descendants of the
   book body, but they set in its type and ink: every `font-*` key of
   `elements.body` and its `color` reach them, and `pages.css` or a zone's `css`
-  overrides them (§4.8). No book font or colour falls back to the system's.
+  overrides them (§4.8). No book font or color falls back to the system's.
   Edited by the Styles panel (§7.4), which lists "All page numbers" alongside
   the three zones.
 - `position` on pages places the folio: `"bottom-center"` (default),
@@ -1813,19 +1813,19 @@ text, so the manuscript says nothing about it.
 
 ### 4.15 Section: `colors`
 
-Named book colours, like font aliases (§4.4): a name → any CSS colour.
+Named book colors, like font aliases (§4.4): a name → any CSS color.
 
 ```json
 "colors": { "ink": "#000000", "rubric": "#9e2a1e" }
 ```
 
 - A `color` or any `*-color` value (`border-left-color`,
-  `text-decoration-color`) that is one of these names becomes its colour, in
+  `text-decoration-color`) that is one of these names becomes its color, in
   `elements`, `is`, page numbers and running heads. Any other value is CSS as
   written; so are shorthands (`border: 1px solid rubric` is left alone).
-- `ink` is the text colour: the template sets `elements.body.color` to `"ink"`,
+- `ink` is the text color: the template sets `elements.body.color` to `"ink"`,
   so every part, running head and folio inherits it (§4.7, §4.8) unless it names
-  another. Changing a colour recolours everything that names it.
+  another. Changing a color recolors everything that names it.
 - The template ships `ink` and `rubric`, the red of a printed rubric. A book
   without `colors` sets in the browser's black.
 
@@ -2263,13 +2263,12 @@ Includes:
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a
   warning under a family that is neither; §4.4)
-- Book colours (§4.15), after Fonts in Style's Book group: one section per
-  colour with its swatches (suggested inks, then any colour picked or typed),
-  "Used by" chips, and for any but `ink` a name and Remove; Add a colour. A
-  rename follows every style that names the colour. Every part's style has a
-  Colour row whose chips are the book's colours by name (unset, it names the
-  colour the part inherits; clicking the chosen chip again unsets), and a Style
-  row of Italic, Bold and Underline toggles beside the case.
+- Book colors (§4.15), after Fonts in Style's Book group: one section per color
+  with one picker showing it, "Used by" chips, and for any but `ink` a name and
+  Remove; Add a color. A rename follows every style that names the color. Every
+  part's style has a Color row whose chips are the book's colors by name (unset,
+  it names the color the part inherits; clicking the chosen chip again unsets),
+  and a Style row of Italic, Bold and Underline toggles beside the case.
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)
@@ -2394,7 +2393,7 @@ placeholder is the illustration's style target like any other part.
 Every illustration under 200 dpi at its laid-out size, and every placeholder, is
 a page-map warning in the page problems (§5.4). While the editor's cursor is on
 an illustration — its `{illustration}` line or its caption line — the footer
-note says "Prints at N dpi here; 300 looks sharp", in the warning colour below
+note says "Prints at N dpi here; 300 looks sharp", in the warning color below
 200.
 
 ### 7.7 Page Setup & Print Imposition

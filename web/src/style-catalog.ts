@@ -257,7 +257,7 @@ export type TabId =
   | "themes"
   | "page"
   | "fonts"
-  | "colours"
+  | "colors"
   | "parts"
   | "publish";
 
@@ -390,7 +390,7 @@ function aliasOf(
 }
 
 // Every part, page numbers and running heads set in `alias` (Fonts tab chips).
-// `prop` "color" lists a colour alias's users (§4.15) the same way.
+// `prop` "color" lists a color alias's users (§4.15) the same way.
 export function usedBy(
   metadata: Metadata,
   alias: string,
@@ -409,7 +409,7 @@ export function usedBy(
       out.push({ label: part.name, route: { tab: "parts", part: part.id } });
     }
   }
-  // Margin boxes take the body's font and colour unless they name their own
+  // Margin boxes take the body's font and color unless they name their own
   // (§4.7, §4.8); a zone's folio takes the shared one first.
   const p = metadata.numbering?.pages;
   const shared = p?.css?.[prop] ?? bodyAlias;
@@ -587,7 +587,7 @@ export function ensureProps(
 
 // The raw value (an alias or CSS) an entry gets for `prop` when it sets none:
 // the nearest ancestor entry's (.toc .toc-part .number → .toc), else the
-// body's. A margin box is outside the body but given its fonts and colour, a
+// body's. A margin box is outside the body but given its fonts and color, a
 // zone's folio the shared folio style's first. Undefined when nothing sets it.
 export function inheritedValue(
   metadata: Metadata,
@@ -694,7 +694,7 @@ export function sourceOf(
     }
   }
   // Margin boxes sit outside the book body; they take only its fonts and
-  // colour, and a zone's folio everything the shared folio style sets.
+  // color, and a zone's folio everything the shared folio style sets.
   const box = entry.section === "numbering" || entry.section === "running";
   const ancestors = [];
   if (entry.key.startsWith("numbering.pages.")) {

@@ -1,6 +1,6 @@
 ---
 name: rubric-design
-description: Use when building or changing anything visible in the editor chrome or the hosted site — a panel, dialog, button, toolbar, pane header, list, row, menu, status line, banner, editor theme, icon, empty state, hover, focus or selected state, a font or type size, a spacing or radius, or a light/dark colour — so it follows the Rubric design language (design-language.md) and reuses the tokens in web/tokens.css instead of inventing literals. Use it even for a one-line style tweak, and whenever a mockup or new component is being judged for fit.
+description: Use when building or changing anything visible in the editor chrome or the hosted site — a panel, dialog, button, toolbar, pane header, list, row, menu, status line, banner, editor theme, icon, empty state, hover, focus or selected state, a font or type size, a spacing or radius, or a light/dark color — so it follows the Rubric design language (design-language.md) and reuses the tokens in web/tokens.css instead of inventing literals. Use it even for a one-line style tweak, and whenever a mockup or new component is being judged for fit.
 ---
 
 # Rubric: the visual direction
@@ -37,7 +37,7 @@ the code and the doc disagree and the doc does not say which wins, ask.
   names, URL and hex fields, More CSS. Never labels or words.
 - **Controls live with their pane.** A pane's controls go in its own header;
   the toolbar holds only what is global.
-- **No literal colours** in TypeScript, editor themes or component CSS; build
+- **No literal colors** in TypeScript, editor themes or component CSS; build
   from `web/src/panel-controls.ts` primitives before writing new CSS.
 - Corners pair `--r` with `corner-shape: var(--corner)`; switches are pills.
 

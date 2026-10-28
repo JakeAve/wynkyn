@@ -69,7 +69,7 @@
 
 :root {
   color-scheme: light;
-  /* Colour: one UI paper and one ink, every grey mixed from them (§2.1). */
+  /* Color: one UI paper and one ink, every grey mixed from them (§2.1). */
   --paper: #fafafa;
   --bg: var(--paper);
   --fg: color-mix(in oklab, var(--paper) 6%, #101010);
