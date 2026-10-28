@@ -15,6 +15,25 @@
   margin: 0;
   text-indent: 1.5em;
 }
+/* The browser's heading styles, pinned so the preview sets the same in any
+   browser and version (Chrome and Firefox dropped the smaller h1 inside a
+   section): today's sizes and spacing, but the text's own weight. Bold is a
+   book's choice. Zero specificity, so every key wins. */
+:where(.bml) :where(h1, h2, h3, h4, h5, h6) {
+  font-weight: inherit;
+}
+:where(.bml) :where(h1) {
+  font-size: 2em;
+  margin-block: 0.67em;
+}
+:where(.bml) :where(h3) {
+  font-size: 1.17em;
+  margin-block: 1em;
+}
+:where(.bml) :where(h4) {
+  font-size: 1em;
+  margin-block: 1.33em;
+}
 /* No `+` combinator anywhere in this file: Paged.js 0.4.3 silently drops every
    rule whose selector contains one, and it drops the whole grouped rule with
    it (.claude/skills/architecture/references/pagedjs-plus-combinator.md). The paragraph that opens a block after

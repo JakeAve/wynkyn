@@ -47,7 +47,11 @@ import {
   toggle,
   type View,
 } from "./panel-controls.ts";
-import { folioClash, type PanelContext } from "./style-catalog.ts";
+import {
+  folioClash,
+  inheritedFont,
+  type PanelContext,
+} from "./style-catalog.ts";
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -703,9 +707,9 @@ function advancedHeads(
       css.value = form.extraCss;
       css.placeholder = "font-size: 8pt\nfont-style: italic";
 
-      // The margin box inherits nothing from the book body, so its font has to
-      // be set here. Same picker as the Styles panel, writing font-family into
-      // the same extra-css blob the textarea shows.
+      // Unset, the margin box takes the body's font (§4.8). Same picker as
+      // the Styles panel, writing font-family into the same extra-css blob
+      // the textarea shows.
       const setFont = (v: string) => {
         const extras = parseCssLines(form.extraCss);
         if (v) extras["font-family"] = v;
@@ -718,7 +722,11 @@ function advancedHeads(
         meta,
         parseCssLines(form.extraCss)["font-family"],
         setFont,
-        "browser default",
+        inheritedFont(meta, {
+          key: "running",
+          path: ["running"],
+          section: "running",
+        }),
       );
 
       css.oninput = () => {

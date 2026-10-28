@@ -279,6 +279,24 @@ export function generatePagedCSS(
     }
   }
 
+  // 1b. Margin boxes sit outside the book body but set in its type: every
+  // `font-*` key of `body` (§4.7, §4.8). The rules below, more specific and
+  // later, let a folio's or head's own keys win.
+  const fonts = Object.entries(metadata.elements?.body ?? {}).filter((
+    e,
+  ): e is [string, string] => e[0].startsWith("font-") && safeProp(e[0], e[1]));
+  if (fonts.length) {
+    out.push(
+      `.pagedjs_margin {\n${
+        fonts.map(([k, v]) =>
+          `  ${k}: ${
+            k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
+          };`
+        ).join("\n")
+      }\n}\n`,
+    );
+  }
+
   // 2. Page numbers per zone (§4.7). The folio text is in --folio, set on each
   // page by the page map (renderer/folios.js); the zone → named-page mapping
   // is in base.css.

@@ -563,3 +563,26 @@ Deno.test("the paper stock never reaches the printed CSS", () => {
     generatePagedCSS({ page }),
   );
 });
+
+Deno.test("margin boxes take the body's fonts, and nothing else of it (§4.7, §4.8)", () => {
+  const css = generatePagedCSS({
+    fonts: { body: "EB Garamond" },
+    elements: {
+      body: {
+        "font-family": "body",
+        "font-size": "11pt",
+        "font-variant-numeric": "oldstyle-nums",
+        "line-height": "1.5",
+        "text-align": "justify",
+      },
+    },
+    running: { odd: [{ content: "book-title", area: "top-right" }] },
+  });
+  assertStringIncludes(
+    css,
+    '.pagedjs_margin {\n  font-family: "EB Garamond";\n  font-size: 11pt;\n  font-variant-numeric: oldstyle-nums;\n}',
+  );
+  // Before the boxes' own rules, which win on order and specificity.
+  assert(css.indexOf(".pagedjs_margin {") < css.indexOf("@top-right"));
+  assertEquals(generatePagedCSS({}).includes(".pagedjs_margin {"), false);
+});

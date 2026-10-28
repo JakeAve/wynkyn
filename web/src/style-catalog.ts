@@ -400,9 +400,12 @@ export function usedBy(
       out.push({ label: part.name, route: { tab: "parts", part: part.id } });
     }
   }
-  // Margin boxes inherit nothing from the body: only an explicit font counts.
-  const pages = pageNumberEntries(metadata).some((e) =>
-    getProps(metadata, e)["font-family"] === alias
+  // Margin boxes take the body's font unless they name their own (§4.7,
+  // §4.8); a zone's folio takes the shared one first.
+  const p = metadata.numbering?.pages;
+  const shared = p?.css?.["font-family"] ?? bodyAlias;
+  const pages = ZONES.some(([z]) =>
+    (p?.[z]?.css?.["font-family"] ?? shared) === alias
   );
   if (pages) {
     out.push({
@@ -414,7 +417,7 @@ export function usedBy(
     ...(metadata.running?.odd ?? []),
     ...(metadata.running?.even ?? []),
   ]
-    .some((e) => e["font-family"] === alias);
+    .some((e) => (e["font-family"] ?? bodyAlias) === alias);
   if (heads) {
     out.push({
       label: "Running heads",
@@ -576,9 +579,8 @@ export function ensureProps(
 }
 
 // What an entry's font actually falls back to when it sets none — shown in the
-// picker, because "inherit" is misleading here: a margin box (folio, running
-// head) is outside the book body and inherits nothing from it, and the body
-// itself falls back to base.css's generic serif.
+// picker: the nearest ancestor's, the body's (a margin box, outside the body,
+// is given the body's fonts), and base.css's generic serif for the body.
 export function inheritedFont(
   metadata: Metadata,
   entry: Pick<StyleEntry, "key" | "path" | "section">,
@@ -586,7 +588,14 @@ export function inheritedFont(
   const family = (v: string | undefined) =>
     v ? (metadata.fonts?.[v] ?? v) : undefined;
   if (entry.section === "numbering" || entry.section === "running") {
-    return "browser default"; // margin box
+    const shared = entry.key.startsWith("numbering.pages.")
+      ? metadata.numbering?.pages?.css?.["font-family"]
+      : undefined;
+    return family(shared) ??
+      family(
+        getProps(metadata, { path: ["elements", "body"] })["font-family"],
+      ) ??
+      "serif";
   }
   // Nearest ancestor entry that names a font: .toc .toc-part .number → .toc.
   for (let i = entry.path.length - 1; i > 1; i--) {
@@ -676,17 +685,25 @@ export function sourceOf(
       return { kind: "set", label: entry.group };
     }
   }
-  // Margin boxes sit outside the book body and inherit nothing from it.
-  if (
-    !INHERITED_PROPS.has(prop) || entry.section === "numbering" ||
-    entry.section === "running"
-  ) return { kind: "default" };
-  // Nearest ancestor entry first, then the body (as inheritedFont does).
+  // Margin boxes sit outside the book body; they take only its fonts, and a
+  // zone's folio everything the shared folio style sets.
+  const box = entry.section === "numbering" || entry.section === "running";
   const ancestors = [];
-  for (let i = entry.path.length - 1; i > 1; i--) {
-    ancestors.push(entry.path.slice(0, i));
+  if (entry.key.startsWith("numbering.pages.")) {
+    ancestors.push(["numbering", "pages", "css"]);
   }
-  if (entry.key !== "body") ancestors.push(["elements", "body"]);
+  if (!INHERITED_PROPS.has(prop) && !ancestors.length) {
+    return { kind: "default" };
+  }
+  // Nearest ancestor entry first, then the body (as inheritedFont does).
+  if (!box) {
+    for (let i = entry.path.length - 1; i > 1; i--) {
+      ancestors.push(entry.path.slice(0, i));
+    }
+  }
+  if (entry.key !== "body" && (!box || prop.startsWith("font-"))) {
+    ancestors.push(["elements", "body"]);
+  }
   for (const path of ancestors) {
     if (prop in getProps(metadata, { path })) {
       return { kind: "inherited", label: sourceLabel(catalog, path) };

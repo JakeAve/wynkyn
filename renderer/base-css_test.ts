@@ -316,6 +316,8 @@ Deno.test({
           dropcap: `${cs(".dropcap").float} ${cs(".dropcap").paddingRight}`,
           heading: cs(".heading").hyphens,
           columns: cs(".columns-parallel").columnGap,
+          weight: [".chapter .title", ".heading"].map((s) => cs(s).fontWeight),
+          titleSize: cs(".chapter .title").fontSize,
           note: cs(".notes .note").fontSize,
           ink: [".footnote-anchor a", "a.ref"].map((s) =>
             `${cs(s).color} ${cs(s).textDecorationLine}`
@@ -331,6 +333,8 @@ Deno.test({
         dropcap: "none 3px",
         heading: "auto",
         columns: "17px",
+        weight: ["400", "400"], // the text's weight, not the browser's bold
+        titleSize: "32px", // 2em of the 16px default, in any browser
         note: "6px",
         ink: Array(2).fill("rgb(0, 0, 0) none"),
       });

@@ -210,7 +210,11 @@ Deno.test({
             ".pagedjs_margin-top-right.hasContent .pagedjs_margin-content",
           )!;
           const text = document.querySelector(".bml")!;
-          const was = [before(head), getComputedStyle(text).fontVariantNumeric];
+          const was = [
+            before(head),
+            getComputedStyle(text).fontVariantNumeric,
+            getComputedStyle(text).fontFamily,
+          ];
           // As web/app.css's body does around the preview.
           document.body.style.font = "15px/1.45 sans-serif";
           document.body.style.fontVariantNumeric = "lining-nums";
@@ -222,7 +226,11 @@ Deno.test({
         });
       });
       assertZonesOpenOnContent(`${book} (copyright margin)`, result);
-      const [head, figures, headInApp, figuresInApp] = fonts;
+      const [head, figures, bodyFace, headInApp, figuresInApp] = fonts;
+      assert(
+        head!.startsWith(bodyFace!),
+        `a head sets in the body face: ${head}`,
+      );
       assertEquals(headInApp, head, "a running head ignores the app's font");
       assertEquals(figuresInApp, figures, "the text ignores the app's figures");
     } finally {

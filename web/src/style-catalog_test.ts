@@ -442,10 +442,16 @@ Deno.test("inheritedFont names what an unset font actually resolves to", () => {
   };
   const cat = catalogFor(meta);
   const at = (key: string) => byKey(cat, key);
-  // Margin boxes sit outside the book body — they inherit nothing from it.
+  // Margin boxes sit outside the book body but take its font…
+  assertEquals(inheritedFont(meta, at("numbering.pages.body")), "Crimson Pro");
+  // …and a zone's folio the shared folio font first.
+  const shared = {
+    ...meta,
+    numbering: { pages: { css: { "font-family": "display" } } },
+  };
   assertEquals(
-    inheritedFont(meta, at("numbering.pages.body")),
-    "browser default",
+    inheritedFont(shared, byKey(catalogFor(shared), "numbering.pages.body")),
+    "Cormorant Garamond",
   );
   // The body itself falls back to base.css's generic serif.
   assertEquals(inheritedFont(meta, at("body")), "serif");
@@ -528,8 +534,17 @@ Deno.test("sourceOf: set here, inherited from an ancestor or the body, or defaul
   assertEquals(sourceOf(meta, at("chapter.title"), "margin-top", cat), {
     kind: "default",
   });
-  // A margin box inherits nothing from the body.
+  // A margin box takes only the body's fonts; a zone's folio takes the
+  // shared folio style first.
   assertEquals(sourceOf(meta, at("numbering.pages.body"), "color", cat), {
+    kind: "inherited",
+    label: "All page numbers",
+  });
+  assertEquals(sourceOf(meta, at("numbering.pages.body"), "font-size", cat), {
+    kind: "inherited",
+    label: "Body",
+  });
+  assertEquals(sourceOf(meta, at("numbering.pages"), "line-height", cat), {
     kind: "default",
   });
   assertEquals(sourceOf(meta, at("numbering.pages"), "color", cat), {
