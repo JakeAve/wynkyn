@@ -1,4 +1,12 @@
 /* renderer/base.css — structural defaults, independent of any book's metadata.json */
+/* A page is paper, not the app around it. In the editor the pages sit inside
+   the app's <body>, whose UI face, size and lining figures would reach every
+   margin box and the book itself; this puts the preview on the export's
+   footing, where an unstyled head or folio is the browser's default font
+   (spec §4.7, §4.8). `font` resets the font-variant longhands too. */
+.pagedjs_page {
+  font: medium serif;
+}
 .bml {
   line-height: 1.5;
   font-family: serif;
@@ -50,12 +58,16 @@ section.matter-colophon p,
 .pagedjs_page_content > div > .bml > :first-child > :first-child > p:first-child {
   margin-top: 0;
 }
-.bml .dropcap {
+/* Zero own-specificity, here and below, wherever a book's flat key (`.dropcap`,
+   `.heading`, `.columns`, `.verses .number`) must win on order. */
+:where(.bml .dropcap) {
   float: left;
   padding-right: 0.05em;
 }
 /* These name the zone pages (spec §4.7); the class sits on each top-level
-   block, not a wrapper. Display matter's `page: display` below outranks them. */
+   block, not a wrapper. Display matter's `page: display` below wins because it
+   comes later: Paged.js applies `page` and `break-*` per selector in source
+   order, not by specificity (references/pagedjs-breaks.md). */
 .zone-front {
   page: front;
 }
@@ -93,12 +105,12 @@ section.matter-colophon p,
 .bml {
   hyphenate-limit-chars: 6 3 3;
 }
-.bml .title,
-.bml .subtitle,
-.bml .number,
-.bml .book-title,
-.bml .heading,
-.bml .subheading {
+:where(.bml .title),
+:where(.bml .subtitle),
+:where(.bml .number),
+:where(.bml .book-title),
+:where(.bml .heading),
+:where(.bml .subheading) {
   hyphens: manual;
 }
 /* A chapter opener must not strand at the foot of a page or column — matters
@@ -134,7 +146,7 @@ section.matter-colophon p,
 :where(.bml .verses) {
   margin: 1em 0;
 }
-.bml .verse .number {
+:where(.bml .verse .number) {
   padding-right: 0.3em;
 }
 :where(.bml figure) {
@@ -189,10 +201,6 @@ section.matter-colophon p,
   align-items: flex-end;
   gap: 0.4em;
 }
-:where(.bml .toc) a {
-  text-decoration: none;
-  color: inherit;
-}
 :where(.bml .toc) .label {
   min-width: 0;
 }
@@ -232,12 +240,15 @@ section.matter-colophon p,
   border-top: 1px solid #999;
   padding-top: 0.5em;
 }
-.bml .columns-parallel {
+:where(.bml .columns-parallel) {
   display: grid;
   gap: 1em;
 }
-.bml a.ref {
+/* Links are for the reader's eye on paper: TOC rows, `{ref}` numbers and note
+   anchors print in the text's own ink, never the browser's underlined blue. */
+:where(.bml a) {
   color: inherit;
+  text-decoration: none;
 }
 
 /* Paged.js stamps data-align-last-split-element="justify" on the deepest
@@ -256,9 +267,13 @@ section.matter-colophon p,
 }
 /* Display matter sets lines, not prose: its paragraphs take their indent from
    the section (none by default), so centred lines centre and a book can still
-   say `dedication: { "text-indent": "1.5em" }`. Two classes outrank the
-   metadata's `.bml p`; after `.lead` above so the section decides there too. */
-.bml .matter-display p {
+   say `dedication: { "text-indent": "1.5em" }`. (0,1,2), like the margin rule
+   above: over the metadata's `.bml p` (0,1,1), under a book's own line key
+   (`title-page → author`, 0,2,0). A `.lead` there follows the section too. */
+section.matter-display p {
+  text-indent: inherit;
+}
+section.matter-display p.lead {
   text-indent: inherit;
 }
 /* A title page is centred unless the book says otherwise. :where() keeps this
@@ -290,13 +305,18 @@ section.matter-colophon p,
 }
 /* The copyright page sits at the foot of its text block (§3.4.3); a book moves
    it with `copyright: { "justify-content": "flex-start" | "center" }`. Paged.js
-   gives the page's content div a height, so stretch the tree on this page only.
+   gives the page's content div a height, so stretch the tree on this page only
+   and let the section flex into it: a flex item's margins come out of the
+   space, where `height: 100%` plus a margin overflowed onto a second page.
    Unpaged (EPUB) it is a plain column. */
 .pagedjs_page_content > div > .bml:has(> .matter-copyright) {
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 :where(.bml .matter-copyright) {
-  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;

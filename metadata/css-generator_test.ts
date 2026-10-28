@@ -30,6 +30,29 @@ Deno.test("nested page-type elements become descendant selectors", () => {
   assertStringIncludes(css, "font-size: 26pt;");
 });
 
+Deno.test("part and chapter sub-elements are children, deeper levels descendants (§4.5)", () => {
+  // A part holds its chapters and a chapter its verses: `.part .title` would
+  // restyle every chapter title in the part, `.chapter .number` every verse.
+  const css = generateDomCSS({
+    elements: {
+      part: { title: { color: "red" } },
+      chapter: { number: { "font-size": "10pt", em: { color: "blue" } } },
+      verses: { number: { "font-size": "7pt" } },
+    },
+  });
+  assertStringIncludes(css, ".part > .title {");
+  assertStringIncludes(css, ".chapter > .number {");
+  assertStringIncludes(css, ".chapter > .number em {");
+  assertStringIncludes(css, ".verses .number {");
+});
+
+Deno.test("footnote styles the note text, at the page foot or the chapter end (§4.5)", () => {
+  assertStringIncludes(
+    generateDomCSS({ elements: { footnote: { "font-size": "8.5pt" } } }),
+    ".note {\n  font-size: 8.5pt;",
+  );
+});
+
 Deno.test("a nested em styles the emphasis element, not an .em class (§4.5)", () => {
   const css = generateDomCSS({
     elements: {
@@ -503,7 +526,7 @@ Deno.test("keys and values that could break out of the CSS are left out (§4.10 
     is: { "a:b": { color: "red" }, "pull-quote": { color: "gray" } },
   });
   assertStringIncludes(css, "text-align: center;");
-  assertStringIncludes(css, ".chapter .title {\n  font-style: italic;");
+  assertStringIncludes(css, ".chapter > .title {\n  font-style: italic;");
   assertStringIncludes(css, ".is-pull-quote {");
   assertStringIncludes(css, 'font-family: "Evil\\" } body { color: red";');
   assertStringIncludes(css, 'content: "} </style> is fine as a string";');

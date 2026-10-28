@@ -2,7 +2,7 @@
 // Chrome: the page map settles fast, reports nothing, and matches a golden
 // digest. `UPDATE_GOLDEN=1 deno task test` rewrites the golden files.
 import { assert, assertEquals } from "@std/assert";
-import { chromium } from "playwright";
+import { chromium, type Page } from "playwright";
 import { buildBook } from "./pipeline.ts";
 import { toHtml } from "./export-html.ts";
 import type { PageProblem } from "../renderer/page-map-types.ts";
@@ -31,9 +31,11 @@ interface Report {
   digest: Digest;
 }
 
+// `inspect` reads the paginated page before the browser closes.
 async function paginate(
   root: string,
   book: string,
+  inspect?: (page: Page) => Promise<void>,
 ): Promise<{ report: Report; firstPageText: Record<string, string> }> {
   const built = await buildBook(root, book, {
     imageUrlPrefix: `file://${root}${book}/images`,
@@ -66,6 +68,7 @@ async function paginate(
         ]),
       );
     }, firsts);
+    await inspect?.(page);
     return { report, firstPageText };
   } finally {
     await browser.close();
@@ -168,3 +171,62 @@ for (const book of BOOKS) {
     },
   });
 }
+
+// The copyright page fills its text block with flex, so a book's space above
+// it comes out of the page instead of pushing the page onto a second one. And
+// the pages are paper, not the app: an editor <body>'s UI face never reaches
+// a running head or the text (the preview set heads in the UI font).
+Deno.test({
+  name: "page map: great-gatsby with space above the copyright, in an app body",
+  ignore: !hasChrome,
+  fn: async () => {
+    const book = "great-gatsby";
+    const root = await Deno.makeTempDir();
+    try {
+      await Deno.mkdir(`${root}/${book}`);
+      await Deno.copyFile(
+        `${ROOT}${book}/manuscript.md`,
+        `${root}/${book}/manuscript.md`,
+      );
+      const meta: Metadata = JSON.parse(
+        await Deno.readTextFile(`${ROOT}${book}/metadata.json`),
+      );
+      meta.elements = {
+        ...meta.elements,
+        copyright: { ...meta.elements?.copyright, "margin-top": "12pt" },
+      };
+      await Deno.writeTextFile(
+        `${root}/${book}/metadata.json`,
+        JSON.stringify(meta),
+      );
+      let fonts: string[] = [];
+      const result = await paginate(`${root}/`, book, async (page) => {
+        fonts = await page.evaluate(() => {
+          const before = (el: Element) => {
+            const s = getComputedStyle(el, "::after");
+            return `${s.fontFamily} ${s.fontVariantNumeric}`;
+          };
+          const head = document.querySelector(
+            ".pagedjs_margin-top-right.hasContent .pagedjs_margin-content",
+          )!;
+          const text = document.querySelector(".bml")!;
+          const was = [before(head), getComputedStyle(text).fontVariantNumeric];
+          // As web/app.css's body does around the preview.
+          document.body.style.font = "15px/1.45 sans-serif";
+          document.body.style.fontVariantNumeric = "lining-nums";
+          return [
+            ...was,
+            before(head),
+            getComputedStyle(text).fontVariantNumeric,
+          ];
+        });
+      });
+      assertZonesOpenOnContent(`${book} (copyright margin)`, result);
+      const [head, figures, headInApp, figuresInApp] = fonts;
+      assertEquals(headInApp, head, "a running head ignores the app's font");
+      assertEquals(figuresInApp, figures, "the text ignores the app's figures");
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+});

@@ -221,6 +221,38 @@ Deno.test("nested matter sub-elements use the matter type", () => {
   );
 });
 
+Deno.test("part and chapter sub-entries match their own children only", () => {
+  const part = ["part", "zone-body", "section"];
+  const chapter = ["chapter", "section"];
+  const bml = ["bml", "article"];
+  // A chapter's title inside a part is the chapter's, whatever the order.
+  assertEquals(
+    matchKey([["title", "h1"], chapter, part, bml], catalog),
+    "chapter.title",
+  );
+  assertEquals(
+    matchKey([["title", "h1"], chapter, part, bml], [...catalog].reverse()),
+    "chapter.title",
+  );
+  assertEquals(matchKey([["title", "h1"], part, bml], catalog), "part.title");
+  // A verse number in a chapter is a verse number.
+  assertEquals(
+    matchKey(
+      [["number", "span"], ["verse", "p"], ["verses", "div"], chapter, bml],
+      [...catalog].reverse(),
+    ),
+    "verses.number",
+  );
+  // And highlight/Inspect select the same: children, one per alternative.
+  const sel = (k: string) => catalog.find((e) => e.key === k)!.selector;
+  assertEquals(sel("part.title"), ".part > .title");
+  assertEquals(sel("chapter.number"), ".chapter > .number");
+  assertEquals(
+    sel("prose-matter.title"),
+    ".matter-foreword .title, .matter-preface .title, .matter-introduction .title",
+  );
+});
+
 Deno.test("a classed <p> goes to its own entry, not Paragraph", () => {
   const tp = ["matter", "matter-title-page", "section"];
   for (const sub of ["author", "subtitle", "edition"]) {

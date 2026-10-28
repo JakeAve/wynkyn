@@ -2,7 +2,11 @@
 // numbers + running heads + `is:` classes), how a preview click resolves to
 // one, and how entries group into the style panel's book parts and tabs.
 // Pure: the DOM adapter lives in preview.ts, so this is unit-tested in Deno.
-import { folioAreas, selectorFor } from "../../metadata/css-generator.ts";
+import {
+  folioAreas,
+  selectorFor,
+  subSelector,
+} from "../../metadata/css-generator.ts";
 import { CLASS_NAME_RE } from "../../parser/types.ts";
 import type {
   CssProps,
@@ -17,7 +21,7 @@ export interface StyleEntry {
   label: string; // <option> label
   path: string[]; // where the props object lives in Metadata
   section: "elements" | "is" | "numbering" | "running"; // queueSave key
-  selector: string; // rendered CSS selector — space-separated .class tokens
+  selector: string; // rendered CSS selector — .class tokens, descendant or `>`
 }
 
 // [group, type, sub-elements (empty = flat type)]
@@ -99,7 +103,7 @@ const STATIC_CATALOG: StyleEntry[] = ELEMENTS.flatMap(([group, type, subs]) =>
       label: labelFor(sub),
       path: ["elements", type, sub],
       section: "elements" as const,
-      selector: `${selectorFor(type)} .${sub}`,
+      selector: subSelector(selectorFor(type), `.${sub}`),
     }))
     : [{
       key: type,
@@ -478,11 +482,22 @@ export function matchKey(
   for (const entry of catalog) {
     const is = entry.section === "is";
     for (const alt of entry.selector.split(", ")) {
-      // ".class" tokens match a class, bare ones ("p", "em") a tag name.
+      // ".class" tokens match a class, bare ones ("p", "em") a tag name; a
+      // `>` before a token makes the token after it its child.
       const raw = alt.trim().split(/\s+/);
-      const tokens = raw.map((t) => t.startsWith(".") ? t.slice(1) : t)
-        .reverse(); // innermost first
-      const spec = raw.reduce((n, t) => n + (t.startsWith(".") ? 100 : 1), 0);
+      const tokens: Token[] = [];
+      for (const [i, t] of raw.entries()) {
+        if (t === ">") continue;
+        tokens.push({
+          name: t.startsWith(".") ? t.slice(1) : t,
+          child: raw[i + 1] === ">",
+        });
+      }
+      tokens.reverse(); // innermost first
+      const spec = raw.reduce(
+        (n, t) => n + (t === ">" ? 0 : t.startsWith(".") ? 100 : 1),
+        0,
+      );
       const depth = matchDepth(chain, tokens);
       if (depth === null) continue;
       if (
@@ -498,16 +513,25 @@ export function matchKey(
   return best?.key ?? null;
 }
 
+// `child`: the token that follows (the next one inward) must be its child.
+interface Token {
+  name: string;
+  child: boolean;
+}
+
 // Depth of the innermost token's match, or null. Descendant combinator: each
-// outer token must match some strictly-farther ancestor.
-function matchDepth(chain: string[][], tokens: string[]): number | null {
-  const first = tokens[0]!;
+// outer token must match some strictly-farther ancestor; after a `>`, the
+// next ancestor exactly.
+function matchDepth(chain: string[][], tokens: Token[]): number | null {
+  const first = tokens[0]!.name;
   for (let d = 0; d < chain.length; d++) {
     if (!chain[d]!.includes(first)) continue;
     let from = d + 1;
     let ok = true;
     for (const t of tokens.slice(1)) {
-      const at = chain.findIndex((cls, i) => i >= from && cls.includes(t));
+      const at = t.child
+        ? (chain[from]?.includes(t.name) ? from : -1)
+        : chain.findIndex((cls, i) => i >= from && cls.includes(t.name));
       if (at < 0) {
         ok = false;
         break;

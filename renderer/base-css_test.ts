@@ -49,24 +49,24 @@ Deno.test("base.css uses no adjacent-sibling combinator (Paged.js drops those ru
   );
 });
 
-Deno.test("display matter's page rule outranks the zone rules regardless of CSS order", () => {
+Deno.test("display matter's page rule comes after the zone rules (Paged.js goes by order)", () => {
+  // Paged.js applies `page` per selector in source order, ignoring
+  // specificity (.claude/skills/architecture/references/pagedjs-breaks.md).
   const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url))
     .replace(/\/\*[\s\S]*?\*\//g, "");
-  const classCount = (sel: string) => (sel.match(/\.[\w-]+/g) ?? []).length;
   const pageRule = (name: string) =>
     [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
       .filter((m) => new RegExp(`page:\\s*${name}\\s*;`).test(m[2]!))
-      .flatMap((m) => m[1]!.split(",").map((x) => x.trim()));
-  const display = pageRule("display");
-  assert(display.length > 0, "expected a `page: display` rule");
+      .map((m) => ({
+        at: m.index,
+        sels: m[1]!.split(",").map((x) => x.trim()),
+      }));
+  const [display, ...more] = pageRule("display");
+  assert(display && !more.length, "expected one `page: display` rule");
   for (const zone of ["front", "body", "back"]) {
-    assertEquals(pageRule(zone), [`.zone-${zone}`]);
-  }
-  for (const sel of display) {
-    assert(
-      classCount(sel) > classCount(".zone-front"),
-      `"${sel}" must outrank .zone-front`,
-    );
+    const [rule] = pageRule(zone);
+    assertEquals(rule?.sels, [`.zone-${zone}`]);
+    assert(rule!.at < display.at, `.zone-${zone} must come before display`);
   }
 });
 
@@ -233,6 +233,107 @@ Deno.test({
       const [left, right] = m.epigraph as [number, number];
       assertEquals(right - left, m.longest, "shrinks to its longest line");
       assert(Math.abs(left - (600 - right)) <= 1, `centred: ${left}..${right}`);
+    } finally {
+      await browser.close();
+    }
+  },
+});
+
+Deno.test({
+  name:
+    "each style key reaches its own element and no other, over base.css (CSS audit)",
+  ignore: !hasChrome,
+  fn: async () => {
+    const html = render(
+      parse([
+        "{matter: title-page}",
+        "{title}",
+        "T",
+        "{author}",
+        "Ann",
+        "{matter: dedication}",
+        "For you.",
+        "{part: one}",
+        "{title}",
+        "Part One",
+        "{chapter: a}",
+        "{title}",
+        "A",
+        "",
+        "{dropcap}",
+        "Opening, see {ref: a}.{footnote: n}",
+        "",
+        "{note: n}",
+        "The note.",
+        "",
+        "{heading}",
+        "H",
+        "",
+        "{verses: v}",
+        "A verse.",
+        "{/verses}",
+        "",
+        "{columns: 2}",
+        "Left.",
+        "{col}",
+        "Right.",
+        "{/columns}",
+      ].join("\n")),
+      { notes: { placement: "endnote" } },
+    );
+    const css = Deno.readTextFileSync(new URL("./base.css", import.meta.url)) +
+      generateDomCSS({
+        elements: {
+          // Before `part` and `verses`, so order alone can't save them.
+          verses: { number: { "font-size": "7px" } },
+          chapter: { title: { color: "rgb(0, 0, 255)" } },
+          part: {
+            title: { color: "rgb(255, 0, 0)" },
+            number: { "letter-spacing": "9px" },
+          },
+          paragraph: { "text-indent": "20px" },
+          "title-page": { author: { "text-indent": "13px" } },
+          dropcap: { float: "none", "padding-right": "3px" },
+          heading: { hyphens: "auto" },
+          columns: { gap: "17px" },
+          footnote: { "font-size": "6px" },
+        },
+      });
+    const browser = await chromium.launch({ channel: "chrome" });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(`<style>${css}</style>${html}`);
+      const got = await page.evaluate(() => {
+        const cs = (s: string) => getComputedStyle(document.querySelector(s)!);
+        return {
+          partTitle: cs(".part > .title").color,
+          chapterTitle: cs(".chapter .title").color,
+          verseNumber: `${cs(".verse .number").fontSize} ${
+            cs(".verse .number").letterSpacing
+          }`,
+          author: cs(".author").textIndent,
+          dedication: cs(".matter-dedication p").textIndent,
+          dropcap: `${cs(".dropcap").float} ${cs(".dropcap").paddingRight}`,
+          heading: cs(".heading").hyphens,
+          columns: cs(".columns-parallel").columnGap,
+          note: cs(".notes .note").fontSize,
+          ink: [".footnote-anchor a", "a.ref"].map((s) =>
+            `${cs(s).color} ${cs(s).textDecorationLine}`
+          ),
+        };
+      });
+      assertEquals(got, {
+        partTitle: "rgb(255, 0, 0)",
+        chapterTitle: "rgb(0, 0, 255)", // the part's red stays on the part
+        verseNumber: "7px normal", // no chapter or part number styles
+        author: "13px", // a line's own key beats display matter's inherit
+        dedication: "0px", // display matter ignores the paragraph indent
+        dropcap: "none 3px",
+        heading: "auto",
+        columns: "17px",
+        note: "6px",
+        ink: Array(2).fill("rgb(0, 0, 0) none"),
+      });
     } finally {
       await browser.close();
     }
