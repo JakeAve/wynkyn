@@ -679,6 +679,16 @@
       })),
       numbering,
     );
+    // Paged.js marks a forced break on the element it falls before and on
+    // its page (paged.js:30055, :30102); a segment's first section, laid out
+    // alone, has nothing before it, so it is marked here as one flow would be.
+    laid.forEach((l, i) => {
+      const page = l.pages[0];
+      const first = page?.querySelector("section:not([data-split-from])");
+      if (i === 0 || !page || !first) return;
+      first.setAttribute("data-break-before", l.segment.opens);
+      page.setAttribute("data-break-before", l.segment.opens);
+    });
     const like = laid.find((l) => l.pages.length)?.pages[0];
     const pages = plan.slots.map((s) =>
       s

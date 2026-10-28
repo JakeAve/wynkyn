@@ -90,7 +90,7 @@ const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
     return r;
   };
   try {
-    let r = BOOK_SEGMENTS && await segmented();
+    let r = BOOK_SEGMENTS?.length ? await segmented() : null;
     root.dataset.pagedLayout = r ? "segments" : "whole";
     r ??= await whole();
     report = {
