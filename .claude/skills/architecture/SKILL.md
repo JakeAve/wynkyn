@@ -119,7 +119,7 @@ and update the checksum in `server/vendor_test.ts`, then read the golden
 page-map diff and re-check the no-reflow note on `layOut` in
 `renderer/folios.js`. `renderer/base.css` lays out centre-plus-side margin rows
 itself (0.4.3 mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` /
-`.hasContent`; re-check that after an upgrade too. Its known traps are the two
+`.hasContent`; re-check that after an upgrade too. Its known traps are the three
 references below.
 
 ## Read next
@@ -135,4 +135,6 @@ references below.
   `+` combinator; what to write instead.
 - `references/pagedjs-justify-leak.md` — the split-paragraph justification
   leak and the `base.css` guard for it.
+- `references/pagedjs-breaks.md` — `page` and `break-*` go by source order,
+  not specificity, and their selectors split on every comma.
 - Spec §5 (module contracts) and §6 (web architecture) for the why.

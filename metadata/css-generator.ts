@@ -48,6 +48,8 @@ export function selectorFor(key: string): string {
   if (key === "body") return ".bml";
   if (key === "em") return ".bml em";
   if (key === "paragraph") return ".bml p";
+  // A note's text: span.note at the page foot, div.note in the endnotes.
+  if (key === "footnote") return ".note";
   if (key === "prose-matter") {
     return PROSE_MATTER.map((t) => `.matter-${t}`).join(", ");
   }
@@ -56,6 +58,16 @@ export function selectorFor(key: string): string {
     return `.matter-${key}`;
   }
   return `.${key}`;
+}
+
+// A sub-element under each alternative of `parent`. `sub` is a selector part
+// (".title", "em"). Directly under a part or a chapter it is a child: a part
+// holds its chapters and a chapter its verses, so `.part .title` would style
+// every chapter title in it and `.chapter .number` every verse number.
+export function subSelector(parent: string, sub: string): string {
+  const child = parent === ".part" || parent === ".chapter";
+  return parent.split(", ").map((s) => `${s} ${child ? "> " : ""}${sub}`)
+    .join(", ");
 }
 
 function resolveFontValue(
@@ -124,7 +136,7 @@ function emitStyle(
     // `em` is the emphasis element ({em}, §3.2.7); every other key a class.
     const part = sub === "em" ? "em" : `.${sub}`;
     emitStyle(
-      selector.split(", ").map((s) => `${s} ${part}`).join(", "),
+      subSelector(selector, part),
       subStyle,
       fonts,
       out,
@@ -265,6 +277,24 @@ export function generatePagedCSS(
         `@page :left {\n  margin-left: ${outside};\n  margin-right: ${inside};\n}\n`,
       );
     }
+  }
+
+  // 1b. Margin boxes sit outside the book body but set in its type: every
+  // `font-*` key of `body` (§4.7, §4.8). The rules below, more specific and
+  // later, let a folio's or head's own keys win.
+  const fonts = Object.entries(metadata.elements?.body ?? {}).filter((
+    e,
+  ): e is [string, string] => e[0].startsWith("font-") && safeProp(e[0], e[1]));
+  if (fonts.length) {
+    out.push(
+      `.pagedjs_margin {\n${
+        fonts.map(([k, v]) =>
+          `  ${k}: ${
+            k === "font-family" ? resolveFontValue(v, metadata.fonts) : v
+          };`
+        ).join("\n")
+      }\n}\n`,
+    );
   }
 
   // 2. Page numbers per zone (§4.7). The folio text is in --folio, set on each

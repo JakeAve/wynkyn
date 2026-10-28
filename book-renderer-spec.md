@@ -1310,26 +1310,33 @@ represent a _page type_ (half-title, title-page, copyright, etc.) nest their
 sub-elements. Elements that are a single typographic unit (heading, dropcap,
 etc.) are flat. Sub-elements may themselves nest, to any depth; each level
 becomes a descendant selector (`toc → toc-part → number` is
-`.matter-toc .toc-part .number`). One property is special: `content` on
-`toc.leader` is emitted as the `--leader` custom property that the base
-stylesheet repeats across the row (§4.5 recipes); everywhere else `content` sets
-the element's `::before`, as for `break`. One sub-element key is special: `em`
-styles the emphasis element (§3.2.7) inside its parent, so
-`title-page → subtitle → em` is `.matter-title-page .subtitle em`. `paragraph`
-styles body paragraphs (`.bml p`); its typical keys are `text-indent` (the base
-default is `1.5em`) and `margin-top` in `lh` units for space between paragraphs
-(`"0.5lh"`). The paragraph that opens a block (`.lead`: first in its container,
-or after a title, heading or break) and the drop-cap paragraph stay flush and
-tight whatever `paragraph` says; one after a quote, poem, list or other block
-keeps its indent. Pullquote text and attributions are flush. `body` is the whole
-text block (`.bml`); `"hyphens": "auto"` there turns on the browser's dictionary
+`.matter-toc .toc-part .number`), except the first level under `part` and
+`chapter`, which is a child (`chapter → number` is `.chapter > .number`): a part
+holds its chapters and a chapter its verses, so a descendant would style their
+titles and numbers too. `footnote` styles a note's text (`.note`), at the page
+foot or in the endnotes. One property is special: `content` on `toc.leader` is
+emitted as the `--leader` custom property that the base stylesheet repeats
+across the row (§4.5 recipes); everywhere else `content` sets the element's
+`::before`, as for `break`. One sub-element key is special: `em` styles the
+emphasis element (§3.2.7) inside its parent, so `title-page → subtitle → em` is
+`.matter-title-page .subtitle em`. `paragraph` styles body paragraphs
+(`.bml p`); its typical keys are `text-indent` (the base default is `1.5em`) and
+`margin-top` in `lh` units for space between paragraphs (`"0.5lh"`). The
+paragraph that opens a block (`.lead`: first in its container, or after a title,
+heading or break) and the drop-cap paragraph stay flush and tight whatever
+`paragraph` says; one after a quote, poem, list or other block keeps its indent.
+Pullquote text and attributions are flush. `body` is the whole text block
+(`.bml`); `"hyphens": "auto"` there turns on the browser's dictionary
 hyphenation for the book's `language` (the template ships with it on, since
-justified text without it sets rivers). Titles, numbers and headings never
-hyphenate whatever `body` says, and the base stylesheet allows no fragment under
-three letters (`hyphenate-limit-chars: 6 3 3`). Display matter (half-title,
-title-page, copyright, dedication, epigraph, colophon) sets lines, not prose:
-its paragraphs take `text-indent` from the section, none by default, so
-`"dedication": { "text-indent": "1.5em" }` indents a dedication.
+justified text without it sets rivers). Titles and headings set in the text's
+weight, never the browser's bold; a book that wants them bold says
+`"font-weight": "bold"`. Titles, numbers and headings never hyphenate whatever
+`body` says, and the base stylesheet allows no fragment under three letters
+(`hyphenate-limit-chars: 6 3 3`). Display matter (half-title, title-page,
+copyright, dedication, epigraph, colophon) sets lines, not prose: its paragraphs
+take `text-indent` from the section, none by default, so
+`"dedication": { "text-indent": "1.5em" }` indents a dedication; a line's own
+key (`title-page → author → text-indent`) still overrides the section.
 
 ```json
 "elements": {
@@ -1523,9 +1530,10 @@ offer it there.
 - `css` on pages styles the folio's margin box (CSS properties, font aliases
   resolved like §4.5). `pages.css` applies to every zone; a zone's own `css`
   overrides it property by property. Margin boxes are not descendants of the
-  book body, so they inherit nothing from `elements.body` — without `pages.css`
-  a folio renders in the browser's default font. Edited by the Styles panel
-  (§7.4), which lists "All page numbers" alongside the three zones.
+  book body, but they set in its type: every `font-*` key of `elements.body`
+  reaches them, and `pages.css` or a zone's `css` overrides it (§4.8). No book
+  font falls back to the system's. Edited by the Styles panel (§7.4), which
+  lists "All page numbers" alongside the three zones.
 - `position` on pages places the folio: `"bottom-center"` (default),
   `"bottom-outside"`, `"top-center"` or `"top-outside"`. Outside is the
   fore-edge: `bottom-right`/`top-right` on recto (`:right`), `-left` on verso
@@ -1590,10 +1598,11 @@ box — is handled automatically by `numbering.pages`, not by a `running` entry.
 
 All other properties in an entry are CSS and apply to that margin box.
 `font-family` accepts a font alias and is resolved like §4.5. A margin box is
-not a descendant of the book body, so it inherits nothing from `elements.body`:
-without an explicit `font-family` a running head renders in the browser's
-default font. The configuration panel offers the same font picker as the Styles
-panel on each running entry (§7.5).
+not a descendant of the book body, and takes nothing else from it, but it sets
+in the book's type: every `font-*` key of `elements.body` (face, size, style,
+figures) reaches each margin box, and the entry's own keys override them. The
+configuration panel offers the same font picker as the Styles panel on each
+running entry (§7.5).
 
 **`gap`** (on `running`, default `4mm`) — the clear space between a head and the
 text block, whatever the head's size: to its baseline above the text block, to
@@ -2197,11 +2206,9 @@ the effect is visible in the preview pane without a save step.
 
 The font picker's empty option names what the box actually renders in when it
 sets no font of its own — `(unset — Crimson Pro)` for an element inside the book
-body, `(unset — serif)` for the body itself (base.css),
-`(unset — browser
-default)` for a margin box, which is outside the body and
-inherits nothing from it (§4.7, §4.8). "Inherit" would be a lie in the last two
-cases.
+body, `(unset — serif)` for the body itself (base.css), and the body's font for
+a margin box, which is outside the body but given its fonts (§4.7, §4.8).
+"Inherit" would be a lie for the last two.
 
 ### 7.5 Document Configuration Panel
 

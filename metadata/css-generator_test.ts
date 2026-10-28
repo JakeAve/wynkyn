@@ -30,6 +30,29 @@ Deno.test("nested page-type elements become descendant selectors", () => {
   assertStringIncludes(css, "font-size: 26pt;");
 });
 
+Deno.test("part and chapter sub-elements are children, deeper levels descendants (§4.5)", () => {
+  // A part holds its chapters and a chapter its verses: `.part .title` would
+  // restyle every chapter title in the part, `.chapter .number` every verse.
+  const css = generateDomCSS({
+    elements: {
+      part: { title: { color: "red" } },
+      chapter: { number: { "font-size": "10pt", em: { color: "blue" } } },
+      verses: { number: { "font-size": "7pt" } },
+    },
+  });
+  assertStringIncludes(css, ".part > .title {");
+  assertStringIncludes(css, ".chapter > .number {");
+  assertStringIncludes(css, ".chapter > .number em {");
+  assertStringIncludes(css, ".verses .number {");
+});
+
+Deno.test("footnote styles the note text, at the page foot or the chapter end (§4.5)", () => {
+  assertStringIncludes(
+    generateDomCSS({ elements: { footnote: { "font-size": "8.5pt" } } }),
+    ".note {\n  font-size: 8.5pt;",
+  );
+});
+
 Deno.test("a nested em styles the emphasis element, not an .em class (§4.5)", () => {
   const css = generateDomCSS({
     elements: {
@@ -503,7 +526,7 @@ Deno.test("keys and values that could break out of the CSS are left out (§4.10 
     is: { "a:b": { color: "red" }, "pull-quote": { color: "gray" } },
   });
   assertStringIncludes(css, "text-align: center;");
-  assertStringIncludes(css, ".chapter .title {\n  font-style: italic;");
+  assertStringIncludes(css, ".chapter > .title {\n  font-style: italic;");
   assertStringIncludes(css, ".is-pull-quote {");
   assertStringIncludes(css, 'font-family: "Evil\\" } body { color: red";');
   assertStringIncludes(css, 'content: "} </style> is fine as a string";');
@@ -539,4 +562,27 @@ Deno.test("the paper stock never reaches the printed CSS", () => {
     generatePagedCSS({ page: { ...page, paper: "#f3e9d2" } }),
     generatePagedCSS({ page }),
   );
+});
+
+Deno.test("margin boxes take the body's fonts, and nothing else of it (§4.7, §4.8)", () => {
+  const css = generatePagedCSS({
+    fonts: { body: "EB Garamond" },
+    elements: {
+      body: {
+        "font-family": "body",
+        "font-size": "11pt",
+        "font-variant-numeric": "oldstyle-nums",
+        "line-height": "1.5",
+        "text-align": "justify",
+      },
+    },
+    running: { odd: [{ content: "book-title", area: "top-right" }] },
+  });
+  assertStringIncludes(
+    css,
+    '.pagedjs_margin {\n  font-family: "EB Garamond";\n  font-size: 11pt;\n  font-variant-numeric: oldstyle-nums;\n}',
+  );
+  // Before the boxes' own rules, which win on order and specificity.
+  assert(css.indexOf(".pagedjs_margin {") < css.indexOf("@top-right"));
+  assertEquals(generatePagedCSS({}).includes(".pagedjs_margin {"), false);
 });
