@@ -15,6 +15,7 @@ import type {
   Part,
 } from "../parser/types.ts";
 import type {
+  ElementStyle,
   Metadata,
   NotesConfig,
   Numbering,
@@ -719,6 +720,38 @@ const notesClasses = (html: string) =>
   )
     ?.[1]?.split(" ");
 
+// A forced break-after in a style or any key nested in it.
+const forcesAfter = (s: ElementStyle): boolean =>
+  !!breakSide(s["break-after"]) ||
+  Object.values(s).some((v) => typeof v === "object" && forcesAfter(v));
+
+// Whether a forced break-after could fall on something deeper than a section
+// or its endnotes: from a nested key, or a flat one whose selector reaches an
+// element they hold (`inner`, the classes inside them, and the article). Last
+// in its section, its break lands on the next section (Paged.js's
+// displayedElementAfter climbs), a cut renderSegments can't see.
+function deepBreakAfter(
+  pieces: Piece[],
+  elements: Metadata["elements"],
+): boolean {
+  const inner = new Set(["bml"]);
+  for (const p of pieces) {
+    [...p.html.matchAll(/<(\w+) class="([^"]*)"/g)].slice(1).forEach((m) => {
+      const cls = m[2]!.split(" ");
+      if (m[1] !== "aside" || !cls.includes("notes")) {
+        cls.forEach((c) => inner.add(c));
+      }
+    });
+  }
+  return Object.entries(elements ?? {}).some(([key, style]) =>
+    Object.values(style).some((v) => typeof v === "object" && forcesAfter(v)) ||
+    (!!breakSide(style["break-after"]) &&
+      selectorFor(key).split(", ").some((s) =>
+        !/^\.[\w-]+$/.test(s) || inner.has(s.slice(1))
+      ))
+  );
+}
+
 // base.css: matter, parts and the body's start on a recto; chapters, the
 // copyright page and the colophon on the next page.
 function baseOpens(cls: Set<string>): Side {
@@ -787,6 +820,10 @@ export function renderSegments(
   matter(doc.backMatter, "back");
 
   const groups: { opens: Segment["opens"]; pieces: Piece[] }[] = [];
+  // ponytail: a deep forced break-after merges the whole book into one
+  // segment; check whether the previous piece ends in what it reaches if such
+  // books need the speed.
+  const deep = deepBreakAfter(pieces, opts.elements);
   let after: Side = null; // the previous section's break-after
   let partAfter: Side = null; // the open part's, owed where the part ends
   for (const p of pieces) {
@@ -811,7 +848,7 @@ export function renderSegments(
     if (p.opensPart) [partAfter, after] = [own, notesAfter];
     else after = notes ? notesAfter : own;
     const last = groups.at(-1);
-    if (!opens && last) last.pieces.push(p);
+    if ((deep || !opens) && last) last.pieces.push(p);
     else groups.push({ opens: opens ?? "page", pieces: [p] });
   }
 

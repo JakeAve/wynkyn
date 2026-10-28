@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { parse } from "../parser/parser.ts";
+import type { Metadata } from "../metadata/types.ts";
 import {
   formatNumber,
   render as renderLined,
@@ -887,6 +888,43 @@ Deno.test("renderSegments: the endnotes' break-after reaches the next section", 
     },
   });
   assertEquals(segs.find((s) => s.id === "crossing")?.opens, "page");
+});
+
+Deno.test("renderSegments: a forced break-after below a section merges", () => {
+  const doc = parse(SEGMENT_BOOK);
+  const ids = (elements: Metadata["elements"]) =>
+    renderSegments(doc, { elements }).map((s) => s.id);
+  const all = ids({});
+  // Last in its section, it would break before the next one: the cut can't
+  // know, so nothing is cut.
+  for (
+    const elements of [
+      { paragraph: { "break-after": "right" } },
+      { title: { "break-after": "page" } },
+      { footnote: { "break-after": "left" } },
+      { chapter: { title: { "break-after": "verso" } } },
+      { part: { chapter: { dropcap: { "break-after": "always" } } } },
+    ] as Metadata["elements"][]
+  ) {
+    assertEquals(
+      ids(elements),
+      ["matter-half-title"],
+      JSON.stringify(elements),
+    );
+  }
+  assertEquals(
+    renderSegments(doc, {
+      elements: { paragraph: { "break-after": "page" } },
+    })[0]!.html,
+    renderLined(doc),
+  );
+  // A break-before inside a segment is Paged.js's to make; so is a deep
+  // break-after that forces nothing, and a section's own (handled above).
+  assertEquals(ids({ paragraph: { "break-before": "right" } }), all);
+  assertEquals(ids({ chapter: { title: { "break-before": "page" } } }), all);
+  assertEquals(ids({ paragraph: { "break-after": "avoid" } }), all);
+  assertEquals(ids({ chapter: { "break-after": "page" } }), all);
+  assertEquals(ids({ p: { "break-after": "page" } }), all); // reaches nothing
 });
 
 Deno.test("renderSegments: run-on chapters merge into the segment before", () => {
