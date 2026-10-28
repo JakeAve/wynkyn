@@ -484,7 +484,9 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
 let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {};
 let restore: (cached: CachedBook | null, version?: string) => void = () => {};
 
-// The book's cached render with a URL for each image it shows, or null.
+// The book's cached render with a URL for each image it shows, or null. An
+// image it can't read (removed, renamed, refused) is a miss, never a throw:
+// the editor starts on it.
 async function loadCachedBook(): Promise<CachedBook | null> {
   const cached = await loadCachedRender(cacheId(book, edition));
   if (!cached) return null;
@@ -492,14 +494,18 @@ async function loadCachedBook(): Promise<CachedBook | null> {
   for (const s of cached.segments) {
     untokenImages(s.pages, (n) => (names.add(n), ""));
   }
-  const urls = new Map(
-    await Promise.all(
-      [...names].map(async (n) =>
-        [n, await backend.imageUrl(book, n)] as const
+  try {
+    const urls = new Map(
+      await Promise.all(
+        [...names].map(async (n) =>
+          [n, await backend.imageUrl(book, n)] as const
+        ),
       ),
-    ),
-  );
-  return { ...cached, imageUrl: (n) => urls.get(n) ?? "" };
+    );
+    return { ...cached, imageUrl: (n) => urls.get(n) ?? "" };
+  } catch {
+    return null;
+  }
 }
 
 // The edition's metadata with every style edit landed, so a theme goes over

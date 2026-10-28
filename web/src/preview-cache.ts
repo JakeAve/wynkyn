@@ -187,8 +187,12 @@ function openDb(): Promise<IDBDatabase | null> {
       }
     };
     req.onsuccess = () => {
-      // Let a tab with a newer version upgrade instead of blocking on us.
-      req.result.onversionchange = () => req.result.close();
+      // Let a tab with a newer version upgrade instead of blocking on us;
+      // the next transaction opens the upgraded database.
+      req.result.onversionchange = () => {
+        req.result.close();
+        dbPromise = null;
+      };
       resolve(req.result);
     };
     req.onerror = () => resolve(null);
@@ -275,9 +279,9 @@ export async function loadCachedRender(
   });
 }
 
-/** Saves the manifest and `rows` (segment key → row), then sweeps rows no
- * manifest names. The keys the old manifest named are kept a while (`kept`,
- * at most KEEP), so an undo hits. */
+/** Saves the manifest and `rows` (segment key → row), then, when the book
+ * names other keys than before, sweeps rows no manifest names. The keys the
+ * old manifest named are kept a while (`kept`, at most KEEP), so an undo hits. */
 export async function saveCachedRender(
   id: string,
   render: CachedRender,
@@ -296,7 +300,10 @@ export async function saveCachedRender(
       ].filter((k) => !now.has(k)).slice(0, KEEP);
       s.books.put({ ...render, kept }, id);
       for (const [key, row] of rows) s.segments.put(row, key);
-      sweep(s);
+      // Same keys as before: no row lost its name, so there's nothing to sweep.
+      const same = was?.segments.length === now.size &&
+        was.segments.every((x) => now.has(x.key));
+      if (!same) sweep(s);
     };
     return () => {};
   });

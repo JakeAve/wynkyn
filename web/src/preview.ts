@@ -145,6 +145,12 @@ let rendering = false;
 // Abandons the render under way: a newer update has made it pointless.
 let cancelCurrent: (() => void) | null = null;
 const CANCELLED = Symbol("render cancelled");
+// Thrown by a segment's layout when the book must be laid out whole.
+const WHOLE = Symbol("lay the book out whole");
+// Rules Paged.js's Counters, target-counter() and target-text() handlers
+// write for one run's elements (data-ref and the like, fresh each parse):
+// pages laid by another run, or alone, don't match them.
+const PER_RUN = /\[data-(?:ref|page-number|target-text|target-counter-[\w-]+)=/;
 // What the render on screen or being produced for it is of (`target`); every
 // accepted call sets it synchronously, so a queued render can't be skipped as
 // "same".
@@ -193,10 +199,26 @@ function target(
   return [styles, ...keys, JSON.stringify(numbering)].join(" ");
 }
 
+// Each update's segment keys, with the numbers each was keyed under: a
+// segment's styles are hashed once, and its key again only when a number it
+// prints changed.
+const keyMemo = new WeakMap<
+  UpdateMessage,
+  Map<Segment, { style: string; read: string; key: string }>
+>();
+
 // A segment's cache key: its text, the styles that reach it, the numbers it
 // prints.
 function keyOf(u: UpdateMessage, s: Segment, from: Seed): string {
-  return segmentKey(s, segmentStyleHash(s, u), from, u.imageUrls);
+  let memo = keyMemo.get(u);
+  if (!memo) keyMemo.set(u, memo = new Map());
+  const read = s.reads.map((a) => from[a] ?? "000").join("\x1f");
+  const was = memo.get(s);
+  if (was?.read === read) return was.key;
+  const style = was?.style ?? segmentStyleHash(s, u);
+  const key = segmentKey(s, style, from, u.imageUrls);
+  memo.set(s, { style, read, key });
+  return key;
 }
 
 function targetOf(u: UpdateMessage, from: Seed): string {
@@ -255,19 +277,19 @@ function pagesOf(
   return [...div.children];
 }
 
-// The book's font stylesheets, loaded: Paged.js waits only on the faces
-// document.fonts already lists, and a link's join it once its sheet is in.
-// Without this a first segment, laid out at once, set type in a fallback face.
+// Each book-font link's load or failure, watched from when setFontLinks adds
+// it: a link that has failed fires nothing more, so a listener added later
+// would wait for good (offline, fonts blocked).
+const linkSettled = new WeakMap<Element, Promise<unknown>>();
+
+// The book's font stylesheets, loaded or failed: Paged.js waits only on the
+// faces document.fonts already lists, and a link's join it once its sheet is
+// in. Without this a first segment, laid out at once, set type in a fallback
+// face.
 function fontSheets(): Promise<unknown> {
   return Promise.all(
-    [...document.querySelectorAll<HTMLLinkElement>(
-      "link[data-book-font][rel=stylesheet]",
-    )].filter((l) => !l.sheet).map((l) =>
-      new Promise((done) => {
-        l.addEventListener("load", done, { once: true });
-        l.addEventListener("error", done, { once: true });
-      })
-    ),
+    [...document.querySelectorAll("link[data-book-font][rel=stylesheet]")]
+      .map((l) => linkSettled.get(l)),
   );
 }
 
@@ -305,7 +327,8 @@ export function renderPreview(
 // the cache when its key is there, else by its own Previewer in its own stage,
 // then assembles their pages into one .pagedjs_pages. One Previewer's sheets
 // serve every page (all are scoped alike); the others' come down. When the
-// segments' sheets differ the book is laid out whole, and nothing is saved.
+// segments' sheets differ, or hold rules for one run's elements (PER_RUN),
+// the book is laid out whole, and nothing is saved.
 async function runRender(
   update: UpdateMessage,
   container: HTMLElement,
@@ -403,6 +426,7 @@ async function runRender(
       const styles = sheetsOf(previewer);
       if (kept) previewer.polisher.destroy();
       else kept = { previewer, styles };
+      if (styles.some((css) => PER_RUN.test(css))) throw WHOLE;
       const pages = [
         ...flow.pagesArea.querySelectorAll(":scope > .pagedjs_page"),
       ];
@@ -443,7 +467,7 @@ async function runRender(
             layOut,
             assembleAll,
             seed,
-          ),
+          ).catch((err) => err === WHOLE ? null : Promise.reject(err)),
           abort.promise,
         ]);
       }
@@ -646,6 +670,13 @@ export function setFontLinks(html: string, { keep = false } = {}): void {
   }
   for (const link of want.values()) {
     link.setAttribute("data-book-font", "");
+    linkSettled.set(
+      link,
+      new Promise((done) => {
+        link.addEventListener("load", done, { once: true });
+        link.addEventListener("error", done, { once: true });
+      }),
+    );
     document.head.appendChild(link);
   }
 }
