@@ -718,10 +718,10 @@ export function fitPreview(container: HTMLElement): void {
 
 // The book's paper stock (`page.paper`, design-language.md §2.5) on the live
 // pages only: print clears the page background, so sheets and PDFs stay white.
-// A value that isn't a colour leaves the default stock, not a see-through page.
-export function setPaperStock(colour: string | undefined): void {
+// A value that isn't a color leaves the default stock, not a see-through page.
+export function setPaperStock(color: string | undefined): void {
   const preview = document.getElementById("preview")!;
-  if (colour && CSS.supports("color", colour)) {
-    preview.style.setProperty("--stock", colour);
+  if (color && CSS.supports("color", color)) {
+    preview.style.setProperty("--stock", color);
   } else preview.style.removeProperty("--stock");
 }

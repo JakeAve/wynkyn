@@ -36,7 +36,7 @@ export interface PageConfig {
   duplex?: Duplex;
   flip?: Flip; // which edge the stack turns over on for its backs, duplex "none"
   "reverse-backs"?: boolean; // backs file in reverse sheet order, duplex "none"
-  paper?: string; // the paper stock, any CSS colour; tints the preview only (§4.3)
+  paper?: string; // the paper stock, any CSS color; tints the preview only (§4.3)
   marks?: PageMarks; // binding marks, imposed sheets only (§4.3)
 }
 
@@ -141,6 +141,7 @@ export interface Metadata {
   language?: string; // BCP 47 (§4.2), default "en"; `ebook.language` is the older spelling
   page?: PageConfig;
   fonts?: Record<string, string>;
+  colors?: Record<string, string>; // color aliases (§4.15): name → any CSS color
   elements?: Record<string, ElementStyle>;
   is?: Record<string, CssProps>;
   numbering?: Numbering;

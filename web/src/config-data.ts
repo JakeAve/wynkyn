@@ -3,6 +3,7 @@
 import type {
   CssProps,
   FolioPosition,
+  Metadata,
   NumberingStyle,
   Running,
   RunningEntry,
@@ -146,12 +147,66 @@ export function makeRunningEntry(form: RunningEntryForm): RunningEntry {
 // The running heads' simple view (spec R5): what the first entry on each side
 // shows, and the shared size / italic / font across every entry. A property
 // the entries disagree on reads "mixed".
+// Which of Italic, Bold and Underline a set of props turns on.
+export function emphasisOf(props: Record<string, string | undefined>): {
+  italic: boolean;
+  bold: boolean;
+  underline: boolean;
+} {
+  return {
+    italic: props["font-style"] === "italic",
+    bold: ["bold", "bolder", "600", "700", "800", "900"].includes(
+      props["font-weight"] ?? "",
+    ),
+    underline: (props["text-decoration"] ?? "").includes("underline"),
+  };
+}
+
+// Letter case as the Style row offers it: normal, capitals, caps and small
+// caps, or all small caps (all-small-caps shrinks the capitals too;
+// small-caps keeps them full height). Undefined: nothing set.
+export type Case = "none" | "upper" | "csc" | "small";
+
+export function caseOf(
+  props: Record<string, string | undefined>,
+): Case | undefined {
+  const caps = props["font-variant-caps"];
+  if (caps === "all-small-caps") return "small";
+  if (caps === "small-caps") return "csc";
+  if (props["text-transform"] === "uppercase") return "upper";
+  if (props["text-transform"] === "none") return "none";
+  return undefined;
+}
+
+// The two keys a case writes; undefined clears a key.
+export function caseProps(c: Case | undefined): {
+  "text-transform": string | undefined;
+  "font-variant-caps": string | undefined;
+} {
+  return {
+    "text-transform": c === "upper"
+      ? "uppercase"
+      : c === "none"
+      ? "none"
+      : undefined,
+    "font-variant-caps": c === "small"
+      ? "all-small-caps"
+      : c === "csc"
+      ? "small-caps"
+      : undefined,
+  };
+}
+
 export function runningSummary(running: Running | undefined): {
   left: string;
   right: string;
   size: string | "mixed" | undefined;
   italic: boolean | "mixed";
+  bold: boolean | "mixed";
+  underline: boolean | "mixed";
+  case: Case | "mixed" | undefined;
   font: string | "mixed" | undefined;
+  color: string | "mixed" | undefined;
 } {
   const all = [...(running?.odd ?? []), ...(running?.even ?? [])];
   const agree = <T>(pick: (e: RunningEntry) => T): T | "mixed" | undefined =>
@@ -160,8 +215,12 @@ export function runningSummary(running: Running | undefined): {
     left: running?.even?.[0]?.content ?? "none",
     right: running?.odd?.[0]?.content ?? "none",
     size: agree((e) => e["font-size"]),
-    italic: agree((e) => e["font-style"] === "italic") ?? false,
+    italic: agree((e) => emphasisOf(e).italic) ?? false,
+    bold: agree((e) => emphasisOf(e).bold) ?? false,
+    underline: agree((e) => emphasisOf(e).underline) ?? false,
+    case: agree((e) => caseOf(e)),
     font: agree((e) => e["font-family"]),
+    color: agree((e) => e.color),
   };
 }
 
@@ -195,9 +254,20 @@ export function setHeadPosition(running: Running, at: FolioPosition): void {
 }
 
 // Write one shared property to every entry on both sides; undefined deletes.
+// The keys the running heads' shared type rows write to every entry.
+export type SharedProp =
+  | "font-size"
+  | "font-style"
+  | "font-family"
+  | "font-weight"
+  | "text-decoration"
+  | "text-transform"
+  | "font-variant-caps"
+  | "color";
+
 export function setRunningShared(
   running: Running,
-  prop: "font-size" | "font-style" | "font-family",
+  prop: SharedProp,
   value: string | undefined,
 ): void {
   for (const e of [...(running.odd ?? []), ...(running.even ?? [])]) {
@@ -215,6 +285,23 @@ export function renameKey<T>(
   const out: Record<string, T> = {};
   for (const [k, v] of Object.entries(obj)) out[k === from ? to : k] = v;
   return out;
+}
+
+// Renames a book color (§4.15) and every `color` / `*-color` value that names
+// it, in elements, `is` styles, page numbers and running heads, so nothing
+// left pointing at the old name falls back to black.
+export function renameColor(meta: Metadata, from: string, to: string): void {
+  meta.colors = renameKey(meta.colors ?? {}, from, to);
+  const walk = (o: unknown): void => {
+    if (!o || typeof o !== "object") return;
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (
+        v === from && (k === "color" || k.endsWith("-color"))
+      ) (o as Record<string, unknown>)[k] = to;
+      else walk(v);
+    }
+  };
+  walk([meta.elements, meta.is, meta.numbering, meta.running]);
 }
 
 // ---------- style panel (spec §7.4) ----------

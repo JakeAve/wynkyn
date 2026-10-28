@@ -5,6 +5,7 @@
 // panel-*.ts; this file owns the debounced save, routing, and the DOM helpers
 // the builders share. Reusable transforms live in config-data.ts with tests.
 import type { Metadata } from "../../metadata/types.ts";
+import { buildColorsTab } from "./panel-colors.ts";
 import { buildFontsTab } from "./panel-fonts.ts";
 import { buildPageTab, buildPublishTab } from "./panel-page.ts";
 import { buildPartsTab } from "./panel-parts.ts";
@@ -103,6 +104,7 @@ function styleNav(meta: Metadata): Array<[string, NavRow[]]> {
       { id: "themes", label: "Theme", route: { tab: "themes" } },
       { id: "page", label: "Page size & margins", route: { tab: "page" } },
       { id: "fonts", label: "Fonts", route: { tab: "fonts" } },
+      { id: "colors", label: "Colors", route: { tab: "colors" } },
       row(body),
     ],
   ]];
@@ -161,6 +163,12 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         if (family) filtered[alias] = family;
       }
       sections.fonts = filtered;
+    }
+    // Likewise a new color before one is picked (the Colors view).
+    if (sections.colors && typeof sections.colors === "object") {
+      sections.colors = Object.fromEntries(
+        Object.entries(sections.colors).filter(([, v]) => v),
+      );
     }
     // Unstyled `{is}` classes (syncIsNames) stay off disk.
     if (sections.is) {
@@ -278,6 +286,8 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         return buildPageTab(ctx);
       case "fonts":
         return buildFontsTab(ctx);
+      case "colors":
+        return buildColorsTab(ctx);
       case "publish":
         return buildPublishTab(ctx);
       case "parts":

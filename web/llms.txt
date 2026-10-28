@@ -43,7 +43,7 @@ A new book starts from the house style: /templates/metadata.json
 
 ## Working with an author
 
-- Keep the separation: never put a font, size, colour or page break in BML.
+- Keep the separation: never put a font, size, color or page break in BML.
   "Make the chapter titles bigger" is a `metadata.json` edit under `elements`;
   "add an epigraph" is a BML edit.
 - Every section with a heading needs its `{title}` sentinel; a bare first line

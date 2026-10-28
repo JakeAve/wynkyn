@@ -5,6 +5,7 @@
 import type { CssProps, Metadata } from "../../metadata/types.ts";
 import {
   bumpLength,
+  type Case,
   convertLength,
   formatCssLines,
   LENGTH_UNITS,
@@ -156,7 +157,7 @@ export function stepper(o: {
     }
     const n = parseLength(value ?? o.placeholder ?? "")?.n ?? 0;
     const k = dir > 0 ? Math.floor(n / step) + 1 : Math.ceil(n / step) - 1;
-    commit(String(k * step));
+    commit(String(Math.round(k * step * 1000) / 1000)); // 24 × 0.05 is 1.2, not 1.2000000000000002
   };
   input.onchange = () => {
     const t = input.value.trim();
@@ -263,8 +264,8 @@ export function switchInput(
   return input;
 }
 
-// Colour swatches, then a custom colour: a picker beside its code (any CSS
-// colour can be typed). An option whose value is "" means unset; its chip
+// Color swatches, then a custom color: a picker beside its code (any CSS
+// color can be typed). An option whose value is "" means unset; its chip
 // shows the default `--stock` (app.css). The chosen chip takes the red wash,
 // or the picker does when the value is none of the options.
 export function swatches(
@@ -276,12 +277,12 @@ export function swatches(
   const picker = h("input", {
     type: "color",
     "aria-label": `Custom ${label.toLowerCase()}`,
-    title: "Custom colour",
+    title: "Custom color",
   });
   const code = h("input", {
     type: "text",
     class: "txt",
-    "aria-label": `${label} colour code`,
+    "aria-label": `${label} color code`,
     spellcheck: "false",
     autocomplete: "off",
   });
@@ -290,7 +291,7 @@ export function swatches(
     chip.style.background = o.value;
     const b = h("button", {
       type: "button",
-      class: "colour",
+      class: "color",
       "aria-label": o.label,
       title: o.label,
     }, chip);
@@ -317,13 +318,13 @@ export function swatches(
   picker.onchange = () => set(picker.value); // on release: one save, not one per drag tick
   code.onchange = () => {
     const t = code.value.trim();
-    if (t && !CSS.supports("color", t)) return paint(value); // not a colour
+    if (t && !CSS.supports("color", t)) return paint(value); // not a color
     set(t || undefined);
   };
   paint(value);
   return h(
     "span",
-    { class: "colours", role: "group", "aria-label": label },
+    { class: "colors", role: "group", "aria-label": label },
     ...btns.map(([b]) => b),
     picker,
     code,
@@ -361,6 +362,101 @@ export function row(
   );
   r.hidden = !!opts.hidden;
   return r;
+}
+
+// "Add new font" / "Add new color" beside a picker of the book's own: opens
+// the Book view where it is added, so styles stay on the book's fonts and
+// colors (More CSS takes anything).
+export function addNew(ctx: PanelContext, what: "font" | "color"): HTMLElement {
+  const b = h("button", { type: "button", class: "where" }, `Add new ${what}`);
+  b.onclick = () =>
+    ctx.go(
+      what === "font"
+        ? { tab: "fonts", focus: "more-fonts" }
+        : { tab: "colors", focus: "more-colors" },
+    );
+  return b;
+}
+
+export type Emphasis = "font-style" | "font-weight" | "text-decoration";
+
+// The Italic, Bold and Underline toggles: one key each, set when pressed and
+// cleared when released, so any mix of the three can be on.
+export function emphasisToggles(
+  on: { italic: boolean; bold: boolean; underline: boolean },
+  set: (prop: Emphasis, v: string | undefined) => void,
+): HTMLElement[] {
+  return [
+    toggle(
+      "Italic",
+      on.italic,
+      (o) => set("font-style", o ? "italic" : undefined),
+    ),
+    toggle("Bold", on.bold, (o) => set("font-weight", o ? "bold" : undefined)),
+    toggle(
+      "Underline",
+      on.underline,
+      (o) => set("text-decoration", o ? "underline" : undefined),
+    ),
+  ];
+}
+
+// The case buttons: Aa, AA, Aᴀ, Small caps (`caseOf`/`caseProps`). Clicking
+// the lit one unsets it.
+export function caseSeg(
+  value: Case | undefined,
+  onChange: (c: Case | undefined) => void,
+  label: string,
+): HTMLElement {
+  return seg(
+    [
+      { label: "Aa", value: "none", aria: "Normal case" },
+      { label: "AA", value: "upper", aria: "Capitals" },
+      { label: "Aᴀ", value: "csc", aria: "Caps and small caps" },
+      { label: "Small caps", value: "small" },
+    ],
+    value,
+    onChange,
+    label,
+    true,
+  );
+}
+
+// A pick from the book's colors (§4.15), as Font picks from its fonts: a chip
+// of the color the text sets in now, a select ("Inherited · …" first, then
+// the book's colors, plus a color already set that isn't one), then "Add new
+// color". `inherits` is the value used while unset (an alias or CSS).
+export function colorPick(
+  ctx: PanelContext,
+  value: string | undefined,
+  inherits: string | undefined,
+  onChange: (v: string | undefined) => void,
+  label: string,
+): HTMLElement {
+  const colors = ctx.meta.colors ?? {};
+  const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);
+  const resolve = (c: string | undefined) => c ? (colors[c] ?? c) : "#000000";
+  const name = (c: string | undefined) =>
+    !c ? "black" : Object.hasOwn(colors, c) ? cap(c) : c;
+  const chip = h("i", { class: "ink-chip" });
+  chip.style.background = resolve(value ?? inherits);
+  const opts = [
+    { label: `Inherited · ${name(inherits)}`, value: "" },
+    ...Object.keys(colors).map((c) => ({ label: cap(c), value: c })),
+  ];
+  if (value && !Object.hasOwn(colors, value)) {
+    opts.push({ label: value, value });
+  }
+  return h(
+    "span",
+    { class: "ctl" },
+    chip,
+    select(opts, value ?? "", (c) => {
+      chip.style.background = resolve(c || inherits);
+      onChange(c || undefined);
+    }, label),
+    addNew(ctx, "color"),
+  );
 }
 
 // "On N pages" for a style key: hover outlines every match, a click steps

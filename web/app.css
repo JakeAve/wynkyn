@@ -1614,7 +1614,7 @@ body.typing #editor .pane-head {
   background: none;
   color: var(--muted);
 }
-/* an image's slug or filename: an identifier, in the row's colour (§3.1) */
+/* an image's slug or filename: an identifier, in the row's color (§3.1) */
 #editor .cm-tooltip-autocomplete li:has(> .cm-bml-thumb) > .cm-completionLabel {
   align-self: end;
   font: var(--fs-sm) var(--f-hivis);
@@ -2061,7 +2061,7 @@ body.typing #editor .pane-head {
   }
   /* The drawer (§6.13, inspect-drawer.ts): under the pages, the pinned
      target's crumbs and actions, then why / box / type. Chrome, so it takes
-     the theme; its box diagram borrows the marks' colours. */
+     the theme; its box diagram borrows the marks' colors. */
   #inspect-drawer {
     grid-row: 3;
     display: grid;
@@ -2521,6 +2521,11 @@ body.typing #editor .pane-head {
   gap: var(--s-4);
   min-height: var(--h-md);
 }
+/* A holder a view redraws rows into: its rows stay the section's grid items,
+   spaced like every other section's. */
+#config-overlay .rows {
+  display: contents;
+}
 #config-overlay .row[hidden] {
   display: none;
 }
@@ -2675,16 +2680,17 @@ body.typing #editor .pane-head {
 #config-overlay .tog.outline {
   color: var(--fg);
 }
-/* swatches (panel-controls.ts swatches, §6.5): colour chips, then a picker
+/* swatches (panel-controls.ts swatches, §6.5): color chips, then a picker
    beside its code; the chosen one sits in the red wash */
-#config-overlay .colours {
+#config-overlay .colors {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-1);
 }
-#config-overlay .colour,
-#config-overlay .colours input[type="color"] {
+#config-overlay .color,
+#config-overlay .colors input[type="color"],
+#config-overlay input.color-pick {
   width: var(--h-md);
   height: var(--h-md);
   padding: var(--s-1);
@@ -2694,7 +2700,7 @@ body.typing #editor .pane-head {
   background: none;
   cursor: pointer;
 }
-#config-overlay .colour i {
+#config-overlay .color i {
   display: block;
   height: 100%;
   border-radius: var(--r);
@@ -2702,36 +2708,53 @@ body.typing #editor .pane-head {
   background: var(--stock); /* the unset option: the default stock */
   box-shadow: inset 0 0 0 1px var(--line);
 }
-#config-overlay .colour[aria-pressed="true"],
-#config-overlay .colours input[type="color"].on {
+/* A book color sits on paper, so black reads in the dark theme too: the
+   Colors view's picker, and the chip beside a part's Color select. */
+#config-overlay input.color-pick {
+  background: var(--stock);
+}
+#config-overlay .ink-chip {
+  flex: none;
+  width: var(--h-sm);
+  height: var(--h-sm);
+  border: var(--hair) solid var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  box-shadow: inset 0 0 0 var(--s-1) var(--stock);
+}
+#config-overlay .color[aria-pressed="true"],
+#config-overlay .colors input[type="color"].on {
   background: var(--acc-wash);
   box-shadow: inset 0 0 0 1px var(--acc);
 }
-#config-overlay .colours input[type="color"]::-webkit-color-swatch-wrapper {
+#config-overlay .colors input[type="color"]::-webkit-color-swatch-wrapper,
+#config-overlay input.color-pick::-webkit-color-swatch-wrapper {
   padding: 0;
 }
-#config-overlay .colours input[type="color"]::-webkit-color-swatch {
+#config-overlay .colors input[type="color"]::-webkit-color-swatch,
+#config-overlay input.color-pick::-webkit-color-swatch {
   border: 0;
   border-radius: var(--r);
   corner-shape: var(--corner);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-#config-overlay .colours input[type="color"]::-moz-color-swatch {
+#config-overlay .colors input[type="color"]::-moz-color-swatch,
+#config-overlay input.color-pick::-moz-color-swatch {
   border: 0;
   border-radius: var(--r);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-/* Until a custom colour is chosen the picker reads "any colour", not a white
-   chip beside Bright white: a soft hue wheel (§6.5's one literal colour). */
-#config-overlay .colours input[type="color"]:not(.on)::-webkit-color-swatch {
+/* Until a custom color is chosen the picker reads "any color", not a white
+   chip beside Bright white: a soft hue wheel (§6.5's one literal color). */
+#config-overlay .colors input[type="color"]:not(.on)::-webkit-color-swatch {
   background: conic-gradient(in oklch longer hue, oklch(0.82 0.1 30), oklch(0.82
     0.1 30));
 }
-#config-overlay .colours input[type="color"]:not(.on)::-moz-color-swatch {
+#config-overlay .colors input[type="color"]:not(.on)::-moz-color-swatch {
   background: conic-gradient(in oklch longer hue, oklch(0.82 0.1 30), oklch(0.82
     0.1 30));
 }
-#config-overlay .colours input.txt {
+#config-overlay .colors input.txt {
   width: 6.5rem;
   margin-left: var(--s-2);
   font-family: var(--f-hivis); /* a typed code (§3.1) */
@@ -2953,21 +2976,6 @@ body.typing #editor .pane-head {
 }
 #config-overlay .chip:hover {
   background: var(--hover);
-}
-#config-overlay .range {
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
-  flex: 1;
-}
-#config-overlay .range input {
-  flex: 1;
-  min-width: 5rem;
-  accent-color: var(--fg);
-}
-#config-overlay .range output {
-  font-variant-numeric: tabular-nums;
-  min-width: 2.125rem;
 }
 #config-overlay details.more {
   margin-top: var(--s-1);

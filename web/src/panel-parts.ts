@@ -7,10 +7,14 @@ import type {
   NumberingStyle,
   StructureNumbering,
 } from "../../metadata/types.ts";
-import { parseLength } from "./config-data.ts";
+import { caseOf, caseProps, emphasisOf, parseLength } from "./config-data.ts";
 import { buildFurniture } from "./panel-furniture.ts";
 import {
+  addNew,
   applies,
+  caseSeg,
+  colorPick,
+  emphasisToggles,
   icon,
   makeView,
   moreCss,
@@ -20,7 +24,6 @@ import {
   select,
   stepper,
   switchInput,
-  toggle,
   type View,
 } from "./panel-controls.ts";
 import {
@@ -30,6 +33,7 @@ import {
   ensureProps,
   getProps,
   inheritedFont,
+  inheritedValue,
   type PanelContext,
   setCount,
   type StyleEntry,
@@ -59,7 +63,6 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 const cap = (s: string) =>
   s.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
-const fmt = (n: number) => String(Math.round(n * 100) / 100);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // No part chosen: the nav lists them.
@@ -137,10 +140,14 @@ const GENERIC = [
   "font-family",
   "font-size",
   "font-style",
+  "font-weight",
+  "text-decoration",
   "text-transform",
   "font-variant-caps",
+  "color",
   "text-align",
   "letter-spacing",
+  "line-height",
   "margin-top",
   "margin-bottom",
 ];
@@ -252,17 +259,6 @@ function block(
   ];
   if (ff && !(ff in fonts)) fontOpts.push({ label: ff, value: ff });
 
-  // all-small-caps shrinks the capitals too; small-caps keeps them full height.
-  const caps = props["font-variant-caps"] === "all-small-caps"
-    ? "small"
-    : props["font-variant-caps"] === "small-caps"
-    ? "csc"
-    : props["text-transform"] === "uppercase"
-    ? "upper"
-    : props["text-transform"] === "none"
-    ? "none"
-    : undefined;
-
   const inhAlign = `Inherited · ${
     body["text-align"] === "justify" ? "justified" : "left"
   }`;
@@ -300,16 +296,34 @@ function block(
       has(prop),
     );
 
+  // The book's colors (§4.15) by name, like the fonts: changing one
+  // recolors its users. The chip shows the color the text sets in now.
+  const colorRow = row(
+    "Color",
+    colorPick(
+      ctx,
+      props.color,
+      inheritedValue(meta, entry, "color"),
+      set("color"),
+      `${label} color`,
+    ),
+  );
+
   return section(label, focusOf(entry.key), [
     ...extraRows,
     v.mark(
       row(
         "Font",
-        select(
-          fontOpts,
-          ff ?? "",
-          (x) => set("font-family")(x || undefined),
-          `${label} font`,
+        el(
+          "span",
+          "ctl",
+          select(
+            fontOpts,
+            ff ?? "",
+            (x) => set("font-family")(x || undefined),
+            `${label} font`,
+          ),
+          addNew(ctx, "font"),
         ),
       ),
       has("font-family"),
@@ -332,47 +346,42 @@ function block(
         el(
           "span",
           "ctl",
-          toggle(
-            "Italic",
-            props["font-style"] === "italic",
-            (on) => set("font-style")(on ? "italic" : undefined),
-          ),
-          seg(
-            [
-              { label: "Aa", value: "none", aria: "Normal case" },
-              { label: "AA", value: "upper", aria: "Capitals" },
-              { label: "Aᴀ", value: "csc", aria: "Caps and small caps" },
-              { label: "Small caps", value: "small" },
-            ],
-            caps,
-            (c) => {
-              put(
-                meta,
-                entry,
-                "text-transform",
-                c === "upper" ? "uppercase" : c === "none" ? "none" : undefined,
-              );
-              put(
-                meta,
-                entry,
-                "font-variant-caps",
-                c === "small"
-                  ? "all-small-caps"
-                  : c === "csc"
-                  ? "small-caps"
-                  : undefined,
-              );
-              save();
-            },
-            `${label} case`,
-            true,
-          ),
+          ...emphasisToggles(emphasisOf(props), (p, x) => set(p)(x)),
+          caseSeg(caseOf(props), (c) => {
+            for (const [k, x] of Object.entries(caseProps(c))) {
+              put(meta, entry, k, x);
+            }
+            save();
+          }, `${label} case`),
         ),
       ),
-      has("font-style", "text-transform", "font-variant-caps"),
+      has(
+        "font-style",
+        "font-weight",
+        "text-decoration",
+        "text-transform",
+        "font-variant-caps",
+      ),
     ),
+    v.mark(colorRow, has("color")),
     v.mark(alignRow, has("text-align")),
     length("Letter spacing", "letter-spacing", "0em"),
+    // Leading as a multiple of the size (1.2), like Body text's; unset, the
+    // inherited spacing shows.
+    v.mark(
+      row(
+        "Line spacing",
+        stepper({
+          value: props["line-height"],
+          placeholder: inheritedValue(meta, entry, "line-height") ?? "1.5",
+          label: `${label} line spacing`,
+          unit: "",
+          step: () => 0.05,
+          onChange: set("line-height"),
+        }),
+      ),
+      has("line-height"),
+    ),
     length("Space above", "margin-top", "0pt"),
     length("Space below", "margin-bottom", "0pt"),
     moreCss(
@@ -657,17 +666,6 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
   const ff = bp["font-family"];
   const change = el("button", "where", "Change in Fonts");
   change.onclick = () => ctx.go({ tab: "fonts", focus: ff ?? "body" });
-  const lh = parseFloat(bp["line-height"] ?? "") || 1.5;
-  const out = el("output", "", `${fmt(lh)}×`);
-  const range = el("input", "");
-  Object.assign(range, { type: "range", min: "1", max: "2", step: "0.05" });
-  range.value = String(lh);
-  range.setAttribute("aria-label", "Line spacing");
-  range.oninput = () => {
-    out.textContent = `${fmt(+range.value)}×`;
-    put(meta, body, "line-height", range.value);
-    save();
-  };
   const text = section("Text", "text", [
     row(
       "Font",
@@ -694,7 +692,21 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
       has(body, "font-size"),
     ),
     v.mark(
-      row("Line spacing", el("span", "range", range, out)),
+      // As every part's: a multiple of the size; base.css's 1.5 unset.
+      row(
+        "Line spacing",
+        stepper({
+          value: bp["line-height"],
+          placeholder: "1.5",
+          label: "Body text line spacing",
+          unit: "",
+          step: () => 0.05,
+          onChange: (x) => {
+            put(meta, body, "line-height", x);
+            save();
+          },
+        }),
+      ),
       has(body, "line-height"),
     ),
     v.mark(

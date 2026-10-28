@@ -2,7 +2,10 @@ import { assert, assertEquals, assertFalse } from "@std/assert";
 import type { RunningEntry } from "../../metadata/types.ts";
 import {
   bumpLength,
+  caseOf,
+  caseProps,
   convertLength,
+  emphasisOf,
   formatCssLines,
   headPosition,
   isValidFolios,
@@ -13,6 +16,7 @@ import {
   parseCssLines,
   parseLength,
   presetFor,
+  renameColor,
   renameKey,
   runningSummary,
   setHeadPosition,
@@ -167,7 +171,11 @@ Deno.test("runningSummary reports mixed sizes", () => {
     right: "book-title",
     size: "mixed",
     italic: "mixed",
+    bold: false,
+    underline: false,
+    case: undefined,
     font: "mixed",
+    color: undefined,
   });
   running.odd[0]!["font-size"] = "9pt";
   assertEquals(runningSummary(running).size, "9pt");
@@ -176,7 +184,11 @@ Deno.test("runningSummary reports mixed sizes", () => {
     right: "none",
     size: undefined,
     italic: false,
+    bold: false,
+    underline: false,
+    case: undefined,
     font: undefined,
+    color: undefined,
   });
 });
 
@@ -185,13 +197,29 @@ Deno.test("setRunningShared writes every entry", () => {
     { content: "book-title", area: "top-right", "font-size": "8pt" },
     { content: "page-number", area: "bottom-right" },
   ];
-  const even = [{ content: "chapter-title", area: "top-left", color: "red" }];
+  const even: RunningEntry[] = [
+    { content: "chapter-title", area: "top-left", color: "red" },
+  ];
   const running = { odd, even };
   setRunningShared(running, "font-size", "10pt");
   assertEquals(runningSummary(running).size, "10pt");
   assertEquals(even[0]!["color"], "red"); // other keys untouched
   setRunningShared(running, "font-size", undefined);
   assert([...odd, ...even].every((e) => !("font-size" in e)));
+  assertEquals(runningSummary(running).color, "mixed"); // only even sets one
+  setRunningShared(running, "color", "ink");
+  assertEquals(runningSummary(running).color, "ink");
+  // Any mix of Italic, Bold and Underline, on every entry at once.
+  setRunningShared(running, "font-weight", "bold");
+  setRunningShared(running, "text-decoration", "underline");
+  const s = runningSummary(running);
+  assertEquals([s.italic, s.bold, s.underline], [false, true, true]);
+  delete odd[0]!["font-weight"];
+  assertEquals(runningSummary(running).bold, "mixed");
+  setRunningShared(running, "font-variant-caps", "all-small-caps");
+  assertEquals(runningSummary(running).case, "small");
+  even[0]!["font-variant-caps"] = "small-caps";
+  assertEquals(runningSummary(running).case, "mixed");
 });
 
 Deno.test("headPosition reads and setHeadPosition moves the first heads", () => {
@@ -213,4 +241,52 @@ Deno.test("headPosition reads and setHeadPosition moves the first heads", () => 
   ]);
   running.odd[0]!.area = "left-middle"; // hand-placed in the advanced editor
   assertEquals(headPosition(running), undefined);
+});
+
+Deno.test("renameColor renames the color and every reference to it (§4.15)", () => {
+  const meta = {
+    colors: { ink: "#000", rubric: "#9e2a1e" },
+    elements: {
+      chapter: { number: { color: "rubric" }, title: { color: "ink" } },
+      sidebar: { "border-left-color": "rubric", content: "rubric" },
+    },
+    is: { note: { color: "rubric" } },
+    running: { odd: [{ content: "x", area: "top-right", color: "rubric" }] },
+  };
+  renameColor(meta, "rubric", "red");
+  assertEquals(Object.keys(meta.colors), ["ink", "red"]);
+  assertEquals(meta.elements.chapter.number.color, "red");
+  assertEquals(meta.elements.chapter.title.color, "ink");
+  assertEquals(meta.elements.sidebar["border-left-color"], "red");
+  assertEquals(meta.elements.sidebar.content, "rubric"); // not a color
+  assertEquals(meta.is.note.color, "red");
+  assertEquals(meta.running.odd[0]!.color, "red");
+});
+
+Deno.test("emphasisOf reads Italic, Bold and Underline independently", () => {
+  assertEquals(emphasisOf({}), {
+    italic: false,
+    bold: false,
+    underline: false,
+  });
+  assertEquals(
+    emphasisOf({
+      "font-style": "italic",
+      "font-weight": "700",
+      "text-decoration": "underline dotted",
+    }),
+    { italic: true, bold: true, underline: true },
+  );
+  assertEquals(emphasisOf({ "font-weight": "400" }).bold, false);
+});
+
+Deno.test("caseOf and caseProps round-trip the four cases; unset clears both keys", () => {
+  for (const c of ["none", "upper", "csc", "small"] as const) {
+    assertEquals(caseOf(caseProps(c)), c);
+  }
+  assertEquals(caseProps(undefined), {
+    "text-transform": undefined,
+    "font-variant-caps": undefined,
+  });
+  assertEquals(caseOf({}), undefined);
 });
