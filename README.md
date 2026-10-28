@@ -72,7 +72,7 @@ heads. Everything on the right comes from `metadata.json`: the chapter opener,
 the drop cap, the heads and the folios. Click anything on a page and the panel
 opens on the style that drew it.
 
-![The Great Gatsby in the Style tab: the running heads controls on the left, pages 2 and 3 with their heads on the right](.github/readme/running-heads.png)
+![The Great Gatsby in the Style tab: the running heads controls on the left, pages 2 to 5 with their heads on the right](.github/readme/running-heads.png)
 
 Every block starts with a sentinel in braces; the words stay plain text. The
 full language is §3 of [book-renderer-spec.md](book-renderer-spec.md), and
