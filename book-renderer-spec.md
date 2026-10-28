@@ -1909,14 +1909,23 @@ written into the flow before layout from a _seed_ (anchor id → folio text), so
 render is only right once the folios it produces are the ones it was seeded
 with. `toHtml` (shared by `bml render` and print export) sets
 `PagedConfig.auto = false` and inlines a driver that runs on load: it takes the
-book's `<style>` and body once, then renders with a fresh `Paged.Previewer` per
-pass — first seed `{}`, each next pass seeded from the last — until the seed
-settles (normally two passes), at most three. It then sets
+book's `<style>` once and lays the book out through its segments
+(`BuildResult.segments`, cut where pages are forced to break): each with its own
+`Paged.Previewer` in an off-screen stage, then assembled into one run of pages —
+blanks where a side is forced, every page renumbered and its folio, heads and
+margin boxes redone (`BookPageMap.assemble`). The first pass is seeded `{}` (or
+the last export's folios); a next pass re-lays only the segments that print a
+number that changed (the TOC, `{ref}`), until the seed settles (normally two
+passes), at most three. One Previewer's sheets are kept for printing; if the
+segments' sheets differ, the book is laid out whole instead, as one flow with a
+fresh Previewer per pass (`toHtml(b, { whole: true })` does that directly, and a
+Chrome test holds the two to the same pages). It then sets
 `html[data-paged=done|error]` and a JSON report in `html[data-paged-report]`:
 `{ problems, passes, digest }`.
 
-**Checks** run on the map after every pass; each problem names its 1-based
-physical page where it has one:
+**Checks** run on the map after every pass — after assembly, on the book's
+pages, never on a segment alone; each problem names its 1-based physical page
+where it has one:
 
 - a stranded page: no text and no image, and not a deliberate blank;
 - a `{ref}` or TOC target that is on no page;
