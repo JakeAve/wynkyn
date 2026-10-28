@@ -1,5 +1,5 @@
 // web/src/panes.ts — the columns' own chrome (spec §7.1, design-language.md
-// §7): the Contents toggle, Pages hidden by ⌘. alone, and the write pane and
+// §7): the Contents toggle, Pages hidden by Mod+. alone, and the write pane and
 // the pages expanding from their top-right corner. Hidden columns persist
 // (localStorage tree-hidden, pages-hidden); the expanded pane persists per
 // mode (expanded:<mode>, "writing" | "pages" | ""). Pages hide in Write only.
@@ -26,8 +26,7 @@ export function installPanes(deps: { mode(): Mode }): Panes {
       ? "pages"
       : "";
   const writeBtn = $("editor").querySelector<HTMLElement>(".expand")!;
-  const mod = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
-  // Pages hidden (⌘.), the writing's corner button is the way back to them.
+  // Pages hidden (Mod+.), the writing's corner button is the way back to them.
   const pagesBack = () =>
     !expanded() && panes.classList.contains("pages-hidden");
   // Expanded, the Contents toggle pins the outline over the view instead.
@@ -41,9 +40,11 @@ export function installPanes(deps: { mode(): Mode }): Panes {
       ),
     );
     const back = pagesBack();
-    const label = back ? `Show the pages (${mod}.)` : "Expand the writing";
+    const label = back ? "Show the pages" : "Expand the writing";
     writeBtn.setAttribute("aria-label", label);
-    writeBtn.title = back ? label : `${label}; esc returns`;
+    // The shortcuts' label pass adds the key to the title.
+    writeBtn.dataset.command = back ? "toggle-pages" : "expand";
+    writeBtn.dataset.title = back ? label : `${label}; esc returns`;
     writeBtn.setAttribute(
       "aria-pressed",
       String(back || expanded() === "writing"),
@@ -97,7 +98,7 @@ export function installPanes(deps: { mode(): Mode }): Panes {
     attributeFilter: ["data-mode"],
   });
 
-  let last: Pane = "writing"; // the pane ⌘⇧↩ expands in Write
+  let last: Pane = "writing"; // the pane Mod+Shift+Enter expands in Write
   $("editor").addEventListener("focusin", () => last = "writing");
   $("pages").addEventListener("pointerdown", () => last = "pages");
   for (const b of panes.querySelectorAll<HTMLElement>(".expand")) {

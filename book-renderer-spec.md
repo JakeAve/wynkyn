@@ -1232,7 +1232,8 @@ in one section.
   author sees the book on the stock it will be printed on: print sheets, the PDF
   of the pages, `bml export` and the EPUB stay white, and nothing is written
   into the manuscript or the colophon. The panel offers Bright white (unset),
-  Natural, Ivory, Cream and Recycled grey, and a custom colour.
+  Natural, Ivory, Cream and Recycled grey, and a custom colour, over a hint that
+  the stock is for the preview only.
 - `marks` — binding marks: `{ "show", "folds", "cuts", "sewing" }`. Unset or
   `show` not `true` means no marks, so existing books print unchanged. With
   `show` on, `folds` (fold lines), `cuts` (cut marks) and `sewing` (sewing
@@ -1957,8 +1958,11 @@ exports anyway.
 
 Three columns under a fixed toolbar, decided by one rule: **left is where you
 are, middle is what you're changing, right is the result.** The toolbar's mode
-switch (Write ⌘1, Style ⌘2, Publish ⌘3; ⌘, also opens Style) picks all three,
-and the mode persists across reloads:
+switch (Write Mod+1, Style Mod+2, Publish Mod+3; Mod+, also opens Style) picks
+all three, and the mode persists across reloads. Shortcuts are written Mod+key:
+Mod is Ctrl on Windows and Linux, ⌘ on Mac. Every one comes from one command
+table (`web/src/shortcuts.ts`), and the chrome labels them for the platform
+(Ctrl+Shift+F, ⌘⇧F).
 
 | Mode    | Left                    | Middle                               | Right                            |
 | ------- | ----------------------- | ------------------------------------ | -------------------------------- |
@@ -1967,13 +1971,14 @@ and the mode persists across reloads:
 | Publish | print and e-book rows   | page setup, print and e-book exports | the first signature as it prints |
 
 The toolbar holds only what is global: the Contents toggle at the far left
-before the crumb (⌘\), drawn as a panel icon whose side is half filled while the
-left column shows; the crumb; the modes; and the light/dark toggle alone at the
-right. In Write the pages hide with ⌘. (no button; while they are hidden the
-write pane's corner button reads "Show the pages" and brings them back); Style
-and Publish always show them. Both choices persist. The crumb reads library /
-book / edition. The library step, muted so the title leads, is an icon for where
-the books live (a folder on this device, or this browser) and its name (the
+before the crumb (Mod+\), drawn as a panel icon whose side is half filled while
+the left column shows; the crumb (Mod+O switches the book, Mod+Alt+N starts a
+new one); the modes; and the light/dark toggle alone at the right (Mod+Shift+L).
+In Write the pages hide with Mod+. (no button; while they are hidden the write
+pane's corner button reads "Show the pages" and brings them back); Style and
+Publish always show them. Both choices persist. The crumb reads library / book /
+edition. The library step, muted so the title leads, is an icon for where the
+books live (a folder on this device, or this browser) and its name (the
 folder's, or "This browser"); its tooltip says where, and a click goes back to
 the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
 there the crumb starts at the book. Gutters between the columns drag to resize
@@ -1981,9 +1986,9 @@ them. A hidden preview still lays out (it leaves the grid, never
 `display: none`), since Paged.js paginates by measuring.
 
 Each pane carries its own controls in a header along its top: the write pane
-(Write's middle column) has the text view (§7.3), the pages pane (the right
-column in every mode) none yet. Both headers end in an expand button at the top
-right corner:
+(Write's middle column) has Prose | Source, Aa and Spelling (the text view,
+§7.3), the pages pane (the right column in every mode) none yet. Both headers
+end in an expand button at the top right corner:
 
 - **Writing expanded** (Write only): the outline and the pages leave and the
   text centres at its measure. While typing, the toolbar, footer and pane header
@@ -1991,10 +1996,10 @@ right corner:
 - **Pages expanded** (any mode): the pages, or Publish's sheet view, take the
   whole width; the middle column leaves.
 - In either, the mouse at the left edge slides the left column in over the view,
-  and the Contents toggle pins it there.
+  and the Contents toggle pins it there; the pane header moves right of it.
 - The same button or esc returns (esc first closes an open dialog, find bar or
-  menu). ⌘⇧↩ expands the pane last used, or returns (⌘⇧F stays Footnote). The
-  expanded pane is remembered per mode.
+  menu). Mod+Shift+Enter expands the pane last used, or returns (Mod+Shift+F
+  stays Footnote). The expanded pane is remembered per mode.
 
 ### 7.2 Project Tree
 
@@ -2031,27 +2036,53 @@ CodeMirror 6 over plain BML text.
   `{subtitle}` italic. A `%%` line of only box-drawing characters draws as a
   hairline rule, and a `%%` label between two rules as small caps.
 - The selection is a green-grey tint, distinct from the quieter active line.
-- The text view (in the write pane's header, §7.1) is a per-reader preference,
-  not part of the book: prose in Serif (default), Sans or Mono at 12–24px
-  (default 16), with sentinels always in monospace so markup reads as markup.
-  The text holds a reading measure of about 70 characters (36em), centred in the
-  pane while the pages are hidden or the writing expanded. **Hide markup** folds
-  away the sentinel lines of every paragraph that also has prose (`{title}`,
-  `{dropcap}`, `{quote}` … `{/quote}`) and the `{em}` tags, except in the
-  paragraph holding the cursor; structural lines stay as landmarks, and a
-  paragraph of sentinels alone (`{illustration}`, `{break}`) stays visible so it
-  can still be reached.
+- The text view (in the write pane's header, §7.1) is a per-reader preference in
+  localStorage, not part of the book. Two views of the same file, switched by
+  **Prose | Source** or Mod+/: **Source** sets every line in the system
+  monospace at 13/17 of the reader's size, with the sentinel treatments above;
+  **Prose** (the default, `web/src/prose.ts`, design-language.md §8.1) sets the
+  writing in the chosen face and draws the markup instead of showing it: each
+  sentinel is a red small-caps rubric in the left margin (a structural one with
+  its slug beneath and a hairline across the text), the line after `{title}` or
+  `{heading}` is large, after `{subtitle}` italic, `{em}` text italic, quotes
+  and poems indented, `{break}` a ⁂, and `%%` notes a ☞ in the right margin that
+  reads on hover. Inline tags (`{em}`, `{footnote}`, `{ref}`) get rubrics too,
+  `Em`, `Footnote`, `Ref`, once per line beneath its own. The sentinel lines,
+  `%%` lines and `{em}` tags fold away; a click on a rubric, ⁂, ☞ or image shows
+  that paragraph's markup in place, in monospace and editable, until the cursor
+  leaves it. Moving or selecting into text never shows them, though a sentinel
+  or `%%` line shows while the cursor is on it; a key that would change folded
+  markup shows its paragraph instead. An `{illustration}` whose file is in
+  `images/` draws its image (at most 12rem tall) above its line, its caption in
+  italics beneath, and stays drawn while its markup shows. Plates, drop-cap
+  images, illustrations whose file is missing, and footnote and ref tags stay as
+  markup. This replaces Hide markup. The **Aa** menu holds the face (Alegreya,
+  Alegreya Sans, or the book's body face), the size (12–24px, default 17), dim
+  (Off, Paragraph, Sentence) and page turns (on). Dim, in either view, fades all
+  the text but the cursor's paragraph, or but its sentence (one ends at `.`, `?`
+  or `!`, with any closing quotes, before a space or the line's end); the
+  margins stay. Page turns put a short rule and the page's printed folio (its
+  number in the finished book, "vii" or "12") in the right margin beside the
+  block each printed page begins in, from the last layout; a paragraph edited
+  since hides its turn until the next layout lands. The text holds a reading
+  measure of about 70 characters (36em), centred in the pane while the pages are
+  hidden or the writing expanded. Expanded, the writing grows by 19/17 and the
+  measure with it, and Prose's margins widen so notes are written out beside
+  their line (which grows to hold them), page turns read "p. 12" and slugs show
+  in full on up to two lines.
 - The preview follows the cursor: the rendered block the cursor's line is part
   of (the nearest `data-line` at or above it) is outlined and scrolled into
   view, so the writer sees where they are on the page. The footer is split by
-  column: under the editor, the writer's cell (parse warnings, import notes, and
-  "Go to style:" naming the style that block belongs to — "Chapter · Title",
-  "Body text · Paragraph", a custom `{is}` name); under the pages, the page
-  count and page problems. Go to style opens that style in Style mode, the way a
-  preview click does (§7.4), and leaves a history entry, so Back returns to
-  Write with the cursor where it was. The style is read from the enclosing
-  matter type, part or chapter, the enclosing block, and the field sentinel
-  whose text runs on to the line.
+  column: under the editor, the writer's cell (the chapter at the cursor, the
+  word count and the words added this session — "Marley's Ghost · 41,210 words ·
+  +512 this session", the last in red once it is above 0 — then parse warnings,
+  import notes, and "Go to style:" naming the style that block belongs to —
+  "Chapter · Title", "Body text · Paragraph", a custom `{is}` name); under the
+  pages, the page count and page problems. Go to style opens that style in Style
+  mode, the way a preview click does (§7.4), and leaves a history entry, so Back
+  returns to Write with the cursor where it was. The style is read from the
+  enclosing matter type, part or chapter, the enclosing block, and the field
+  sentinel whose text runs on to the line.
 - Find and replace is a bar pinned to the top of the editor, in the chrome's
   colors: find and replace fields, match case / whole word / regex toggles, an
   "n of m" count, previous / next / close, Replace, All, and an "in chapter"
@@ -2065,11 +2096,11 @@ CodeMirror 6 over plain BML text.
   its capital; a possessive is checked without its `'s`. Hovering an underlined
   word offers up to five suggestions and **Add to dictionary**, which writes the
   word (a possessive as its name) to `dictionary.json` through
-  `POST /api/books/:book/dictionary` with `{ word }`. **Spelling** on the text
-  view bar is a menu of the word lists, English (the default) or None, kept with
-  the reader's other text view choices; each language is one list in `vendor/`
-  and a row in `WORD_LISTS` (`app.ts`), and `dictionary.json` is the same
-  whatever the language.
+  `POST /api/books/:book/dictionary` with `{ word }`. **Spelling** in the write
+  pane's header is a menu of the word lists, English (the default) or None, kept
+  with the reader's other text view choices; each language is one list in
+  `vendor/` and a row in `WORD_LISTS` (`text-view.ts`), and `dictionary.json` is
+  the same whatever the language.
 - **EXPERIMENTAL:** `{only}` spans (§3.2.9) carry an amber mark on every line's
   gutter and a tag naming their editions; lines the open edition skips are
   dimmed.
@@ -2081,15 +2112,16 @@ CodeMirror 6 over plain BML text.
     paragraph; each row shows the name, a description, and how it closes
     (`{/quote}`, "wraps", "point", or "—" for none). Blocks include `{only}`,
     marked experimental.
-  - A selection the writer makes shows a wrap bar above it: Emphasis (⌘I) wraps
-    it in `{em}…{/em}`, Quote encloses its lines in `{quote}`/`{/quote}`,
+  - A selection the writer makes shows a wrap bar above it: Emphasis (Mod+I)
+    wraps it in `{em}…{/em}`, Quote encloses its lines in `{quote}`/`{/quote}`,
     Footnote puts a `{footnote: slug}` anchor after it, and Wrap in… opens the
     full list.
-  - ⌘K lists every sentinel, filtered by name or description; Enter inserts it,
-    enclosing the selection for wraps and closed blocks, else placing it after
-    the selection.
-  - Per-sentinel shortcuts remain (em ⌘E, chapter ⌘⇧C, heading ⌘⇧H, footnote
-    ⌘⇧F, quote ⌘⇧Q, break ⌘⇧B), in Write only.
+  - Mod+K lists every sentinel, filtered by name or description; Enter inserts
+    it, enclosing the selection for wraps and closed blocks, else placing it
+    after the selection.
+  - Per-sentinel shortcuts remain (em Mod+E, chapter Mod+Shift+C, heading
+    Mod+Shift+H, footnote Mod+Shift+F, quote Mod+Shift+Q, break Mod+Shift+B), in
+    Write only.
 - Image files dropped or pasted on the editor go in the book's `images/`
   (`POST /api/books/:book/images`, named for the file, never over one already
   there) and come back as `{illustration: slug}` / `Caption` blocks, one per
@@ -2180,8 +2212,8 @@ Includes:
   Print (auto duplex or by hand, the by-hand flip and back order, and the Print
   sheets buttons, §7.7); **PDF**, the pages in reading order at the page size,
   one per printed page (Print pages; Save as PDF gives the file `book.pdf` would
-  be); and **E-book** (Export EPUB, §7.8). All printing runs in the browser;
-  proofs and the sheet PDFs on disk are `bml
+  be); and **E-book** (Export EPUB, Mod+Shift+E, §7.8). All printing runs in the
+  browser; proofs and the sheet PDFs on disk are `bml
   export`'s
 - Font aliases (name → font family, with a searchable picker over every Google
   family and the fonts installed on this Mac, each drawn in its own face, and a
@@ -2189,6 +2221,9 @@ Includes:
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)
+- Style's Book group opens from the keyboard too: Mod+Shift+1–4 for Theme, Page
+  size & margins, Fonts and Body (⌥⌘1–4 on a Mac, where ⌘⇧3 and ⌘⇧4 take
+  screenshots).
 - A **Theme** view, first in Style's Book group: a grid of cards, one per preset
   theme (§4.13), each drawn in the theme's own fonts (its name in the display
   face, a chapter label, a line of body text and the description), in name
@@ -2225,28 +2260,36 @@ width (§7.1).
 **Zoom.** At 100% a spread fits the pane's width (never larger than 1:1). The
 header's `−` `100%` `+`, just before the expand button, steps by 10% from 50% to
 400%; the percentage opens a menu with Fit spread (100%) and Fit page (one whole
-page fits the pane, centred). ⌘-scroll or a trackpad pinch over the pages zooms
-continuously between 50% and 400% around the pointer; the buttons and menu zoom
-around the pane's centre. Past 100% the spread stays side by side and the pane
-scrolls sideways. Zoom is the reader's own (remembered in the browser,
-`preview-zoom`), not the book's: it is CSS zoom over a layout made at 1:1, so it
-never re-renders and never reaches paper. The sheet view in Publish has no zoom.
+page fits the pane, centred); Mod+= and Mod+− step, Mod+0 fits the spread, while
+the pages are shown (otherwise the browser zooms). Mod-scroll or a trackpad
+pinch over the pages zooms continuously between 50% and 400% around the pointer;
+the buttons and menu zoom around the pane's centre. Past 100% the spread stays
+side by side and the pane scrolls sideways. Zoom is the reader's own (remembered
+in the browser, `preview-zoom`), not the book's: it is CSS zoom over a layout
+made at 1:1, so it never re-renders and never reaches paper. The sheet view in
+Publish has no zoom.
 
-**Inspect.** The header's Inspect toggle, after zoom, turns the pages into
-something to point at, as a browser's element picker does; it starts off and
-isn't remembered, and clicks on the pages then belong to it rather than going to
-the source line or the style. Pointing at a block outlines it in blue, shades
-its space above and below (amber), its first-line indent (green) and its content
-(light blue), and tags it with its name, its size in the book's own units (mm
-when the page size is metric, else inches) and its face and size of type. A
-click pins it, with a minium outline: the block, or a span clicked directly (an
-italic, a cross-reference, a drop cap, a footnote reference), or, below a page's
-last block, the empty space that makes the page short. With something pinned,
-holding ⌥ while pointing at something else draws the distances between them. A
-running head or page number the page map dropped (a chapter opening, a display
-or blank page) shows as a dashed ghost in its margin box, and can be pinned too.
-A click on the desk unpins; esc unpins, then leaves Inspect, then returns an
-expanded pane.
+**Turning pages.** Alt+] and Alt+[ move to the next or previous page, the next
+spread when pages sit side by side; Alt+Shift+] and Alt+Shift+[ to the next or
+previous chapter or part opening. On a Mac they are ⌃] and ⌃[ (with ⇧ for
+chapters), since ⌥] and ⌥[ type ’ and ‘. The page lands centred, so the footer's
+indicator names it.
+
+**Inspect.** The header's Inspect toggle (Mod+'), after zoom, turns the pages
+into something to point at, as a browser's element picker does; it starts off
+and isn't remembered, and clicks on the pages then belong to it rather than
+going to the source line or the style. Pointing at a block outlines it in blue,
+shades its space above and below (amber), its first-line indent (green) and its
+content (light blue), and tags it with its name, its size in the book's own
+units (mm when the page size is metric, else inches) and its face and size of
+type. A click pins it, with a minium outline: the block, or a span clicked
+directly (an italic, a cross-reference, a drop cap, a footnote reference), or,
+below a page's last block, the empty space that makes the page short. With
+something pinned, holding ⌥ while pointing at something else draws the distances
+between them. A running head or page number the page map dropped (a chapter
+opening, a display or blank page) shows as a dashed ghost in its margin box, and
+can be pinned too. A click on the desk unpins; esc unpins, then leaves Inspect,
+then returns an expanded pane.
 
 What is pinned opens the drawer under the pages: a breadcrumb of where it sits
 (Body › the chapter's title › Paragraph › Line 3; each crumb pins that), the
@@ -2498,14 +2541,13 @@ user lands in Write mode looking at their own words wrapped in the tags,
 paginated in the house template, with the importer's notes in the footer. There
 is no settings form; the editor is the review step.
 
-**Welcome — where books live.** Shown when the app has no library. Four rows,
+**Welcome — where books live.** Shown when the app has no library. Three rows,
 each one line of explanation, in the manner of a session-type picker:
 
 1. Create a new folder on my device — Wynkyn creates a Books folder.
 2. Select an existing folder on my device — the user already has one.
 3. Keep books in this browser — works anywhere, but browsers clear site storage,
    so download what you want to keep.
-4. Save books in the cloud — paid, coming soon, disabled.
 
 Under the rows, the privacy line: _Your books are yours. Wynkyn never reads,
 analyses, trains on, shares or sells your manuscripts, and never will. Free

@@ -457,6 +457,11 @@ kbd {
   min-width: 0;
   overflow: hidden;
 }
+/* the writer's stats (app.ts showStats): the session's gain in red once
+   there is one */
+#write-stats .gain {
+  color: var(--acc-ink);
+}
 .foot-gutter {
   background: linear-gradient(var(--line), var(--line)) 50% 0 / 1px 100%
     no-repeat;
@@ -560,6 +565,11 @@ kbd {
 .gutter {
   cursor: col-resize;
   background: linear-gradient(var(--line), var(--line)) 50% 0 / 1px 100%
+    no-repeat;
+}
+.gutter:focus-visible {
+  outline: none; /* the bar below is its ring */
+  background: linear-gradient(var(--acc), var(--acc)) 50% 0 / 0.1875rem 100%
     no-repeat;
 }
 .gutter:hover,
@@ -768,6 +778,13 @@ kbd {
   visibility: visible;
   box-shadow: var(--shadow-pop);
 }
+/* ...and the expanded pane's header steps right of it, so it stays reachable. */
+#panes:is(.expand-writing, .expand-pages) .pane-head {
+  transition: padding-left var(--t);
+}
+#panes:is(.expand-writing, .expand-pages):is(.pin-outline, :has(#outline-edge:hover, #tree:hover, #style-nav:hover)) .pane-head {
+  padding-left: calc(var(--w-tree) + var(--s-5));
+}
 /* Writing expanded: the chrome fades while typing, back on a mouse move. */
 :is(#toolbar, #footer, #editor .pane-head > :not(.expand)) {
   transition: opacity var(--t);
@@ -783,7 +800,7 @@ body.typing #editor .pane-head {
   padding: var(--s-4);
 }
 /* Lists (§6.6): a small-caps group label, then rows --s-1 apart. */
-:is(#tree, #style-nav) .nh {
+:is(#tree, #style-nav, #shortcuts-list) .nh {
   font-size: var(--fs-sm);
   font-variant-caps: all-small-caps;
   letter-spacing: var(--track-caps);
@@ -791,7 +808,7 @@ body.typing #editor .pane-head {
   color: var(--muted);
   padding: var(--s-5) var(--s-4) var(--s-1);
 }
-:is(#tree, #style-nav) .nh:first-child {
+:is(#tree, #style-nav, #shortcuts-list) .nh:first-child {
   padding-top: 0;
 }
 #tree :is(ul.tree-list, li) {
@@ -850,49 +867,395 @@ body.typing #editor .pane-head {
   flex: 1;
   min-height: 0;
 }
-/* The text view (#text-view, app.ts installTextView): the writer's font and size on
-   #editor, a reading measure, centred once Pages is hidden. Size goes on
-   .cm-content only, so line numbers stay put, and the measure is in rem, so
-   bigger text wraps sooner instead of widening the column. */
+/* The write pane's text (text-view.ts, design-language.md §8): Prose sets the
+   writing in the reader's face and size, Source every line in the system
+   monospace at 13/17 of it. Size goes on .cm-content only, so line numbers
+   stay put, and the measure is in rem, so bigger text wraps sooner instead of
+   widening the column; it is centred once Pages is hidden. Expanded, the
+   writing grows by 19/17 and the measure with it (§7). */
+#editor {
+  --ed-font: var(--ed-face, var(--f-text));
+  --ed-fs: calc(var(--ed-size, 1.0625rem) * var(--ed-grow, 1));
+}
+#panes.expand-writing #editor {
+  --ed-grow: calc(19 / 17);
+}
+#editor[data-view="source"] {
+  --ed-font: var(--f-mono);
+  --ed-fs: calc(var(--ed-size, 1.0625rem) * var(--ed-grow, 1) * 13 / 17);
+}
 #editor .cm-scroller {
-  font-family: var(--ed-font, var(--f-text));
+  font-family: var(--ed-font);
   line-height: 1.6;
 }
-/* numbers sit on the text's line */
+/* numbers sit on the text's line; in Source they are the text's size too */
 #editor .cm-gutters {
-  line-height: calc(var(--ed-fs, 1rem) * 1.6);
+  line-height: calc(var(--ed-fs) * 1.6);
+}
+#editor[data-view="source"] .cm-gutters {
+  font-size: var(--ed-fs);
 }
 #editor .cm-content {
-  font-size: var(--ed-fs, 1rem);
-  max-width: 36rem; /* ~70 characters of 1rem serif prose */
+  font-size: var(--ed-fs);
+  max-width: calc(36rem * var(--ed-grow,
+    1)); /* ~70 characters of 1rem serif prose */
 }
 #panes.pages-hidden #editor .cm-scroller {
   justify-content: center;
 }
-/* the text view, in the write pane's header */
+/* Prose (prose.ts, design-language.md §8.1): the margins are .cm-content's
+   padding, and the marks in them are widgets placed against their line. No
+   line numbers: folded markup would make them jump. Expanded, the margins
+   widen (--ml, --mr) and notes, page turns and slugs are written out. */
+#editor[data-view="prose"] .cm-gutters {
+  display: none;
+}
+#editor[data-view="prose"] {
+  --ml: 6rem;
+  --mr: 3rem;
+}
+#panes.expand-writing #editor[data-view="prose"] {
+  --ml: 9.5rem;
+  --mr: 10.5rem;
+}
+#editor[data-view="prose"] .cm-content {
+  max-width: calc(36rem * var(--ed-grow, 1) + var(--ml) + var(--mr));
+  padding-left: var(--ml);
+  padding-right: var(--mr);
+}
+#editor[data-view="prose"] .cm-line {
+  position: relative;
+}
+#editor .cm-prose-rubric,
+#editor .cm-prose-side {
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+  padding-top: var(--s-2);
+  font: var(--fs-2xs) / var(--lh) var(--f-ui);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  user-select: none;
+  cursor: default;
+}
+/* a click on a mark opens its paragraph's markup (prose.ts) */
+#editor :is(.cm-prose-rubric, .cm-prose-note, .cm-prose-break .cm-prose-marks, .cm-prose-illustration img) {
+  cursor: pointer;
+}
+/* a red small-caps rubric, the slug beneath it right-aligned and truncated,
+   inset from the pane's edge */
+#editor .cm-prose-rubric {
+  right: 100%;
+  width: var(--ml);
+  padding-inline: var(--s-5);
+  text-align: right;
+  color: var(--acc-ink);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  font-size: var(--fs-xs);
+}
+#editor .cm-prose-rubric::before {
+  content: attr(data-label);
+}
+/* the label, the slug, then the inline tags' rubrics (Em, Footnote, Ref),
+   one per row */
+#editor .cm-prose-rubric {
+  display: flex;
+  flex-direction: column;
+}
+#editor .cm-prose-rubric::after {
+  order: 1;
+}
+#editor .cm-prose-tags {
+  order: 2;
+  white-space: pre-line;
+}
+#editor .cm-prose-tags::before {
+  content: attr(data-tags);
+}
+/* a text line whose margin stacks rubrics grows to hold them (prose.ts) */
+#editor[data-view="prose"] .cm-line[style*="--marks"] {
+  min-height: calc(var(--s-2) + var(--marks) * var(--fs-xs) * var(--lh));
+}
+#editor .cm-prose-rubric[data-slug]::after {
+  content: attr(data-slug);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fs-2xs) / var(--lh) var(--f-hivis);
+  font-variant-caps: normal;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+/* expanded, the slug is written out on up to two lines, and its row makes
+   room for them */
+#panes.expand-writing #editor .cm-prose-rubric[data-slug]::after {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+#panes.expand-writing #editor .cm-line.cm-prose-slugged {
+  min-height: calc(var(--s-2) + (var(--fs-xs) + 2 * var(--fs-2xs)) * var(--lh));
+}
+/* the right margin: a page turn above the line's notes */
+#editor .cm-prose-side {
+  left: 100%;
+  width: var(--mr);
+  padding-left: var(--s-5);
+  display: grid;
+  justify-items: start;
+  gap: var(--s-2);
+}
+/* a page turn: a short rule and the number; "p. 12" (data-long) when the
+   margins widen. Off in the Aa menu: hidden. */
+#editor .cm-prose-turn {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+#editor .cm-prose-turn::before {
+  content: "";
+  width: var(--s-5);
+  border-top: var(--hair) solid currentColor;
+}
+#editor .cm-prose-turn::after {
+  content: attr(data-turn);
+}
+/* Expanded, a note is written out, so the right margin floats instead: the
+   line grows to hold it and the next line's notes start below it. */
+#panes.expand-writing #editor[data-view="prose"] :is(.cm-line, .cm-prose-illustration) {
+  display: flow-root;
+}
+#panes.expand-writing #editor .cm-prose-side {
+  position: static;
+  float: right;
+  clear: right;
+  margin-right: calc(var(--mr) * -1);
+}
+#panes.expand-writing #editor .cm-prose-turn::after {
+  content: attr(data-long);
+}
+#editor[data-turns="off"] .cm-prose-turn {
+  display: none;
+}
+/* a note: the ☞ alone at normal width, its text (data-note) on hover */
+#editor .cm-prose-note {
+  color: var(--acc-ink);
+  font-size: var(--fs);
+  line-height: 1;
+  padding-top: var(--s-1);
+}
+#editor .cm-prose-note::before {
+  content: "☞";
+}
+#panes.expand-writing #editor .cm-prose-note {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-3);
+}
+#panes.expand-writing #editor .cm-prose-note::after {
+  content: attr(data-note);
+  font: var(--fs-xs) / var(--lh) var(--f-ui);
+  color: var(--muted);
+}
+/* a folded row is as tall as its rubric and slug, so the next rubric clears it */
+#editor .cm-line.cm-prose-slugged {
+  min-height: calc(var(--s-2) + (var(--fs-xs) + var(--fs-2xs)) * var(--lh));
+}
+/* a structural block's hairline across the text column */
+#editor .cm-line.cm-prose-rule {
+  box-shadow: inset 0 1px 0 var(--line);
+}
+#editor .cm-line.cm-prose-title {
+  font-family: var(--f-title);
+  font-size: calc(2rem * var(--ed-grow, 1));
+  line-height: var(--lh-tight);
+  padding-block: var(--s-4) var(--s-2);
+}
+#editor .cm-line.cm-prose-subtitle {
+  font-style: italic;
+}
+#editor .cm-line.cm-prose-block {
+  padding-left: 2em;
+}
+/* {break} as ⁂ (the widget's text) */
+#editor .cm-line.cm-prose-break {
+  text-align: center;
+  color: var(--muted);
+  font-size: 1.35em;
+}
+/* an illustration's image at a modest size, its rubric beside it, and its
+   caption in italics beneath */
+#editor .cm-prose-illustration {
+  position: relative;
+  min-height: calc(var(--s-2) + (var(--fs-xs) + var(--fs-2xs)) * var(--lh));
+  padding: var(--s-2) 0;
+  cursor: text;
+}
+#editor .cm-prose-illustration img {
+  display: block;
+  max-width: 100%;
+  max-height: 12rem;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+}
+#editor .cm-line.cm-prose-caption {
+  font-style: italic;
+  font-size: .85em;
+  color: var(--muted);
+}
+/* markup at the cursor: monospace, muted, sentinel names red (bmlHighlight) */
+#editor .cm-line.cm-prose-src {
+  font-family: var(--f-mono);
+  font-size: .75em;
+  color: var(--muted);
+}
+#editor[data-view="prose"] .cm-bml-wrap {
+  font-size: .75em;
+  color: var(--muted);
+}
+/* Dim (editor.ts setDim, §8.3): the text outside the cursor's paragraph or
+   sentence fades; the margins stay. */
+#editor :is(.cm-text, .cm-prose-illustration img) {
+  transition: opacity var(--t);
+}
+#editor .cm-line.cm-dim .cm-text,
+#editor .cm-text.cm-off,
+#editor .cm-prose-illustration:has(+ .cm-line.cm-dim) img {
+  opacity: .28;
+}
+@media (prefers-reduced-motion: reduce) {
+  #editor :is(.cm-text, .cm-prose-illustration img) {
+    transition: none;
+  }
+}
+/* The write pane's header (§7): Prose | Source (a small seg), Aa, Spelling. */
 #text-view {
   flex: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-3) var(--s-6);
+  gap: var(--s-2) var(--s-3);
   padding-block: var(--s-2);
-  color: var(--muted);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
 }
-#text-view label {
+#text-view > .seg button {
+  min-height: calc(var(--h-sm) - 2 * var(--s-1) - 2 * var(--hair));
+  padding-block: 0;
+}
+#text-view .tv-menu {
+  position: relative;
+}
+#text-view .tv-menu > .btn[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--fg);
+}
+/* Aa and Spelling (§6.9): popovers under their buttons, as .fontpop. */
+#text-view .tvpop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--s-2));
+  left: 0;
+  width: max-content;
+  min-width: 15rem;
   display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-2);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+  corner-shape: var(--corner);
+  box-shadow: var(--shadow-pop);
+  color: var(--fg);
+  font-size: var(--fs);
+}
+#text-view .tvpop [role="radiogroup"]:not(.seg) {
+  display: grid;
+  gap: var(--s-1);
+}
+#text-view .tvpop .hd {
+  padding: var(--s-2) var(--s-3) var(--s-1);
+  font-size: var(--fs-sm);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  font-weight: 500;
+  color: var(--muted);
+}
+#text-view .tvpop hr {
+  margin: var(--s-1) calc(-1 * var(--s-2));
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+/* An item: a check column, then its name; the current one takes the wash. */
+#text-view .tvpop .it {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
   align-items: center;
-  gap: var(--s-4);
+  gap: var(--s-3);
+  width: 100%;
+  min-height: var(--h-md);
+  padding: 0 var(--s-4) 0 var(--s-3);
+  background: none;
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  text-align: left;
   cursor: pointer;
 }
-#text-view input[type="range"] {
-  width: 5.625rem;
-  margin: 0;
-  accent-color: var(--fg);
+#text-view .tvpop .it:hover {
+  background: var(--hover);
 }
-#text-view output {
-  min-width: 2.6em;
+#text-view .tvpop .it .ck {
+  width: 0.875rem;
+  height: 0.875rem;
+  visibility: hidden;
+}
+#text-view .tvpop .it[aria-checked="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+#text-view .tvpop .it[aria-checked="true"] .ck {
+  visibility: visible;
+}
+/* each face named in itself */
+#text-view .tvpop [data-face="alegreya"] {
+  font: var(--fs-lg) var(--f-text);
+}
+#text-view .tvpop [data-face="sans"] {
+  font: var(--fs-lg) var(--f-ui);
+}
+#text-view .tvpop .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-5);
+  min-height: var(--h-md);
+  padding-inline: var(--s-3);
+  cursor: default;
+}
+#text-view .tvpop label.row {
+  cursor: pointer;
+}
+#text-view .tvpop .row .seg {
+  flex-wrap: nowrap;
+}
+#text-view .tvpop .row .seg button {
+  font-size: var(--fs-sm);
+}
+#text-view .tv-size {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+#text-view .tv-size output {
+  min-width: 2ch;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 #text-view .tv-step {
@@ -911,9 +1274,6 @@ body.typing #editor .pane-head {
 #text-view .tv-step:hover {
   background: var(--hover);
   color: var(--fg);
-}
-#text-view .tv-hide {
-  margin-left: auto;
 }
 /* Banners (§6.10): a strip across the top of the pane they concern, small
    ghost buttons at the right. Changed on disk: the buffer has unsaved edits
@@ -999,31 +1359,31 @@ body.typing #editor .pane-head {
 #editor .cm-lineNumbers .cm-gutterElement.cm-bml-cond {
   box-shadow: inset -1px 0 0 var(--warn);
 }
-#editor .cm-line.cm-bml-struct {
+#editor[data-view="source"] .cm-line.cm-bml-struct {
   background-color: var(--struct);
   box-shadow: inset 0 1px 0 var(--line);
 }
-#editor .cm-line.cm-bml-field,
-#editor .cm-line.cm-bml-field * {
+#editor[data-view="source"] .cm-line.cm-bml-field,
+#editor[data-view="source"] .cm-line.cm-bml-field * {
   color: var(--muted);
   font-weight: 400;
   letter-spacing: .02em;
 }
-#editor .cm-line.cm-bml-field {
+#editor[data-view="source"] .cm-line.cm-bml-field {
   font-size: .75em; /* follows the writer's size */
 }
-#editor .cm-line.cm-bml-rail {
+#editor[data-view="source"] .cm-line.cm-bml-rail {
   box-shadow: inset 1px 0 0 var(--syn-p);
 }
-#editor .cm-line.cm-bml-strong {
+#editor[data-view="source"] .cm-line.cm-bml-strong {
   color: var(--fg);
   font-weight: 600;
 }
-#editor .cm-line.cm-bml-italic {
+#editor[data-view="source"] .cm-line.cm-bml-italic {
   font-style: italic;
 }
-#editor .cm-bml-wrap,
-#editor .cm-bml-wrap * {
+#editor[data-view="source"] .cm-bml-wrap,
+#editor[data-view="source"] .cm-bml-wrap * {
   color: var(--syn-p);
   font-weight: 400;
   opacity: .8;
@@ -1033,21 +1393,21 @@ body.typing #editor .pane-head {
   font-style: italic;
 }
 /* %% ──── draws as a hairline rule (its text shows while the cursor is on it) */
-#editor .cm-line.cm-bml-rule {
+#editor[data-view="source"] .cm-line.cm-bml-rule {
   font-family: var(--f-mono); /* box-drawing runs are line-wide in mono only */
 }
-#editor .cm-line.cm-bml-rule:not(.cm-activeLine) {
+#editor[data-view="source"] .cm-line.cm-bml-rule:not(.cm-activeLine) {
   white-space: pre;
   contain: inline-size; /* its long dash run must not widen the editor */
   overflow: hidden;
   background: linear-gradient(var(--line), var(--line)) center / 100% 1px
     no-repeat;
 }
-#editor .cm-line.cm-bml-rule:not(.cm-activeLine) * {
+#editor[data-view="source"] .cm-line.cm-bml-rule:not(.cm-activeLine) * {
   color: transparent;
 }
-#editor .cm-line.cm-bml-label,
-#editor .cm-line.cm-bml-label * {
+#editor[data-view="source"] .cm-line.cm-bml-label,
+#editor[data-view="source"] .cm-line.cm-bml-label * {
   font-variant: small-caps;
   font-style: normal;
   letter-spacing: .08em;
@@ -2361,6 +2721,16 @@ body.typing #editor .pane-head {
   border-radius: var(--r);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+/* Until a custom colour is chosen the picker reads "any colour", not a white
+   chip beside Bright white: a soft hue wheel (§6.5's one literal colour). */
+#config-overlay .colours input[type="color"]:not(.on)::-webkit-color-swatch {
+  background: conic-gradient(in oklch longer hue, oklch(0.82 0.1 30), oklch(0.82
+    0.1 30));
+}
+#config-overlay .colours input[type="color"]:not(.on)::-moz-color-swatch {
+  background: conic-gradient(in oklch longer hue, oklch(0.82 0.1 30), oklch(0.82
+    0.1 30));
+}
 #config-overlay .colours input.txt {
   width: 6.5rem;
   margin-left: var(--s-2);
@@ -2429,10 +2799,6 @@ body.typing #editor .pane-head {
   outline: none;
   border-color: var(--acc);
   box-shadow: 0 0 0 1px var(--acc);
-}
-#text-view select.sel {
-  height: var(--h-sm); /* as the bar's steppers */
-  padding-left: var(--s-3);
 }
 #config-overlay input.txt {
   width: 8.75rem;
@@ -3124,13 +3490,6 @@ body.typing #editor .pane-head {
 .pill[hidden] {
   display: none;
 }
-.choice:disabled {
-  cursor: default;
-  opacity: .55;
-}
-.choice:disabled:hover {
-  background: none;
-}
 .ask .privacy {
   margin: var(--s-5) 0 0;
   padding-top: var(--s-5);
@@ -3193,6 +3552,56 @@ body.typing #editor .pane-head {
 }
 #title-source {
   font-size: var(--fs-sm);
+}
+/* Keyboard shortcuts: list rows (§6.6) of a label and its keys; a row being
+   recorded is pressed (the red wash) and says which keys do what. */
+#shortcuts-list {
+  display: grid;
+  gap: var(--s-1);
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 0 calc(var(--s-4) * -1);
+}
+.sc-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4);
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sc-row:hover {
+  background: var(--hover);
+}
+.sc-row[aria-pressed="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+.sc-label {
+  margin-right: auto;
+}
+.sc-hint {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.sc-row[aria-pressed="true"] .sc-hint {
+  color: inherit;
+}
+#shortcuts-note {
+  flex: 1;
+}
+#shortcuts-note.warn {
+  color: var(--warn);
+}
+/* `.ask p` would mute it. */
+#shortcuts-note.sw-err {
+  color: var(--err);
 }
 /* The title dialog's theme picker: a row of five small cards, wide enough
    for them. */

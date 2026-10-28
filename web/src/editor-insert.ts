@@ -1,5 +1,5 @@
 // web/src/editor-insert.ts — inserting sentinels from inside the editor
-// (spec §7.3): `{` completions, a wrap bar over a selection, and a ⌘K list
+// (spec §7.3): `{` completions, a wrap bar over a selection, and a Mod+K list
 // of every sentinel. All insertion goes through applySnippet.
 import {
   autocompletion,
@@ -10,6 +10,7 @@ import {
 } from "@codemirror/autocomplete";
 import {
   ChangeSet,
+  EditorSelection,
   type EditorState,
   type Extension,
   Prec,
@@ -26,6 +27,7 @@ import {
 import {
   applySnippet,
   closingForm,
+  linkedClose,
   nextField,
   overSelection,
   type Snippet,
@@ -43,7 +45,6 @@ const RANK: Record<SnippetGroup, number> = {
   block: 1,
   inline: 2,
 };
-const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
 
 function snippet(label: string): Snippet {
   return SNIPPETS.find((s) => s.label === label)!;
@@ -98,10 +99,19 @@ export function insertSnippet(
     step({ selection: over.selection });
   }
   step(applySnippet(state, used));
+  const { from: at, to: end } = state.selection.main;
+  // `{is: name}`'s name is selected in the closing tag too, so typing it
+  // renames both and one undo takes both back.
+  const close = linkedClose(used, at);
   view.dispatch({
     changes,
-    selection: state.selection,
-    effects: setStop.of(nextField(used, state.selection.main.from)),
+    selection: close
+      ? EditorSelection.create([
+        EditorSelection.range(at, end),
+        EditorSelection.range(close.from, close.to),
+      ])
+      : state.selection,
+    effects: setStop.of(nextField(used, at)),
     scrollIntoView: true,
     userEvent: "input",
   });
@@ -143,7 +153,7 @@ function formCell(c: Completion): Node {
   return f;
 }
 
-// ---- ⌘K: every sentinel, filtered by name or description ----
+// ---- Mod+K: every sentinel, filtered by name or description ----
 
 const setPalette = StateEffect.define<boolean>();
 const paletteField = StateField.define<number | null>({
@@ -164,7 +174,7 @@ const paletteField = StateField.define<number | null>({
     ),
 });
 
-function openPalette(view: EditorView): boolean {
+export function openPalette(view: EditorView): boolean {
   view.dispatch({ effects: setPalette.of(true) });
   return true;
 }
@@ -254,13 +264,14 @@ function paletteView(view: EditorView) {
 function wrapBar(view: EditorView) {
   const dom = document.createElement("div");
   dom.className = "cm-bml-wrapbar";
-  const button = (text: string, chord: string, run: () => void) => {
+  // A kbd's key comes from the shortcuts' label pass (shortcuts.ts).
+  const button = (text: string, command: string, run: () => void) => {
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = text;
-    if (chord) {
+    if (command) {
       const k = document.createElement("kbd");
-      k.textContent = chord;
+      k.dataset.command = command;
       b.append(k);
     }
     b.onmousedown = (e) => e.preventDefault(); // keep the selection
@@ -270,11 +281,11 @@ function wrapBar(view: EditorView) {
   const sep = document.createElement("span");
   sep.className = "vsep";
   dom.append(
-    button("Emphasis", `${MOD}I`, () => insertSnippet(view, snippet("em"))),
+    button("Emphasis", "em", () => insertSnippet(view, snippet("em"))),
     button("Quote", "", () => insertSnippet(view, snippet("quote"))),
     button("Footnote", "", () => insertSnippet(view, snippet("footnote"))),
     sep,
-    button("Wrap in…", `${MOD}K`, () => openPalette(view)),
+    button("Wrap in…", "sentinel-list", () => openPalette(view)),
   );
   return { dom };
 }
@@ -309,10 +320,7 @@ export function insertExtensions(extra: CompletionSource[] = []): Extension[] {
     stopField,
     paletteField,
     wrapBarField,
-    Prec.high(keymap.of([
-      { key: "Tab", run: jumpToStop },
-      { key: "Mod-i", run: (v) => insertSnippet(v, snippet("em")) },
-      { key: "Mod-k", run: openPalette },
-    ])),
+    // Mod+I and Mod+K are app shortcuts (shortcuts.ts), which run first.
+    Prec.high(keymap.of([{ key: "Tab", run: jumpToStop }])),
   ];
 }

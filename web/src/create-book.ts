@@ -18,6 +18,7 @@ import {
   type WebSource,
 } from "./web-source.ts";
 import { $, brief } from "./dom.ts";
+import { label } from "./keys.ts";
 
 export interface CreateBookDeps {
   backend(): Backend; // a Back to the Welcome connects again
@@ -25,7 +26,6 @@ export interface CreateBookDeps {
   setBooks(books: string[]): void; // after a folder import copied some in
   leave(href: string): Promise<void>;
   restart(): void; // main again: Back from an empty library
-  chordLabel(chord: string): string;
 }
 
 /** Returns `createManuscript(cancelable)`, the dialog's opener. */
@@ -255,8 +255,8 @@ export function installCreateBook(
     const err = $("web-err");
     $("web-paste-hint").textContent =
       `That site doesn’t let a web page read it. Open it in a new tab, select all (${
-        d.chordLabel("Mod-A")
-      }), copy (${d.chordLabel("Mod-C")}), and paste it here.`;
+        label("mod+a")
+      }), copy (${label("mod+c")}), and paste it here.`;
     box.hidden = true;
     err.textContent = "";
     url.oninput = () => {

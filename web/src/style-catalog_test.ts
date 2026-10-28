@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import type { Metadata } from "../../metadata/types.ts";
 import {
   bookParts,
   catalogFor,
@@ -10,6 +11,7 @@ import {
   routeFor,
   setCount,
   sourceOf,
+  syncIsNames,
   usedBy,
 } from "./style-catalog.ts";
 
@@ -521,4 +523,13 @@ Deno.test("entryName: the source label, margin boxes by what they hold", () => {
     sourceOf(head, byKey(cat, "running.top-center"), "font-size", cat),
     { kind: "set", label: "Running heads" },
   );
+});
+
+Deno.test("syncIsNames: adds the manuscript's names, drops unstyled stale ones", () => {
+  const meta: Metadata = { is: { fo: {}, old: { color: "red" } } };
+  syncIsNames(meta, ["foo"]);
+  assertEquals(meta.is, { old: { color: "red" }, foo: {} });
+  const none: Metadata = {};
+  syncIsNames(none, []);
+  assertEquals(none, {}); // no `is` section conjured
 });

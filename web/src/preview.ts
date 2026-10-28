@@ -594,6 +594,56 @@ export function marginShows(box: Element): boolean {
     content.replace(/["\s]/g, "") !== "";
 }
 
+// Where each printed page begins in the manuscript (design-language.md §8.1
+// page turns), 1-based lines, read from the live pages of the last layout.
+// `page` is its printed folio ("vii", "12"), as numbered even when hidden.
+export interface PageTurn {
+  line: number;
+  page: string;
+}
+export function pageTurns(container: HTMLElement): PageTurn[] {
+  const out: PageTurn[] = [];
+  let last = 0;
+  for (
+    const p of container.querySelectorAll<HTMLElement>(
+      ":scope > :not(.preview-stage) .pagedjs_page",
+    )
+  ) {
+    // The first leaf block on the page: a section's own data-line is its
+    // opening, not where this page starts. A block split across pages keeps
+    // its data-line on the continuation, so the turn lands on that block.
+    // ponytail: block granularity, not the exact line where the page breaks.
+    const line = Number(
+      p.querySelector("[data-line]:not(:has([data-line]))")
+        ?.getAttribute("data-line"),
+    );
+    const page = p.dataset.folio;
+    // One turn per line: the first page that begins in it.
+    if (!(line > last)) continue;
+    last = line;
+    if (page) out.push({ line, page });
+  }
+  return out;
+}
+
+// The live pages and the index of the one nearest the pane's vertical centre
+// (the first of a spread, on a tie); -1 when there are none.
+function nearestPage(
+  container: HTMLElement,
+): { pages: HTMLElement[]; at: number } {
+  const pages = [...container.querySelectorAll<HTMLElement>(LIVE_PAGE)];
+  const mid = container.getBoundingClientRect().top +
+    container.clientHeight / 2;
+  let at = -1;
+  let bestDist = Infinity;
+  pages.forEach((p, i) => {
+    const r = p.getBoundingClientRect();
+    const d = Math.abs((r.top + r.bottom) / 2 - mid);
+    if (d < bestDist) [at, bestDist] = [i, d];
+  });
+  return { pages, at };
+}
+
 // "Page 12 of 208" for the footer: the page nearest the pane's vertical
 // centre, refreshed on scroll and after each render.
 export function installPageIndicator(
@@ -603,34 +653,49 @@ export function installPageIndicator(
   let raf = 0;
   const update = () => {
     raf = 0;
-    const pages = container.querySelectorAll<HTMLElement>(
-      ":scope > :not(.preview-stage) .pagedjs_page",
-    );
-    if (!pages.length) {
-      out.textContent = "";
-      return;
-    }
-    const mid = container.getBoundingClientRect().top +
-      container.clientHeight / 2;
-    let best = pages[0]!;
-    let bestDist = Infinity;
-    for (const p of pages) {
-      const r = p.getBoundingClientRect();
-      const d = Math.abs((r.top + r.bottom) / 2 - mid);
-      if (d < bestDist) {
-        bestDist = d;
-        best = p;
-      }
-    }
-    out.textContent = `Page ${
-      best.dataset.pageNumber ?? "?"
-    } of ${pages.length}`;
+    const { pages, at } = nearestPage(container);
+    out.textContent = pages[at]
+      ? `Page ${pages[at].dataset.pageNumber ?? "?"} of ${pages.length}`
+      : "";
   };
   const schedule = () => {
     if (!raf) raf = requestAnimationFrame(update);
   };
   container.addEventListener("scroll", schedule, { passive: true });
   return schedule;
+}
+
+// Where a chapter or part begins: the fragment with its id, not a split
+// continuation (folios.js's `opener`).
+const OPENER = ".chapter:not([data-split-from]), .part:not([data-split-from])";
+
+// The next or previous page, or page holding a chapter or part opening, from
+// the one the indicator names. Pages sit in spreads, so a step leaves the
+// current row: next page from a spread is the next spread.
+export function stepPreview(
+  container: HTMLElement,
+  dir: 1 | -1,
+  unit: "page" | "chapter",
+): void {
+  const { pages, at } = nearestPage(container);
+  const here = pages[at];
+  if (!here) return;
+  const top = here.offsetTop;
+  let i = at;
+  while (pages[i]?.offsetTop === top) i += dir;
+  if (unit === "chapter") {
+    while (pages[i] && !pages[i]!.querySelector(OPENER)) i += dir;
+  }
+  const p = pages[i];
+  if (!p) return;
+  // By hand, not scrollIntoView (see markEdited). A page shorter than the
+  // pane is centred, so it is the one the indicator then names; a taller one
+  // shows its top.
+  const r = p.getBoundingClientRect();
+  const c = container.getBoundingClientRect();
+  const h = container.clientHeight;
+  container.scrollTop += r.top - c.top -
+    (r.height < h ? (h - r.height) / 2 : 16);
 }
 
 // Fit a full spread (two pages + gap) to the pane width via CSS zoom, never

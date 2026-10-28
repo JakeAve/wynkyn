@@ -10,7 +10,6 @@ import { buildPageTab, buildPublishTab } from "./panel-page.ts";
 import { buildPartsTab } from "./panel-parts.ts";
 import { buildThemesTab, markTried } from "./panel-themes.ts";
 import {
-  addIsNames,
   type BookPart,
   bookParts,
   catalogFor,
@@ -20,6 +19,7 @@ import {
   type Route,
   routeFor,
   setCount,
+  syncIsNames,
 } from "./style-catalog.ts";
 
 export type PanelMode = "style" | "publish";
@@ -29,6 +29,7 @@ export interface ConfigPanel {
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
   selectStyle(key: string): void; // style mode, where a catalog entry is styled (§7.4)
   pagesChanged(): void; // the preview repaginated
+  isNamesChanged(): void; // the manuscript was reparsed; Custom styles follow it
   open(view: string): void; // the nav row `view` (navId), if this book has it
   themeTried(slug: string | null): void; // mark the previewed theme's card
 }
@@ -161,7 +162,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       }
       sections.fonts = filtered;
     }
-    // Unstyled `{is}` classes (addIsNames) stay off disk.
+    // Unstyled `{is}` classes (syncIsNames) stay off disk.
     if (sections.is) {
       sections.is = Object.fromEntries(
         Object.entries(sections.is).filter(([, p]) => Object.keys(p).length),
@@ -285,7 +286,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   }
 
   function render(keepScroll = false): void {
-    addIsNames(meta, opts.isNames());
+    syncIsNames(meta, opts.isNames());
     renderNav();
     const top = body.scrollTop;
     // A hovered "On N pages" button that is replaced never gets its mouseleave.
@@ -329,8 +330,12 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       tried = slug;
       markTried(body, slug);
     },
+    isNamesChanged() {
+      syncIsNames(meta, opts.isNames());
+      renderNav(true);
+    },
     selectStyle(key) {
-      addIsNames(meta, opts.isNames());
+      syncIsNames(meta, opts.isNames());
       go(routeFor(key, meta));
     },
   };

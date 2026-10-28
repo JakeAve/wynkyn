@@ -79,6 +79,11 @@ Deno.test({
         ws.on("framereceived", ({ payload }) => {
           if (String(payload).startsWith('{"type":"update"')) updates++;
         }));
+      // Source: every line as typed, so the DOM reads back as the buffer
+      // (Prose folds markup away).
+      await page.addInitScript(() =>
+        localStorage.setItem("text-view", '{"view":"source"}')
+      );
       await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
       await page.locator('#status[data-kind="saved"]').waitFor();
       const original = await disk();

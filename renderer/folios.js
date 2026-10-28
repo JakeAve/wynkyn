@@ -380,6 +380,9 @@
    */
   function writeEntry(page, entry, numbering) {
     /** @type {any} */ (page)[PAGE_ENTRY] = entry;
+    // The page's own number as the reader sees it ("vii", "12"), shown or not:
+    // the write pane's page turns (web/src/preview.ts pageTurns).
+    /** @type {HTMLElement} */ (page).dataset.folio = entry.refText;
     const style = /** @type {HTMLElement} */ (page).style;
     // An opener with its own folio position shows its number in the
     // --folio-opener box (metadata/css-generator.ts) and none in --folio.

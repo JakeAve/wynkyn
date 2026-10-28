@@ -29,7 +29,8 @@ export interface ThemePreviewDeps {
   saveSections(sections: Partial<Metadata>): void;
   // A null cacheKey paints without touching the book's cached render.
   paint(msg: UpdateMessage, cacheKey?: string | null): void;
-  restore(cached: CachedRender): void;
+  // `version`: the manuscript version the cached pages were built from.
+  restore(cached: CachedRender, version?: string): void;
   leave(href: string): Promise<void>;
   setStatus(kind: "error", detail: string): void;
 }
@@ -118,6 +119,8 @@ export class ThemePreview {
           seed: {},
           problems: [],
         },
+      // the cache holds `next`'s pages (same hash); without it, unknown
+      cached && next ? next.manuscriptVersion : undefined,
     );
   }
 
