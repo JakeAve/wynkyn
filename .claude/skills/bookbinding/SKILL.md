@@ -76,7 +76,7 @@ so older books still work and rewrite themselves on the next save.
 frame) and `sidesFor` hands each `Side` its `marks`, so both renderers just
 draw them. Fold lines all go on the front (each fold takes a half behind, so
 what still faces you is the printed front), each across only what the earlier
-folds left; cut ticks only for `cut` and `leaves`; sewing dots at the spine of
+folds left; cut ticks on every page edge that isn't a fold (the cuts before folding, and the leftover paper's trim on any fold); sewing dots at the spine of
 each signature's centre recto, wherever imposition put it. Everything stays
 0.2in inside the sheet edge (printer dead zone). Spec §7.7 has the details.
 

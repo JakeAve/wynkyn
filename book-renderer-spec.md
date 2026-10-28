@@ -2470,10 +2470,10 @@ the sheet edge, where home printers can't print.
   half; octavo: the first spine fold full height, the head fold on the right
   half, the last spine fold on the bottom-right quarter. `cut`: one line per
   folio at its spine, on the front. None for `leaves`.
-- **Cut marks** (`cut` and `leaves` only, front): short ticks on each cut line
-  where it meets the sheet edges — every row edge, and the folio edges (`cut`)
-  or every column edge (`leaves`). True folds have none; their slits are trimmed
-  after sewing.
+- **Cut marks** (front): short ticks on every page edge that isn't a fold, where
+  it meets the sheet edges — the cuts of a `cut` or `leaves` sheet before
+  folding, and on any fold the trim of the leftover paper beyond the pages (fore
+  edge, head and tail). A cut line inside the dead zone gets no ticks.
 - **Sewing stations** (not `leaves`): dots at the spine edge of each signature's
   centre recto (the inside of its innermost folio, whichever face of whichever
   sheet that lands on) — two kettle holes `kettle` from the head and tail of the
