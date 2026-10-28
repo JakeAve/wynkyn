@@ -5,6 +5,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { laidOut, until } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -35,13 +36,11 @@ async function withApp(
     await page.locator("#editor .cm-content").waitFor();
     // Waits for the manuscript on disk to hold `has` (saves are debounced).
     const file = `${root}/demo-book/manuscript.md`;
-    const saved = async (has: string) => {
-      for (let i = 0; i < 100; i++) {
-        if ((await Deno.readTextFile(file)).includes(has)) return;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      throw new Error(`never saved ${has}`);
-    };
+    const saved = (has: string) =>
+      until(
+        async () => (await Deno.readTextFile(file)).includes(has),
+        `a save of ${has}`,
+      );
     await fn(page, saved);
   } finally {
     await browser.close();
@@ -240,14 +239,7 @@ Deno.test({
       await page.keyboard.press("Control+Shift+L");
       assert((await theme()) !== before, "Ctrl+Shift+L flips the theme");
 
-      // Laid out to the end: the last chapter is in, and the count holds.
-      await page.locator("#preview .chapter", { hasText: "Chapter three" })
-        .first().waitFor();
-      for (let n = -1, was = -2; n !== was;) {
-        was = n;
-        await page.waitForTimeout(300);
-        n = await page.locator("#preview .pagedjs_page").count();
-      }
+      await laidOut(page); // to the end, so the page count holds
       // The footer's indicator names page n (it redraws a frame after a scroll).
       const at = (n: number) =>
         page.waitForFunction(

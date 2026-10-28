@@ -2,6 +2,7 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { startServer } from "./dev-server.ts";
 import { contentVersion } from "./pipeline.ts";
+import { quietFor, until } from "../testing/wait.ts";
 
 // Tests copy the fixture into a temp dir: later tasks write to it, and the
 // watcher must not fire on tracked files under server/testdata/.
@@ -86,6 +87,7 @@ function nextMessage(
   timeoutMs = 5000,
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
+    // clock: a deadline for a hang, not a wait
     const t = setTimeout(
       () => reject(new Error("timed out waiting for a ws message")),
       timeoutMs,
@@ -103,6 +105,7 @@ function nextMessageWhere(
   timeoutMs = 5000,
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
+    // clock: a deadline for a hang, not a wait
     const t = setTimeout(
       () => reject(new Error("timed out waiting for a matching ws message")),
       timeoutMs,
@@ -148,7 +151,7 @@ Deno.test("websocket: initial build on connect, rebuild pushed on file change", 
     assertEquals("origin" in first, false);
     assert((first.html as string).includes("Chapter One"));
 
-    // Give the fresh FSEvents watch a beat before the write it must see.
+    // clock: a fresh FSEvents watch has no ready signal; give it a beat.
     await new Promise((r) => setTimeout(r, 300));
     const manuscript = `${root}/demo-book/manuscript.md`;
     const src = await Deno.readTextFile(manuscript);
@@ -181,7 +184,8 @@ Deno.test("save: each post lands before it is answered; POST and broadcast carry
   const manuscript = `${root}/demo-book/manuscript.md`;
   try {
     await nextMessage(ws); // initial build
-    await new Promise((r) => setTimeout(r, 300)); // let the watch warm up
+    // clock: a fresh FSEvents watch has no ready signal; give it a beat.
+    await new Promise((r) => setTimeout(r, 300));
 
     const post = (text: string) =>
       fetch(`${base}/api/books/demo-book/manuscript`, {
@@ -838,7 +842,8 @@ Deno.test("rename: a stale save carrying the old token lands with the new one", 
     `ws://localhost:${server.port}/ws?book=demo-book&client=tab`,
   );
   const manuscript = `${root}/demo-book/manuscript.md`;
-  const settle = () => new Promise((r) => setTimeout(r, 150));
+  const lands = (text: string) =>
+    until(async () => await Deno.readTextFile(manuscript) === text, text);
   try {
     await nextMessage(ws);
     const renamed = await post("/editions/pocket/rename", { slug: "travel" });
@@ -847,11 +852,7 @@ Deno.test("rename: a stale save carrying the old token lands with the new one", 
       text: "{chapter: one}\n\n{only: pocket | default}\nP\n{/only}\n",
       clientId: "tab",
     })).body?.cancel();
-    await settle();
-    assertEquals(
-      await Deno.readTextFile(manuscript),
-      "{chapter: one}\n\n{only: travel | default}\nP\n{/only}\n",
-    );
+    await lands("{chapter: one}\n\n{only: travel | default}\nP\n{/only}\n");
     // Once the tab saves without the old token it has caught up: `pocket`
     // is free again for a new edition of that name.
     await (await post("/manuscript", {
@@ -863,11 +864,7 @@ Deno.test("rename: a stale save carrying the old token lands with the new one", 
       text: "{chapter: one}\n\n{only: pocket}\nP\n{/only}\n",
       clientId: "tab",
     })).body?.cancel();
-    await settle();
-    assertEquals(
-      await Deno.readTextFile(manuscript),
-      "{chapter: one}\n\n{only: pocket}\nP\n{/only}\n",
-    );
+    await lands("{chapter: one}\n\n{only: pocket}\nP\n{/only}\n");
   } finally {
     ws.close();
     await server.stop();
@@ -982,13 +979,16 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     assertEquals(u0.edition, null);
     assertEquals(p0.edition, "pocket");
     assert((p0.pagedCss as string).includes("3.5in 5in"));
-    await new Promise((r) => setTimeout(r, 300)); // let the watch warm up
+    // clock: a fresh FSEvents watch has no ready signal; give it a beat.
+    await new Promise((r) => setTimeout(r, 300));
 
-    // Pocket metadata write → only the pocket client hears it.
+    // Pocket metadata write → only the pocket client hears it. A late watch
+    // event can still push the unnamed client a rebuild of what it has, so
+    // what must not arrive is a build carrying the pocket write.
     let unnamedHeard = false;
-    unnamed.addEventListener("message", () => unnamedHeard = true, {
-      once: true,
-    });
+    const hear = (e: MessageEvent) =>
+      unnamedHeard ||= String(e.data).includes("float: footnote");
+    unnamed.addEventListener("message", hear);
     const p1 = nextMessageWhere(
       pocket,
       (m) => m.metadataVersion !== p0.metadataVersion,
@@ -999,7 +999,8 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     const msg = await p1;
     assertEquals(msg.edition, "pocket");
     assert((msg.pagedCss as string).includes("float: footnote"));
-    await new Promise((r) => setTimeout(r, 300));
+    await quietFor(300);
+    unnamed.removeEventListener("message", hear);
     assertEquals(unnamedHeard, false);
 
     // Manuscript write → both clients, each built with its own edition.

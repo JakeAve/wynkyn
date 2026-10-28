@@ -6,6 +6,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { chromium } from "playwright";
 import { strToU8, unzipSync, zipSync } from "fflate";
 import { hasChrome } from "../../testing/chrome.ts";
+import { until } from "../../testing/wait.ts";
 import { serveSite } from "../../scripts/serve-site.ts";
 
 const DIST = new URL("../../dist/", import.meta.url);
@@ -60,11 +61,10 @@ Deno.test({
             throw e;
           }
         });
-      const deadline = Date.now() + 10_000;
-      while (!(await stored()).includes("typed in the browser")) {
-        if (Date.now() > deadline) throw new Error("the edit never landed");
-        await new Promise((r) => setTimeout(r, 50));
-      }
+      await until(
+        async () => (await stored()).includes("typed in the browser"),
+        "the edit to land",
+      );
       await page.locator('#status[data-kind="saved"]').waitFor();
 
       // Download: the book's folder as a zip, named after it.

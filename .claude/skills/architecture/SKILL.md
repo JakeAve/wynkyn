@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: Use before adding or moving code in Wynkyn — a new module, metadata key, sentinel, panel view, client feature, server route or test — or when deciding where something belongs and what may import what. Also use for the web app's modules, modes and saving (sync.ts, backend.ts), the spec version in metadata.json, the hosted site and its deploys (build:site, dist/, Deno Deploy, GitHub Pages), the dev loop (git worktrees, ports, hot reload, test tiers, fixtures, CI, verifying in Chrome), and whenever Paged.js does something surprising in the preview or export or needs upgrading. Read it even for a "small" change that crosses a directory boundary.
+description: Use before adding or moving code in Wynkyn — a new module, metadata key, sentinel, panel view, client feature, server route or test — or when deciding where something belongs and what may import what. Also use for the web app's modules, modes and saving (sync.ts, backend.ts), the spec version in metadata.json, the hosted site and its deploys (build:site, dist/, Deno Deploy, GitHub Pages), the dev loop (git worktrees, ports, hot reload, test tiers, fixtures, CI, verifying in Chrome), writing or fixing a test, a red or flaky CI run, and whenever Paged.js does something surprising in the preview or export or needs upgrading. Read it even for a "small" change that crosses a directory boundary.
 ---
 
 # Architecture
@@ -51,7 +51,7 @@ pure        pure          pure+2 js     disk, Chrome   browser only
   `backend.ts`; `app.ts` never calls `fetch` for book data itself.
 
 Chrome-driven tests under `renderer/` and `server/` may import
-`server/pipeline.ts` and `testing/chrome.ts`; production code in `renderer/`
+`server/pipeline.ts`, `testing/chrome.ts` and `testing/wait.ts`; production code in `renderer/`
 never imports from `server/`.
 
 ## Where a change goes
@@ -97,7 +97,10 @@ pure sibling with a test. `dev-server.ts` is the HTTP surface and only routes;
   a reason the existing ones can't meet.
 - Tests are plain `Deno.test` beside the module. One test that fails when the
   logic breaks beats a suite per function. Chrome tests gate on `hasChrome`;
-  pagination truth is the golden page maps under `testdata/`.
+  pagination truth is the golden page maps under `testdata/`. Tests wait for
+  the state they assert, never a clock: `testing/wait.ts`, enforced by
+  `testing/clock_test.ts`. Read references/dev-workflow.md, "Tests that hold
+  on CI", before writing a Chrome test or touching a failing one.
 - `metadata.json` carries a top-level `spec`, the spec version it complies
   with. `SPEC_VERSION` in `metadata/upgrade.ts` is the source of truth;
   `templates/metadata.json` and the spec's §3 heading must match it

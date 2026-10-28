@@ -5,6 +5,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { until } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -37,12 +38,8 @@ Deno.test({
       JSON.parse(await Deno.readTextFile(metaPath))
         .page["folios-per-signature"];
     // Saves are debounced in the page, so wait for the file to catch up.
-    const until = async (want: number) => {
-      for (let i = 0; i < 50 && await saved() !== want; i++) {
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      assertEquals(await saved(), want);
-    };
+    const saves = (want: number) =>
+      until(async () => await saved() === want, `a save of ${want}`);
     try {
       const page = await browser.newPage();
       await page.goto(
@@ -56,11 +53,11 @@ Deno.test({
 
       await more.click(); // a folio: one sheet a folio, so 4 → 5
       assertEquals(await input.inputValue(), "5");
-      await until(5);
+      await saves(5);
 
       await input.fill("7"); // typed, too
       await input.press("Enter");
-      await until(7);
+      await saves(7);
 
       // A quarto's sheet is two folios: presses land on even counts.
       await page.getByLabel("Fold", { exact: true }).selectOption("quarto");
@@ -69,7 +66,7 @@ Deno.test({
       await less.click();
       await less.click();
       assertEquals(await input.inputValue(), "4");
-      await until(4);
+      await saves(4);
     } finally {
       await browser.close();
       await server.stop();

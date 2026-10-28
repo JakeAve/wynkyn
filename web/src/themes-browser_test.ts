@@ -6,6 +6,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { laidOut, until } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -29,24 +30,8 @@ Deno.test({
     const browser = await chromium.launch({ channel: "chrome" });
     const editions = () =>
       [...Deno.readDirSync(`${dir}/editions`)].map((e) => e.name).sort();
-    const until = async (ok: () => Promise<boolean>, what: string) => {
-      for (let i = 0; i < 100; i++) {
-        if (await ok()) return;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      assert(await ok(), what);
-    };
     // No render staged and the pages not dimmed.
-    const settled = async (page: Page) => {
-      await page.locator("#preview .preview-stage").waitFor({
-        state: "detached",
-        timeout: 30_000,
-      });
-      await page.locator("#preview[data-stale]").waitFor({
-        state: "detached",
-        timeout: 30_000,
-      });
-    };
+    const settled = (page: Page) => laidOut(page);
     // The body face of the pages on screen, or "" while a render is under
     // way: Paged.js puts the staged render's sheets in the document, so the
     // pages on screen take its look mid-render and lose it between passes.
@@ -64,9 +49,6 @@ Deno.test({
       const page = await browser.newPage();
       const app = `http://localhost:${server.port}/app/?book=demo-book`;
       await page.goto(`${app}&mode=style&view=themes`);
-      await page.locator("#preview .pagedjs_page").first().waitFor({
-        timeout: 30_000,
-      });
       await settled(page);
       assert((await liveFont(page)).includes("EB Garamond"));
       const metaBefore = await Deno.readTextFile(metaPath);

@@ -972,6 +972,11 @@ async function main(): Promise<void> {
       setPageTurns(editor, pageTurns(previewEl));
     }
     textView.refresh();
+    // Counts layouts that have landed and everything above has read: what
+    // tests wait on (testing/wait.ts laidOut), rather than a sign of a page.
+    previewEl.dataset.layouts = String(
+      Number(previewEl.dataset.layouts ?? 0) + 1,
+    );
   };
   paint = (msg, cacheKey: string | null = key) => {
     renderPreview(msg, previewEl, cacheKey).then((problems) => {

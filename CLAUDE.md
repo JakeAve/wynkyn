@@ -31,6 +31,11 @@ look; when code and it disagree, ask.
 - Deno only, strict TS, `noUncheckedIndexedAccess`. No new deps without reason.
   Tests are plain `Deno.test` with `jsr:@std/assert`, in `*_test.ts` beside the
   module.
+- Tests wait for the state they assert, never a guessed number of milliseconds
+  (`testing/wait.ts`: `laidOut`, `eventually`, `until`; `testing/clock_test.ts`
+  fails an unlabelled sleep). A CI failure that passes on re-run is a race to
+  fix at its root, never a re-run, retry or longer timeout (`architecture` →
+  `references/dev-workflow.md`).
 
 ## Commands
 
@@ -46,16 +51,17 @@ look; when code and it disagree, ask.
 
 Skills live in `.claude/skills/`; read the one that fits before the first edit.
 
-| Topic                                                                      | Read                                                  |
-| -------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Where code goes, layers, what may import what, a new module or key         | `architecture`                                        |
-| The web app: client modules, modes and columns, saving, backends           | `architecture` → `references/web-app.md`              |
-| Dev loop, ports, hot reload, test tiers, fixtures, CI, verifying in Chrome | `architecture` → `references/dev-workflow.md`         |
-| Paged.js surprises, upgrading the vendored copy                            | `architecture` (Paged.js) → `references/pagedjs-*.md` |
-| Hosted site, `dist/`, Deno Deploy, GitHub Pages                            | `architecture` → `references/hosted-site.md`          |
-| Metadata keys, the `spec` version, upgrades of old books                   | `architecture` (Where a change goes, Standing rules)  |
-| Printing, binding, the `page` section, imposition, folios, proofs          | `bookbinding`                                         |
-| UI behaviour, modes, panels, wording, status messages                      | `ux-principles`                                       |
-| Chrome and site visuals: tokens, type, colours, components, dark mode      | `rubric-design` (then `design-language.md`)           |
-| Source text (Gutenberg, pasted, OCR) → BML `manuscript.md`                 | `convert-manuscript`                                  |
-| The `bml` CLI: adding, importing, checking, exporting a book, editions     | `bml`                                                 |
+| Topic                                                                      | Read                                                                  |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Where code goes, layers, what may import what, a new module or key         | `architecture`                                                        |
+| The web app: client modules, modes and columns, saving, backends           | `architecture` → `references/web-app.md`                              |
+| Dev loop, ports, hot reload, test tiers, fixtures, CI, verifying in Chrome | `architecture` → `references/dev-workflow.md`                         |
+| Writing a test, a Chrome test, a red or flaky CI run                       | `architecture` → `references/dev-workflow.md` (Tests that hold on CI) |
+| Paged.js surprises, upgrading the vendored copy                            | `architecture` (Paged.js) → `references/pagedjs-*.md`                 |
+| Hosted site, `dist/`, Deno Deploy, GitHub Pages                            | `architecture` → `references/hosted-site.md`                          |
+| Metadata keys, the `spec` version, upgrades of old books                   | `architecture` (Where a change goes, Standing rules)                  |
+| Printing, binding, the `page` section, imposition, folios, proofs          | `bookbinding`                                                         |
+| UI behaviour, modes, panels, wording, status messages                      | `ux-principles`                                                       |
+| Chrome and site visuals: tokens, type, colours, components, dark mode      | `rubric-design` (then `design-language.md`)                           |
+| Source text (Gutenberg, pasted, OCR) → BML `manuscript.md`                 | `convert-manuscript`                                                  |
+| The `bml` CLI: adding, importing, checking, exporting a book, editions     | `bml`                                                                 |

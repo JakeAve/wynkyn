@@ -6,6 +6,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { laidOut } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -196,15 +197,23 @@ Deno.test({
     const { page, close } = await open(LONG);
     try {
       const turn = page.locator('#editor .cm-prose-turn[data-turn="2"]');
-      await page.locator("#preview .pagedjs_page").nth(1).waitFor({
-        timeout: 30_000,
-      });
-      // CodeMirror draws only the lines near the viewport: scroll to it.
-      for (let i = 0; i < 40 && !await turn.count(); i++) {
-        await page.locator("#editor .cm-scroller").evaluate((s) =>
-          s.scrollTop += 200
+      // The turns land with the whole layout, not with its second page
+      // (Paged.js draws page by page).
+      await laidOut(page);
+      // CodeMirror draws only the lines near the viewport: scroll a step at
+      // a time, each after the redraw, until the turn is drawn or the end.
+      while (!await turn.count()) {
+        const moved = await page.locator("#editor .cm-scroller").evaluate(
+          async (s) => {
+            const top = s.scrollTop;
+            s.scrollTop += 200;
+            for (let i = 0; i < 2; i++) {
+              await new Promise((r) => requestAnimationFrame(r));
+            }
+            return s.scrollTop !== top;
+          },
         );
-        await page.waitForTimeout(50);
+        if (!moved) break;
       }
       assertEquals(await turn.getAttribute("data-long"), "p. 2");
       // The printed folio, not the count of pages: the body starts at 1

@@ -5,6 +5,7 @@ import { assert } from "@std/assert";
 import { chromium } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { laidOut } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -29,27 +30,14 @@ Deno.test({
         globalThis.requestAnimationFrame = () => 0;
       });
       await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-      const live = page.locator(
-        "#preview > :not(.preview-stage) .pagedjs_page",
-      );
-      await live.first().waitFor({ timeout: 30_000 });
-      await page.locator("#preview .preview-stage").waitFor({
-        state: "detached",
-      });
-      assert(!await page.locator("#preview[data-stale]").count());
+      const first = await laidOut(page);
 
       await page.locator("#editor .cm-content").click();
       await page.keyboard.press("End");
       await page.keyboard.type(" edited");
       await page.locator("#preview[data-stale]").waitFor();
       // The save lands, the server rebuilds, the render swaps in: undimmed.
-      await page.locator("#preview[data-stale]").waitFor({
-        state: "detached",
-        timeout: 30_000,
-      });
-      await page.locator("#preview .preview-stage").waitFor({
-        state: "detached",
-      });
+      await laidOut(page, first);
     } finally {
       await browser.close();
       await server.stop();
@@ -74,11 +62,7 @@ Deno.test({
     try {
       const page = await browser.newPage();
       await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-      const stage = page.locator("#preview .preview-stage");
-      await page.locator("#preview .pagedjs_page").first().waitFor({
-        timeout: 30_000,
-      });
-      await stage.waitFor({ state: "detached", timeout: 30_000 });
+      await laidOut(page);
       // While a render is staged — the moment it is added, then every 10ms —
       // the face of the pages on screen. Recorded in the page, so a render
       // that comes and goes between two polls from here is still caught.

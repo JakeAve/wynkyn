@@ -10,6 +10,7 @@ import { impose, sidesFor } from "../../server/imposition.ts";
 import { marksFor } from "../../server/marks.ts";
 import { resolveMarks, resolvePageSetup } from "../../metadata/page-setup.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { eventually, laidOut } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -27,10 +28,7 @@ Deno.test({
       await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
       await page.locator('#status[data-kind="saved"]').waitFor();
       // Paginated and settled: pages on screen, no render staged behind them.
-      await page.waitForFunction(() =>
-        document.querySelector("#preview .pagedjs_page") &&
-        !document.querySelector("#preview .preview-stage")
-      );
+      await laidOut(page);
       const n = await page.locator(
         "#preview > :not(.preview-stage) .pagedjs_page",
       ).count();
@@ -131,10 +129,7 @@ Deno.test({
       const page = await browser.newPage();
       await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
       await page.locator('#status[data-kind="saved"]').waitFor();
-      await page.waitForFunction(() =>
-        document.querySelector("#preview .pagedjs_page") &&
-        !document.querySelector("#preview .preview-stage")
-      );
+      await laidOut(page);
       const n = await page.locator(
         "#preview > :not(.preview-stage) .pagedjs_page",
       ).count();
@@ -148,10 +143,7 @@ Deno.test({
       await page.getByRole("switch", { name: "Binding marks" }).check();
       assert(await sewing.isVisible(), "sub-marks show once marks are on");
       // Saves are debounced in the page, so wait for the file to catch up.
-      for (let i = 0; i < 50 && !(await saved())?.show; i++) {
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      assertEquals(await saved(), { show: true });
+      await eventually(async () => assertEquals(await saved(), { show: true }));
       await page.getByRole("button", { name: "Print sheets" }).click();
       await page.locator("html[data-printed]").waitFor();
 

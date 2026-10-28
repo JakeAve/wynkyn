@@ -4,6 +4,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { laidOut, quietFor, until } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -71,19 +72,17 @@ Deno.test({
     const browser = await chromium.launch({ channel: "chrome" });
     try {
       const page = await browser.newPage();
-      let updates = 0; // rebuild pushes the page receives
+      // Rebuild pushes, by the text they were built from: a slow first
+      // render can still be pushing when the drop goes in.
+      const pushed: string[] = [];
       page.on("websocket", (ws) =>
         ws.on("framereceived", (f) => {
-          if (String(f.payload).startsWith('{"type":"update"')) updates++;
+          const m = JSON.parse(String(f.payload));
+          if (m.type === "update") pushed.push(m.manuscriptVersion);
         }));
       await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
-        .first().waitFor({ timeout: 30_000 });
-      await page.locator("#preview .preview-stage").waitFor({
-        state: "detached",
-      });
-      await page.waitForTimeout(500); // let the first render's pushes settle
-      updates = 0;
+      await laidOut(page);
+      const opening = new Set(pushed);
 
       // A refused file: nothing inserted, the refusal shown.
       assert(!await drop(page, "bright cold day", { files: ["photo.heic"] }));
@@ -110,18 +109,17 @@ Deno.test({
       );
       const block = "thirteen.\n\n{illustration: night-sky}\nCaption\n\n" +
         "{illustration: ornament";
-      for (let i = 0; i < 50; i++) {
-        if (
-          (await Deno.readTextFile(`${bookDir}/manuscript.md`)).includes(block)
-        ) break;
-        await page.waitForTimeout(100);
-      }
-      assert(
-        (await Deno.readTextFile(`${bookDir}/manuscript.md`)).includes(block),
-        "the manuscript gains the block",
+      await until(
+        async () =>
+          (await Deno.readTextFile(`${bookDir}/manuscript.md`)).includes(block),
+        "the manuscript to gain the block",
       );
-      await page.waitForTimeout(2000); // any second push would land by now
-      assertEquals(updates, 1, "one rebuild push per drop");
+      await quietFor(2000); // any second push would land by now
+      assertEquals(
+        pushed.filter((v) => !opening.has(v)).length,
+        1,
+        "one rebuild push per drop",
+      );
       // Prose lists the images again after the drop and draws the new one.
       await page.locator(
         '#editor .cm-prose-illustration img[src$="night-sky.png"]',
@@ -156,7 +154,7 @@ Deno.test({
         (await page.locator("#editor .cm-content").textContent())!
           .includes("PASTED WORDS"),
       );
-      await page.waitForTimeout(300);
+      await quietFor(300); // no image is written for pasted text
       assertEquals([...Deno.readDirSync(`${bookDir}/images`)].length, before);
 
       // A file dropped where nothing takes it (the tree) doesn't open in the

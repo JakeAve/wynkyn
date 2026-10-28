@@ -5,23 +5,12 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "./dev-server.ts";
 import { hasChrome } from "../testing/chrome.ts";
+import { until } from "../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../web/app.js", import.meta.url))
   .then(() => true, () => false);
 
 // Polls a Deno-side condition; the client's save debounce is fixed in app.ts.
-async function until(
-  what: string,
-  ok: () => boolean | Promise<boolean>,
-  timeoutMs = 10_000,
-): Promise<void> {
-  const end = Date.now() + timeoutMs;
-  while (!(await ok())) {
-    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}
-
 // The buffer, read from the rendered lines: CodeMirror's view object hangs
 // off internal DOM properties that change between versions, while
 // `.cm-line` per document line is stable. The fixture is short enough that
@@ -94,8 +83,8 @@ Deno.test({
         const next = original.replace("Demo Book", "Demo Book (a)");
         await writeDisk(next);
         await until(
-          "the buffer to load it",
           async () => await buffer(page) === next,
+          "the buffer to load it",
         );
         assert(!await bannerShown(page));
       });
@@ -127,8 +116,8 @@ Deno.test({
         await conflict(" mine", "Demo Book (c)");
         await page.locator("#disk-keep").click();
         await until(
-          "the save to land",
           async () => await disk() === await buffer(page),
+          "the save to land",
         );
         const now = await disk();
         assert(now.includes(" mine") && !now.includes("Demo Book (c)"));
@@ -145,9 +134,9 @@ Deno.test({
         const at = await caret(page);
         assertEquals(at, [5, "Demo Book (b) own".length]);
         const seen = updates;
-        await until("the save to land", async () => await disk() === typed);
+        await until(async () => await disk() === typed, "the save to land");
         // The watcher's update for our own write is the echo to ignore.
-        await until("its update to arrive", () => updates > seen);
+        await until(() => updates > seen, "its update to arrive");
         await page.locator('#status[data-kind="saved"]').waitFor();
         assertEquals(await buffer(page), typed);
         assertEquals(await caret(page), at);
