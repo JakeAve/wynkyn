@@ -19,6 +19,7 @@ interface PageShape {
   folio: string;
   boxes: string;
   text: string;
+  styles: string;
 }
 
 // Inline `grid-template-columns` on margin rows is left out: assembly redoes
@@ -44,19 +45,40 @@ async function layOut(
       `${await page.getAttribute("html", "data-paged-report")}`,
     );
     const layout = (await page.getAttribute("html", "data-paged-layout"))!;
-    const pages = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>(".pagedjs_page")].map((p) => ({
-        classes: [...p.classList].sort().join(" "),
-        id: p.id,
-        number: p.dataset.pageNumber ?? "",
-        folio: p.dataset.folio ?? "",
-        boxes: [...p.querySelectorAll(".pagedjs_margin.hasContent")]
-          .map((b) =>
-            [...b.classList].find((c) => c.startsWith("pagedjs_margin-"))
-          ).join(" "),
-        text: p.querySelector(".pagedjs_area")?.textContent ?? "",
-      }))
-    );
+    const pages = await page.evaluate(() => {
+      const style = (e: Element | null | undefined, pseudo?: string) =>
+        e ? getComputedStyle(e, pseudo) : undefined;
+      const box = (s = style(null)) =>
+        s ? `${s.borderTop} ${s.backgroundColor} ${s.padding} ${s.margin}` : "";
+      const letter = (s = style(null)) => s ? `${s.fontSize} ${s.color}` : "";
+      return [...document.querySelectorAll<HTMLElement>(".pagedjs_page")].map((
+        p,
+      ) => {
+        const area = p.querySelector(".pagedjs_area");
+        const ch = area?.querySelector(".chapter");
+        return {
+          classes: [...p.classList].sort().join(" "),
+          id: p.id,
+          number: p.dataset.pageNumber ?? "",
+          folio: p.dataset.folio ?? "",
+          boxes: [...p.querySelectorAll(".pagedjs_margin.hasContent")]
+            .map((b) =>
+              [...b.classList].find((c) => c.startsWith("pagedjs_margin-"))
+            ).join(" "),
+          text: area?.textContent ?? "",
+          // The box of each part on the page, real or a segment's wrapper, and
+          // of its first chapter, with that chapter's drop cap.
+          styles: [
+            ...[...area?.querySelectorAll(".part") ?? []].map((e) =>
+              box(style(e))
+            ),
+            box(style(ch)),
+            letter(style(ch?.querySelector(".dropcap"))),
+            letter(style(ch?.querySelector("p"), "::first-letter")),
+          ].join(" | "),
+        };
+      });
+    });
     return { layout, ms, pages };
   } finally {
     await page.close();
@@ -122,6 +144,8 @@ Deno.test({
           ...meta.elements?.part,
           "margin-top": "18pt",
           "padding-top": "12pt",
+          "border-top": "2pt solid #8b1a1a",
+          "background-color": "#f6efe3",
           "text-indent": "3em",
           chapter: {
             "margin-top": "24pt",
