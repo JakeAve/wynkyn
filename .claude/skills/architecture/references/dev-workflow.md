@@ -56,70 +56,86 @@ drives the built `dist/` with no server, so `deno task build:site` first or it
 is skipped. Chrome tests gate on `hasChrome` from `testing/chrome.ts`, which
 launches Chrome once and skips them only if that fails.
 
-### Waiting without a clock
+### Tests that hold on CI
 
-CI's runners are slower than a laptop, and unevenly so: a step that takes
-40 ms here took 45 s there. A test that passes here can still read the page
-mid-change there. Wait for the state the assertion is about, never a guessed
-number of milliseconds. `testing/clock_test.ts` fails any `setTimeout` or
-`waitForTimeout` in a test that isn't labelled `// clock: <why>` (on its line
-or the one above), so a guess can't land unnoticed. Use `testing/wait.ts`:
+CI's macOS runners are slower than a laptop, and unevenly so: a step that
+takes 40 ms here took 45 s there. A test that reads the page at a guessed
+moment passes here for months and then fails on `main`. Every rule below
+comes from a real red run.
 
-- `laidOut(page, after?)`: the preview is laid out, nothing is pending (no
-  render, no edit waiting for one) and everything that reads the pages (page
-  turns, the indicator) has caught up. It reads `#preview[data-layouts]`,
-  which `afterLayout` in `app.ts` counts up. Keep the count from before an
-  edit and pass it to wait for the layout after that edit. Not
+**1. Pick the cheapest test that can fail.** Logic goes in a pure function
+with a plain `Deno.test` (no browser, no server, no clock). A Chrome test is
+only for what only a browser knows: real layout and pagination, a click, a
+key, focus, a transition. Several assertions about one flow go in one
+Chrome test, not one test each.
+
+**2. Wait for the state you assert, never for time.** Use `testing/wait.ts`:
+
+| Helper | Waits for |
+| --- | --- |
+| `laidOut(page, after?)` | the preview laid out with nothing pending (no render, no edit waiting for one), and the page turns and indicator caught up. Pass the count from before an edit to wait for the layout after it |
+| `eventually(check)` | an assert to hold, retried like Playwright Test's `expect`. Wrap any read of state an action changes later: `assertEquals(await x.count(), 0)` alone reads once, at whatever instant |
+| `until(ok, what)` | a condition, polled |
+| `quietFor(ms)` | nothing: the pause before asserting that something did *not* happen |
+
+Their deadlines are 30 s or more, long enough that only a hang reaches them.
+Playwright's own locator waits (`locator.waitFor()`) are fine too.
+`testing/clock_test.ts` fails any `setTimeout` or `waitForTimeout` in a test
+without a `// clock: <why>` on its line or the one above. The reason must
+hold on a runner ten times slower: "slowness only makes this pass more
+easily" (no second push arrives), or "there is nothing to wait on" (a fresh
+FSEvents watch has no ready signal).
+
+Reading straight after a synchronous action is fine: a key pressed into
+CodeMirror has changed the document when `press` returns. Anything that goes
+through a save, the server, the watch, the websocket, a render, a debounce,
+a transition or an animation frame needs a wait.
+
+**3. If the app gives no signal for the state, add one to the app.** An
+attribute or a count, as `afterLayout` in `app.ts` counts layouts on
+`#preview[data-layouts]`, beats inferring the state from what is on screen.
+
+**4. Know the false signals.** Each passed locally and failed on CI:
+
+- **An earlier sign of the state:** page 2 in the preview is not "the layout
+  is done". Paged.js draws page by page, and the page turns land only with
+  the last page. Nor is "the page count held for 300 ms", nor
   `.preview-stage` detached: the stage is also absent before a render starts.
-- `eventually(check)`: retries an assert until it holds, like Playwright
-  Test's `expect`. The plain `assertEquals(await x.count(), 0)` reads once,
-  at whatever instant; wrap a read of anything an action changes later.
-  Never for "stays": a check that already holds passes at once.
-- `until(ok, what)`: polls a condition. All three wait up to 30 s or more, a
-  deadline only a hang reaches.
-- `quietFor(ms)`: the pause before asserting that nothing happened.
-
-When the app has no signal for the state a test needs, add one to the app
-(an attribute or a count, like `data-layouts`) rather than inferring it.
-
-- **The signal, not an earlier sign of it:** wait on what the assertion
-  reads. Page 2 in the preview is not "the layout is done": Paged.js draws
-  page by page, and the editor's page turns land only when the last page does
-  (a scroll that started at page 2 ran past the line before its turn existed).
-  Nor is "the page count held for 300 ms". Both are `laidOut`.
-
+  All three are `laidOut`.
+- **A budget in steps:** "40 tries × 50 ms" is a 2 s clock in disguise.
+  Bound a poll by a deadline.
 - **A transition or fade:** wait for its class or attribute to land, then
-  `el.getAnimations()` and `Promise.all(… .map((a) => a.finished))`. Read
-  straight after the class lands and the value is still the start of it.
+  `Promise.all(el.getAnimations().map((a) => a.finished))`. Read straight
+  after the class lands and the value is still the start of it.
 - **Something that goes on the next frame** (⌥ released, a hover left): read
   what you need *before* the action that clears it.
 - **A push or a save:** match the one you caused (`nextMessageWhere` on its
-  version), not merely the next; a write truncates first, so the watch can
+  version), not merely the next. A write truncates first, so the watch can
   push a half-written file ahead of it.
-- **A debounced value** (the `#line=` hash, the save): compare what the test
-  is about, or poll it with `until`.
-- **Polling:** check, then sleep, and return on the first match; a second read
-  for the assertion can catch a different moment. Bound it by a deadline, not
-  a count of short steps: "40 tries × 50 ms" is a 2 s clock in disguise.
-- **Scrolling a CodeMirror line into view:** step less than a screen and wait
-  two `requestAnimationFrame`s after each step, so the redraw has run before
-  you look.
-- **Counting events** (pushes, saves): count the ones your action caused, by
-  version, not "all since I reset the counter after a pause".
+- **"Nothing arrives":** a late watch event can push a rebuild of unchanged
+  content at any time. Listen for the thing that must not arrive (the other
+  edition's styles), not for any message.
+- **Counting events:** count the ones your action caused, by version, not
+  "all since I reset the counter after a pause".
+- **A CodeMirror line:** it is drawn only near the viewport. Scroll less than
+  a screen at a time and wait two `requestAnimationFrame`s after each step.
 
-A fixed pause is fine only where slowness makes it pass more easily ("no
-second push arrives"), or where there is nothing to wait on (a fresh FSEvents
-watch has no ready signal). To check a fix, stretch the app's own `--t` and
-`--t-fast` to 1 s: the old wait should fail and the new one pass. Forcing
-`transition-duration` on `*` animates everything and proves nothing. CPU
-throttling (`Emulation.setCPUThrottlingRate`) slows the test's own steps as
-much as the app, so it rarely opens a race: log what the test sees at the
-moment it starts waiting (here, "0 page turns at page 2") instead.
+**5. Prove it before you push.** Run a new or changed Chrome test five times
+(`for i in 1 2 3 4 5; do deno test -A <file> --filter "<name>"; done`). For
+a wait on a transition, stretch the app's `--t` and `--t-fast` to 1 s: the
+old wait should fail and the new one pass. Forcing `transition-duration` on
+`*` animates everything and proves nothing. CPU throttling
+(`Emulation.setCPUThrottlingRate`) slows the test as much as the app, so it
+rarely opens a race. Log what the test sees at the moment it starts waiting
+(here, "0 page turns at page 2") instead. Don't judge a flake while another
+worktree's suite is running: two suites and two Chromes starve each other.
 
-**A red CI run on `main` that passed on the PR is a race, not bad luck.**
-Never re-run it to green, add retries or raise a timeout. Read the failing
-line, find what the test waited on instead of the state it asserts, fix that,
-and check the rest of the file for the same pattern.
+**6. A red CI run that passed on the PR is a race, not bad luck.** Never
+re-run it to green, add retries or raise a timeout. Read the failing line,
+find what the test waited on instead of the state it asserts, fix that, and
+check the rest of the file for the same pattern. CI tests a PR merged with
+the latest `main`, so the clock guard can fail on a sleep another branch
+brought in: fix it there too.
 
 ## Fixtures
 

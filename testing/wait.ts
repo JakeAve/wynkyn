@@ -1,5 +1,5 @@
 // Waiting in tests without a clock (architecture → references/dev-workflow.md,
-// "Waiting without a clock"). The only sleeps tests may use without a
+// "Tests that hold on CI"). The only sleeps tests may use without a
 // `// clock:` reason; clock_test.ts holds every other one to that.
 import type { Page } from "playwright";
 
