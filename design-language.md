@@ -139,8 +139,12 @@ The pages stay paper in both themes, so their marks use fixed values.
   pages" matches.
 - `--page-shadow`: the shadow under each page (§5); this one does follow the
   theme, deeper on dark.
-- `--sheet-*`: the imposed sheet in Print (paper, edge, slot, blank, ink, fold,
-  cut), unchanged, except `--sheet-cut` becomes the light `--acc`.
+- `--sheet-*`: the imposed sheet in Print (paper, edge, slot, blank, ink),
+  unchanged. The drawing shows the sheet as it prints: page outlines for the
+  printed pages, and lines only for binding marks that will print, in
+  `--sheet-ink` (hairline dashes for folds, hairline ticks for cuts, dots for
+  sewing stations). With marks off it draws no lines; the note beneath says how
+  to fold. ~~`--sheet-fold`~~ and ~~`--sheet-cut`~~ went with the guides.
 - `--inspect-*`: Inspect's marks (spec §7.6), drawn in their own layer over the
   pages, screen only. `--inspect-hover` `#2563eb` rings what the pointer is on
   and draws a pinned line's baseline; the box model as DevTools shades it:

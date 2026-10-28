@@ -6,6 +6,7 @@ import {
   gridFor,
   isValidSize,
   parseDims,
+  resolveMarks,
   resolvePageSetup,
   tryParseDims,
 } from "./page-setup.ts";
@@ -249,4 +250,39 @@ Deno.test("resolvePageSetup: a booklet is one signature of every page", () => {
   const flagged = resolvePageSetup(page, { folios: 4, pageCount: 37 });
   assertFalse(flagged.booklet);
   assertEquals(flagged.folios, 4);
+});
+
+Deno.test("resolveMarks: off unless show, defaults on, false wins", () => {
+  assertEquals(resolveMarks(undefined), null);
+  assertEquals(resolveMarks({}), null);
+  assertEquals(resolveMarks({ show: false, folds: true }), null);
+  const on = { folds: true, cuts: true, sewing: { stations: 3, kettle: 0.5 } };
+  assertEquals(resolveMarks({ show: true }), on);
+  assertEquals(resolveMarks({ show: true, sewing: true }), on);
+  assertEquals(resolveMarks({ show: true, sewing: {} }), on);
+  assertEquals(resolveMarks({ show: true, folds: false, cuts: false }), {
+    ...on,
+    folds: false,
+    cuts: false,
+  });
+  assertEquals(resolveMarks({ show: true, sewing: false })?.sewing, null);
+  assertEquals(
+    resolveMarks({ show: true, sewing: { stations: 5, kettle: "12mm" } })
+      ?.sewing,
+    { stations: 5, kettle: 12 * (1 / 25.4) },
+  );
+  assertEquals(
+    resolveMarks({ show: true, sewing: { stations: 0 } })?.sewing?.stations,
+    0,
+  );
+  // Bad values fall back to the defaults.
+  assertEquals(
+    resolveMarks({ show: true, sewing: { stations: 2.5, kettle: "wide" } })
+      ?.sewing,
+    { stations: 3, kettle: 0.5 },
+  );
+  assertEquals(
+    resolveMarks({ show: true, sewing: { stations: -1 } })?.sewing?.stations,
+    3,
+  );
 });

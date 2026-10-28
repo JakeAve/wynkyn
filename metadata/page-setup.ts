@@ -2,7 +2,7 @@
 // the sheet it prints on, and everything the two together imply. Pure and
 // dependency-free (no Deno APIs) so the config panel and the print exporter
 // share one source of truth for this geometry.
-import type { Duplex, Fold, PageConfig } from "./types.ts";
+import type { Duplex, Fold, PageConfig, PageMarks } from "./types.ts";
 
 export interface Dims {
   w: number;
@@ -437,4 +437,33 @@ export function describePageSetup(s: PageSetup): string {
   if (isTrueFold(s.fold)) return `${size} · ${s.fold} on ${s.sheet}`;
   if (s.fold === "leaves") return `${size} · ${s.nUp}-up leaves on ${s.sheet}`;
   return `${size} · ${s.nUp}-up on ${s.sheet}`;
+}
+
+/** Binding marks with every default applied; lengths in inches (§4.3). */
+export interface ResolvedMarks {
+  folds: boolean;
+  cuts: boolean;
+  // stations: holes evenly spaced between the two kettle holes; kettle: the
+  // distance from head and tail of the page to its kettle-stitch hole.
+  sewing: { stations: number; kettle: number } | null;
+}
+
+/** `page.marks` → settings to draw, or null when marks are off (§4.3). */
+export function resolveMarks(
+  marks: PageMarks | undefined,
+): ResolvedMarks | null {
+  if (marks?.show !== true) return null;
+  const s = marks.sewing;
+  const cfg = typeof s === "object" ? s : {};
+  const stations = Number.isInteger(cfg.stations) && cfg.stations! >= 0
+    ? cfg.stations!
+    : 3;
+  const kettle = cfg.kettle === undefined
+    ? undefined
+    : tryParseDims(`${cfg.kettle} ${cfg.kettle}`)?.w;
+  return {
+    folds: marks.folds !== false,
+    cuts: marks.cuts !== false,
+    sewing: s === false ? null : { stations, kettle: kettle ?? 0.5 },
+  };
 }

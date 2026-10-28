@@ -105,8 +105,6 @@
   --sheet-slot: #e2e2de;
   --sheet-blank: #ededea;
   --sheet-ink: #161616;
-  --sheet-fold: #8f8f8a;
-  --sheet-cut: #db3834; /* the light --acc */
   /* Inspect's marks on the pages (inspect.ts); its pinned ring is --pick. */
   --inspect-hover: #2563eb; /* the pointed-at ring, a pinned line's baseline */
   --inspect-space: rgb(245 158 11 / .22); /* space above and below */

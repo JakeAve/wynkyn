@@ -18,7 +18,12 @@ import {
   type Slot,
 } from "./imposition.ts";
 import { metadataPath } from "./editions.ts";
-import { type PageSetup, resolvePageSetup } from "../metadata/page-setup.ts";
+import {
+  type PageSetup,
+  resolveMarks,
+  resolvePageSetup,
+} from "../metadata/page-setup.ts";
+import { MARK_STYLE, marksFor } from "./marks.ts";
 import { loadMetadata } from "../metadata/loader.ts";
 import { missingFonts } from "./local-fonts.ts";
 import { buildBook } from "./pipeline.ts";
@@ -114,6 +119,25 @@ export async function buildSheetPdf(
   for (const side of sides) {
     const page = out.addPage([W, H]);
     for (const slot of side.slots) drawSlot(page, slot, side.label);
+    // Last, so the marks sit on top of the pages and the proof placeholders.
+    const color = rgb(MARK_STYLE.grey, MARK_STYLE.grey, MARK_STYLE.grey);
+    for (const d of side.marks.dots) {
+      page.drawCircle({
+        x: d.x * PT,
+        y: H - d.y * PT,
+        size: MARK_STYLE.dot / 2, // the radius
+        color,
+      });
+    }
+    for (const l of side.marks.lines) {
+      page.drawLine({
+        start: { x: l.x1 * PT, y: H - l.y1 * PT },
+        end: { x: l.x2 * PT, y: H - l.y2 * PT },
+        thickness: MARK_STYLE.line,
+        color,
+        ...(l.kind === "fold" ? { dashArray: MARK_STYLE.dash } : {}),
+      });
+    }
   }
   return await out.save();
 }
@@ -301,6 +325,7 @@ export async function exportBook(
     sheet: imposition.sheet, // oriented by the grid, not by `sheet` as parsed
     page,
   };
+  const marks = marksFor(imposition, page, resolveMarks(m.page?.marks));
   if (duplex === "none") {
     for (
       const [name, mode] of [["sheets-fronts.pdf", "fronts"], [
@@ -312,7 +337,7 @@ export async function exportBook(
       await Deno.writeFile(
         path,
         await buildSheetPdf(
-          sidesFor(imposition, mode, reverseBacks),
+          sidesFor(imposition, mode, reverseBacks, marks),
           geom,
           source,
         ),
@@ -323,7 +348,11 @@ export async function exportBook(
     const path = `${out}/sheets.pdf`;
     await Deno.writeFile(
       path,
-      await buildSheetPdf(sidesFor(imposition, "duplex", false), geom, source),
+      await buildSheetPdf(
+        sidesFor(imposition, "duplex", false, marks),
+        geom,
+        source,
+      ),
     );
     files.push(path);
   }

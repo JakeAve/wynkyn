@@ -6,7 +6,13 @@
 // the first signature drawn as it prints into the sheet view (R7), and printing
 // from this browser. Both write the `page` section; Publish reads the trim size
 // the Page tab set and links back to it.
-import type { Duplex, Flip, Fold, PageConfig } from "../../metadata/types.ts";
+import type {
+  Duplex,
+  Flip,
+  Fold,
+  PageConfig,
+  PageMarks,
+} from "../../metadata/types.ts";
 import {
   DEFAULT_SIZE,
   fmtLength,
@@ -42,8 +48,11 @@ import {
   FOLD_VALUES,
   isTrueFold,
   type PageSetup,
+  type ResolvedMarks,
+  resolveMarks,
   TRUE_FOLDS,
 } from "../../metadata/page-setup.ts";
+import { marksFor, type SideMarks } from "../../server/marks.ts";
 import { printSheets } from "./print.ts";
 
 const FOLD_LABELS: Record<Fold, string> = {
@@ -207,12 +216,26 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
     const pages = ctx.preview.pageCount();
     const setup = resolvePageSetup(page, { pageCount: pages || undefined });
     showSetup(setup, pages, readout);
-    drawSignature(ctx, setup, pages, page.flip ?? "short-edge", ctx.sheetView);
+    drawSignature(
+      ctx,
+      setup,
+      pages,
+      page.flip ?? "short-edge",
+      resolveMarks(page.marks),
+      ctx.sheetView,
+    );
     // Auto names what it picked; loose leaves have no signatures to set.
     foldSel.options[0]!.text = setup.error === null
       ? `Auto: ${FOLD_LABELS[setup.fold].toLowerCase()}`
       : "Auto";
     signatures.hidden = setup.error === null && setup.fold === "leaves";
+    // Each mark's row shows only while marks are on and it applies to the fold.
+    const fold = setup.error === null ? setup.fold : null;
+    const on = page.marks?.show === true;
+    foldsRow.hidden = sewingRow.hidden = !on || fold === "leaves";
+    cutsRow.hidden = !on || (fold !== "cut" && fold !== "leaves");
+    stationsRow.hidden = kettleRow.hidden = sewingRow.hidden ||
+      page.marks?.sewing === false;
   };
   const v = makeView(ctx, redraw);
   const save = () => v.changed("page");
@@ -347,6 +370,107 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
     ),
     folioRow,
   ]);
+
+  // Binding marks (§4.3): `show` is the master and the rest stay stored while
+  // it is off. A mark is on while unset, so switching one on deletes its key,
+  // and `marks` goes once nothing is left in it.
+  type Sewing = Exclude<NonNullable<PageMarks["sewing"]>, boolean>;
+  const tidy = (m: PageMarks) => {
+    if (!Object.keys(m).length) delete page.marks;
+    save();
+  };
+  // Turning sewing off and on again brings back its stations and kettle.
+  let lastSewing = typeof page.marks?.sewing === "object"
+    ? page.marks.sewing
+    : undefined;
+  const markRow = (label: string, key: "folds" | "cuts" | "sewing") =>
+    v.mark(
+      row(
+        label,
+        switchInput(label, page.marks?.[key] !== false, (on) => {
+          const m = page.marks ??= {};
+          if (!on) m[key] = false;
+          else if (key === "sewing" && lastSewing) m.sewing = lastSewing;
+          else delete m[key];
+          tidy(m);
+        }),
+      ),
+      () => page.marks?.[key] !== undefined,
+    );
+  // A stepper writes sewing as an object; emptied, it goes back to unset.
+  const sewing = (edit: (s: Sewing) => void) => {
+    const m = page.marks ??= {};
+    const s = typeof m.sewing === "object" ? m.sewing : {};
+    edit(s);
+    lastSewing = Object.keys(s).length ? s : undefined;
+    if (lastSewing) m.sewing = lastSewing;
+    else delete m.sewing;
+    tidy(m);
+  };
+  const foldsRow = markRow("Fold lines", "folds");
+  const cutsRow = markRow("Cut marks", "cuts");
+  const sewingRow = markRow("Sewing stations", "sewing");
+  const stationsRow = v.mark(
+    row(
+      "Stations",
+      stepper({
+        value: lastSewing?.stations?.toString(),
+        placeholder: "3",
+        unit: "",
+        label: "Stations",
+        onChange: (n) => {
+          if (n !== undefined && !Number.isInteger(Number(n))) return false;
+          sewing((s) => {
+            if (n === undefined) delete s.stations;
+            else s.stations = Number(n);
+          });
+        },
+      }),
+    ),
+    () =>
+      typeof page.marks?.sewing === "object" &&
+      page.marks.sewing.stations !== undefined,
+  );
+  const kettleRow = v.mark(
+    row(
+      "Kettle stitch",
+      stepper({
+        value: lastSewing?.kettle,
+        placeholder: "0.5in",
+        label: "Kettle stitch",
+        onChange: (k) =>
+          sewing((s) => {
+            if (k === undefined) delete s.kettle;
+            else s.kettle = k;
+          }),
+      }),
+    ),
+    () =>
+      typeof page.marks?.sewing === "object" &&
+      page.marks.sewing.kettle !== undefined,
+  );
+  const marks = section("Binding marks", "marks", [
+    v.mark(
+      row(
+        "Binding marks",
+        switchInput("Binding marks", page.marks?.show === true, (on) => {
+          (page.marks ??= {}).show = on;
+          save();
+        }),
+      ),
+      () => page.marks?.show !== undefined,
+    ),
+    foldsRow,
+    cutsRow,
+    sewingRow,
+    stationsRow,
+    kettleRow,
+    el(
+      "p",
+      "hint",
+      "Marks print on the sheets only: fold lines on the fronts, sewing dots on each signature's centre fold.",
+    ),
+  ]);
   redraw();
 
   return [
@@ -368,6 +492,7 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       readout,
     ]),
     signatures,
+    marks,
     printing.sec,
     pagesSection(ctx),
     ebookSection(ctx),
@@ -424,10 +549,12 @@ function printSection(
       pages.length,
       page.flip ?? "short-edge",
     );
-    printSheets(pages, sidesFor(imp, mode, page["reverse-backs"] === true), {
-      sheet: imp.sheet,
-      page: setup.page,
-    });
+    const marks = marksFor(imp, setup.page, resolveMarks(page.marks));
+    printSheets(
+      pages,
+      sidesFor(imp, mode, page["reverse-backs"] === true, marks),
+      { sheet: imp.sheet, page: setup.page },
+    );
   };
   const btn = (label: string, mode: "duplex" | "fronts" | "backs") => {
     // One primary on a screen: Print sheets.
@@ -516,6 +643,7 @@ function pagesSection(ctx: PanelContext): HTMLElement {
     const sides = pages.map((_, i) => ({
       label: `page ${i + 1}`,
       slots: [{ page: i, rotate: 0 as const, folio: 0, x: 0, y: 0 }],
+      marks: { dots: [], lines: [] }, // book pages never carry binding marks
     }));
     printSheets(pages, sides, { sheet: size, page: size });
   };
@@ -680,37 +808,19 @@ function drawSignature(
   setup: PageSetup,
   pageCount: number,
   flip: Flip,
+  marks: ResolvedMarks | null,
   host: HTMLElement,
 ): void {
   host.replaceChildren();
   if (setup.error !== null) return;
   const imp = liveImposition(ctx, setup, pageCount, flip);
   const first = imp.sheets.filter((sh) => sh.signature === 0);
+  // Signature 0's sheets come first in imp.sheets, so indexes line up.
+  const sheetMarks = marksFor(imp, setup.page, marks);
   const { w: W, h: H } = imp.sheet;
   const { w: pw, h: ph } = setup.page;
-  const { origin: o, cell } = imp;
   const folded = isTrueFold(imp.fold);
-  // Grid lines: a folded sheet folds at every cell edge; loose leaves cut at
-  // every one; a cut sheet folds each column pair and cuts the rest.
-  const lines: Array<
-    { cls: string; x1: number; y1: number; x2: number; y2: number }
-  > = [];
-  for (let c = 1; c < imp.cols; c++) {
-    const x = o.x + c * cell.w;
-    const cls = folded || (imp.fold === "cut" && c % 2) ? "fold" : "cut";
-    lines.push({ cls, x1: x, x2: x, y1: o.y, y2: o.y + imp.rows * cell.h });
-  }
-  for (let r = 1; r < imp.rows; r++) {
-    const y = o.y + r * cell.h;
-    lines.push({
-      cls: folded ? "fold" : "cut",
-      x1: o.x,
-      x2: o.x + imp.cols * cell.w,
-      y1: y,
-      y2: y,
-    });
-  }
-  const side = (slots: Slot[], label: string) => {
+  const side = (slots: Slot[], label: string, m?: SideMarks) => {
     const s = svg("svg", {
       viewBox: `0 0 ${W} ${H}`,
       role: "img",
@@ -736,8 +846,14 @@ function drawSignature(
         transform: slot.rotate ? `rotate(180 ${cx} ${cy})` : "",
       }, String(slot.page + 1)));
     }
-    for (const { cls, ...at } of lines) {
-      s.append(svg("line", { class: cls, ...at }));
+    // The sheet as it prints: every line is a binding mark, and with marks off
+    // there are none. A dot is drawn bigger than it prints (1pt) so it can be
+    // seen at this scale. The page outlines stand for the printed pages.
+    for (const { kind, ...at } of m?.lines ?? []) {
+      s.append(svg("line", { class: `mark ${kind}`, ...at }));
+    }
+    for (const d of m?.dots ?? []) {
+      s.append(svg("circle", { class: "mark", cx: d.x, cy: d.y, r: 0.06 }));
     }
     return el("figure", "", s, el("figcaption", "", label));
   };
@@ -746,8 +862,8 @@ function drawSignature(
       el(
         "div",
         "sheet",
-        side(sh.front, `Sheet ${i + 1} front`),
-        side(sh.back, `Sheet ${i + 1} back`),
+        side(sh.front, `Sheet ${i + 1} front`, sheetMarks[i]?.front),
+        side(sh.back, `Sheet ${i + 1} back`, sheetMarks[i]?.back),
       ),
     )
   );
@@ -765,13 +881,29 @@ function drawSignature(
         : ""
     }`
     : imp.fold === "leaves"
-    ? "Solid lines cut. Cut the stack and pile the pieces in reading order, top row first."
+    ? "Cut the stack between the pages and pile the pieces in reading order, top row first."
     : setup.cutsPerSheet
-    ? "Dashed lines fold, solid lines cut."
-    : "Dashed lines fold.";
+    ? "Cut the sheet between the folios, then fold each one at its spine."
+    : "Fold each sheet at its spine.";
+  // Where the sewing stations land: the innermost sheet, which may be past
+  // the ones shown.
+  const sewn = first.findIndex((_, i) =>
+    [sheetMarks[i]?.front, sheetMarks[i]?.back].some((f) => f?.dots.length)
+  );
+  const sewnFace = sewn < 0
+    ? ""
+    : sheetMarks[sewn]?.front.dots.length
+    ? "front"
+    : "back";
   const notes = [
     more > 0 ? `And ${more} more sheet${more === 1 ? "" : "s"}.` : "",
     how,
+    marks
+      ? "Every line here prints."
+      : "Switch on Binding marks to print fold and cut lines.",
+    sewn < 0
+      ? ""
+      : `Sewing stations: sheet ${sewn + 1} ${sewnFace}, on the fold.`,
     first.some((sh) => [...sh.front, ...sh.back].some((t) => t.rotate))
       ? "Upside-down numbers print upside down, which is how the sheet lines up."
       : "",
