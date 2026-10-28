@@ -40,8 +40,6 @@ import {
 import { styleKeysAt } from "./bml-language.ts";
 import { chapterAt, wordCount } from "./prose-model.ts";
 import { setPageTurns } from "./prose.ts";
-import { SNIPPETS } from "./snippets.ts";
-import { insertSnippet } from "./editor-insert.ts";
 import { type ImageHost, pickImageFile } from "./editor-images.ts";
 import type { ImageFile } from "../../server/images.ts";
 import { buildTree } from "./tree-data.ts";
@@ -56,8 +54,9 @@ import type { Backend } from "./backend.ts";
 import { installSwitcher, type Switcher } from "./switcher.ts";
 import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
-import { installTextView, type TextView } from "./text-view.ts";
-import { installPanes, type Panes } from "./panes.ts";
+import { installTextView } from "./text-view.ts";
+import { installPanes } from "./panes.ts";
+import { installShortcuts } from "./shortcuts.ts";
 import { installPreviewZoom } from "./preview-zoom.ts";
 import { installInspect } from "./inspect.ts";
 import { connect } from "./library.ts";
@@ -689,22 +688,37 @@ function installGutters(): void {
     const saved = localStorage.getItem(cssVar);
     if (saved) root.style.setProperty(cssVar, saved);
     const gutter = $(id);
+    // Where the column starts, its width now, and the width the pointer and
+    // the keys share: at least `min`, and 12.5rem left for whatever pane sits
+    // to the right.
+    const left = () =>
+      (cssVar === "--w-tree"
+        ? panes
+        : mode === "write"
+        ? $("editor")
+        : $("config-overlay")).getBoundingClientRect().left;
+    const rem = () => parseFloat(getComputedStyle(root).fontSize);
+    const width = () => gutter.getBoundingClientRect().left - left();
+    const resize = (px: number) => {
+      const max = panes.getBoundingClientRect().right - left() - 12.5 * rem();
+      const w = Math.min(Math.max(px, min * rem()), max);
+      root.style.setProperty(cssVar, `${w}px`);
+      gutter.setAttribute("aria-valuenow", String(Math.round(w)));
+    };
+    gutter.onfocus = () =>
+      gutter.setAttribute("aria-valuenow", String(Math.round(width())));
+    gutter.onkeydown = (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      resize(width() + (e.key === "ArrowLeft" ? -rem() : rem()));
+      localStorage.setItem(cssVar, root.style.getPropertyValue(cssVar));
+    };
     gutter.onpointerdown = (e) => {
       e.preventDefault();
       gutter.setPointerCapture(e.pointerId);
       gutter.classList.add("dragging");
-      const work = mode === "write" ? $("editor") : $("config-overlay");
-      const left = (cssVar === "--w-tree" ? panes : work)
-        .getBoundingClientRect().left;
-      const rem = parseFloat(getComputedStyle(root).fontSize);
-      gutter.onpointermove = (m) => {
-        // Leave at least 12.5rem for whatever pane sits to the right.
-        const max = panes.getBoundingClientRect().right - left - 12.5 * rem;
-        root.style.setProperty(
-          cssVar,
-          `${Math.min(Math.max(m.clientX - left, min * rem), max)}px`,
-        );
-      };
+      const l = left();
+      gutter.onpointermove = (m) => resize(m.clientX - l);
       gutter.onpointerup = () => {
         gutter.onpointermove = gutter.onpointerup = null;
         gutter.classList.remove("dragging");
@@ -726,74 +740,6 @@ function installThemeToggle(): void {
   };
 }
 
-const MOD = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl+";
-// Keyboard chords. Snippet chords insert via insertSnippet; the rest are UI.
-const SNIPPET_KEYS: Record<string, string> = {
-  em: "Mod-E",
-  chapter: "Mod-Shift-C",
-  heading: "Mod-Shift-H",
-  footnote: "Mod-Shift-F",
-  quote: "Mod-Shift-Q",
-  break: "Mod-Shift-B",
-};
-function chordLabel(chord: string): string {
-  return chord.replace("Mod-", MOD).replace("Shift-", "⇧");
-}
-function chordOf(e: KeyboardEvent): string | null {
-  if (!(e.metaKey || e.ctrlKey) || e.altKey) return null;
-  return `Mod-${e.shiftKey ? "Shift-" : ""}${
-    e.key.length === 1 ? e.key.toUpperCase() : e.key
-  }`;
-}
-// Open popups esc closes first: a dialog, the find bar, completions, the
-// sentinel palette and wrap bar, menus (the zoom menu is a popover). Not
-// hover tooltips (spelling, lint).
-const POPUPS =
-  "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
-function installShortcuts(
-  panes: Panes,
-  textView: TextView,
-  inspect: { escape(): boolean },
-): void {
-  const bySnippet = new Map(
-    SNIPPETS.filter((s) => SNIPPET_KEYS[s.label]).map((
-      s,
-    ) => [SNIPPET_KEYS[s.label], s]),
-  );
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !document.querySelector(POPUPS)) {
-      // Inspect first: it unpins, then leaves; then an expanded pane returns.
-      if (inspect.escape() || panes.returnFromExpand()) e.preventDefault();
-    }
-    const chord = chordOf(e);
-    if (!chord) return;
-    const snippet = bySnippet.get(chord);
-    const m = MODES[Number(chord.slice(4)) - 1]; // Mod-1..3
-    if (snippet && mode === "write") {
-      insertSnippet(editor, snippet);
-    } else if (m) setMode(m);
-    else if (chord === "Mod-,") setMode("style");
-    else if (chord === "Mod-\\") panes.toggleTree();
-    else if (chord === "Mod-.") panes.togglePages();
-    else if (chord === "Mod-Shift-Enter") panes.toggleExpand();
-    // Prose | Source; capture phase, so CodeMirror's toggle comment never sees it
-    else if (chord === "Mod-/" && mode === "write") textView.toggleView();
-    else return;
-    e.preventDefault();
-  }, true);
-  MODES.forEach((m, i) => {
-    $("modes").querySelector(`[data-mode="${m}"]`)!.setAttribute(
-      "title",
-      `${m[0]!.toUpperCase()}${m.slice(1)} (${chordLabel(`Mod-${i + 1}`)})`,
-    );
-  });
-  $("tree-toggle").title += ` (${chordLabel("Mod-\\")})`;
-  $("tv-views").title += ` (${chordLabel("Mod-/")})`;
-  for (const b of document.querySelectorAll<HTMLElement>(".expand")) {
-    b.title += ` (${chordLabel("Mod-Shift-↩")})`;
-  }
-}
-
 // Create a new manuscript (spec §7.9): the empty library's first step, and
 // the switcher's New book.
 const createManuscript = installCreateBook({
@@ -802,7 +748,6 @@ const createManuscript = installCreateBook({
   setBooks: (b) => books = b,
   leave,
   restart: main,
-  chordLabel,
 });
 
 async function main(): Promise<void> {
@@ -952,7 +897,16 @@ async function main(): Promise<void> {
   // Inspect reads the book's metadata (running heads, units, where a value
   // comes from), which is otherwise fetched only when Style or Publish opens.
   $("inspect").addEventListener("click", () => void ensureConfigPanel());
-  installShortcuts(installPanes({ mode: () => mode }), textView, inspect);
+  installShortcuts({
+    mode: () => mode,
+    panes: installPanes({ mode: () => mode }),
+    textView,
+    inspect,
+    editor: () => editor,
+    preview: $("preview"),
+    createManuscript,
+    ensureConfigPanel,
+  });
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset
       .mode as Mode | undefined;

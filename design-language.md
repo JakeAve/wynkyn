@@ -376,7 +376,9 @@ shared CSS classes; this section is what each must look like.
 States, everywhere: **hover** `--hover` wash; **focus** 2px `--acc` ring offset
 1px (fields: border turns `--acc` plus a 1px `--acc` ring); **selected /
 pressed** `--acc-wash` + `--acc-ink`; **disabled** 45% opacity, no pointer
-events.
+events. The column gutters are the exception: focused (Tab), the hairline
+thickens to a 3px `--acc` bar instead of a ring, and ←/→ move it 1rem a press
+within the same limits as a drag.
 
 ### 6.1 Button
 
@@ -486,6 +488,16 @@ right-aligned, `--s-3` apart, ghost first, primary last. `esc` closes it unless
 it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
 `.ask` with `.ask-foot`; fields in a dialog (`.ask .field`) are §6.3 frames.
 
+**Keyboard shortcuts** (`#shortcuts`, Ctrl+Shift+/ or ⌘?): an `.ask` with a
+filter field, then every command under its section's small-caps group label
+(§6.6), a row each (`.sc-row`): the name left, its keys as `kbd` right, "none"
+in `--fs-xs` `--muted` when unbound. Clicking a row records: it takes the red
+wash and its keys give way to "Press keys · Esc cancels · Backspace default ·
+Delete none". A row that lost its key to another shows "was Ctrl+B" before its
+keys. The footer line (`#shortcuts-note`, `--fs-xs` `--muted`) tips, then
+reports: a refused combo in `--err`, an accent clash on a Mac in `--warn`; Done
+at the right.
+
 ### 6.9 Menu, popover, tooltip
 
 - **Menu / popover:** `--bg`, 1px `--line`, `--r-pop` + corner, `--shadow-pop`,
@@ -493,8 +505,8 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
   kbd or detail. Current item: red wash and a red check. Separators are
   hairlines bleeding to the edges. Optional small-caps heading. Used by: the
   book and edition switcher (`#switcher`), the font picker (`.fontpop`), `{`
-  completions (`.cm-tooltip-autocomplete`), ⌘K (`.cm-bml-palette`), the wrap bar
-  and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write
+  completions (`.cm-tooltip-autocomplete`), Mod+K (`.cm-bml-palette`), the wrap
+  bar and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write
   pane's header (`.tvpop`); the pages' zoom menu (`.menu`, a native popover of
   `menuitemradio` rows). Fields inside a popover are §6.3 frames (focus: `--acc`
   border and ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but
@@ -529,20 +541,32 @@ it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
 
 ### 6.11 Chrome
 
-- **Toolbar** (`--h-toolbar`): left, the Contents toggle (⌘\) and the crumb
-  (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`); centre,
-  Write / Style / Publish (⌘1–3); right, the theme toggle alone. The save status
-  sits after the crumb.
+Shortcuts are written Mod+key: Mod is Ctrl on Windows and Linux, ⌘ on Mac. A
+control's tooltip and `kbd` show its key as the platform writes it
+(Ctrl+Shift+F, ⌘⇧F), filled from its `data-command` (`web/src/shortcuts.ts`).
+
+- **Toolbar** (`--h-toolbar`): left, the Contents toggle (Mod+\) and the crumb
+  (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`; the book
+  switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
+  Publish (Mod+1–3); right, the theme toggle alone (Mod+Shift+L). The save
+  status sits after the crumb.
 - **Pane header** (`--h-pane` at least, `.pane-head`): the pane's own controls
   at left in small sizes, `--s-2` apart; its expand button
   (`.btn.sm.icon
   .expand`) pinned to the top-right corner even when the
   controls wrap. A hairline below; the pages pane's header sits on `--desk` with
   none. The pages pane's controls sit at the right instead, beside expand: zoom
-  (`#zoom`), `−` and `+` as small icon buttons around the percentage, a small
-  ghost in tabular figures that opens the zoom menu (§6.9); then Inspect
-  (`#inspect`), a small icon toggle (DevTools' picker arrow) that takes the red
-  wash while on. Both hidden in Publish.
+  (`#zoom`), `−` and `+` as small icon buttons around the percentage (Mod+−,
+  Mod+=; Mod+0 fits the spread), a small ghost in tabular figures that opens the
+  zoom menu (§6.9); then Inspect (`#inspect`, Mod+'), a small icon toggle
+  (DevTools' picker arrow) that takes the red wash while on. Both hidden in
+  Publish, where the zoom keys stay the browser's.
+- **Keys without a control of their own:** Alt+] and Alt+[ step the pages to the
+  next or previous spread, Alt+Shift+] and Alt+Shift+[ to the next or previous
+  chapter or part opening (⌃ in place of Alt on a Mac, where ⌥] and ⌥[ type ’
+  and ‘); in Style, Mod+Shift+1–4 open Theme, Page size & margins, Fonts and
+  Body (⌥⌘1–4 on a Mac, where ⌘⇧3 and ⌘⇧4 take screenshots); in Publish,
+  Mod+Shift+E exports the EPUB (Mod+P stays the browser's print).
 - **Footer** (`--h-footer`): split by column, `--fs-xs` `--muted`; the writer's
   cell opens with the stats line (§8.3), the session count in `--acc-ink` once
   non-zero, then Go to style with a dotted underline.
@@ -603,19 +627,20 @@ changing, right is the result.
     (Write's outline, or the Style / Publish nav), with `--shadow-pop`; the
     Contents toggle pins it. While it is out, the pane header steps right of it
     so its controls stay reachable.
-  - Return with the same button or `esc`. `⌘⇧↩` expands the pane last used, or
-    returns. (`⌘⇧F` stays Footnote.)
+  - Return with the same button or `esc`. Mod+Shift+Enter expands the pane last
+    used, or returns. (Mod+Shift+F stays Footnote.)
   - Expanded state is per mode and persists. A hidden preview still lays out (it
     leaves the grid, never `display: none`).
-- **Gone from the toolbar:** the Pages toggle (⌘. stays as a shortcut), focus,
-  and every Write-only control. While the pages are hidden, the write pane's
-  corner button shows the return state, "Show the pages (⌘.)", and brings them
-  back. The pages hide in Write only; Style and Publish always show them.
+- **Gone from the toolbar:** the Pages toggle (Mod+. stays as a shortcut),
+  focus, and every Write-only control. While the pages are hidden, the write
+  pane's corner button shows the return state, "Show the pages (Mod+.)", and
+  brings them back. The pages hide in Write only; Style and Publish always show
+  them.
 
 ## 8. The write pane
 
-Two views of the same file, switched in the pane header or with `⌘/`. Nothing is
-stored differently.
+Two views of the same file, switched in the pane header or with Mod+/. Nothing
+is stored differently.
 
 ### 8.1 Prose (default)
 
@@ -697,7 +722,7 @@ outside its sentence, to opacity .28 over `--t` (instant under
 and an illustration's image fades with its caption. A sentence ends at `.`, `?`
 or `!` (and any closing quotes) before a space or the line's end, so an
 abbreviation ends one early. Spelling's popover lists the word lists and None as
-check items. Completions, the wrap bar, ⌘K, sentinel shortcuts, find and
+check items. Completions, the wrap bar, Mod+K, sentinel shortcuts, find and
 replace, image drops and the preview following the cursor work in both views and
 expanded. Footer (built): the writer's cell opens with "Chapter title · 41,210
 words · +512 this session", the chapter at the cursor (its slug in `--f-hivis`

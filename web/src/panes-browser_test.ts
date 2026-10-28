@@ -177,3 +177,31 @@ Deno.test({
       assert((await panesClass(page)).includes("pages-hidden"));
     }),
 });
+
+Deno.test({
+  name: "arrow keys on a focused gutter resize the column",
+  ignore: !hasChrome || !appBuilt,
+  fn: () =>
+    withApp(async (page) => {
+      const gutter = page.locator("#gutter-tree");
+      const tree = () => page.locator("#tree").evaluate((e) => e.clientWidth);
+      const rem = await page.evaluate(() =>
+        parseFloat(getComputedStyle(document.documentElement).fontSize)
+      );
+      const before = await tree();
+      await gutter.focus();
+      await page.keyboard.press("ArrowRight");
+      assertEquals(await tree(), Math.round(before + rem));
+      assertEquals(
+        Number(await gutter.getAttribute("aria-valuenow")),
+        Math.round(before + rem),
+      );
+      assertEquals(
+        await page.evaluate(() => localStorage.getItem("--w-tree")),
+        `${before + rem}px`,
+      );
+      // The minimum holds: 7.5rem, however many presses.
+      for (let i = 0; i < 40; i++) await page.keyboard.press("ArrowLeft");
+      assertEquals(await tree(), Math.round(7.5 * rem));
+    }),
+});
