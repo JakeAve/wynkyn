@@ -18,6 +18,18 @@ export interface PageEntry {
   anchors: string[];
 }
 
+/** What one laid-out page says about itself; see the PageFacts JSDoc in folios.js. */
+export interface PageFacts {
+  zone: "front" | "body" | "back" | null;
+  display: boolean;
+  blank: boolean;
+  empty: boolean;
+  opener: boolean;
+  chapterTitles: string[];
+  partTitles: string[];
+  anchors: string[];
+}
+
 /** A run of the book laid out alone: where pages are forced to break
  * (renderer/render.ts `renderSegments`). */
 export interface Segment {
