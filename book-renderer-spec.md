@@ -1162,6 +1162,7 @@ books/
   "running": { ... },
   "notes": { ... },
   "toc": { ... },
+  "openers": { ... },
   "ebook": { ... }
 }
 ```
@@ -1776,11 +1777,26 @@ rather than mixing with the book's:
   stays.
 - `running` — replaced wholesale.
 
-Never touched: `page`, `is`, `notes`, `toc`, `ebook`, `language`, `name`,
-`spec`, and any key this schema doesn't know.
+Never touched: `page`, `is`, `notes`, `toc`, `openers`, `ebook`, `language`,
+`name`, `spec`, and any key this schema doesn't know.
 
 **A new book** can start from any theme: its `metadata.json` is the template
 with the theme applied (§7.9). House, or no theme, is the template as it is.
+
+### 4.14 Section: `openers`
+
+What an opener page carries beyond its number and title. Page furniture, not
+text, so the manuscript says nothing about it.
+
+```json
+"openers": { "book-title": true }
+```
+
+- `book-title` — the book's title (the title page's `{title}`, as for running
+  heads, §4.8) set above the first chapter's number, as many trade editions open
+  the text. It renders as `<p class="book-title">`, first in that chapter,
+  styled by `elements.chapter.book-title` (centred by default). Default `false`.
+  Only the first chapter of the body carries it, inside a part or not.
 
 ## 5. Module Contracts
 

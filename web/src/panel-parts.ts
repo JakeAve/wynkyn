@@ -480,6 +480,29 @@ function extrasFor(
       },
     };
   }
+  if (entry.key === "chapter.book-title") {
+    return {
+      rows: [v.mark(
+        row(
+          "Show",
+          switchInput(
+            "Show the book's title above the first chapter",
+            meta.openers?.["book-title"] ?? false,
+            (on) => {
+              (meta.openers ??= {})["book-title"] = on;
+              v.changed("openers");
+            },
+          ),
+        ),
+        () => meta.openers?.["book-title"] !== undefined,
+      )],
+      reset() {
+        if (meta.openers?.["book-title"] === undefined) return [];
+        delete meta.openers["book-title"];
+        return ["openers"];
+      },
+    };
+  }
   if (entry.key === "break") {
     const o = el("input", "txt");
     o.type = "text";

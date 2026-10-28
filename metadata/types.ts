@@ -130,6 +130,11 @@ export interface TocConfig {
   headings?: boolean; // list level-1 {heading: slug}s under their chapter
 }
 
+// What an opener page carries beyond its number and title (spec §4.14).
+export interface OpenersConfig {
+  "book-title"?: boolean; // the book's title above the first chapter's number
+}
+
 export interface Metadata {
   spec?: string; // the spec version this file complies with (§4.2); missing = pre-versioned
   name?: string; // the default edition's display name (§4.1); named editions use their slug
@@ -143,6 +148,7 @@ export interface Metadata {
   print?: LegacyPrintConfig; // legacy; folded into `page` on load
   notes?: NotesConfig;
   toc?: TocConfig;
+  openers?: OpenersConfig;
   ebook?: EbookConfig;
 }
 

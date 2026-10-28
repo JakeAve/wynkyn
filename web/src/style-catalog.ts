@@ -57,7 +57,7 @@ const ELEMENTS: Array<[string, string, string[]]> = [
   ]],
   ["Foreword / preface / introduction", "prose-matter", ["title"]],
   ["Part", "part", ["title", "number"]],
-  ["Chapter", "chapter", ["title", "number"]],
+  ["Chapter", "chapter", ["title", "number", "book-title"]],
   ["Headings", "heading", []],
   ["Headings", "subheading", []],
   ["Epigraph", "epigraph", ["text", "attribution"]],

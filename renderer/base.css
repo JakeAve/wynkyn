@@ -82,7 +82,8 @@
   break-before: right;
 }
 .bml .title,
-.bml .number {
+.bml .number,
+.bml .book-title {
   text-indent: 0;
 }
 /* Hyphenation is a book's choice (`body: { "hyphens": "auto" }`, spec §4.5);
@@ -93,12 +94,14 @@
 .bml .title,
 .bml .subtitle,
 .bml .number,
+.bml .book-title,
 .bml .heading,
 .bml .subheading {
   hyphens: manual;
 }
 /* A chapter opener must not strand at the foot of a page or column — matters
    once a book sets `chapter: { "break-before": "auto" }` and chapters run on. */
+:where(.bml .chapter) > .book-title,
 :where(.bml .chapter) > .number,
 :where(.bml .chapter) > .title {
   break-after: avoid;
@@ -117,6 +120,10 @@
 }
 /* Zero own-specificity, like blockquote above, so a book's `break` and
    `illustration` styles win. */
+/* The book's title over the first chapter (`openers`, spec §4.14). */
+:where(.bml .book-title) {
+  text-align: center;
+}
 :where(.bml .break) {
   text-align: center;
   margin: 1em 0;
