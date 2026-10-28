@@ -2388,11 +2388,16 @@ contents exactly as the print export (§7.7) will — the whole point of the liv
 preview is that it is not an approximation.
 
 A re-render is staged over the pages on screen, which stay up but dimmed from
-the moment of the edit; each new page lands over the old one it replaces as it
-is laid out, with a "Setting type… N pages" count at the pane's foot (the first
-load shows the count alone). The layout keeps going in a background tab. An
-update that arrives mid-render abandons that render and starts its own, so a run
-of edits costs one render after the last, not one per edit.
+the moment of the edit, with a "Setting type… N pages" count at the pane's foot
+(the first load shows the count alone); the new pages swap in at once when the
+book is assembled. The preview lays the book out a segment at a time, as export
+does (§5.4): each front or back matter section, part opening and chapter whose
+text, styles and printed page numbers are unchanged comes from the browser's
+cache (IndexedDB), so an edit to one chapter lays out that chapter, and the
+contents again only if its page numbers moved. Opening a book shows its cached
+pages before its first build arrives. The layout keeps going in a background
+tab. An update that arrives mid-render abandons that render and starts its own,
+so a run of edits costs one render after the last, not one per edit.
 
 An illustration whose image is missing shows its placeholder (§4.10 item 8). In
 Write, a click on it moves the editor's cursor to its line, as any page click

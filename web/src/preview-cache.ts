@@ -2,7 +2,6 @@
 // segments: one manifest per book+edition (`books`) naming one row per
 // segment (`segments`), so an edit re-lays only the segments it touched.
 import type {
-  PageEntry,
   PageFacts,
   PageProblem,
   Seed,
@@ -30,6 +29,9 @@ export interface CachedRender {
   fontLinks: string;
   pageNumbering: PageNumberingConfig;
   seed: Seed;
+  // The book's problems as laid out: a restore assembles before its images
+  // load, so it can't judge them itself.
+  problems: PageProblem[];
   segments: Array<
     { key: string; line: number; opens: Segment["opens"]; ids: string[] }
   >;
@@ -250,56 +252,4 @@ export async function deleteCachedRender(id: string): Promise<void> {
     sweep(s);
     return () => {};
   });
-}
-
-// --- Legacy whole-render API, kept only so preview.ts, app.ts and
-// theme-preview.ts compile until they move to segments. The store it used is
-// gone, so it never restores and never saves. Delete with those callers.
-
-export interface LegacyRender {
-  hash: string;
-  pages: string;
-  styles: string[];
-  fontLinks: string;
-  seed: Seed;
-  problems: PageProblem[];
-  map?: PageEntry[];
-}
-
-export function restoredPageMap(
-  c: LegacyRender,
-): { seed: Seed; problems: PageProblem[]; map: PageEntry[] } {
-  return { seed: c.seed ?? {}, problems: c.problems ?? [], map: c.map ?? [] };
-}
-
-export function restoredHash(c: LegacyRender): string | null {
-  return c.map ? c.hash : null;
-}
-
-export function renderHash(
-  u: {
-    html: string;
-    baseCss: string;
-    domCss: string;
-    pagedCss: string;
-    fontLinks: string;
-    pageNumbering?: unknown;
-  },
-): string {
-  return hash([
-    u.html,
-    u.baseCss,
-    u.domCss,
-    u.pagedCss,
-    u.fontLinks,
-    JSON.stringify(u.pageNumbering ?? null),
-  ]);
-}
-
-export function loadLegacyRender(_id: string): Promise<LegacyRender | null> {
-  return Promise.resolve(null);
-}
-
-export function saveLegacyRender(_id: string, _r: LegacyRender): Promise<void> {
-  return Promise.resolve();
 }
