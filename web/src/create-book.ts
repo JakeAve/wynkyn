@@ -2,9 +2,7 @@
 // dialog (import a file or a web page, copy books in from a folder, or start
 // blank), the title dialog with its theme cards, and the web dialog; plus the
 // footer's import notes, the `%% check:` lines an import leaves.
-import type { EditorView } from "@codemirror/view";
 import type { Backend } from "./backend.ts";
-import { scrollEditorToLine } from "./editor.ts";
 import { editionHref, slugify } from "./editions.ts";
 import { titleCase } from "../../server/editions.ts";
 import { importBooks } from "./fs-store.ts";
@@ -313,7 +311,11 @@ export function installCreateBook(
 }
 
 // ---- Import notes (spec §7.9): the `%% check:` lines, listed in the footer --
-export function renderImportNotes(text: string, editor: EditorView): void {
+// `goTo` opens Write at a line: the footer shows in Style and Publish too.
+export function renderImportNotes(
+  text: string,
+  goTo: (line: number) => void,
+): void {
   const btn = $("import-notes");
   const list = $("import-notes-list");
   const notes = text.split("\n").flatMap((l, i) =>
@@ -346,8 +348,7 @@ export function renderImportNotes(text: string, editor: EditorView): void {
     b.onclick = () => {
       list.hidden = true;
       btn.setAttribute("aria-expanded", "false");
-      scrollEditorToLine(editor, n.line);
-      editor.focus();
+      goTo(n.line);
     };
     list.append(b);
   }

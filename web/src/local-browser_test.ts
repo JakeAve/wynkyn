@@ -358,12 +358,19 @@ Deno.test({
         (await notes.innerText()).includes("import note"),
         "the footer counts the notes",
       );
+      // From Style, where the editor is hidden, a note opens Write at it.
+      await page.locator('#modes [data-mode="style"]').click();
       await notes.click();
       await page.locator("#import-notes-list button").first().click();
       assert(
         await page.locator("#import-notes-list").isHidden(),
         "picking a note closes the list",
       );
+      await page.locator('html[data-mode="write"]').waitFor({
+        state: "attached",
+      });
+      await page.locator("#editor .cm-activeLine", { hasText: "%% check:" })
+        .waitFor();
 
       // The switcher's New book runs the same dialog, now with a Cancel.
       await page.locator("#book-switcher").click();

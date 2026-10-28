@@ -290,7 +290,7 @@ function reparse(text: string): void {
   });
   configPanel?.isNamesChanged();
   applyDiagnostics(editor, doc.diagnostics);
-  renderImportNotes(text, editor);
+  renderImportNotes(text, goToLine);
   setEditionSpans(editor, doc.onlySpans, editionToken(edition));
   const diag = $("diagnostics");
   const first = doc.diagnostics[0];
@@ -300,7 +300,7 @@ function reparse(text: string): void {
     } — line ${first.line}: ${first.message}`
     : "";
   diag.title = first ? "click to jump to the first note" : "";
-  diag.onclick = first ? () => scrollEditorToLine(editor, first.line) : null;
+  diag.onclick = first ? () => goToLine(first.line) : null;
   refreshTree(doc);
 }
 
@@ -535,6 +535,13 @@ function setMode(next: Mode): void {
   ensureConfigPanel().then((panel) => {
     if (mode !== "write") panel?.setMode(mode); // the latest, if it changed meanwhile
   });
+}
+
+// A footer note or an Inspect row → that line in Write; the editor is hidden
+// in Style and Publish, so scrolling it alone would show nothing.
+function goToLine(line: number): void {
+  setMode("write");
+  scrollEditorToLine(editor, line);
 }
 
 // Preview click → Style on that element (spec §7.4).
@@ -889,10 +896,7 @@ async function main(): Promise<void> {
     pageMap,
     mode: () => mode,
     style: pickStyle,
-    source: (line) => {
-      setMode("write");
-      scrollEditorToLine(editor, line);
-    },
+    source: goToLine,
   });
   // Inspect reads the book's metadata (running heads, units, where a value
   // comes from), which is otherwise fetched only when Style or Publish opens.
