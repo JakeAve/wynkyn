@@ -533,6 +533,7 @@ function ebookSection(ctx: PanelContext): HTMLElement {
   status.setAttribute("aria-live", "polite");
   const btn = el("button", "tog outline", "Export EPUB");
   btn.type = "button";
+  btn.dataset.command = "export-epub";
   btn.onclick = async () => {
     btn.disabled = true;
     status.replaceChildren(el("p", "", "Building the e-book…"));
