@@ -146,6 +146,7 @@ const GENERIC = [
   "color",
   "text-align",
   "letter-spacing",
+  "line-height",
   "margin-top",
   "margin-bottom",
 ];
@@ -434,6 +435,22 @@ function block(
     v.mark(colorRow, has("color")),
     v.mark(alignRow, has("text-align")),
     length("Letter spacing", "letter-spacing", "0em"),
+    // Leading as a multiple of the size (1.2), like Body text's; unset, the
+    // inherited spacing shows.
+    v.mark(
+      row(
+        "Line spacing",
+        stepper({
+          value: props["line-height"],
+          placeholder: inheritedValue(meta, entry, "line-height") ?? "1.5",
+          label: `${label} line spacing`,
+          unit: "",
+          step: () => 0.05,
+          onChange: set("line-height"),
+        }),
+      ),
+      has("line-height"),
+    ),
     length("Space above", "margin-top", "0pt"),
     length("Space below", "margin-bottom", "0pt"),
     moreCss(

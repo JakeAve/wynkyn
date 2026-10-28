@@ -156,7 +156,7 @@ export function stepper(o: {
     }
     const n = parseLength(value ?? o.placeholder ?? "")?.n ?? 0;
     const k = dir > 0 ? Math.floor(n / step) + 1 : Math.ceil(n / step) - 1;
-    commit(String(k * step));
+    commit(String(Math.round(k * step * 1000) / 1000)); // 24 × 0.05 is 1.2, not 1.2000000000000002
   };
   input.onchange = () => {
     const t = input.value.trim();
