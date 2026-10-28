@@ -9,6 +9,8 @@ jobs:
   test:
     # macOS: golden page maps were generated there, and its runners ship Chrome.
     runs-on: macos-latest
+    # A normal run is ~5 min; a hung download or test fails here, not at 6 h.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2
