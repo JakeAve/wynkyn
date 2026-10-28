@@ -28,6 +28,19 @@ Deno.test("buildBook produces html, css, font links, and title", async () => {
   assertEquals(b.diagnostics, []);
 });
 
+Deno.test("openers.book-title sets the title over the first chapter only (§4.14)", async () => {
+  const off = await buildBook(ROOT, "demo-book");
+  assert(!off.html.includes('class="book-title"'));
+  const on = await buildBook(ROOT, "demo-book", {
+    metadata: { openers: { "book-title": true } },
+  });
+  assertEquals(on.html.split('<p class="book-title">Demo Book</p>').length, 2);
+  // Inside the first chapter, ahead of its number and title.
+  const at = on.html.indexOf('class="book-title"');
+  assert(at > on.html.indexOf('<section class="chapter'));
+  assert(at < on.html.indexOf("Chapter One"));
+});
+
 Deno.test("buildBook picks images by spec extension priority", async () => {
   // svg beats png beats jpg (spec §4.11 item 8)
   const dir = await Deno.makeTempDir();

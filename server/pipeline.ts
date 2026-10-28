@@ -183,6 +183,7 @@ export async function buildBook(
       toc: m.toc,
       images,
       language: m.language ?? m.ebook?.language,
+      bookTitle: m.openers?.["book-title"] ? bookTitle : undefined,
     }),
     baseCss: opts.baseCss ?? await defaultBaseCss(),
     domCss: generateDomCSS(m),

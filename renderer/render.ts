@@ -26,6 +26,7 @@ export interface RenderOptions {
   toc?: TocConfig;
   images?: Record<string, string>; // slug → relative path; resolved by the caller
   language?: string; // BCP 47 (spec §4.2); stamped on the article as `lang`
+  bookTitle?: string; // set above the first chapter's number (`openers`, §4.14)
 }
 
 // folios.js is a classic script (toHtml inlines it), so its formatter hangs
@@ -436,8 +437,10 @@ function renderChapter(
     return `<section class="chapter${zoneClass(zone)}${
       start ? " body-start" : ""
     }" id="${escapeHtml(ch.slug)}"${dl(ch)}>${
-      numberDiv(n, opts.numbering?.chapters)
-    }${inner}</section>`;
+      n === 1 && opts.bookTitle
+        ? `<p class="book-title">${escapeHtml(opts.bookTitle)}</p>`
+        : ""
+    }${numberDiv(n, opts.numbering?.chapters)}${inner}</section>`;
   }, zone);
 }
 
