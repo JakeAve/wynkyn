@@ -14,6 +14,7 @@ import {
   loadCachedSegment,
   saveCachedRender,
   segmentKey,
+  segmentStyleHash,
   shiftLines,
   styleHash,
   tokenImages,
@@ -192,11 +193,16 @@ function target(
   return [styles, ...keys, JSON.stringify(numbering)].join(" ");
 }
 
+// A segment's cache key: its text, the styles that reach it, the numbers it
+// prints.
+function keyOf(u: UpdateMessage, s: Segment, from: Seed): string {
+  return segmentKey(s, segmentStyleHash(s, u), from, u.imageUrls);
+}
+
 function targetOf(u: UpdateMessage, from: Seed): string {
-  const sh = styleHash(u);
   return target(
-    sh,
-    u.segments.map((s) => segmentKey(s, sh, from, u.imageUrls)),
+    styleHash(u),
+    u.segments.map((s) => keyOf(u, s, from)),
     u.pageNumbering,
   );
 }
@@ -319,9 +325,15 @@ async function runRender(
   };
   scopeRenders();
   const sh = styleHash(update);
+  // Same book CSS as the manifest's: its sheets and scope serve this render.
   const book = cacheKey !== null && manifest?.styleHash === sh
     ? manifest
     : null;
+  // The keys on screen. With new CSS a cached segment needs this run's
+  // sheets, so one segment is laid out regardless: the first whose key isn't
+  // on screen (a style change reached it), or else the last.
+  const shown = new Set(manifest?.segments.map((x) => x.key));
+  const last = update.segments.at(-1);
   // `kept`: the first Previewer, whose sheets stay. `laying`: the one at
   // work. `copies`: the manifest's sheets, when every segment was cached.
   // `as`: keeps TS from narrowing these to null past the closures.
@@ -356,11 +368,11 @@ async function runRender(
     stage.append(area);
     const layOut = async (s: Segment, passSeed: Seed): Promise<Laid> => {
       if (cancelled) throw CANCELLED;
-      const key = segmentKey(s, sh, passSeed, update.imageUrls);
+      const key = keyOf(update, s, passSeed);
       keys.set(s, key);
-      const row = book && await loadCachedSegment(key);
+      const row = cacheKey !== null && await loadCachedSegment(key);
       if (cancelled) throw CANCELLED;
-      if (row) {
+      if (row && (book || kept || (shown.has(key) && s !== last))) {
         const pages = pagesOf(row, s.line, (n) => update.imageUrls[n] ?? "");
         // Assembly checks each image's resolution.
         await Promise.all(
@@ -369,13 +381,7 @@ async function runRender(
         );
         if (cancelled) throw CANCELLED;
         const { facts, problems } = row;
-        return {
-          segment: s,
-          pages,
-          facts,
-          problems,
-          sheet: book.styles.join("\n"),
-        };
+        return { segment: s, pages, facts, problems, sheet: null };
       }
       // Scoped like the rest before Paged.js parses (ScopeSheets keeps it).
       const own = document.createElement("div");
@@ -415,7 +421,8 @@ async function runRender(
       return { segment: s, pages, facts, problems, sheet: styles.join("\n") };
     };
     const assembleAll = (laid: Laid[]): RenderResult => {
-      // Every segment so far came from the cache: so do the sheets.
+      // Every segment so far came from the cache, in the manifest's CSS: so
+      // do the sheets.
       if (!kept && !copies.length) copies = addStyles(book!.styles);
       const r = BookPageMap.assemble(
         laid,
@@ -589,7 +596,7 @@ export function restoreCachedRender(
       pages: pagesOf(row, s.line, imageUrl),
       facts: row.facts,
       problems: row.problems,
-      sheet: "",
+      sheet: null,
     };
   });
   const r = BookPageMap.assemble(

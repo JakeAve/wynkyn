@@ -6,7 +6,8 @@
 import { checkOnlySpans, parse } from "../parser/parser.ts";
 import { parseMetadataText } from "../metadata/loader.ts";
 import {
-  generateDomCSS,
+  type DomRule,
+  domRules,
   generateFontLinks,
   generatePagedCSS,
   type PageNumberingConfig,
@@ -55,6 +56,7 @@ export interface BuildResult {
   imageUrls: Record<string, string>; // image file name → the URL html uses
   baseCss: string;
   domCss: string;
+  domRules: DomRule[]; // domCss rule by rule, for the preview cache
   pagedCss: string;
   pageNumbering: PageNumberingConfig; // per-zone folio style, for the page map
   fontLinks: string; // <link> tags for Google Fonts
@@ -190,6 +192,7 @@ export async function buildBook(
     opts.imageUrl,
   );
   const bookTitle = extractBookTitle(doc, book);
+  const rules = domRules(m);
   const renderOpts: RenderOptions = {
     numbering: m.numbering,
     notes: opts.notes ?? m.notes,
@@ -208,7 +211,8 @@ export async function buildBook(
     segments: renderSegments(doc, renderOpts),
     imageUrls,
     baseCss: opts.baseCss ?? await defaultBaseCss(),
-    domCss: generateDomCSS(m),
+    domCss: rules.map((r) => r.css).join(""),
+    domRules: rules,
     pagedCss: generatePagedCSS(m, { bookTitle }),
     pageNumbering: pageNumberingConfig(m),
     fontLinks: generateFontLinks(m),

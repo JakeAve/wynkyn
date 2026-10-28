@@ -43,13 +43,14 @@ export interface Segment {
 
 /** A segment laid out by its own Previewer (`pageMap.segment: true`): its
  * pages, their raw facts and its layout problems (pages numbered within the
- * segment), and its stylesheet text, which every segment must share. */
+ * segment), and its stylesheet text, which every segment laid in one run
+ * must share; null for a segment from the cache, which takes that run's. */
 export interface Laid {
   segment: Segment;
   pages: Element[];
   facts: PageFacts[];
   problems: PageProblem[];
-  sheet: string;
+  sheet: string | null;
 }
 
 /** `BookPageMap.planAssembly`: the book's pages in order, each a segment's

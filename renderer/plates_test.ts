@@ -77,6 +77,7 @@ Deno.test({
         imageUrls: {},
         baseCss,
         domCss: "",
+        domRules: [],
         pagedCss,
         pageNumbering: pageNumberingConfig({}),
         manuscriptVersion: "",

@@ -2,7 +2,9 @@ import { assertEquals, assertNotEquals } from "@std/assert";
 import type { Segment } from "../../renderer/page-map-types.ts";
 import {
   cacheId,
+  reacher,
   segmentKey,
+  segmentStyleHash,
   shiftLines,
   styleHash,
   tokenImages,
@@ -32,6 +34,44 @@ Deno.test("styleHash: a change in any field changes it", () => {
   for (const k of Object.keys(style) as (keyof typeof style)[]) {
     assertNotEquals(styleHash({ ...style, [k]: style[k] + "x" }), S);
   }
+});
+
+Deno.test("reacher: a selector reaches html holding its every tag and class", () => {
+  const title = reacher(
+    `<article class="bml"><section class="matter matter-title-page"><h1 class="title">T</h1></section></article>`,
+  );
+  const chapter = reacher(seg(1).html);
+  assertEquals(title(".matter-title-page .title"), true);
+  assertEquals(chapter(".matter-title-page .title"), false);
+  assertEquals(chapter(".chapter > .number"), false);
+  assertEquals(chapter(".bml p"), true);
+  assertEquals(chapter(".bml em"), false);
+  assertEquals(chapter(".matter-preface, .chapter"), true);
+  // A shape it can't read reaches everything.
+  assertEquals(chapter(".chapter :is(.x)"), true);
+});
+
+Deno.test("segmentStyleHash: changes with the rules that reach the segment only", () => {
+  const u = {
+    baseCss: "a{}",
+    pagedCss: "c{}",
+    domRules: [
+      { selector: ".chapter", css: ".chapter{}" },
+      { selector: ".matter-title-page .title", css: "t{}" },
+    ],
+  };
+  const h = segmentStyleHash(seg(1), u);
+  const rules = (title: string, chapter = ".chapter{}") => ({
+    ...u,
+    domRules: [
+      { selector: ".chapter", css: chapter },
+      { selector: ".matter-title-page .title", css: title },
+    ],
+  });
+  assertEquals(segmentStyleHash(seg(1), rules("t{x}")), h);
+  assertNotEquals(segmentStyleHash(seg(1), rules("t{}", ".chapter{x}")), h);
+  assertNotEquals(segmentStyleHash(seg(1), { ...u, pagedCss: "" }), h);
+  assertNotEquals(segmentStyleHash(seg(1), { ...u, baseCss: "" }), h);
 });
 
 Deno.test("segmentKey: changes with its own text or a read seed value", () => {

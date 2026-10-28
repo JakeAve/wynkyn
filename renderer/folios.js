@@ -368,8 +368,9 @@
   /**
    * `settle` over segments: lay each out, assemble, and re-lay only the
    * segments that print a number the assembly changed (`reads`) until the
-   * folios hold. null when the segments' stylesheets differ: their pages
-   * can't share one set of sheets, so the caller lays the book out whole.
+   * folios hold. null when the stylesheets of the segments laid in this run
+   * differ: their pages can't share one set of sheets, so the caller lays the
+   * book out whole. A cached segment (`sheet: null`) takes this run's sheets.
    * @param {Segment[]} segments
    * @param {(s: Segment, seed: Seed) => Promise<Laid>} layOut
    * @param {(laid: Laid[]) => RenderResult} assembleAll
@@ -388,7 +389,8 @@
     const laid = [];
     for (const s of segments) laid.push(await layOut(s, seed));
     for (let passes = 1;; passes++) {
-      if (laid.some((l) => l.sheet !== laid[0]?.sheet)) return null;
+      const sheets = laid.flatMap((l) => l.sheet === null ? [] : [l.sheet]);
+      if (sheets.some((s) => s !== sheets[0])) return null;
       const result = assembleAll(laid);
       if (sameSeed(result.seed, seed)) return { ...result, passes };
       if (passes >= maxPasses) {

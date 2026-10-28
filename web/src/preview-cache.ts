@@ -7,7 +7,10 @@ import type {
   Seed,
   Segment,
 } from "../../renderer/page-map-types.ts";
-import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
+import type {
+  DomRule,
+  PageNumberingConfig,
+} from "../../metadata/css-generator.ts";
 import { BUILD_ID } from "../../renderer/build-id.ts";
 import { escapeHtml } from "../../renderer/render.ts";
 
@@ -35,6 +38,9 @@ export interface CachedRender {
   segments: Array<
     { key: string; line: number; opens: Segment["opens"]; ids: string[] }
   >;
+  // Keys the book named before, newest first: the sweep spares their rows so
+  // undoing an edit finds its pages. saveCachedRender keeps it.
+  kept?: string[];
 }
 
 const DB_NAME = "preview-cache";
@@ -42,6 +48,8 @@ const SEGMENTS = "segments";
 const BOOKS = "books";
 const SEP = "\x1f"; // ASCII unit separator; cannot appear in HTML/CSS.
 const TOKEN = "wynkyn-image:";
+// Rows a book no longer names that are kept for undo, per book.
+const KEEP = 300;
 
 // cyrb53: a fast non-cryptographic 53-bit string hash. Sync and available on
 // plain http over a LAN IP, where crypto.subtle is undefined.
@@ -66,19 +74,57 @@ export function styleHash(
   return hash([u.baseCss, u.domCss, u.pagedCss, u.fontLinks]);
 }
 
+// A compound selector read here: an optional tag, then classes.
+const COMPOUND = /^([a-z][a-z0-9-]*)?((?:\.[A-Za-z0-9_-]+)*)$/;
+
+/** Whether a selector can match anything in `html`: some alternative whose
+ * every tag and class appears there. A part it can't read counts as present;
+ * over-reaching only costs a cache miss. */
+export function reacher(html: string): (selector: string) => boolean {
+  const classes = new Set(
+    [...html.matchAll(/\sclass="([^"]*)"/g)].flatMap((m) => m[1]!.split(/\s+/)),
+  );
+  const tags = new Set(
+    [...html.matchAll(/<([a-z][a-z0-9-]*)/g)].map((m) => m[1]!),
+  );
+  return (selector) =>
+    selector.split(",").some((alt) =>
+      alt.trim().split(/\s*>\s*|\s+/).every((part) => {
+        const m = part.match(COMPOUND);
+        return !m || ((!m[1] || tags.has(m[1])) &&
+          m[2]!.split(".").slice(1).every((c) => classes.has(c)));
+      })
+    );
+}
+
+/** The styles one segment's layout depends on: base.css, the paged CSS and
+ * the DOM rules that reach it. Font links are left out: a family changes
+ * pages only through a `font-family` rule, whose text names it. */
+export function segmentStyleHash(
+  s: Segment,
+  u: { baseCss: string; pagedCss: string; domRules: DomRule[] },
+): string {
+  const reaches = reacher(s.html);
+  return hash([
+    u.baseCss,
+    u.pagedCss,
+    ...u.domRules.filter((r) => reaches(r.selector)).map((r) => r.css),
+  ]);
+}
+
 /** Names a segment's layout: its own text (wherever it sits in the
- * manuscript, whatever URL its images have this session), the book's styles,
- * the page numbers it prints and the layout code. `pageNumbering` is left
+ * manuscript, whatever URL its images have this session), its styles
+ * (`segmentStyleHash`), the page numbers it prints and the layout code. `pageNumbering` is left
  * out: assembly applies it, so a numbering change lays out nothing. */
 export function segmentKey(
   s: Segment,
-  styleHash: string,
+  segmentStyle: string,
   seed: Seed,
   imageUrls: Record<string, string>,
 ): string {
   return hash([
     tokenImages(shiftLines(s.html, -s.line), imageUrls),
-    styleHash,
+    segmentStyle,
     ...s.reads.map((a) => seed[a] ?? "000"),
     BUILD_ID,
   ]);
@@ -175,14 +221,14 @@ async function transact<T>(
   });
 }
 
-// Deletes the segment rows no manifest names.
+// Deletes the segment rows no manifest names or keeps.
 function sweep(s: Stores): void {
   const books = s.books.getAll();
   books.onsuccess = () => {
     const named = new Set(
-      (books.result as CachedRender[]).flatMap((b) =>
-        b.segments.map((x) => x.key)
-      ),
+      (books.result as CachedRender[]).flatMap((
+        b,
+      ) => [...b.segments.map((x) => x.key), ...b.kept ?? []]),
     );
     const keys = s.segments.getAllKeys();
     keys.onsuccess = () => {
@@ -230,16 +276,28 @@ export async function loadCachedRender(
 }
 
 /** Saves the manifest and `rows` (segment key → row), then sweeps rows no
- * manifest names. */
+ * manifest names. The keys the old manifest named are kept a while (`kept`,
+ * at most KEEP), so an undo hits. */
 export async function saveCachedRender(
   id: string,
   render: CachedRender,
   rows: Map<string, CachedSegment>,
 ): Promise<void> {
   await transact("readwrite", (s) => {
-    s.books.put(render, id);
-    for (const [key, row] of rows) s.segments.put(row, key);
-    sweep(s);
+    const old = s.books.get(id);
+    old.onsuccess = () => {
+      const was = old.result as CachedRender | undefined;
+      const now = new Set(render.segments.map((x) => x.key));
+      const kept = [
+        ...new Set([
+          ...was?.segments.map((x) => x.key) ?? [],
+          ...was?.kept ?? [],
+        ]),
+      ].filter((k) => !now.has(k)).slice(0, KEEP);
+      s.books.put({ ...render, kept }, id);
+      for (const [key, row] of rows) s.segments.put(row, key);
+      sweep(s);
+    };
     return () => {};
   });
 }

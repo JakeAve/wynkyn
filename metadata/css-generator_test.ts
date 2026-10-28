@@ -1,6 +1,6 @@
 // metadata/css-generator_test.ts
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { generateDomCSS } from "./css-generator.ts";
+import { domRules, generateDomCSS } from "./css-generator.ts";
 import type { FolioPosition } from "./types.ts";
 import {
   DEFAULT_FOLIO_GAP,
@@ -18,6 +18,28 @@ Deno.test("body maps to .bml with font alias resolved", () => {
   assertStringIncludes(css, ".bml {");
   assertStringIncludes(css, 'font-family: "EB Garamond";');
   assertStringIncludes(css, "font-size: 11pt;");
+});
+
+Deno.test("domRules: one rule per selector written, joining to generateDomCSS", () => {
+  const m = {
+    fonts: { title: "Cinzel" },
+    elements: {
+      "title-page": { title: { "font-family": "title" } },
+      chapter: { "break-before": "page", number: { content: "No. " } },
+      empty: {},
+    },
+    is: { caps: { "font-variant": "small-caps" } },
+  };
+  const rules = domRules(m);
+  assertEquals(rules.map((r) => r.selector), [
+    ".matter-title-page .title",
+    ".chapter",
+    ".chapter > .number",
+    ".is-caps",
+  ]);
+  // The alias is resolved in the rule's text: a font change shows there.
+  assertStringIncludes(rules[0]!.css, 'font-family: "Cinzel";');
+  assertEquals(rules.map((r) => r.css).join(""), generateDomCSS(m));
 });
 
 Deno.test("nested page-type elements become descendant selectors", () => {

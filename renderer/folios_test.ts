@@ -413,4 +413,16 @@ Deno.test("settleSegments re-lays only the segments whose numbers moved", async 
     {},
   );
   assertEquals(odd, null);
+
+  // A cached segment takes this run's sheets: its old ones don't count.
+  const cached = await settleSegments(
+    segments,
+    async (s, seed) => ({
+      ...(await layOut(s, seed)),
+      sheet: s.id === "ref" ? null : "css",
+    }),
+    assembleAll,
+    {},
+  );
+  assertEquals(cached?.seed, { toc: "1", one: "2", ref: "3" });
 });
