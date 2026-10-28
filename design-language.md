@@ -461,18 +461,18 @@ pill, whatever the corner shape.
   0.1), never white, so it can't pass for a white chip; this is the one literal
   color in the chrome. The chosen chip, or the picker when the value is none of
   them, sits in `--acc-wash` inside a 1px `--acc` frame (the wash alone is lost
-  around a warm chip). An option valued `""` means unset. An option may carry a
-  chip color apart from its value, so a book color (spec §4.15) is chosen and
-  stored by name and drawn in its color; its name can be typed in the code field
-  too. Used for Paper stock (§2.5) and each part's Color row (the book's colors;
-  unset, the label carries "Inherited · Ink" beneath and clicking the chosen
-  chip again unsets). Ink swatches (`.colors.ink`) sit on a `--stock` paper
-  ground so a black chip reads in the dark theme; chosen, the 1px `--acc` frame
-  alone marks them.
+  around a warm chip). An option valued `""` means unset. Paper stock (§2.5)
+  only.
 - **Color picker** (`.color-pick`): the Colors view's one control per book
-  color, a native picker the swatches' size and edge, on the same `--stock`
-  paper ground as ink swatches, showing the color itself; no suggested chips, no
-  code field, no hue wheel.
+  color, a native picker the swatches' size and edge on a `--stock` paper ground
+  (so black reads in the dark theme), showing the color itself; no suggested
+  chips, no code field, no hue wheel.
+- **Book picks** (Font and Color rows): a `select` of the book's own fonts or
+  colors only, "Inherited · …" first, then an "Add new font" / "Add new color"
+  link (`.where`, `--fs-xs` `--muted`) that opens the Fonts or Colors view at
+  its add section. The Color row leads with `.ink-chip`, an `--h-sm` square of
+  the color the text sets in now, inside a `--s-1` `--stock` paper ring and a
+  hairline. Anything else goes in More CSS.
 - **Style row**: the part's Italic, Bold and Underline `toggle`s, then the case
   `seg`; each toggle stores one key and clears it when released.
 - **Tip line** (`.tip`): a red ☞ in Fell before `--fs-sm` `--muted` text.

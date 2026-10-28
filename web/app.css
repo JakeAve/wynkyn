@@ -2703,11 +2703,19 @@ body.typing #editor .pane-head {
   background: var(--stock); /* the unset option: the default stock */
   box-shadow: inset 0 0 0 1px var(--line);
 }
-/* Inks sit on paper, so black reads in the dark theme too; chosen, the red
-   frame alone marks it. */
-#config-overlay .colors.ink .color,
+/* A book color sits on paper, so black reads in the dark theme too: the
+   Colors view's picker, and the chip beside a part's Color select. */
 #config-overlay input.color-pick {
   background: var(--stock);
+}
+#config-overlay .ink-chip {
+  flex: none;
+  width: var(--h-sm);
+  height: var(--h-sm);
+  border: var(--hair) solid var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  box-shadow: inset 0 0 0 var(--s-1) var(--stock);
 }
 #config-overlay .color[aria-pressed="true"],
 #config-overlay .colors input[type="color"].on {

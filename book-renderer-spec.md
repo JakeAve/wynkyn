@@ -1826,8 +1826,8 @@ Named book colors, like font aliases (§4.4): a name → any CSS color.
 - `ink` is the text color: the template sets `elements.body.color` to `"ink"`,
   so every part, running head and folio inherits it (§4.7, §4.8) unless it names
   another. Changing a color recolors everything that names it.
-- The template ships `ink` and `rubric`, the red of a printed rubric. A book
-  without `colors` sets in the browser's black.
+- The template ships `ink` alone; a book adds its own. A book without `colors`
+  sets in the browser's black.
 
 ## 5. Module Contracts
 
@@ -2266,9 +2266,11 @@ Includes:
 - Book colors (§4.15), after Fonts in Style's Book group: one section per color
   with one picker showing it, "Used by" chips, and for any but `ink` a name and
   Remove; Add a color. A rename follows every style that names the color. Every
-  part's style has a Color row whose chips are the book's colors by name (unset,
-  it names the color the part inherits; clicking the chosen chip again unsets),
-  and a Style row of Italic, Bold and Underline toggles beside the case.
+  part's style picks from the book's own: a Font select of its fonts and a Color
+  select of its colors (with a chip of the color the text sets in now), each
+  "Inherited · …" first and followed by an "Add new font" / "Add new color" link
+  to the Fonts or Colors view; anything else is More CSS. And a Style row of
+  Italic, Bold and Underline toggles beside the case.
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)

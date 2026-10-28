@@ -10,6 +10,7 @@ import type {
 import { parseLength } from "./config-data.ts";
 import { buildFurniture } from "./panel-furniture.ts";
 import {
+  addNew,
   applies,
   icon,
   makeView,
@@ -19,7 +20,6 @@ import {
   seg,
   select,
   stepper,
-  swatches,
   switchInput,
   toggle,
   type View,
@@ -305,41 +305,53 @@ function block(
       has(prop),
     );
 
-  // The book's colors (§4.15) by name, so changing one recolors its users.
-  // Unset, the row says what the text inherits; clicking the chosen chip
-  // again unsets it.
+  // The book's colors (§4.15) by name, like the fonts: changing one
+  // recolors its users. The chip shows the color the text sets in now.
+  const colors = meta.colors ?? {};
   const inherits = inheritedValue(meta, entry, "color");
-  const inhInk = `Inherited · ${
-    !inherits ? "black" : meta.colors?.[inherits] ? cap(inherits) : inherits
-  }`;
-  const ink = swatches(
-    Object.entries(meta.colors ?? {}).map(([name, color]) => ({
-      value: name,
-      label: cap(name),
-      color,
-    })),
-    props.color,
-    (c) => {
-      inkFrom.textContent = c ? "" : inhInk;
-      set("color")(c);
+  const resolve = (c: string | undefined) => c ? (colors[c] ?? c) : "#000000";
+  const chip = el("i", "ink-chip");
+  chip.style.background = resolve(props.color ?? inherits);
+  const colorOpts = [
+    {
+      label: `Inherited · ${
+        !inherits ? "black" : colors[inherits] ? cap(inherits) : inherits
+      }`,
+      value: "",
     },
-    `${label} color`,
+    ...Object.keys(colors).map((name) => ({ label: cap(name), value: name })),
+  ];
+  const own = props.color;
+  if (own && !(own in colors)) colorOpts.push({ label: own, value: own });
+  const colorRow = row(
+    "Color",
+    el(
+      "span",
+      "ctl",
+      chip,
+      select(colorOpts, own ?? "", (c) => {
+        chip.style.background = resolve(c || inherits);
+        set("color")(c || undefined);
+      }, `${label} color`),
+      addNew(ctx, "color"),
+    ),
   );
-  ink.classList.add("ink");
-  const colorRow = row("Color", ink, { note: inhInk });
-  const inkFrom = colorRow.querySelector(".from")!;
-  if (props.color) inkFrom.textContent = "";
 
   return section(label, focusOf(entry.key), [
     ...extraRows,
     v.mark(
       row(
         "Font",
-        select(
-          fontOpts,
-          ff ?? "",
-          (x) => set("font-family")(x || undefined),
-          `${label} font`,
+        el(
+          "span",
+          "ctl",
+          select(
+            fontOpts,
+            ff ?? "",
+            (x) => set("font-family")(x || undefined),
+            `${label} font`,
+          ),
+          addNew(ctx, "font"),
         ),
       ),
       has("font-family"),

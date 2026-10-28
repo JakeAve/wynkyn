@@ -265,13 +265,10 @@ export function switchInput(
 
 // Color swatches, then a custom color: a picker beside its code (any CSS
 // color can be typed). An option whose value is "" means unset; its chip
-// shows `color`, else the default `--stock` (app.css). An option's `color`
-// also draws a value that is a name, not a color (a book color, §4.15),
-// which can be typed too. With no unset option, clicking the chosen chip
-// again unsets. The chosen chip takes the red wash, or the picker does when
-// the value is none of the options.
+// shows the default `--stock` (app.css). The chosen chip takes the red wash,
+// or the picker does when the value is none of the options.
 export function swatches(
-  options: Array<{ value: string; label: string; color?: string }>,
+  options: Array<{ value: string; label: string }>,
   value: string | undefined,
   onChange: (v: string | undefined) => void,
   label: string,
@@ -288,22 +285,16 @@ export function swatches(
     spellcheck: "false",
     autocomplete: "off",
   });
-  const unsets = !options.some((o) => o.value === "");
   const btns = options.map((o) => {
     const chip = h("i");
-    chip.style.background = o.color ?? o.value;
+    chip.style.background = o.value;
     const b = h("button", {
       type: "button",
       class: "color",
       "aria-label": o.label,
       title: o.label,
     }, chip);
-    b.onclick = () =>
-      set(
-        unsets && b.getAttribute("aria-pressed") === "true"
-          ? undefined
-          : o.value || undefined,
-      );
+    b.onclick = () => set(o.value || undefined);
     return [b, o.value] as const;
   });
   const paint = (v: string | undefined) => {
@@ -316,8 +307,7 @@ export function swatches(
     picker.classList.toggle("on", own);
     code.value = v ?? "";
     // The picker only takes #rrggbb; unset is the white it means.
-    const hex = options.find((o) => o.value === v)?.color ?? v ?? "";
-    picker.value = /^#[0-9a-f]{6}$/i.test(hex) ? hex : "#ffffff";
+    picker.value = /^#[0-9a-f]{6}$/i.test(v ?? "") ? v! : "#ffffff";
   };
   const set = (v: string | undefined) => {
     value = v;
@@ -327,8 +317,7 @@ export function swatches(
   picker.onchange = () => set(picker.value); // on release: one save, not one per drag tick
   code.onchange = () => {
     const t = code.value.trim();
-    const named = options.some((o) => o.value === t);
-    if (t && !named && !CSS.supports("color", t)) return paint(value); // not a color
+    if (t && !CSS.supports("color", t)) return paint(value); // not a color
     set(t || undefined);
   };
   paint(value);
@@ -372,6 +361,20 @@ export function row(
   );
   r.hidden = !!opts.hidden;
   return r;
+}
+
+// "Add new font" / "Add new color" beside a picker of the book's own: opens
+// the Book view where it is added, so styles stay on the book's fonts and
+// colors (More CSS takes anything).
+export function addNew(ctx: PanelContext, what: "font" | "color"): HTMLElement {
+  const b = h("button", { type: "button", class: "where" }, `Add new ${what}`);
+  b.onclick = () =>
+    ctx.go(
+      what === "font"
+        ? { tab: "fonts", focus: "more-fonts" }
+        : { tab: "colors", focus: "more-colors" },
+    );
+  return b;
 }
 
 // "On N pages" for a style key: hover outlines every match, a click steps

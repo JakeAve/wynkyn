@@ -34,6 +34,7 @@ import {
   textInputRaw,
 } from "./config-panel.ts";
 import {
+  addNew,
   applies,
   icon,
   makeView,
@@ -88,14 +89,15 @@ function dropped(rules: Array<[string, string]>): HTMLElement {
   ], el("span", "from", "Chicago"));
 }
 
-// Font alias segments (Body / Display / …); clicking the lit one unsets it.
+// Font alias segments (Body / Display / …), then "Add new font"; clicking the
+// lit one unsets it.
 function fontSeg(
   ctx: PanelContext,
   value: string | undefined,
   onChange: (v: string | undefined) => void,
   label: string,
 ): HTMLElement {
-  return seg(
+  const fonts = seg(
     Object.keys(ctx.meta.fonts ?? {}).map((a) => ({
       value: a,
       label: a[0]!.toUpperCase() + a.slice(1),
@@ -105,6 +107,7 @@ function fontSeg(
     label,
     true,
   );
+  return el("span", "ctl", fonts, addNew(ctx, "font"));
 }
 
 // ---- page numbers ----
