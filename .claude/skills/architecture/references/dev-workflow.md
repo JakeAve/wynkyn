@@ -64,13 +64,29 @@ mid-change there. Wait for the state the assertion is about, never a guessed
 number of milliseconds. `testing/clock_test.ts` fails any `setTimeout` or
 `waitForTimeout` in a test that isn't labelled `// clock: <why>` (on its line
 or the one above), so a guess can't land unnoticed. Use `testing/wait.ts`:
-`until(ok, what)` polls with a 30 s deadline that only a hang reaches, and
-`quietFor(ms)` is the pause before asserting that nothing happened.
+
+- `laidOut(page, after?)`: the preview is laid out, nothing is pending (no
+  render, no edit waiting for one) and everything that reads the pages (page
+  turns, the indicator) has caught up. It reads `#preview[data-layouts]`,
+  which `afterLayout` in `app.ts` counts up. Keep the count from before an
+  edit and pass it to wait for the layout after that edit. Not
+  `.preview-stage` detached: the stage is also absent before a render starts.
+- `eventually(check)`: retries an assert until it holds, like Playwright
+  Test's `expect`. The plain `assertEquals(await x.count(), 0)` reads once,
+  at whatever instant; wrap a read of anything an action changes later.
+  Never for "stays": a check that already holds passes at once.
+- `until(ok, what)`: polls a condition. All three wait up to 30 s or more, a
+  deadline only a hang reaches.
+- `quietFor(ms)`: the pause before asserting that nothing happened.
+
+When the app has no signal for the state a test needs, add one to the app
+(an attribute or a count, like `data-layouts`) rather than inferring it.
 
 - **The signal, not an earlier sign of it:** wait on what the assertion
   reads. Page 2 in the preview is not "the layout is done": Paged.js draws
   page by page, and the editor's page turns land only when the last page does
   (a scroll that started at page 2 ran past the line before its turn existed).
+  Nor is "the page count held for 300 ms". Both are `laidOut`.
 
 - **A transition or fade:** wait for its class or attribute to land, then
   `el.getAnimations()` and `Promise.all(… .map((a) => a.finished))`. Read

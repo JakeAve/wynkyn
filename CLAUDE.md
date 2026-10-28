@@ -32,9 +32,10 @@ look; when code and it disagree, ask.
   Tests are plain `Deno.test` with `jsr:@std/assert`, in `*_test.ts` beside the
   module.
 - Tests wait for the state they assert, never a guessed number of milliseconds
-  (`testing/wait.ts`; `testing/clock_test.ts` fails an unlabelled sleep). A CI
-  failure that passes on re-run is a race to fix at its root, never a re-run,
-  retry or longer timeout (`architecture` → `references/dev-workflow.md`).
+  (`testing/wait.ts`: `laidOut`, `eventually`, `until`; `testing/clock_test.ts`
+  fails an unlabelled sleep). A CI failure that passes on re-run is a race to
+  fix at its root, never a re-run, retry or longer timeout (`architecture` →
+  `references/dev-workflow.md`).
 
 ## Commands
 
