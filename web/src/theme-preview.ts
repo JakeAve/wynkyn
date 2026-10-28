@@ -8,9 +8,9 @@ import type { Metadata } from "../../metadata/types.ts";
 import type { UpdateMessage } from "./preview.ts";
 import type { Sync } from "./sync.ts";
 import {
-  type CachedRender,
   cacheId,
-  loadCachedRender,
+  type LegacyRender as CachedRender,
+  loadLegacyRender as loadCachedRender,
   renderHash,
 } from "./preview-cache.ts";
 import { editionHref, freeSlug } from "./editions.ts";

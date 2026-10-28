@@ -9,11 +9,11 @@ import {
   type StyleEntry,
 } from "./style-catalog.ts";
 import {
-  type CachedRender,
+  type LegacyRender as CachedRender,
   renderHash,
   restoredHash,
   restoredPageMap,
-  saveCachedRender,
+  saveLegacyRender as saveCachedRender,
 } from "./preview-cache.ts";
 import { scopeSheet } from "./scope-css.ts";
 import type {

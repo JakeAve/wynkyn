@@ -22,9 +22,9 @@ import {
 } from "./preview.ts";
 import type { ServerMessage } from "../../server/pipeline.ts";
 import {
-  type CachedRender,
   cacheId,
-  loadCachedRender,
+  type LegacyRender as CachedRender,
+  loadLegacyRender as loadCachedRender,
 } from "./preview-cache.ts";
 import {
   formatProblem,
