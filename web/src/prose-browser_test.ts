@@ -196,15 +196,26 @@ Deno.test({
     const { page, close } = await open(LONG);
     try {
       const turn = page.locator('#editor .cm-prose-turn[data-turn="2"]');
-      await page.locator("#preview .pagedjs_page").nth(1).waitFor({
-        timeout: 30_000,
+      // The turns land once the whole layout is done, not when its second
+      // page appears (Paged.js draws page by page): wait for the first one,
+      // at the top of the text, before looking for the rest.
+      await page.locator("#editor .cm-prose-turn").first().waitFor({
+        timeout: 60_000,
       });
-      // CodeMirror draws only the lines near the viewport: scroll to it.
-      for (let i = 0; i < 40 && !await turn.count(); i++) {
-        await page.locator("#editor .cm-scroller").evaluate((s) =>
-          s.scrollTop += 200
+      // CodeMirror draws only the lines near the viewport: scroll a step at
+      // a time, each after the redraw, until the turn is drawn or the end.
+      while (!await turn.count()) {
+        const moved = await page.locator("#editor .cm-scroller").evaluate(
+          async (s) => {
+            const top = s.scrollTop;
+            s.scrollTop += 200;
+            for (let i = 0; i < 2; i++) {
+              await new Promise((r) => requestAnimationFrame(r));
+            }
+            return s.scrollTop !== top;
+          },
         );
-        await page.waitForTimeout(50);
+        if (!moved) break;
       }
       assertEquals(await turn.getAttribute("data-long"), "p. 2");
       // The printed folio, not the count of pages: the body starts at 1

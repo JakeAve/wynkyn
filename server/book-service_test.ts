@@ -3,6 +3,7 @@ import { assertEquals, assertRejects } from "@std/assert";
 import { BookService, ServiceError } from "./book-service.ts";
 import { diskStore, withTabs } from "./store.ts";
 import { memoryStore } from "../testing/memory-store.ts";
+import { quietFor, until } from "../testing/wait.ts";
 import { contentVersion, imageFiles, type ServerMessage } from "./pipeline.ts";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
@@ -240,13 +241,6 @@ function tabs() {
     new BookService({ store: withTabs(memoryStore(files), channel), lock });
   return [tab(), tab()] as const;
 }
-async function until(ok: () => boolean) {
-  for (let i = 0; i < 200 && !ok(); i++) {
-    await new Promise((r) => setTimeout(r, 10));
-  }
-  return ok();
-}
-
 Deno.test("tabs: a write reaches its own tab's watch once", async () => {
   const store = withTabs(memoryStore(), `test-${crypto.randomUUID()}`);
   const heard: string[][] = [];
@@ -254,7 +248,7 @@ Deno.test("tabs: a write reaches its own tab's watch once", async () => {
   try {
     await store.write("demo-book/manuscript.md", "X\n");
     await until(() => heard.length > 0);
-    await new Promise((r) => setTimeout(r, 50)); // an echo would be in by now
+    await quietFor(50); // an echo would be in by now
     assertEquals(heard, [["demo-book/manuscript.md"]]);
   } finally {
     stop();
@@ -274,14 +268,12 @@ Deno.test("tabs: two services over one library each see the other's save", async
       });
       assertEquals("ok" in saved, true);
       const version = "version" in saved ? saved.version : "";
-      assertEquals(
-        await until(() =>
+      await until(
+        () =>
           seen.some((m) =>
             m.type === "update" && m.manuscriptVersion === version
-          )
-        ),
-        true,
-        `${text} reached the other tab`,
+          ),
+        `${text} to reach the other tab`,
       );
       unsubscribe();
     }

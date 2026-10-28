@@ -6,6 +6,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { until } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -29,13 +30,6 @@ Deno.test({
     const browser = await chromium.launch({ channel: "chrome" });
     const editions = () =>
       [...Deno.readDirSync(`${dir}/editions`)].map((e) => e.name).sort();
-    const until = async (ok: () => Promise<boolean>, what: string) => {
-      for (let i = 0; i < 100; i++) {
-        if (await ok()) return;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      assert(await ok(), what);
-    };
     // No render staged and the pages not dimmed.
     const settled = async (page: Page) => {
       await page.locator("#preview .preview-stage").waitFor({

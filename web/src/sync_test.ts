@@ -44,7 +44,11 @@ function fakeBackend() {
   };
 }
 
+// clock: one macrotask, not a duration
 const tick = () => new Promise((r) => setTimeout(r, 0));
+// Timers fire in deadline order, so a wait past debounceMs (5) runs after
+// the save it lets go, however slow the machine.
+// clock: ordered timers, not a duration
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function setup(over: Partial<SyncOptions> = {}) {
