@@ -982,11 +982,13 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     // clock: a fresh FSEvents watch has no ready signal; give it a beat.
     await new Promise((r) => setTimeout(r, 300));
 
-    // Pocket metadata write → only the pocket client hears it.
+    // Pocket metadata write → only the pocket client hears it. A late watch
+    // event can still push the unnamed client a rebuild of what it has, so
+    // what must not arrive is a build carrying the pocket write.
     let unnamedHeard = false;
-    unnamed.addEventListener("message", () => unnamedHeard = true, {
-      once: true,
-    });
+    const hear = (e: MessageEvent) =>
+      unnamedHeard ||= String(e.data).includes("float: footnote");
+    unnamed.addEventListener("message", hear);
     const p1 = nextMessageWhere(
       pocket,
       (m) => m.metadataVersion !== p0.metadataVersion,
@@ -998,6 +1000,7 @@ Deno.test("editions: ws clients get their own edition's builds; manuscript edits
     assertEquals(msg.edition, "pocket");
     assert((msg.pagedCss as string).includes("float: footnote"));
     await quietFor(300);
+    unnamed.removeEventListener("message", hear);
     assertEquals(unnamedHeard, false);
 
     // Manuscript write → both clients, each built with its own edition.
