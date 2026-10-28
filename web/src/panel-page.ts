@@ -48,10 +48,11 @@ import {
   FOLD_VALUES,
   isTrueFold,
   type PageSetup,
+  type ResolvedMarks,
   resolveMarks,
   TRUE_FOLDS,
 } from "../../metadata/page-setup.ts";
-import { marksFor } from "../../server/marks.ts";
+import { marksFor, type SideMarks } from "../../server/marks.ts";
 import { printSheets } from "./print.ts";
 
 const FOLD_LABELS: Record<Fold, string> = {
@@ -210,7 +211,14 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
     const pages = ctx.preview.pageCount();
     const setup = resolvePageSetup(page, { pageCount: pages || undefined });
     showSetup(setup, pages, readout);
-    drawSignature(ctx, setup, pages, page.flip ?? "short-edge", ctx.sheetView);
+    drawSignature(
+      ctx,
+      setup,
+      pages,
+      page.flip ?? "short-edge",
+      resolveMarks(page.marks),
+      ctx.sheetView,
+    );
     // Auto names what it picked; loose leaves have no signatures to set.
     foldSel.options[0]!.text = setup.error === null
       ? `Auto: ${FOLD_LABELS[setup.fold].toLowerCase()}`
@@ -794,12 +802,15 @@ function drawSignature(
   setup: PageSetup,
   pageCount: number,
   flip: Flip,
+  marks: ResolvedMarks | null,
   host: HTMLElement,
 ): void {
   host.replaceChildren();
   if (setup.error !== null) return;
   const imp = liveImposition(ctx, setup, pageCount, flip);
   const first = imp.sheets.filter((sh) => sh.signature === 0);
+  // Signature 0's sheets come first in imp.sheets, so indexes line up.
+  const sheetMarks = marksFor(imp, setup.page, marks);
   const { w: W, h: H } = imp.sheet;
   const { w: pw, h: ph } = setup.page;
   const { origin: o, cell } = imp;
@@ -824,7 +835,7 @@ function drawSignature(
       y2: y,
     });
   }
-  const side = (slots: Slot[], label: string) => {
+  const side = (slots: Slot[], label: string, m?: SideMarks) => {
     const s = svg("svg", {
       viewBox: `0 0 ${W} ${H}`,
       role: "img",
@@ -853,6 +864,14 @@ function drawSignature(
     for (const { cls, ...at } of lines) {
       s.append(svg("line", { class: cls, ...at }));
     }
+    // The binding marks that print, in ink over the guides above. A dot is
+    // drawn bigger than it prints (1pt) so it can be seen at this scale.
+    for (const { kind, ...at } of m?.lines ?? []) {
+      s.append(svg("line", { class: `mark ${kind}`, ...at }));
+    }
+    for (const d of m?.dots ?? []) {
+      s.append(svg("circle", { class: "mark", cx: d.x, cy: d.y, r: 0.06 }));
+    }
     return el("figure", "", s, el("figcaption", "", label));
   };
   first.slice(0, SHOWN_SHEETS).forEach((sh, i) =>
@@ -860,8 +879,8 @@ function drawSignature(
       el(
         "div",
         "sheet",
-        side(sh.front, `Sheet ${i + 1} front`),
-        side(sh.back, `Sheet ${i + 1} back`),
+        side(sh.front, `Sheet ${i + 1} front`, sheetMarks[i]?.front),
+        side(sh.back, `Sheet ${i + 1} back`, sheetMarks[i]?.back),
       ),
     )
   );
@@ -883,9 +902,23 @@ function drawSignature(
     : setup.cutsPerSheet
     ? "Dashed lines fold, solid lines cut."
     : "Dashed lines fold.";
+  // Where the sewing stations land: the innermost sheet, which may be past
+  // the ones shown.
+  const sewn = first.findIndex((_, i) =>
+    [sheetMarks[i]?.front, sheetMarks[i]?.back].some((f) => f?.dots.length)
+  );
+  const sewnFace = sewn < 0
+    ? ""
+    : sheetMarks[sewn]?.front.dots.length
+    ? "front"
+    : "back";
   const notes = [
     more > 0 ? `And ${more} more sheet${more === 1 ? "" : "s"}.` : "",
     how,
+    marks ? "Binding marks print in ink." : "",
+    sewn < 0
+      ? ""
+      : `Sewing stations: sheet ${sewn + 1} ${sewnFace}, on the fold.`,
     first.some((sh) => [...sh.front, ...sh.back].some((t) => t.rotate))
       ? "Upside-down numbers print upside down, which is how the sheet lines up."
       : "",
