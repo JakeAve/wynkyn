@@ -2270,9 +2270,9 @@ Includes:
   select of its colors (with a chip of the color the text sets in now), each
   "Inherited · …" first and followed by an "Add new font" / "Add new color" link
   to the Fonts or Colors view; anything else is More CSS. And a Style row of
-  Italic, Bold and Underline toggles beside the case, and Line spacing: a
-  multiple of the size (`line-height: 1.2`) stepping by 0.05, showing the
-  spacing it inherits while unset.
+  Italic, Bold and Underline toggles beside the case, and Line spacing (Body
+  text's is the same stepper): a multiple of the size (`line-height: 1.2`)
+  stepping by 0.05, showing the spacing it inherits while unset.
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)

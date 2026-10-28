@@ -61,7 +61,6 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 const cap = (s: string) =>
   s.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
-const fmt = (n: number) => String(Math.round(n * 100) / 100);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // No part chosen: the nav lists them.
@@ -735,17 +734,6 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
   const ff = bp["font-family"];
   const change = el("button", "where", "Change in Fonts");
   change.onclick = () => ctx.go({ tab: "fonts", focus: ff ?? "body" });
-  const lh = parseFloat(bp["line-height"] ?? "") || 1.5;
-  const out = el("output", "", `${fmt(lh)}×`);
-  const range = el("input", "");
-  Object.assign(range, { type: "range", min: "1", max: "2", step: "0.05" });
-  range.value = String(lh);
-  range.setAttribute("aria-label", "Line spacing");
-  range.oninput = () => {
-    out.textContent = `${fmt(+range.value)}×`;
-    put(meta, body, "line-height", range.value);
-    save();
-  };
   const text = section("Text", "text", [
     row(
       "Font",
@@ -772,7 +760,21 @@ function bodyDetail(ctx: PanelContext, part: BookPart): Node[] {
       has(body, "font-size"),
     ),
     v.mark(
-      row("Line spacing", el("span", "range", range, out)),
+      // As every part's: a multiple of the size; base.css's 1.5 unset.
+      row(
+        "Line spacing",
+        stepper({
+          value: bp["line-height"],
+          placeholder: "1.5",
+          label: "Body text line spacing",
+          unit: "",
+          step: () => 0.05,
+          onChange: (x) => {
+            put(meta, body, "line-height", x);
+            save();
+          },
+        }),
+      ),
       has(body, "line-height"),
     ),
     v.mark(
