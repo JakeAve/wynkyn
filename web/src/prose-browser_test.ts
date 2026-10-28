@@ -6,6 +6,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { laidOut } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -196,12 +197,9 @@ Deno.test({
     const { page, close } = await open(LONG);
     try {
       const turn = page.locator('#editor .cm-prose-turn[data-turn="2"]');
-      // The turns land once the whole layout is done, not when its second
-      // page appears (Paged.js draws page by page): wait for the first one,
-      // at the top of the text, before looking for the rest.
-      await page.locator("#editor .cm-prose-turn").first().waitFor({
-        timeout: 60_000,
-      });
+      // The turns land with the whole layout, not with its second page
+      // (Paged.js draws page by page).
+      await laidOut(page);
       // CodeMirror draws only the lines near the viewport: scroll a step at
       // a time, each after the redraw, until the turn is drawn or the end.
       while (!await turn.count()) {

@@ -4,7 +4,7 @@ import { assert, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
-import { quietFor, until } from "../../testing/wait.ts";
+import { laidOut, quietFor, until } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -81,11 +81,7 @@ Deno.test({
           if (m.type === "update") pushed.push(m.manuscriptVersion);
         }));
       await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-      await page.locator("#preview > :not(.preview-stage) .pagedjs_page")
-        .first().waitFor({ timeout: 30_000 });
-      await page.locator("#preview .preview-stage").waitFor({
-        state: "detached",
-      });
+      await laidOut(page);
       const opening = new Set(pushed);
 
       // A refused file: nothing inserted, the refusal shown.
