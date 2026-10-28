@@ -169,6 +169,7 @@ Deno.test("runningSummary reports mixed sizes", () => {
     size: "mixed",
     italic: "mixed",
     font: "mixed",
+    color: undefined,
   });
   running.odd[0]!["font-size"] = "9pt";
   assertEquals(runningSummary(running).size, "9pt");
@@ -178,6 +179,7 @@ Deno.test("runningSummary reports mixed sizes", () => {
     size: undefined,
     italic: false,
     font: undefined,
+    color: undefined,
   });
 });
 
@@ -193,6 +195,9 @@ Deno.test("setRunningShared writes every entry", () => {
   assertEquals(even[0]!["color"], "red"); // other keys untouched
   setRunningShared(running, "font-size", undefined);
   assert([...odd, ...even].every((e) => !("font-size" in e)));
+  assertEquals(runningSummary(running).color, "mixed"); // only even sets one
+  setRunningShared(running, "color", "ink");
+  assertEquals(runningSummary(running).color, "ink");
 });
 
 Deno.test("headPosition reads and setHeadPosition moves the first heads", () => {

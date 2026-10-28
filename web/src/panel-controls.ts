@@ -377,6 +377,43 @@ export function addNew(ctx: PanelContext, what: "font" | "color"): HTMLElement {
   return b;
 }
 
+// A pick from the book's colors (§4.15), as Font picks from its fonts: a chip
+// of the color the text sets in now, a select ("Inherited · …" first, then
+// the book's colors, plus a color already set that isn't one), then "Add new
+// color". `inherits` is the value used while unset (an alias or CSS).
+export function colorPick(
+  ctx: PanelContext,
+  value: string | undefined,
+  inherits: string | undefined,
+  onChange: (v: string | undefined) => void,
+  label: string,
+): HTMLElement {
+  const colors = ctx.meta.colors ?? {};
+  const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);
+  const resolve = (c: string | undefined) => c ? (colors[c] ?? c) : "#000000";
+  const name = (c: string | undefined) =>
+    !c ? "black" : Object.hasOwn(colors, c) ? cap(c) : c;
+  const chip = h("i", { class: "ink-chip" });
+  chip.style.background = resolve(value ?? inherits);
+  const opts = [
+    { label: `Inherited · ${name(inherits)}`, value: "" },
+    ...Object.keys(colors).map((c) => ({ label: cap(c), value: c })),
+  ];
+  if (value && !Object.hasOwn(colors, value)) {
+    opts.push({ label: value, value });
+  }
+  return h(
+    "span",
+    { class: "ctl" },
+    chip,
+    select(opts, value ?? "", (c) => {
+      chip.style.background = resolve(c || inherits);
+      onChange(c || undefined);
+    }, label),
+    addNew(ctx, "color"),
+  );
+}
+
 // "On N pages" for a style key: hover outlines every match, a click steps
 // through them. None while the key is on no page. A view with only one of
 // these shows it in its heading (config-panel.ts).

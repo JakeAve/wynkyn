@@ -472,7 +472,8 @@ pill, whatever the corner shape.
   link (`.where`, `--fs-xs` `--muted`) that opens the Fonts or Colors view at
   its add section. The Color row leads with `.ink-chip`, an `--h-sm` square of
   the color the text sets in now, inside a `--s-1` `--stock` paper ring and a
-  hairline. Anything else goes in More CSS.
+  hairline. Page numbers and Running heads have the same Color pick
+  (`colorPick`). Anything else goes in More CSS.
 - **Style row**: the part's Italic, Bold and Underline `toggle`s, then the case
   `seg`; each toggle stores one key and clears it when released.
 - **Tip line** (`.tip`): a red ☞ in Fell before `--fs-sm` `--muted` text.

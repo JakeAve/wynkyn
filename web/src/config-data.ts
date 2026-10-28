@@ -153,6 +153,7 @@ export function runningSummary(running: Running | undefined): {
   size: string | "mixed" | undefined;
   italic: boolean | "mixed";
   font: string | "mixed" | undefined;
+  color: string | "mixed" | undefined;
 } {
   const all = [...(running?.odd ?? []), ...(running?.even ?? [])];
   const agree = <T>(pick: (e: RunningEntry) => T): T | "mixed" | undefined =>
@@ -163,6 +164,7 @@ export function runningSummary(running: Running | undefined): {
     size: agree((e) => e["font-size"]),
     italic: agree((e) => e["font-style"] === "italic") ?? false,
     font: agree((e) => e["font-family"]),
+    color: agree((e) => e.color),
   };
 }
 
@@ -198,7 +200,7 @@ export function setHeadPosition(running: Running, at: FolioPosition): void {
 // Write one shared property to every entry on both sides; undefined deletes.
 export function setRunningShared(
   running: Running,
-  prop: "font-size" | "font-style" | "font-family",
+  prop: "font-size" | "font-style" | "font-family" | "color",
   value: string | undefined,
 ): void {
   for (const e of [...(running.odd ?? []), ...(running.even ?? [])]) {

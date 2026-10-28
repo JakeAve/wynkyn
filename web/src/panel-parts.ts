@@ -12,6 +12,7 @@ import { buildFurniture } from "./panel-furniture.ts";
 import {
   addNew,
   applies,
+  colorPick,
   icon,
   makeView,
   moreCss,
@@ -307,33 +308,14 @@ function block(
 
   // The book's colors (§4.15) by name, like the fonts: changing one
   // recolors its users. The chip shows the color the text sets in now.
-  const colors = meta.colors ?? {};
-  const inherits = inheritedValue(meta, entry, "color");
-  const resolve = (c: string | undefined) => c ? (colors[c] ?? c) : "#000000";
-  const chip = el("i", "ink-chip");
-  chip.style.background = resolve(props.color ?? inherits);
-  const colorOpts = [
-    {
-      label: `Inherited · ${
-        !inherits ? "black" : colors[inherits] ? cap(inherits) : inherits
-      }`,
-      value: "",
-    },
-    ...Object.keys(colors).map((name) => ({ label: cap(name), value: name })),
-  ];
-  const own = props.color;
-  if (own && !(own in colors)) colorOpts.push({ label: own, value: own });
   const colorRow = row(
     "Color",
-    el(
-      "span",
-      "ctl",
-      chip,
-      select(colorOpts, own ?? "", (c) => {
-        chip.style.background = resolve(c || inherits);
-        set("color")(c || undefined);
-      }, `${label} color`),
-      addNew(ctx, "color"),
+    colorPick(
+      ctx,
+      props.color,
+      inheritedValue(meta, entry, "color"),
+      set("color"),
+      `${label} color`,
     ),
   );
 

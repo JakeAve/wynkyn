@@ -36,6 +36,7 @@ import {
 import {
   addNew,
   applies,
+  colorPick,
   icon,
   makeView,
   moreCss,
@@ -50,7 +51,9 @@ import {
 } from "./panel-controls.ts";
 import {
   folioClash,
+  getProps,
   inheritedFont,
+  inheritedValue,
   type PanelContext,
 } from "./style-catalog.ts";
 
@@ -302,7 +305,7 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
     openerWhere,
   ];
 
-  const FOLIO = ["font-size", "font-family", "font-style"];
+  const FOLIO = ["font-size", "font-family", "font-style", "color"];
   const zones = ZONES.map(([zone, label]) => {
     const cfg = pages[zone] ?? {};
     const current = cfg.show === false || cfg.style === "none"
@@ -361,7 +364,10 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
           "Size",
           stepper({
             value: css["font-size"],
-            // A margin box inherits nothing: unset shows no number.
+            // Unset, a page number takes the body's size (§4.7).
+            placeholder: getProps(ctx.meta, { path: ["elements", "body"] })[
+              "font-size"
+            ],
             label: "Page number size",
             onChange: (v) => setCss("font-size", v),
           }),
@@ -379,6 +385,23 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
           ),
         ),
         () => !!live()?.css?.["font-family"],
+      ),
+      view.mark(
+        row(
+          "Color",
+          colorPick(
+            ctx,
+            css.color,
+            inheritedValue(ctx.meta, {
+              key: "numbering.pages",
+              path: ["numbering", "pages", "css"],
+              section: "numbering",
+            }, "color"),
+            (v) => setCss("color", v),
+            "Page number color",
+          ),
+        ),
+        () => !!live()?.css?.color,
       ),
       view.mark(
         row(
@@ -545,7 +568,7 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
   const drawSimple = () => {
     const s = runningSummary(running);
     const shared = (
-      prop: "font-size" | "font-style" | "font-family",
+      prop: "font-size" | "font-style" | "font-family" | "color",
       v: string | undefined,
     ) => {
       setRunningShared(running, prop, v);
@@ -585,6 +608,26 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
           () => !!now().font && now().font !== "mixed",
         ),
         s.font === "mixed",
+      ),
+      mixed(
+        view.mark(
+          row(
+            "Color",
+            colorPick(
+              ctx,
+              s.color === "mixed" ? undefined : s.color,
+              inheritedValue(ctx.meta, {
+                key: "running",
+                path: ["running"],
+                section: "running",
+              }, "color"),
+              (v) => shared("color", v),
+              "Running head color",
+            ),
+          ),
+          () => !!now().color && now().color !== "mixed",
+        ),
+        s.color === "mixed",
       ),
       mixed(
         view.mark(
