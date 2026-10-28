@@ -5,6 +5,7 @@
 import type { CssProps, Metadata } from "../../metadata/types.ts";
 import {
   bumpLength,
+  type Case,
   convertLength,
   formatCssLines,
   LENGTH_UNITS,
@@ -398,6 +399,27 @@ export function emphasisToggles(
       (o) => set("text-decoration", o ? "underline" : undefined),
     ),
   ];
+}
+
+// The case buttons: Aa, AA, Aᴀ, Small caps (`caseOf`/`caseProps`). Clicking
+// the lit one unsets it.
+export function caseSeg(
+  value: Case | undefined,
+  onChange: (c: Case | undefined) => void,
+  label: string,
+): HTMLElement {
+  return seg(
+    [
+      { label: "Aa", value: "none", aria: "Normal case" },
+      { label: "AA", value: "upper", aria: "Capitals" },
+      { label: "Aᴀ", value: "csc", aria: "Caps and small caps" },
+      { label: "Small caps", value: "small" },
+    ],
+    value,
+    onChange,
+    label,
+    true,
+  );
 }
 
 // A pick from the book's colors (§4.15), as Font picks from its fonts: a chip

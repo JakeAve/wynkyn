@@ -2,6 +2,8 @@ import { assert, assertEquals, assertFalse } from "@std/assert";
 import type { RunningEntry } from "../../metadata/types.ts";
 import {
   bumpLength,
+  caseOf,
+  caseProps,
   convertLength,
   emphasisOf,
   formatCssLines,
@@ -171,6 +173,7 @@ Deno.test("runningSummary reports mixed sizes", () => {
     italic: "mixed",
     bold: false,
     underline: false,
+    case: undefined,
     font: "mixed",
     color: undefined,
   });
@@ -183,6 +186,7 @@ Deno.test("runningSummary reports mixed sizes", () => {
     italic: false,
     bold: false,
     underline: false,
+    case: undefined,
     font: undefined,
     color: undefined,
   });
@@ -193,7 +197,9 @@ Deno.test("setRunningShared writes every entry", () => {
     { content: "book-title", area: "top-right", "font-size": "8pt" },
     { content: "page-number", area: "bottom-right" },
   ];
-  const even = [{ content: "chapter-title", area: "top-left", color: "red" }];
+  const even: RunningEntry[] = [
+    { content: "chapter-title", area: "top-left", color: "red" },
+  ];
   const running = { odd, even };
   setRunningShared(running, "font-size", "10pt");
   assertEquals(runningSummary(running).size, "10pt");
@@ -210,6 +216,10 @@ Deno.test("setRunningShared writes every entry", () => {
   assertEquals([s.italic, s.bold, s.underline], [false, true, true]);
   delete odd[0]!["font-weight"];
   assertEquals(runningSummary(running).bold, "mixed");
+  setRunningShared(running, "font-variant-caps", "all-small-caps");
+  assertEquals(runningSummary(running).case, "small");
+  even[0]!["font-variant-caps"] = "small-caps";
+  assertEquals(runningSummary(running).case, "mixed");
 });
 
 Deno.test("headPosition reads and setHeadPosition moves the first heads", () => {
@@ -268,4 +278,15 @@ Deno.test("emphasisOf reads Italic, Bold and Underline independently", () => {
     { italic: true, bold: true, underline: true },
   );
   assertEquals(emphasisOf({ "font-weight": "400" }).bold, false);
+});
+
+Deno.test("caseOf and caseProps round-trip the four cases; unset clears both keys", () => {
+  for (const c of ["none", "upper", "csc", "small"] as const) {
+    assertEquals(caseOf(caseProps(c)), c);
+  }
+  assertEquals(caseProps(undefined), {
+    "text-transform": undefined,
+    "font-variant-caps": undefined,
+  });
+  assertEquals(caseOf({}), undefined);
 });

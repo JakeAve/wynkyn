@@ -7,11 +7,12 @@ import type {
   NumberingStyle,
   StructureNumbering,
 } from "../../metadata/types.ts";
-import { emphasisOf, parseLength } from "./config-data.ts";
+import { caseOf, caseProps, emphasisOf, parseLength } from "./config-data.ts";
 import { buildFurniture } from "./panel-furniture.ts";
 import {
   addNew,
   applies,
+  caseSeg,
   colorPick,
   emphasisToggles,
   icon,
@@ -258,17 +259,6 @@ function block(
   ];
   if (ff && !(ff in fonts)) fontOpts.push({ label: ff, value: ff });
 
-  // all-small-caps shrinks the capitals too; small-caps keeps them full height.
-  const caps = props["font-variant-caps"] === "all-small-caps"
-    ? "small"
-    : props["font-variant-caps"] === "small-caps"
-    ? "csc"
-    : props["text-transform"] === "uppercase"
-    ? "upper"
-    : props["text-transform"] === "none"
-    ? "none"
-    : undefined;
-
   const inhAlign = `Inherited · ${
     body["text-align"] === "justify" ? "justified" : "left"
   }`;
@@ -357,36 +347,12 @@ function block(
           "span",
           "ctl",
           ...emphasisToggles(emphasisOf(props), (p, x) => set(p)(x)),
-          seg(
-            [
-              { label: "Aa", value: "none", aria: "Normal case" },
-              { label: "AA", value: "upper", aria: "Capitals" },
-              { label: "Aᴀ", value: "csc", aria: "Caps and small caps" },
-              { label: "Small caps", value: "small" },
-            ],
-            caps,
-            (c) => {
-              put(
-                meta,
-                entry,
-                "text-transform",
-                c === "upper" ? "uppercase" : c === "none" ? "none" : undefined,
-              );
-              put(
-                meta,
-                entry,
-                "font-variant-caps",
-                c === "small"
-                  ? "all-small-caps"
-                  : c === "csc"
-                  ? "small-caps"
-                  : undefined,
-              );
-              save();
-            },
-            `${label} case`,
-            true,
-          ),
+          caseSeg(caseOf(props), (c) => {
+            for (const [k, x] of Object.entries(caseProps(c))) {
+              put(meta, entry, k, x);
+            }
+            save();
+          }, `${label} case`),
         ),
       ),
       has(

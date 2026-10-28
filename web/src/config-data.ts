@@ -162,6 +162,41 @@ export function emphasisOf(props: Record<string, string | undefined>): {
   };
 }
 
+// Letter case as the Style row offers it: normal, capitals, caps and small
+// caps, or all small caps (all-small-caps shrinks the capitals too;
+// small-caps keeps them full height). Undefined: nothing set.
+export type Case = "none" | "upper" | "csc" | "small";
+
+export function caseOf(
+  props: Record<string, string | undefined>,
+): Case | undefined {
+  const caps = props["font-variant-caps"];
+  if (caps === "all-small-caps") return "small";
+  if (caps === "small-caps") return "csc";
+  if (props["text-transform"] === "uppercase") return "upper";
+  if (props["text-transform"] === "none") return "none";
+  return undefined;
+}
+
+// The two keys a case writes; undefined clears a key.
+export function caseProps(c: Case | undefined): {
+  "text-transform": string | undefined;
+  "font-variant-caps": string | undefined;
+} {
+  return {
+    "text-transform": c === "upper"
+      ? "uppercase"
+      : c === "none"
+      ? "none"
+      : undefined,
+    "font-variant-caps": c === "small"
+      ? "all-small-caps"
+      : c === "csc"
+      ? "small-caps"
+      : undefined,
+  };
+}
+
 export function runningSummary(running: Running | undefined): {
   left: string;
   right: string;
@@ -169,6 +204,7 @@ export function runningSummary(running: Running | undefined): {
   italic: boolean | "mixed";
   bold: boolean | "mixed";
   underline: boolean | "mixed";
+  case: Case | "mixed" | undefined;
   font: string | "mixed" | undefined;
   color: string | "mixed" | undefined;
 } {
@@ -182,6 +218,7 @@ export function runningSummary(running: Running | undefined): {
     italic: agree((e) => emphasisOf(e).italic) ?? false,
     bold: agree((e) => emphasisOf(e).bold) ?? false,
     underline: agree((e) => emphasisOf(e).underline) ?? false,
+    case: agree((e) => caseOf(e)),
     font: agree((e) => e["font-family"]),
     color: agree((e) => e.color),
   };
@@ -224,6 +261,8 @@ export type SharedProp =
   | "font-family"
   | "font-weight"
   | "text-decoration"
+  | "text-transform"
+  | "font-variant-caps"
   | "color";
 
 export function setRunningShared(

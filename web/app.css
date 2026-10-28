@@ -2521,6 +2521,11 @@ body.typing #editor .pane-head {
   gap: var(--s-4);
   min-height: var(--h-md);
 }
+/* A holder a view redraws rows into: its rows stay the section's grid items,
+   spaced like every other section's. */
+#config-overlay .rows {
+  display: contents;
+}
 #config-overlay .row[hidden] {
   display: none;
 }

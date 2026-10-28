@@ -16,6 +16,8 @@ import {
   MARGIN_AREAS,
 } from "../../metadata/css-generator.ts";
 import {
+  caseOf,
+  caseProps,
   emphasisOf,
   formatCssLines,
   HEAD_AREAS,
@@ -38,6 +40,7 @@ import {
 import {
   addNew,
   applies,
+  caseSeg,
   colorPick,
   emphasisToggles,
   icon,
@@ -313,6 +316,8 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
     "font-style",
     "font-weight",
     "text-decoration",
+    "text-transform",
+    "font-variant-caps",
     "color",
   ];
   const zones = ZONES.map(([zone, label]) => {
@@ -415,12 +420,23 @@ function pageNumbers(ctx: PanelContext, view: View): HTMLElement[] {
       view.mark(
         row(
           "Style",
-          el("span", "ctl", ...emphasisToggles(emphasisOf(css), setCss)),
+          el(
+            "span",
+            "ctl",
+            ...emphasisToggles(emphasisOf(css), setCss),
+            caseSeg(caseOf(css), (c) => {
+              for (const [k, x] of Object.entries(caseProps(c))) setCss(k, x);
+            }, "Page number case"),
+          ),
         ),
         () =>
-          ["font-style", "font-weight", "text-decoration"].some((k) =>
-            live()?.css?.[k]
-          ),
+          [
+            "font-style",
+            "font-weight",
+            "text-decoration",
+            "text-transform",
+            "font-variant-caps",
+          ].some((k) => live()?.css?.[k]),
       ),
       moreCss("More CSS for page numbers", css, (next) => {
         if (!Object.keys(next).length && !numbering.pages?.css) return;
@@ -467,8 +483,9 @@ const HEADS = [
 function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
   const running = ctx.meta.running ??= {};
   const now = () => runningSummary(running);
-  const content = document.createElement("div");
-  const type = document.createElement("div");
+  // Redrawn in place; `.rows` lets their rows take the section's spacing.
+  const content = el("div", "rows");
+  const type = el("div", "rows");
   const summary = document.createElement("span");
   const advanced = advancedHeads(ctx, running, () => {
     drawSimple();
@@ -649,12 +666,27 @@ function runningHeads(ctx: PanelContext, view: View): HTMLElement[] {
                 bold: s.bold === true,
                 underline: s.underline === true,
               }, shared),
+              caseSeg(
+                s.case === "mixed" ? undefined : s.case,
+                (c) => {
+                  const p = caseProps(c);
+                  setRunningShared(
+                    running,
+                    "text-transform",
+                    p["text-transform"],
+                  );
+                  shared("font-variant-caps", p["font-variant-caps"]);
+                },
+                "Running head case",
+              ),
             ),
           ),
           () =>
-            [now().italic, now().bold, now().underline].some((x) => x === true),
+            [now().italic, now().bold, now().underline].some((x) =>
+              x === true
+            ) || (!!now().case && now().case !== "mixed"),
         ),
-        [s.italic, s.bold, s.underline].includes("mixed"),
+        [s.italic, s.bold, s.underline, s.case].includes("mixed"),
       ),
     );
   };
