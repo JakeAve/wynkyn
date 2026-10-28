@@ -233,11 +233,7 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
     const fold = setup.error === null ? setup.fold : null;
     const on = page.marks?.show === true;
     foldsRow.hidden = sewingRow.hidden = !on || fold === "leaves";
-    // Cuts: before folding, or the leftover paper's trim on any fold.
-    const toCut = setup.error === null &&
-      (setup.cutsPerSheet > 0 || setup.slackAcross > 0 ||
-        setup.slackDown > 0 || fold === "leaves");
-    cutsRow.hidden = !on || !toCut;
+    cutsRow.hidden = !on || (fold !== "cut" && fold !== "leaves");
     stationsRow.hidden = kettleRow.hidden = sewingRow.hidden ||
       page.marks?.sewing === false;
   };

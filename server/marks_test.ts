@@ -55,7 +55,7 @@ Deno.test("marksFor: fold lines on the front only, each across what the earlier 
   assertEquals(folds("cut", "legal", { w: 5.5, h: 8.5 }), [[7, 0.2, 7, 8.3]]);
 });
 
-Deno.test("marksFor: cut ticks on every page edge that isn't a fold, inside the dead zone", () => {
+Deno.test("marksFor: cut ticks only where the sheet is cut, inside the dead zone", () => {
   const cuts = (fold: Fold, page: { w: number; h: number }) => {
     const [m] = marks(4, {
       ...base,
@@ -67,28 +67,14 @@ Deno.test("marksFor: cut ticks on every page edge that isn't a fold, inside the 
     assertEquals(lines(m!.back.lines, "cut"), []);
     return lines(m!.front.lines, "cut");
   };
+  assertEquals(cuts("folio", { w: 5.5, h: 8.5 }), []);
   // cut 2-up, pages from x 1.5 to 12.5: ticks at the head and tail of each side.
-  const sides = [
+  assertEquals(cuts("cut", { w: 5.5, h: 8.5 }), [
     [1.5, 0.2, 1.5, 0.45],
     [1.5, 8.05, 1.5, 8.3],
     [12.5, 0.2, 12.5, 0.45],
     [12.5, 8.05, 12.5, 8.3],
-  ];
-  assertEquals(cuts("cut", { w: 5.5, h: 8.5 }), sides);
-  // A folio the same: its pages sit against the spine (no tick on the fold),
-  // and the leftover paper beyond their fore edges is trimmed off.
-  assertEquals(cuts("folio", { w: 5.5, h: 8.5 }), sides);
-  // A page as tall as the sheet leaves nothing to trim head and tail; one
-  // shorter gets ticks there too (centred, 0.25in in from each edge).
-  assertEquals(
-    cuts("folio", { w: 5.5, h: 8 }).filter(([, y1, , y2]) => y1 === y2),
-    [
-      [0.2, 0.25, 0.45, 0.25],
-      [13.55, 0.25, 13.8, 0.25],
-      [0.2, 8.25, 0.45, 8.25],
-      [13.55, 8.25, 13.8, 8.25],
-    ],
-  );
+  ]);
   // leaves 2 × 2 on portrait legal: every row and column edge, middle included.
   const leaves = cuts("leaves", { w: 4, h: 6 });
   assertEquals(leaves.length, 12);

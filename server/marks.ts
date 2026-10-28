@@ -77,37 +77,23 @@ export function marksFor(
       front.push(foldLine(x, origin.y, x, origin.y + rows * page.h));
     }
   }
-  if (marks?.cuts && imp.sheets[0]) {
-    // A cut runs along every page edge that isn't a fold: the cuts of a cut or
-    // leaves sheet before folding, and on any sheet the leftover paper's trim.
-    // Ticks lie on each line where it meets the sheet edges; a line inside the
-    // dead zone can't be marked at all.
-    const eps = 1e-6;
-    const foldsX: number[] = [];
-    const foldsY: number[] = [];
-    if (isTrueFold(fold)) {
-      for (let c = 1; c < cols; c++) foldsX.push(c * imp.cell.w);
-      for (let r = 1; r < rows; r++) foldsY.push(r * imp.cell.h);
-    } else if (fold === "cut") {
-      for (let j = 0; j < cols / 2; j++) {
-        foldsX.push(origin.x + (2 * j + 1) * page.w);
-      }
-    }
-    const edges = (vs: number[], folds: number[], edge: number) =>
-      [...new Set(vs)]
-        .filter((v) => !folds.some((f) => Math.abs(f - v) < eps))
-        .filter((v) => v >= DEAD_ZONE && v <= edge - DEAD_ZONE)
-        .sort((a, b) => a - b);
-    const slots = imp.sheets[0].front; // every sheet lays its pages out alike
+  if (marks?.cuts && (fold === "cut" || fold === "leaves")) {
+    // Ticks lie on each cut line where it meets the sheet edges; a line inside
+    // the dead zone can't be marked at all.
+    const ok = (v: number, edge: number) =>
+      v >= DEAD_ZONE && v <= edge - DEAD_ZONE;
     const cut = (x1: number, y1: number, x2: number, y2: number) =>
       front.push({ kind: "cut", x1, y1, x2, y2 });
-    const ys = slots.flatMap((sl) => [sl.y, sl.y + page.h]);
-    for (const y of edges(ys, foldsY, H)) {
+    for (let r = 0; r <= rows; r++) {
+      const y = origin.y + r * page.h;
+      if (!ok(y, H)) continue;
       cut(DEAD_ZONE, y, DEAD_ZONE + TICK, y);
       cut(W - DEAD_ZONE - TICK, y, W - DEAD_ZONE, y);
     }
-    const xs = slots.flatMap((sl) => [sl.x, sl.x + page.w]);
-    for (const x of edges(xs, foldsX, W)) {
+    // cut: only between folios; leaves: between every column.
+    for (let c = 0; c <= cols; c += fold === "cut" ? 2 : 1) {
+      const x = origin.x + c * page.w;
+      if (!ok(x, W)) continue;
       cut(x, DEAD_ZONE, x, DEAD_ZONE + TICK);
       cut(x, H - DEAD_ZONE - TICK, x, H - DEAD_ZONE);
     }
