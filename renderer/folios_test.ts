@@ -70,6 +70,7 @@ const {
           facts: PageFacts[];
           problems: PageProblem[];
           ids: string[];
+          reads: string[];
         }
       >,
       n: PageNumberingConfig,
@@ -280,7 +281,13 @@ const part = (
   opens: Segment["opens"],
   facts: PageFacts[],
   problems: PageProblem[] = [],
-) => ({ opens, facts, problems, ids: facts.flatMap((f) => f.anchors) });
+) => ({
+  opens,
+  facts,
+  problems,
+  ids: facts.flatMap((f) => f.anchors),
+  reads: [] as string[],
+});
 
 Deno.test("planAssembly adds a blank only where a segment would miss its side", () => {
   const body = (id: string) => page({ zone: "body", anchors: [id] });
@@ -359,6 +366,19 @@ Deno.test("planAssembly reports an id no page carries", () => {
   assertEquals(plan.problems, [{ page: null, message: '"#c" is on no page' }]);
 });
 
+Deno.test("planAssembly reports a {ref} to an id no segment renders", () => {
+  const plan = planAssembly([
+    {
+      ...part("page", [page({ zone: "body", anchors: ["a"] })]),
+      reads: ["missing-slug", "z"],
+    },
+    part("page", [page({ zone: "back", anchors: ["z"] })]),
+  ], numbering);
+  assertEquals(plan.problems, [
+    { page: null, message: '"#missing-slug" is on no page' },
+  ]);
+});
+
 Deno.test("settleSegments re-lays only the segments whose numbers moved", async () => {
   const seg = (id: string, reads: string[] = []): Segment => ({
     id,
@@ -385,7 +405,12 @@ Deno.test("settleSegments re-lays only the segments whose numbers moved", async 
   };
   const assembleAll = (laid: Laid[]) => {
     const { map, seed, problems } = planAssembly(
-      laid.map((l) => ({ ...l, opens: l.segment.opens, ids: l.segment.ids })),
+      laid.map((l) => ({
+        ...l,
+        opens: l.segment.opens,
+        ids: l.segment.ids,
+        reads: l.segment.reads,
+      })),
       numbering,
     );
     return { map, seed, problems };

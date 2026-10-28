@@ -667,12 +667,16 @@ interface Piece {
 
 type Side = Segment["opens"] | null; // null: no forced break, runs on
 
-// A break value as the side it forces; undefined for one CSS would drop.
+// A break value as the side it forces, as Paged.js reads it (needsBreakBefore
+// breaks on these six only); undefined when the key doesn't set it. Anything
+// else (auto, avoid, unset, inherit, revert, a typo) counts as no break: a
+// segment merged into the one before lays out as one flow would, where a
+// cut the flow doesn't make would not.
 function breakSide(v: unknown): Side | undefined {
-  switch (v) {
+  if (v === undefined) return undefined;
+  switch (String(v).trim().toLowerCase()) {
     case "page":
     case "always":
-    case "all":
       return "page";
     case "right":
     case "recto":
@@ -680,13 +684,8 @@ function breakSide(v: unknown): Side | undefined {
     case "left":
     case "verso":
       return "left";
-    case "auto":
-    case "avoid":
-    case "avoid-page":
-    case "column":
-    case "avoid-column":
-      return null;
   }
+  return null;
 }
 
 // `prop` on a section with these classes: the last `elements` key whose
@@ -711,6 +710,14 @@ function breakProp(
 
 const classesOf = (html: string) =>
   new Set(html.match(/^<section class="([^"]*)"/)?.[1]?.split(" ") ?? []);
+
+// The classes of the endnotes that end a piece (renderBlockWithNotes): after a
+// chapter's or a matter block's section, or last in a part's opening content.
+const notesClasses = (html: string) =>
+  html.match(
+    /<aside class="(notes(?: [^"]*)?)">(?:(?!<aside[ >]).)*<\/aside>$/s,
+  )
+    ?.[1]?.split(" ");
 
 // base.css: matter, parts and the body's start on a recto; chapters, the
 // copyright page and the colophon on the next page.
@@ -793,8 +800,16 @@ export function renderSegments(
     );
     // A forced side beats a plain page break, from either end.
     const opens = before && before !== "page" ? before : after ?? before;
-    after = breakProp(cls, "break-after", opts.elements, null);
-    if (p.opensPart) [partAfter, after] = [after, null];
+    // Paged.js puts a break-after before the next displayed element: the
+    // section's lands on its endnotes, when it has some, and theirs on the
+    // next piece. A part's waits for the part's end.
+    const own = breakProp(cls, "break-after", opts.elements, null);
+    const notes = notesClasses(p.html);
+    const notesAfter = notes
+      ? breakProp(new Set(notes), "break-after", opts.elements, null)
+      : null;
+    if (p.opensPart) [partAfter, after] = [own, notesAfter];
+    else after = notes ? notesAfter : own;
     const last = groups.at(-1);
     if (!opens && last) last.pieces.push(p);
     else groups.push({ opens: opens ?? "page", pieces: [p] });

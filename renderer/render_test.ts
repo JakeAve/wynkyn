@@ -851,6 +851,44 @@ Deno.test("renderSegments: elements keys override opens, later keys winning", ()
   );
 });
 
+Deno.test("renderSegments: a break value that isn't a page or a side merges", () => {
+  const doc = parse(SEGMENT_BOOK);
+  const ids = (v: string) =>
+    renderSegments(doc, { elements: { chapter: { "break-before": v } } })
+      .map((s) => s.id);
+  const runOn = ids("auto");
+  for (const v of ["unset", "initial", "inherit", "revert", "revert-layer"]) {
+    assertEquals(ids(v), runOn, v);
+  }
+  assertEquals(ids("sideways"), runOn); // CSS drops it; merging is still safe
+  assertEquals(ids("all"), runOn); // Paged.js breaks on none of these
+  assertEquals(ids(" Recto "), renderSegments(doc).map((s) => s.id));
+  // A break-after it can't read forces nothing: the next opens as base.css says.
+  assertEquals(
+    renderSegments(doc, { elements: { prelude: { "break-after": "unset" } } })
+      .find((s) => s.id === "one")!.opens,
+    "right",
+  );
+});
+
+Deno.test("renderSegments: the endnotes' break-after reaches the next section", () => {
+  const doc = parse(SEGMENT_BOOK);
+  const opens = (elements: Record<string, Record<string, string>>) =>
+    renderSegments(doc, { elements }).find((s) => s.id === "crossing")!.opens;
+  // thaw ends with its endnotes: theirs is the break after it.
+  assertEquals(opens({ notes: { "break-after": "left" } }), "left");
+  // thaw's own break-after falls before its endnotes, inside its segment.
+  assertEquals(opens({ chapter: { "break-after": "left" } }), "page");
+  // Run on, the endnotes' break still cuts where the flow breaks.
+  const segs = renderSegments(doc, {
+    elements: {
+      chapter: { "break-before": "auto" },
+      notes: { "break-after": "page" },
+    },
+  });
+  assertEquals(segs.find((s) => s.id === "crossing")?.opens, "page");
+});
+
 Deno.test("renderSegments: run-on chapters merge into the segment before", () => {
   const doc = parse(SEGMENT_BOOK);
   const segs = renderSegments(doc, {

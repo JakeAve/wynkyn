@@ -323,8 +323,10 @@
    * The book's page order from its segments, laid out alone: each segment's
    * pages in turn, a blank before one that opens on the side it would miss
    * (never before page 1, as Paged.js), then the page map. Problems move from
-   * segment pages to book pages; every id a segment renders must land.
-   * @param {Array<{ opens: "page" | "right" | "left"; facts: PageFacts[]; problems: PageProblem[]; ids: string[] }>} parts
+   * segment pages to book pages; every id a segment renders or reads (a TOC
+   * or {ref} target, as the Folios handler's afterParsed expects) must land,
+   * the book's last id last.
+   * @param {Array<{ opens: "page" | "right" | "left"; facts: PageFacts[]; problems: PageProblem[]; ids: string[]; reads: string[] }>} parts
    * @param {PageNumberingConfig} numbering
    * @returns {AssemblyPlan}
    */
@@ -354,14 +356,18 @@
       }
     });
     const map = buildPageMap(facts, numbering);
+    const ids = parts.flatMap((p) => p.ids);
+    const expected = new Set([...parts.flatMap((p) => p.reads), ...ids]);
+    const last = ids.at(-1);
+    if (last !== undefined) {
+      expected.delete(last);
+      expected.add(last);
+    }
     return {
       slots,
       map,
       seed: anchorFolios(map),
-      problems: [
-        ...problems,
-        ...checkPageMap(map, parts.flatMap((p) => p.ids)),
-      ],
+      problems: [...problems, ...checkPageMap(map, [...expected])],
     };
   }
 
@@ -678,6 +684,7 @@
         facts: l.facts,
         problems: l.problems,
         ids: l.segment.ids,
+        reads: l.segment.reads,
       })),
       numbering,
     );
