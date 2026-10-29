@@ -123,7 +123,7 @@ itself (0.4.3 mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` /
 `.hasContent`; re-check that after an upgrade too. The export lays segments
 out alone and assembles them (`BookPageMap.assemble`, redoing classes and margin
 boxes as Paged.js would), so an upgrade also re-runs
-`server/segments-browser_test.ts`: assembled pages must still match a whole-flow
+`server/pagination_test.ts`: assembled pages must still match a whole-flow
 render page for page. Its known traps are the three references below.
 
 ## Read next
