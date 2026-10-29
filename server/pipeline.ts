@@ -202,6 +202,7 @@ export async function buildBook(
     bookTitle: m.openers?.["book-title"] ? bookTitle : undefined,
     elements: m.elements,
     is: m.is,
+    onePage: m["one-page"],
   };
   return {
     book,

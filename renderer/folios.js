@@ -454,6 +454,37 @@
   const Paged = /** @type {any} */ (globalThis).Paged;
   if (!Paged) return; // Deno unit tests import only the pure core
 
+  /** The node after `n` in document order, outside it; null at the end. */
+  /** @param {Node} n @returns {Node | null} */
+  function nodeAfter(n) {
+    for (let x = /** @type {Node | null} */ (n); x; x = x.parentNode) {
+      if (x.nextSibling) return x.nextSibling;
+    }
+    return null;
+  }
+
+  /** Drops everything in the flow from `offset` in `node` on. */
+  /** @param {Node} node @param {number} offset */
+  function dropFrom(node, offset) {
+    if (node.nodeType === 3) {
+      node.textContent = (node.textContent ?? "").slice(0, offset);
+    } else while (node.childNodes.length > offset) node.lastChild?.remove();
+    for (let x = /** @type {Node | null} */ (node); x; x = x.parentNode) {
+      while (x.nextSibling) x.nextSibling.remove();
+    }
+  }
+
+  // "Title page" for `matter-title-page`.
+  /** @param {Element} section */
+  function matterName(section) {
+    const type = [...section.classList].find((c) =>
+      c.startsWith("matter-") &&
+      c !== "matter-display"
+    )?.slice(7) ?? "page";
+    const name = type.replaceAll("-", " ");
+    return name[0]?.toUpperCase() + name.slice(1);
+  }
+
   /** @type {ZoneNumbering} */
   const ARABIC = { style: "arabic", show: true };
   const PAGE_ENTRY = Symbol("pageEntry");
@@ -760,6 +791,64 @@
           targets.add(last);
         }
         this.expected = [...targets];
+        /** @type {DocumentFragment} */
+        this.source = parsed;
+      }
+
+      // A one-page section (spec §4.16) never breaks: what doesn't fit is cut.
+      // With more to come, the break moves past it and Paged.js removes the
+      // overflow. Last in the flow, there is nowhere to move it, and the flow
+      // only ends on a page with no overflow: so the overflow comes off here,
+      // the rest of the section with it, and the page reports none.
+      /**
+       * @param {any} token @param {Range | undefined} overflow
+       * @param {Element} rendered @returns {any}
+       */
+      onBreakToken(token, overflow, rendered) {
+        const node = token?.node;
+        const el = node?.nodeType === 1 ? node : node?.parentElement;
+        const section = el?.closest("[data-one-page]");
+        if (!section || section === node) return; // the break before it
+        const next = nodeAfter(section);
+        if (!next) return;
+        if (overflow) this.cut(rendered, section);
+        return new token.constructor(next, 0);
+      }
+
+      /**
+       * @param {Range | null} overflow @param {Element} rendered
+       * @param {unknown} _bounds @param {any} layout
+       */
+      onOverflow(overflow, rendered, _bounds, layout) {
+        const at = overflow?.startContainer;
+        const el = at?.nodeType === 1
+          ? /** @type {Element} */ (at)
+          : at?.parentElement;
+        const ref = el?.closest("[data-one-page]")?.getAttribute("data-ref");
+        const section = ref &&
+          this.source?.querySelector(`[data-ref="${ref}"]`);
+        if (!overflow || !section || nodeAfter(section)) return;
+        const token = layout.createBreakToken(overflow, rendered, this.source);
+        if (!token?.node) return;
+        // As findBreakToken passes it, so the cut ends where a break would.
+        const letter = token.offset
+          ? token.node.textContent?.charAt(token.offset)
+          : undefined;
+        dropFrom(token.node, token.offset);
+        layout.removeOverflow(overflow, letter);
+        this.cut(rendered, section);
+        return null;
+      }
+
+      /** @param {Element} rendered @param {Element} section */
+      cut(rendered, section) {
+        const page = rendered.closest(".pagedjs_page");
+        if (!page) return;
+        this.problems.push({
+          page: this.pageNumber(page),
+          warn: true,
+          message: `${matterName(section)} runs past one page; the rest is cut`,
+        });
       }
 
       /** @param {Element} page */

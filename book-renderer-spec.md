@@ -396,7 +396,9 @@ on a recto (`break-before: right` in `renderer/base.css`, a blank verso inserted
 when needed), so odd folios fall on rectos. Two exceptions: the copyright page
 is the title page's verso, and the colophon is not forced to a recto because
 print imposition pins it to the last page of the last signature (§7.7). Chapters
-open on a new page of either hand unless a book says otherwise.
+open on a new page of either hand unless a book says otherwise. Display pages
+(half-title, title page, copyright, dedication, epigraph, colophon) are held to
+one page; what doesn't fit is cut, not run on (§4.16).
 
 #### 3.4.1 Half-Title Page
 
@@ -1164,6 +1166,7 @@ books/
   "notes": { ... },
   "toc": { ... },
   "openers": { ... },
+  "one-page": { ... },
   "ebook": { ... }
 }
 ```
@@ -1828,6 +1831,26 @@ Named book colors, like font aliases (§4.4): a name → any CSS color.
   another. Changing a color recolors everything that names it.
 - The template ships `ink` alone; a book adds its own. A book without `colors`
   sets in the browser's black.
+
+### 4.16 Section: `one-page`
+
+Which matter pages are held to a single page. A display page is one page by
+nature, and holding it there means no edit to it can push a page onto the rest
+of the book.
+
+```json
+"one-page": { "copyright": false, "foreword": true }
+```
+
+- Keys are matter types (§3.4); `true` holds that type's section to one page.
+  The display types (half-title, title-page, copyright, dedication, epigraph,
+  colophon) default to `true`, every other type to `false`.
+- A held section never breaks onto a second page: what doesn't fit is cut at the
+  foot of its text block, whole lines kept, and the page lists a warning ("Title
+  page runs past one page; the rest is cut") that never blocks an export
+  (§4.10). What follows it starts where it would have had the section fit.
+- The renderer marks a held section `data-one-page`; `renderer/folios.js` ends
+  its flow at the page's foot, one flow or a segment alone (§7.6).
 
 ## 5. Module Contracts
 
