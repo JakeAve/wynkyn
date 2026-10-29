@@ -454,7 +454,6 @@
   const Paged = /** @type {any} */ (globalThis).Paged;
   if (!Paged) return; // Deno unit tests import only the pure core
 
-  /** The node after `n` in document order, outside it; null at the end. */
   /** @param {Node} n @returns {Node | null} */
   function nodeAfter(n) {
     for (let x = /** @type {Node | null} */ (n); x; x = x.parentNode) {
@@ -463,7 +462,6 @@
     return null;
   }
 
-  /** Drops everything in the flow from `offset` in `node` on. */
   /** @param {Node} node @param {number} offset */
   function dropFrom(node, offset) {
     if (node.nodeType === 3) {
@@ -474,7 +472,6 @@
     }
   }
 
-  // "Title page" for `matter-title-page`.
   /** @param {Element} section */
   function matterName(section) {
     const type = [...section.classList].find((c) =>
@@ -795,11 +792,8 @@
         this.source = parsed;
       }
 
-      // A one-page section (spec §4.16) never breaks: what doesn't fit is cut.
-      // With more to come, the break moves past it and Paged.js removes the
-      // overflow. Last in the flow, there is nowhere to move it, and the flow
-      // only ends on a page with no overflow: so the overflow comes off here,
-      // the rest of the section with it, and the page reports none.
+      // §4.16. Paged.js ends a flow only on a page with no overflow (a null
+      // token starts it over), so a section last in its flow cuts its own.
       /**
        * @param {any} token @param {Range | undefined} overflow
        * @param {Element} rendered @returns {any}
@@ -830,7 +824,6 @@
         if (!overflow || !section || nodeAfter(section)) return;
         const token = layout.createBreakToken(overflow, rendered, this.source);
         if (!token?.node) return;
-        // As findBreakToken passes it, so the cut ends where a break would.
         const letter = token.offset
           ? token.node.textContent?.charAt(token.offset)
           : undefined;
