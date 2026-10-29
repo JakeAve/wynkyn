@@ -69,8 +69,6 @@ const VARIANTS = {
       },
     },
   }),
-  // A title page set too big for one page (§4.16): one flow, the break moves
-  // past it to the copyright page; alone in its segment, the flow ends there.
   "overfull-title": (m: Metadata): Metadata => ({
     ...m,
     elements: {
