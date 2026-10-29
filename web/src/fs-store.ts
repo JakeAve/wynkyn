@@ -4,6 +4,7 @@
 // handle API either way, so one store serves both.
 import type { BookStore } from "../../server/store.ts";
 import { slugify } from "./editions.ts";
+import { bookFiles } from "./book-zip.ts";
 
 declare global {
   interface FileSystemHandle {
@@ -246,6 +247,29 @@ export async function importBooks(
     written.add(book);
   }
   return { written: [...written].sort(), skipped };
+}
+
+/** Copies books between stores, never overwriting: a slug `to` already has is
+ * skipped whole, like importBooks. */
+export async function copyBooks(
+  from: BookStore,
+  to: BookStore,
+  books: string[],
+): Promise<{ copied: string[]; skipped: string[] }> {
+  const copied: string[] = [];
+  const skipped: string[] = [];
+  for (const book of books) {
+    if (await to.exists(`${book}/manuscript.md`)) {
+      skipped.push(book);
+      continue;
+    }
+    for (const rel of await bookFiles(from, book)) {
+      const data = await from.read(`${book}/${rel}`);
+      if (data) await to.create(`${book}/${rel}`, data);
+    }
+    copied.push(book);
+  }
+  return { copied, skipped };
 }
 
 function idb<T>(

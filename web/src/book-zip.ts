@@ -4,22 +4,45 @@
 import { zipSync } from "fflate";
 import type { BookStore } from "../../server/store.ts";
 
-export async function zipBook(
+/** The files a book has, relative to its folder: what a zip or a copy takes. */
+export async function bookFiles(
   store: BookStore,
   book: string,
-): Promise<Uint8Array<ArrayBuffer>> {
-  const files: Record<string, Uint8Array> = {};
-  const add = async (rel: string) => {
-    const data = await store.read(`${book}/${rel}`);
-    if (data) files[`${book}/${rel}`] = data;
-  };
-  await add("manuscript.md");
-  await add("metadata.json");
-  await add("dictionary.json");
+): Promise<string[]> {
+  const rels: string[] = [];
+  for (const rel of ["manuscript.md", "metadata.json", "dictionary.json"]) {
+    if (await store.exists(`${book}/${rel}`)) rels.push(rel);
+  }
   for (const dir of ["editions", "images"]) {
     for (const name of await store.listDir(`${book}/${dir}`)) {
-      await add(`${dir}/${name}`);
+      rels.push(`${dir}/${name}`);
+    }
+  }
+  return rels;
+}
+
+async function zipBooks(
+  store: BookStore,
+  books: string[],
+  prefix: string,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const files: Record<string, Uint8Array> = {};
+  for (const book of books) {
+    for (const rel of await bookFiles(store, book)) {
+      const data = await store.read(`${book}/${rel}`);
+      if (data) files[`${prefix}${book}/${rel}`] = data;
     }
   }
   return new Uint8Array(zipSync(files)); // a plain ArrayBuffer, for Blob
 }
+
+export const zipBook = (
+  store: BookStore,
+  book: string,
+): Promise<Uint8Array<ArrayBuffer>> => zipBooks(store, [book], "");
+
+/** Every book under `Books/`, the folder "Import a folder" takes whole. */
+export const zipLibrary = (
+  store: BookStore,
+  books: string[],
+): Promise<Uint8Array<ArrayBuffer>> => zipBooks(store, books, "Books/");
