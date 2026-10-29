@@ -30,6 +30,14 @@ chromeTest({
     const site = serveSite(DIST, 0);
     try {
       const page = await newPage();
+      // An OPFS folder stands in for the picker, which can't be driven.
+      await page.addInitScript(() => {
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).showDirectoryPicker = async () => {
+          const root = await navigator.storage.getDirectory();
+          return root.getDirectoryHandle("My Books", { create: true });
+        };
+      });
       const url = `http://localhost:${site.addr.port}/app/`;
       await page.goto(url);
       await page.locator("#library[open]").waitFor();
@@ -98,6 +106,22 @@ chromeTest({
           "typed in the browser",
         ),
       );
+
+      // Changing to a folder offers to bring the books along.
+      await page.locator("#library-open").click();
+      await page.locator("#library[open]").waitFor();
+      await page.locator("#lib-pick").click();
+      await page.locator("#bring[open]").waitFor();
+      await page.locator("#bring-copy").click();
+      await page.locator("#library-name", { hasText: "My Books" }).waitFor();
+      const copied = await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        const dir = await root.getDirectoryHandle("My Books");
+        const book = await dir.getDirectoryHandle("demo-book");
+        const fh = await book.getFileHandle("manuscript.md");
+        return await (await fh.getFile()).text();
+      });
+      assertStringIncludes(copied, "typed in the browser");
     } finally {
       await site.shutdown();
     }
@@ -486,8 +510,8 @@ chromeTest({
 });
 
 chromeTest({
-  name: "local library: a picked folder is named in the switcher, and " +
-    "Change library… goes back to the Welcome with it on offer",
+  name: "local library: a picked folder is named in the switcher and in " +
+    "Change library, and offered again once its permission lapses",
   ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
@@ -535,12 +559,33 @@ chromeTest({
         (await lib.getAttribute("title")) ?? "",
         "“My Books”",
       );
+      // A mark that a reload would wipe.
+      // deno-lint-ignore no-explicit-any
+      await page.evaluate(() => (globalThis as any).stayed = true);
       await lib.click();
       await page.locator("#library[open]").waitFor();
       assertStringIncludes(
-        (await page.locator("#lib-reopen").textContent()) ?? "",
+        (await page.locator("#lib-now").textContent()) ?? "",
         "My Books",
       );
+      await page.locator("#lib-cancel").click();
+      await page.locator("#library").waitFor({ state: "hidden" });
+      // deno-lint-ignore no-explicit-any
+      assert(await page.evaluate(() => (globalThis as any).stayed));
+      assertStringIncludes(page.url(), "book=tiny");
+      assertEquals(await page.locator("#book-name").textContent(), "Tiny");
+
+      // A lapsed permission: back mode offers the folder again.
+      await page.addInitScript(() => {
+        // deno-lint-ignore no-explicit-any
+        (FileSystemHandle.prototype as any).queryPermission = () =>
+          Promise.resolve("prompt");
+      });
+      await page.reload();
+      await page.locator("#library[open]").waitFor();
+      await page.getByRole("button", { name: /Open My Books again/ }).click();
+      await page.locator('#status[data-kind="saved"]').waitFor();
+      assertEquals(await page.locator("#book-name").textContent(), "Tiny");
     } finally {
       await site.shutdown();
     }

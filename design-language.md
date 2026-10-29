@@ -506,7 +506,11 @@ padding `--s-3 --s-5`, `--fs-sm` and a `--h-sm` tile. `.choices` sits inside the
 dialog's padding, never bleeding into it, so the frames line up with the
 heading. A tag on a choice ("Chromium only") is the experimental chip (`.pill`,
 §6.10) inside the title. The library and Create dialogs carry tiles; a question
-whose answers have no natural picture (Apply a theme) leaves them out.
+whose answers have no natural picture (Apply a theme) leaves them out. Change
+library opens with the current row: unframed, in the wash with `--acc-ink`, a
+check, the place and a `--muted` `--fs-xs` count at the end. Compact rows sit
+under a small-caps group label (`--fs-sm`, `--track-caps`, `--muted`). Folder
+names in titles and leads are `--f-hivis` `--fs-sm`.
 
 ### 6.8 Dialog
 

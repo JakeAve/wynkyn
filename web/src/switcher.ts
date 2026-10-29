@@ -20,6 +20,7 @@ import {
 import { titleCase } from "../../server/editions.ts";
 import { zipBook } from "./book-zip.ts";
 import { rememberedFolder } from "./fs-store.ts";
+import { changeLibrary } from "./library.ts";
 import { $, brief } from "./dom.ts";
 
 export interface SwitcherDeps {
@@ -384,10 +385,13 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
       );
     });
   }
-  lib.onclick = () => {
-    localStorage.removeItem("library");
-    void leave(location.pathname);
-  };
+  // Listed afresh: another tab may have added a book since this one loaded.
+  lib.onclick = async () =>
+    changeLibrary({
+      store: backend.store!,
+      books: (await backend.listBooks()).books,
+      leave,
+    });
 
   $("edition-new").onclick = () => {
     from.replaceChildren(

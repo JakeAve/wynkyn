@@ -2035,11 +2035,11 @@ pane's corner button reads "Show the pages" and brings them back); Style and
 Publish always show them. Both choices persist. The crumb reads library / book /
 edition. The library step, muted so the title leads, is an icon for where the
 books live (a folder on this device, or this browser) and its name (the
-folder's, or "This browser"); its tooltip says where, and a click goes back to
-the Welcome (§7.9) to pick another. The dev server has only its `books/`, so
-there the crumb starts at the book. Gutters between the columns drag to resize
-them. A hidden preview still lays out (it leaves the grid, never
-`display: none`), since Paged.js paginates by measuring.
+folder's, or "This browser"); its tooltip says where, and a click opens Change
+library (§7.9) to pick another. The dev server has only its `books/`, so there
+the crumb starts at the book. Gutters between the columns drag to resize them. A
+hidden preview still lays out (it leaves the grid, never `display: none`), since
+Paged.js paginates by measuring.
 
 Each pane carries its own controls in a header along its top: the write pane
 (Write's middle column) has Prose | Source, Aa and Spelling (the text view,
@@ -2612,18 +2612,41 @@ user lands in Write mode looking at their own words wrapped in the tags,
 paginated in the house template, with the importer's notes in the footer. There
 is no settings form; the editor is the review step.
 
-**Welcome — where books live.** Shown when the app has no library. Three rows,
-each one line of explanation, in the manner of a session-type picker:
-
-1. Create a new folder on my device — Wynkyn creates a Books folder.
-2. Select an existing folder on my device — the user already has one.
-3. Keep books in this browser — works anywhere, but browsers clear site storage,
-   so download what you want to keep.
-
-Under the rows, the privacy line: _Your books are yours. Wynkyn never reads,
+**The library dialog — where books live.** One dialog in three modes, each
+ending with the privacy line: _Your books are yours. Wynkyn never reads,
 analyses, trains on, shares or sells your manuscripts, and never will. Free
-users store everything on device._ Rows 1 and 2 need the File System Access API
-(Chrome, Edge, Brave); row 3 is the fallback everywhere.
+users store everything on device._ The folder rows need the File System Access
+API (Chrome, Edge, Brave); without it they stay and carry a "Chromium only" tag,
+and a click fails with the browser's own error. Browser storage works
+everywhere.
+
+- **Welcome**, when no folder is remembered: "Welcome to Wynkyn", "Choose where
+  your books will live. You can change it later." Three rows: _Create a new
+  folder_ (recommended; Wynkyn creates a folder on your device), _Open a folder
+  I already have_, _Keep books in this browser_ (nothing to set up, but browsers
+  can clear site storage, so download what you want to keep).
+- **Welcome back**, when the remembered folder's permission has lapsed: Chrome
+  asks again before Wynkyn can open it, and only on a click. One large row,
+  _Open `<name>` again_, noted with the last book open (`last-book`) when known.
+  Under a small-caps "Or keep books somewhere else", compact rows without notes:
+  _Open a different folder_, _Create a new folder_, _Keep books in this
+  browser_.
+- **Change library**, from the crumb's library step: a current row in the wash
+  ("Now: the `<name>` folder" or "Now: this browser", with the book count), then
+  the other kinds of library, then Cancel, which changes nothing. From a folder:
+  _Open a different folder_, _Create a new folder_, _Keep books in this
+  browser_. From this browser: _Create a new folder_ and _Open a folder I
+  already have_, and, when the browser holds books, "Next you choose whether
+  your books come along." A pick sets the library and reloads to the bare path.
+
+**Bring your books along?** After a change from this browser to a folder, when
+the browser holds books the folder lacks: "You have N books in this browser that
+are not saved to the `<name>` folder. Would you like to copy them to your
+folder?" _Copy them into `<name>`_ (recommended; this browser keeps its copies
+too) or _Open `<name>` without them_ (they stay in this browser; switch back any
+time from the library). Copying never overwrites: a book the folder already has
+is left out of N and named in a warning line ("Already in `<name>`, so not
+copied: …"). A failed copy shows in the dialog, which stays open.
 
 **Create a new folder.** A location picker and a folder name (default `Books`),
 with the resulting path shown. Then _Create a new manuscript_.

@@ -391,33 +391,57 @@
     </dialog>
     <dialog id="library" class="ask" aria-labelledby="library-title">
       <h2 id="library-title" tabindex="-1" autofocus>Welcome to Wynkyn</h2>
-      <p>It looks like you don’t have any manuscripts yet. Choose where to keep
-        them to get started.</p>
+      <p id="lib-lead"></p>
+      <div id="lib-now" hidden><svg class="ico"><use href="#check" /></svg><span
+          id="lib-now-where"></span><span id="lib-now-count"></span></div>
       <div class="choices">
         <button id="lib-reopen" class="choice primary"
           hidden><svg class="ico"><use href="#where-folder" /></svg><span></span></button>
-        <button id="lib-new"
-          class="choice"><svg class="ico"><use href="#folder-plus" /></svg><span>Create a
-            new folder on my device
-            <span class="pill" hidden>Chromium only</span>
-            <small>Wynkyn creates a Books folder where you choose. Chrome or
-              Edge.</small></span></button>
-        <button id="lib-pick"
-          class="choice"><svg class="ico"><use href="#folder-open" /></svg><span>Select an
-            existing folder on my device
-            <span class="pill" hidden>Chromium only</span>
-            <small>You already have a Wynkyn books folder on your
-              device.</small></span></button>
-        <button id="lib-browser"
-          class="choice"><svg class="ico"><use href="#where-browser" /></svg><span>Keep
-            books in this browser
-            <small>Works in this browser, but browsers can clear site storage,
-              so <b>download what you want to keep</b>.</small></span></button>
       </div>
+      <div id="lib-else" class="nh" hidden>Or keep books somewhere else</div>
+      <div id="lib-rows" class="choices">
+        <button id="lib-new"
+          class="choice"><svg class="ico"><use href="#folder-plus" /></svg><span><span
+              class="t"></span><span class="pill" hidden>Chromium
+              only</span><small></small></span></button>
+        <button id="lib-pick"
+          class="choice"><svg class="ico"><use href="#folder-open" /></svg><span><span
+              class="t"></span><span class="pill" hidden>Chromium
+              only</span><small></small></span></button>
+        <button id="lib-browser"
+          class="choice"><svg class="ico"><use href="#where-browser" /></svg><span><span
+              class="t"></span><small></small></span></button>
+      </div>
+      <p id="lib-next" class="hint" hidden>Next you choose whether your books
+        come along.</p>
       <p class="privacy"><b>Your books are yours.</b> Wynkyn never reads,
         analyses, trains on, shares or sells your manuscripts, and never will.
         Free users store everything on device.</p>
       <span id="lib-err" class="sw-err"></span>
+      <div id="lib-foot" class="ask-foot" hidden>
+        <button id="lib-cancel" class="btn" type="button">Cancel</button>
+      </div>
+    </dialog>
+    <dialog id="bring" class="ask" aria-labelledby="bring-title">
+      <h2 id="bring-title" tabindex="-1" autofocus>Bring your books along?</h2>
+      <p>You have <span id="bring-count"></span> in this browser that are not
+        saved to the <span class="hivis bring-name"></span> folder. Would you
+        like to copy them to your folder?</p>
+      <div class="choices">
+        <button id="bring-copy"
+          class="choice primary"><svg class="ico"><use href="#copy" /></svg><span>Copy
+            them into <span class="hivis bring-name"></span>
+            <small>This browser keeps its copies too.</small></span></button>
+        <button id="bring-skip"
+          class="choice"><svg class="ico"><use href="#where-folder" /></svg><span>Open
+            <span class="hivis bring-name"></span> without them
+            <small>They stay in this browser. Switch back any time from the
+              library.</small></span></button>
+      </div>
+      <p id="bring-clash" hidden>Already in <span
+          class="hivis bring-name"></span>, so not copied: <span
+          id="bring-clash-titles"></span>.</p>
+      <span id="bring-err" class="sw-err"></span>
     </dialog>
     <dialog id="create" class="ask" aria-labelledby="create-title">
       <div id="create-head">
