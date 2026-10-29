@@ -113,6 +113,15 @@ chromeTest({
       await page.locator("#lib-pick").click();
       await page.locator("#bring[open]").waitFor();
       await page.locator("#bring-copy").click();
+      // The bare path lands on Choose a book, the last book open active.
+      await page.locator("#choose[open]").waitFor();
+      assertEquals(
+        await page.locator('#choose-list [aria-selected="true"]')
+          .getAttribute("title"),
+        "demo-book",
+      );
+      await page.keyboard.press("Enter");
+      await page.waitForURL(/book=demo-book/);
       await page.locator("#library-name", { hasText: "My Books" }).waitFor();
       const copied = await page.evaluate(async () => {
         const root = await navigator.storage.getDirectory();

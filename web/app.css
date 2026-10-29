@@ -265,7 +265,8 @@ kbd {
   background: var(--desk);
   padding: var(--s-4);
 }
-#book-search {
+#book-search,
+#choose-search {
   width: 100%;
   height: var(--h-md);
   border: 1px solid var(--line);
@@ -275,7 +276,8 @@ kbd {
   padding: 0 var(--s-4);
   margin-bottom: var(--s-3);
 }
-#book-search::placeholder {
+#book-search::placeholder,
+#choose-search::placeholder {
   color: var(--muted);
 }
 #book-list,
@@ -414,7 +416,7 @@ kbd {
   min-width: 0;
 }
 /* Fields (§6.3) outside the panel: focus turns the border red. */
-:is(#switcher, .ask .field, #editor .cm-bml-palette, #config-overlay .fontpop) :is(input, select, textarea):focus-visible,
+:is(#switcher, #choose, .ask .field, #editor .cm-bml-palette, #config-overlay .fontpop) :is(input, select, textarea):focus-visible,
 .cm-bml-find .field:focus-within {
   outline: none;
   border-color: var(--acc);
@@ -3609,6 +3611,71 @@ body.typing #editor .pane-head {
   margin: var(--s-5) 0 0;
   color: var(--warn);
   font-size: var(--fs-xs);
+}
+/* Choose a book (§6.8): title rows in Alegreya, the text flush with the
+   heading. */
+#choose {
+  width: 30rem;
+}
+.choose-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+#choose h2 {
+  margin: 0;
+}
+#choose-where {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+#choose-list {
+  display: grid;
+  gap: var(--s-1);
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-inline: calc(-1 * var(--s-5));
+}
+.choose-row {
+  display: block;
+  width: 100%;
+  padding: var(--s-4) var(--s-5);
+  border: none;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.choose-row span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--fs-lg) / var(--lh-tight) var(--f-text);
+}
+.choose-row small {
+  display: block;
+  margin-top: var(--s-1);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.choose-row:hover {
+  background: var(--hover);
+}
+.choose-row[aria-selected="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+#choose .ask-foot {
+  padding-top: var(--s-5);
+  border-top: var(--hair) solid var(--line);
+}
+#choose-change {
+  margin-right: auto;
 }
 /* A dialog opens with its title focused (announced, nothing pre-chosen);
    Tab moves to the first choice. */

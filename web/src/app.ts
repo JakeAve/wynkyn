@@ -57,8 +57,9 @@ import { installPanes } from "./panes.ts";
 import { installShortcuts } from "./shortcuts.ts";
 import { installPreviewZoom } from "./preview-zoom.ts";
 import { installInspect } from "./inspect.ts";
-import { connect } from "./library.ts";
-import { $, brief } from "./dom.ts";
+import { changeLibrary, connect, whereBooks } from "./library.ts";
+import { chooseBook } from "./choose-book.ts";
+import { $, brief, store } from "./dom.ts";
 import { h } from "./panel-controls.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
 import "../../renderer/folios.js"; // registers the page-map handler
@@ -783,7 +784,19 @@ async function main(): Promise<void> {
     return;
   }
   const requested = params.get("book");
-  book = requested && books.includes(requested) ? requested : books[0]!;
+  if (requested && books.includes(requested)) book = requested;
+  else {
+    book = await chooseBook({
+      books,
+      where: await whereBooks(backend),
+      onChange: backend.kind === "local"
+        ? () => changeLibrary({ store: backend.store!, books, leave })
+        : undefined,
+      onNew: () => createManuscript(true),
+    });
+    history.replaceState(null, "", here());
+  }
+  store("last-book", book);
 
   // A failed editions fetch (old server still running, network blip) must not
   // keep the whole app from booting — fall back to a single default edition.

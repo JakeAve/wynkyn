@@ -2651,10 +2651,19 @@ copied: …"). A failed copy shows in the dialog, which stays open.
 **Create a new folder.** A location picker and a folder name (default `Books`),
 with the resulting path shown. Then _Create a new manuscript_.
 
-**Select an existing folder.** The native picker, then permission to edit. A
-folder holding books (`<slug>/manuscript.md`) shows **Choose a book**: title,
-chapter count, page count, last edit, and a _New manuscript…_ button. An empty
-folder goes to _Create a new manuscript_.
+**Select an existing folder.** The native picker, then permission to edit. An
+empty folder goes to _Create a new manuscript_.
+
+**Choose a book.** A bare address (no `?book=`, or one naming a book the library
+lacks) on a library with books opens it; a reload keeps `?book=` and skips it.
+"Choose a book", with "N in `<name>`" (the folder, "this browser", or the dev
+server's `books`) at the right; a "Find a book…" search, the switcher's filter;
+then a row per book, its title alone. The last book open (localStorage
+`last-book`, set whenever a book opens) is active and noted "Last open", else
+the first row. Arrows move, Enter or a click opens, and `esc` does nothing, as
+there is no book behind it. Footer: _Change library…_ at the left (no server
+only), _New book_ at the right, which opens _Create a new manuscript_ over it;
+Cancel there returns to it.
 
 **Create a new manuscript.** Three rows: _Import a file_ (Word, EPUB, plain
 text, Markdown, HTML), _Import from the web_ (a Project Gutenberg book, a shared

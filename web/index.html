@@ -443,6 +443,21 @@
           id="bring-clash-titles"></span>.</p>
       <span id="bring-err" class="sw-err"></span>
     </dialog>
+    <dialog id="choose" class="ask" aria-labelledby="choose-title">
+      <div class="choose-head">
+        <h2 id="choose-title">Choose a book</h2>
+        <span id="choose-where"></span>
+      </div>
+      <input id="choose-search" type="search" placeholder="Find a book…"
+        autocomplete="off" aria-label="Find a book" autofocus>
+      <div id="choose-list" role="listbox" aria-label="Books"></div>
+      <div class="ask-foot">
+        <button id="choose-change" class="btn" type="button"
+          hidden><svg><use href="#where-folder" /></svg>Change library…</button>
+        <button id="choose-new" class="btn outline" type="button">New
+          book</button>
+      </div>
+    </dialog>
     <dialog id="create" class="ask" aria-labelledby="create-title">
       <div id="create-head">
         <h2 id="create-title" tabindex="-1"

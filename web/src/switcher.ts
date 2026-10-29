@@ -42,6 +42,13 @@ export interface Switcher {
   renaming(): Promise<unknown>; // this tab's edition rename, settled or not
 }
 
+export function matchBooks(books: string[], q: string): string[] {
+  q = q.trim().toLowerCase();
+  return books.filter((b) =>
+    !q || b.includes(q) || titleCase(b).toLowerCase().includes(q)
+  );
+}
+
 export function installSwitcher(d: SwitcherDeps): Switcher {
   const { backend, book, edition, leave, setMode, createManuscript } = d;
   let renaming: Promise<unknown> = Promise.resolve(); // this tab's edition rename
@@ -67,12 +74,7 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
   const bookSearch = () => $("book-search") as HTMLInputElement;
   const newForm = () => $("edition-new-form") as HTMLFormElement;
 
-  function bookHits(): string[] {
-    const q = bookSearch().value.trim().toLowerCase();
-    return d.books().filter((b) =>
-      !q || b.includes(q) || titleCase(b).toLowerCase().includes(q)
-    );
-  }
+  const bookHits = () => matchBooks(d.books(), bookSearch().value);
 
   function renderBooks(): void {
     const hits = bookHits();

@@ -515,11 +515,21 @@ names in titles and leads are `--f-hivis` `--fs-sm`.
 ### 6.8 Dialog
 
 `--bg`, `--r-dlg` + corner, `--shadow-dlg` over `--backdrop`; width by content
-up to about 26rem (wider only for the font picker and themes). Header: title in
-Fell `--fs-h`, optional lead in `--muted`. Padding `--s-6`. Footer: actions
-right-aligned, `--s-3` apart, ghost first, primary last. `esc` closes it unless
-it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
-`.ask` with `.ask-foot`; fields in a dialog (`.ask .field`) are §6.3 frames.
+up to about 26rem (wider only for the font picker, themes and Choose a book).
+Header: title in Fell `--fs-h`, optional lead in `--muted`. Padding `--s-6`.
+Footer: actions right-aligned, `--s-3` apart, ghost first, primary last. `esc`
+closes it unless it guards unsaved work (closing on a backdrop click: planned).
+In `web/app.css`: `.ask` with `.ask-foot`; fields in a dialog (`.ask .field`)
+are §6.3 frames.
+
+**Choose a book** (`#choose`, 30rem): the title, then "N in `<name>`" in
+`--fs-xs` `--muted` at the right (the name in `--f-hivis` for a folder or
+`books`); the search field (§6.3); then §6.6 rows (`.choose-row`) set in
+Alegreya 500 `--fs-lg`, padding `--s-4 --s-5`, bled by `--s-5` so the titles
+line up with the heading. The active row takes the red wash; "Last open" sits
+under its title in `--fs-xs` `--muted`. The footer is ruled by a `--hair`
+`--line` top: Change library… (ghost, folder glyph) left, New book (outline)
+right.
 
 **Keyboard shortcuts** (`#shortcuts`, Ctrl+Shift+/ or ⌘?): an `.ask` with a
 filter field, then every command under its section's small-caps group label
