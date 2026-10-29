@@ -461,9 +461,8 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
 let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {};
 let restore: (cached: CachedBook | null, version?: string) => void = () => {};
 
-// The book's cached render with a URL for each image it shows, or null. An
-// image it can't read (removed, renamed, refused) is a miss, never a throw:
-// the editor starts on it.
+// An image it can't read (removed, renamed, refused) is a miss, never a
+// throw: the editor starts on it.
 async function loadCachedBook(): Promise<CachedBook | null> {
   const cached = await loadCachedRender(cacheId(book, edition));
   if (!cached) return null;

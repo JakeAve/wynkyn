@@ -319,10 +319,8 @@
   };
 
   /**
-   * The book's page order from its segments, laid out alone: each segment's
-   * pages in turn, a blank before one that opens on the side it would miss
-   * (never before page 1, as Paged.js), then the page map. Problems move from
-   * segment pages to book pages; every id a segment renders or reads (a TOC
+   * A blank goes before a segment that opens on the side it would miss, never
+   * before page 1 (as Paged.js). Every id a segment renders or reads (a TOC
    * or {ref} target, as the Folios handler's afterParsed expects) must land,
    * the book's last id last.
    * @param {Array<{ opens: "page" | "right" | "left"; facts: PageFacts[]; problems: PageProblem[]; ids: string[]; reads: string[] }>} parts
@@ -663,10 +661,7 @@
   }
 
   /**
-   * Lay the segments' pages into `pagesArea` as one book (spec: segmented
-   * layout, Assembly): blanks where a side is forced, each page renumbered
-   * and given its side, its page-map entry written, the margin boxes of moved
-   * pages redone, then the checks a whole-flow render runs after layout.
+   * Spec: segmented layout, Assembly.
    * @param {Laid[]} laid
    * @param {PageNumberingConfig} numbering
    * @param {Element} pagesArea in the document: margins are read off styles
