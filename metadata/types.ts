@@ -58,6 +58,7 @@ export type NumberingStyle =
   | "alpha-upper"
   | "alpha-lower"
   | "words" // One, Two … Ninety-Nine; chapters/parts only (§4.7)
+  | "ordinal" // First, Second … Ninety-Ninth; chapters/parts only (§4.7)
   | "none";
 
 export interface StructureNumbering {

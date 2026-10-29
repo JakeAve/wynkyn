@@ -1501,9 +1501,10 @@ since CSS has no direct equivalent.
 
 **`style` options:** `"arabic"`, `"roman-upper"`, `"roman-lower"`,
 `"alpha-upper"`, `"alpha-lower"`, `"words"` (One, Two … Ninety-Nine; digits from
-100), `"none"`. `"words"` applies to `chapters` and `parts` only —
-`pages.*.style: "words"` renders as arabic and the configuration panel does not
-offer it there.
+100), `"ordinal"` (First, Second … Ninety-Ninth; digits from 100), `"none"`.
+`"words"` and `"ordinal"` apply to `chapters` and `parts` only — on
+`pages.*.style` they render as arabic and the configuration panel does not offer
+them there.
 
 ```json
 "numbering": {
