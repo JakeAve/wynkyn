@@ -776,14 +776,17 @@ Out of scope unless asked: illustrations, woodcut empty states, blackletter.
 
 ## 10. The mark
 
-The existing sun (`web/brand/mark.svg`), rays and disc, drawn in `--acc`: the
-SVG sets its own `color` (`#db3834`, `#ef6d62` under
-`prefers-color-scheme:
-dark`), since an `<img>` or favicon cannot read the
-page's tokens. The PNG icons (`icon-32`, `apple-touch-icon`, `icon-512`) are the
-same sun in the light `--acc` on the manifest's cream `#f4efe4`, filling 81%,
-86% and 62% of the square (the 512 leaves the maskable safe zone); re-export
-them from `mark.svg` whenever the red changes.
+A woodcut sun (`web/brand/mark.svg`) in `--acc`: a disc of radius 15 on the
+100-unit box, ringed by a hairline of paper, and twelve flames out to radius 49.
+Each flame waves twice and has a line cut down its middle; their lengths (within
+10%), sway and width vary as if each were cut by hand. One evenodd path, so the
+cuts show whatever is behind it. The SVG sets its own `color` (`#db3834`,
+`#ef6d62` under `prefers-color-scheme:
+dark`), since an `<img>` or favicon
+cannot read the page's tokens. The PNG icons (`icon-32`, `apple-touch-icon`,
+`icon-512`) are the same sun in the light `--acc` on the manifest's cream
+`#f4efe4`, filling 81%, 86% and 62% of the square (the 512 leaves the maskable
+safe zone); re-export them from `mark.svg` whenever the red changes.
 
 The share card (`og.svg`, exported to `og.png` at 1200×630) is a black woodcut
 title page rubricated in light `--acc`: the sun and the inner hairline rule are
