@@ -3413,22 +3413,22 @@ body.typing #editor .pane-head {
 .ask .empty p {
   margin: 0;
 }
-/* Choice list (§6.7): full-width rows, each a 500 title over an optional
-   <small> note, for a dialog that asks one question. `.primary`, the
-   recommended one, takes the red wash and a red title. */
+/* Choice list (§6.7). */
 .choices {
   display: grid;
-  gap: var(--s-1);
-  margin: 0 calc(var(--s-5) * -1);
+  gap: var(--s-3);
 }
 .choice {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
   width: 100%;
   margin: 0;
   padding: var(--s-4) var(--s-5);
   border: 0;
   border-radius: var(--r);
   corner-shape: var(--corner);
+  box-shadow: inset 0 0 0 var(--hair) var(--line);
   background: none;
   color: var(--fg);
   font: inherit;
@@ -3442,6 +3442,30 @@ body.typing #editor .pane-head {
 .choice:hover {
   background: var(--hover);
 }
+.choice::after {
+  content: "";
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-left: auto;
+  background: var(--muted);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5l4.5 4.5L6 12.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+.choice .ico {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  padding: var(--s-4);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: var(--hover);
+  stroke: var(--muted);
+  fill: none;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .choice small {
   display: block;
   margin-top: var(--s-1);
@@ -3452,7 +3476,22 @@ body.typing #editor .pane-head {
 }
 .choice.primary {
   background: var(--acc-wash);
+  box-shadow: inset 0 0 0 var(--hair)
+    color-mix(in srgb, var(--acc) 45%, transparent);
   color: var(--acc-ink);
+}
+.choice.primary .ico {
+  background: var(--acc-wash);
+  stroke: currentColor;
+}
+.choice.sm {
+  padding: var(--s-3) var(--s-5);
+  font-size: var(--fs-sm);
+}
+.choice.sm .ico {
+  width: var(--h-sm);
+  height: var(--h-sm);
+  padding: 0.3125rem;
 }
 .ask .sw-err {
   display: block;

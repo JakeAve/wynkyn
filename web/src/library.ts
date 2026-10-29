@@ -50,7 +50,7 @@ async function chooseLibrary(): Promise<FileSystemDirectoryHandle> {
     const reopen = $("lib-reopen");
     reopen.hidden = !remembered;
     if (remembered) {
-      reopen.textContent = `Open “${remembered.name}” again`;
+      reopen.lastElementChild!.textContent = `Open “${remembered.name}” again`;
       reopen.onclick = async () => {
         if (await reopenFolder(remembered, true)) {
           done(remembered, "folder");

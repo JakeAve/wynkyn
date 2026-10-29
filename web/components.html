@@ -216,6 +216,19 @@
       <symbol id="check" viewBox="0 0 16 16">
         <path d="M3.5 8.5l3 3 6-7" />
       </symbol>
+      <symbol id="folder-plus" viewBox="0 0 16 16">
+        <path
+          d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" />
+        <path d="M8 7.5v4M6 9.5h4" />
+      </symbol>
+      <symbol id="folder-open" viewBox="0 0 16 16">
+        <path d="M1.5 12.5v-8a1 1 0 0 1 1-1h4L8 5h5a1 1 0 0 1 1 1v1" />
+        <path d="M1.5 12.5l2-5h11l-2 5z" />
+      </symbol>
+      <symbol id="where-browser" viewBox="0 0 16 16">
+        <rect x="1.5" y="3" width="13" height="10" rx="1.5" />
+        <path d="M1.5 6h13" />
+      </symbol>
       <symbol id="expand-out" viewBox="0 0 16 16">
         <path d="M9.5 1.5h5v5M14.5 1.5 9 7M6.5 14.5h-5v-5M1.5 14.5 7 9" />
       </symbol>
@@ -451,19 +464,29 @@
 
       <section class="part">
         <h2>Dialogs and choice lists <span>§6.7–6.8</span></h2>
-        <p>A dialog that asks one question answers it with full-width choice
-          rows; the recommended one carries the red wash and a red title.
-          Titles in Fell; actions bottom right, primary last.</p>
+        <p>A dialog that asks one question answers it with framed choice
+          rows: an icon tile, the title over its note, a chevron. The
+          recommended one carries the red wash and a red ring; <code>.sm</code>
+          rows are the secondary ones. Titles in Fell; actions bottom right,
+          primary last.</p>
         <div class="board">
           <dialog class="ask" open aria-labelledby="s-lib">
             <h2 id="s-lib">Welcome to Wynkyn</h2>
             <p>Choose where to keep your books.</p>
             <div class="choices">
-              <button class="choice primary">Reopen the Books folder
-                <small>The folder you used last time.</small></button>
-              <button class="choice">Select an existing folder on my device
-                <span class="pill">Chromium only</span>
-                <small>You already have a Wynkyn books folder.</small></button>
+              <button class="choice primary"><svg class="ico"><use
+                    href="#folder-plus" /></svg><span>Create a new folder
+                  <small>Wynkyn makes a Books folder wherever you
+                    choose.</small></span></button>
+              <button class="choice"><svg class="ico"><use
+                    href="#folder-open" /></svg><span>Select an existing
+                  folder on my device
+                  <span class="pill">Chromium only</span>
+                  <small>You already have a Wynkyn books
+                    folder.</small></span></button>
+              <button class="choice sm"><svg class="ico"><use
+                    href="#where-browser" /></svg><span>Keep books in this
+                  browser</span></button>
             </div>
             <span class="sw-err">Couldn't open the folder: permission was
               denied.</span>

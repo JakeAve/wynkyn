@@ -494,12 +494,19 @@ row takes the red wash. Nesting indents by `--s-4` per level. No separators. In
 
 ### 6.7 Choice list
 
-How a dialog asks one question. Full-width rows: a 500 title over a `--fs-xs`
-`--muted` note, padding `--s-4 --s-5`, `--s-1` apart. Hover wash; the
-recommended choice carries the red wash and a red title (Ink's `.choice.primary`
-black pill became this). The library dialog stays the reference. `.choices`
-bleeds `--s-5` into the dialog's padding so the titles line up with its heading;
-a tag on a choice ("Chromium only") is the experimental chip (`.pill`, §6.10).
+How a dialog asks one question. Full-width framed rows, `--s-3` apart: an inset
+`--hair` `--line` ring, `--r` + corner, padding `--s-4 --s-5`, `--s-5` between
+the parts. Each row is an optional icon tile, then a 500 title over a `--fs-xs`
+`--muted` note (`<small>`), then a `--muted` chevron pushed to the end. The tile
+(`.ico`) is a 2rem `--hover` square with `--r` + corner holding an `--icon`
+glyph in `--muted`. Hover wash. The recommended choice (`.primary`) carries the
+red wash, a ring of `--acc` at 45% and `--acc-ink` text; its tile takes the wash
+again and the red glyph. `.sm`, for secondary rows under a primary one, is
+padding `--s-3 --s-5`, `--fs-sm` and a `--h-sm` tile. `.choices` sits inside the
+dialog's padding, never bleeding into it, so the frames line up with the
+heading. A tag on a choice ("Chromium only") is the experimental chip (`.pill`,
+§6.10) inside the title. The library and Create dialogs carry tiles; a question
+whose answers have no natural picture (Apply a theme) leaves them out.
 
 ### 6.8 Dialog
 
