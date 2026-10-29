@@ -56,6 +56,35 @@ drives the built `dist/` with no server, so `deno task build:site` first or it
 is skipped. Chrome tests gate on `hasChrome` from `testing/chrome.ts`, which
 launches Chrome once and skips them only if that fails.
 
+### What earns a test
+
+A test is worth what it catches that nothing else does. Every one is code to
+keep green, and every Chrome test is also a race in waiting: nearly every red
+run on `main` has been a Chrome test reading the page at the wrong moment, and
+CI spends most of its ~8 minutes in them. Before writing a test, name the bug
+it would catch and check no test already catches it.
+
+- **One test per behaviour, at the lowest layer that sees it.** Logic goes in
+  a pure function with a plain `Deno.test` (no browser, no server, no clock).
+  A Chrome test is only for what only a browser knows: real layout and
+  pagination, a click, a key, focus, a transition. It doesn't re-prove
+  through the UI what a pure test proves; it proves the wiring.
+- **Extend a flow before starting one.** Each Chrome test boots a server, a
+  browser and a book, seconds on CI. A new assertion in the test that already
+  opens that screen costs nothing. Several assertions about one flow go in
+  one test, not one test each.
+- **The goldens are pagination's test.** A page count or where a heading lands
+  shows in the `testdata/*/page-map.json` diff; don't add a Chrome test for it.
+- **Test behaviour, not text.** Don't pin copy, a table's rows verbatim, CSS
+  text, a constant, or a one-line wrapper (`return info.name`). Those tests
+  fail on every deliberate change and never on a bug.
+- **Not every fix needs its own test.** Add one where the same logic could
+  break the same way again. A typo, a wrong constant or a one-line wiring fix
+  is covered by the flow test that already walks it, or by nothing.
+- **Same shape, one table.** Near-identical cases are rows of one `Deno.test`.
+- **Fixing a flake starts with "should this test exist?"** If another test
+  already covers it, deleting it is the root fix.
+
 ### Tests that hold on CI
 
 CI's macOS runners are slower than a laptop, and unevenly so: a step that
@@ -63,11 +92,7 @@ takes 40 ms here took 45 s there. A test that reads the page at a guessed
 moment passes here for months and then fails on `main`. Every rule below
 comes from a real red run.
 
-**1. Pick the cheapest test that can fail.** Logic goes in a pure function
-with a plain `Deno.test` (no browser, no server, no clock). A Chrome test is
-only for what only a browser knows: real layout and pagination, a click, a
-key, focus, a transition. Several assertions about one flow go in one
-Chrome test, not one test each.
+**1. Pick the cheapest test that can fail** (What earns a test, above).
 
 **2. Wait for the state you assert, never for time.** Use `testing/wait.ts`:
 

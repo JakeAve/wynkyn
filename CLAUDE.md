@@ -31,6 +31,11 @@ look; when code and it disagree, ask.
 - Deno only, strict TS, `noUncheckedIndexedAccess`. No new deps without reason.
   Tests are plain `Deno.test` with `jsr:@std/assert`, in `*_test.ts` beside the
   module.
+- A test earns its place by catching a bug no other test catches: a pure test
+  for logic, a Chrome test only for what only a browser knows, and a new
+  assertion in an existing Chrome flow before a new one. No tests of copy,
+  constants or one-line wrappers (`architecture` → `references/dev-workflow.md`,
+  What earns a test).
 - Tests wait for the state they assert, never a guessed number of milliseconds
   (`testing/wait.ts`: `laidOut`, `eventually`, `until`; `testing/clock_test.ts`
   fails an unlabelled sleep). A CI failure that passes on re-run is a race to
@@ -43,7 +48,7 @@ look; when code and it disagree, ask.
 - `deno task dev` build the client + live server (main checkout :8000, a
   worktree its own port); edits reload themselves
 - `deno task check` fmt, lint, types (both git hooks run it)
-- `deno task test` all tests, Chrome included (~50 s, pre-push)
+- `deno task test` all tests, Chrome included (minutes; ~8 on CI; pre-push)
 - `deno task test:fast` without Chrome (~10 s, pre-commit)
 - `deno task build:site` the hosted site as plain files in `dist/`
 

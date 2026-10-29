@@ -109,13 +109,12 @@ async function assertParity(root: string, book: string): Promise<void> {
   }
 }
 
-for (const book of ["common-sense", "great-gatsby"]) {
-  Deno.test({
-    name: `segments: ${book} assembles to the whole-flow render`,
-    ignore: !hasChrome,
-    fn: () => assertParity(ROOT, book),
-  });
-}
+// common-sense's parity is the styled-part test below, on the same book.
+Deno.test({
+  name: "segments: great-gatsby assembles to the whole-flow render",
+  ignore: !hasChrome,
+  fn: () => assertParity(ROOT, "great-gatsby"),
+});
 
 // A chapter in a part is laid out inside a `.part` wrapper marked
 // data-split-from (renderer/render.ts), standing in for the part's continued

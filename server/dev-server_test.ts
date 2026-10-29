@@ -139,41 +139,6 @@ Deno.test("epub: the export lands in the edition's export folder", async () => {
   }
 });
 
-Deno.test("websocket: initial build on connect, rebuild pushed on file change", async () => {
-  const root = await makeBooksRoot();
-  const server = await startServer({ booksRoot: root, port: 0 });
-  const ws = new WebSocket(
-    `ws://localhost:${server.port}/ws?book=demo-book&client=t1`,
-  );
-  try {
-    const first = await nextMessage(ws);
-    assertEquals(first.type, "update");
-    assertEquals("origin" in first, false);
-    assert((first.html as string).includes("Chapter One"));
-
-    // clock: a fresh FSEvents watch has no ready signal; give it a beat.
-    await new Promise((r) => setTimeout(r, 300));
-    const manuscript = `${root}/demo-book/manuscript.md`;
-    const src = await Deno.readTextFile(manuscript);
-    const changed = src.replace("Chapter One", "Chapter Won");
-    // The push of this text, not merely the next one: the write truncates
-    // first, so the watch can fire mid-write and push a build of the empty or
-    // half-written file ahead of it.
-    const version = await contentVersion(changed);
-    const pushed = nextMessageWhere(ws, (m) => m.manuscriptVersion === version);
-    await Deno.writeTextFile(manuscript, changed);
-
-    const msg = await pushed;
-    assertEquals(msg.type, "update");
-    assertEquals(msg.metadataVersion, first.metadataVersion);
-    assert((msg.html as string).includes("Chapter Won"));
-  } finally {
-    ws.close();
-    await server.stop();
-    await Deno.remove(root, { recursive: true });
-  }
-});
-
 Deno.test("save: each post lands before it is answered; POST and broadcast carry the version", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });

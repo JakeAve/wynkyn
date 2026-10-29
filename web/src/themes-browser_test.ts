@@ -49,8 +49,10 @@ Deno.test({
       const page = await browser.newPage();
       const app = `http://localhost:${server.port}/app/?book=demo-book`;
       await page.goto(`${app}&mode=style&view=themes`);
-      await settled(page);
-      assert((await liveFont(page)).includes("EB Garamond"));
+      await until(
+        async () => (await liveFont(page)).includes("EB Garamond"),
+        "the book's look",
+      );
       const metaBefore = await Deno.readTextFile(metaPath);
       const edsBefore = await editions();
 
@@ -82,8 +84,10 @@ Deno.test({
         async () => (await liveText(page)).includes("fourteen"),
         "the pushed text reaches the preview",
       );
-      await settled(page);
-      assert((await liveFont(page)).includes("Libre Caslon"));
+      await until(
+        async () => (await liveFont(page)).includes("Libre Caslon"),
+        "the push built in the theme",
+      );
       assert(await bar.isVisible());
 
       // Discard: the book's own look, with the held push, and no bar.
@@ -117,8 +121,10 @@ Deno.test({
         async () => (await liveText(page)).includes("fifteen"),
         "pushes are not held after a failed preview",
       );
-      await settled(page);
-      assert((await liveFont(page)).includes("EB Garamond"));
+      await until(
+        async () => (await liveFont(page)).includes("EB Garamond"),
+        "the push built in the book's look",
+      );
 
       // Apply… asks; Cancel changes nothing and keeps the preview.
       await caslon.click();

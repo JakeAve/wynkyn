@@ -7,7 +7,6 @@ import {
 import { strFromU8, unzipSync } from "fflate";
 import {
   buildEpub,
-  epubBytes,
   exportEpub,
   navList,
   splitBlocks,
@@ -162,17 +161,6 @@ Deno.test("buildEpub: cover page first in the spine, cover image marked", () => 
   // No contents block in the book: the nav exists for the reader's menu only.
   assert(files["OEBPS/nav.xhtml"]);
   assert(!opf.includes('<itemref idref="nav"/>'));
-});
-
-Deno.test("epubBytes: the same package from a store as exportEpub writes", async () => {
-  const { epub, documents } = await epubBytes(ROOT, "demo-book");
-  assertEquals(documents, 2);
-  const files = read(epub);
-  assertStringIncludes(
-    files["OEBPS/002-one.xhtml"]!,
-    '<img src="images/ornament.svg" alt="A small ornament"/>',
-  );
-  assert(files["OEBPS/images/ornament.svg"], "the used image rides along");
 });
 
 Deno.test("exportEpub: demo-book → a valid package", async () => {

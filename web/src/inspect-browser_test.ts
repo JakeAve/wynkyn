@@ -6,6 +6,7 @@ import { assert, assertEquals, assertNotEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { laidOut } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
@@ -43,10 +44,7 @@ async function withBook(fn: (page: Page) => Promise<void>) {
   try {
     const page = await browser.newPage();
     await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-    await page.waitForFunction(() =>
-      document.querySelector("#preview .pagedjs_page") &&
-      !document.querySelector("#preview .preview-stage")
-    );
+    await laidOut(page);
     await fn(page);
   } finally {
     await browser.close();

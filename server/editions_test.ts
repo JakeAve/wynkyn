@@ -3,24 +3,13 @@ import { assertEquals } from "@std/assert";
 import {
   classifyChange,
   createEdition,
-  editionToken,
   listEditions,
-  metadataPath,
   renameOnlyToken,
   safeName,
   summaryOf,
 } from "./editions.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;
-
-Deno.test("metadataPath: unnamed edition is metadata.json, named is editions/<slug>.json", () => {
-  assertEquals(metadataPath("books", "b"), "books/b/metadata.json");
-  assertEquals(metadataPath("books", "b", null), "books/b/metadata.json");
-  assertEquals(
-    metadataPath("books", "b", "pocket"),
-    "books/b/editions/pocket.json",
-  );
-});
 
 Deno.test("safeName rejects separators, dot-dot, and leading dots", () => {
   assertEquals(safeName("pocket"), true);
@@ -137,11 +126,6 @@ Deno.test("createEdition: writes editions/<slug>.json, refuses a duplicate", asy
   } finally {
     await Deno.remove(root, { recursive: true });
   }
-});
-
-Deno.test("editionToken: null is the default token, a slug is itself", () => {
-  assertEquals(editionToken(null), "default");
-  assertEquals(editionToken("pocket"), "pocket");
 });
 
 Deno.test("listEditions: default name from metadata, title-cased slugs, {only} passages", async () => {

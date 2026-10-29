@@ -5,16 +5,12 @@ import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import { chromium, type Page } from "playwright";
 import { startServer } from "../../server/dev-server.ts";
 import { hasChrome } from "../../testing/chrome.ts";
+import { laidOut } from "../../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
   .then(() => true, () => false);
 
 const LIVE = "#preview > :not(.preview-stage) .pagedjs_page";
-const settled = (page: Page) =>
-  page.waitForFunction(() =>
-    document.querySelector("#preview .pagedjs_page") &&
-    !document.querySelector("#preview .preview-stage")
-  );
 const rect = (page: Page, i: number) =>
   page.locator(LIVE).nth(i).evaluate((el) => {
     const r = el.getBoundingClientRect();
@@ -31,7 +27,7 @@ Deno.test({
     try {
       const page = await browser.newPage();
       await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-      await settled(page);
+      await laidOut(page);
       const zoom = page.locator('#zoom [data-zoom="menu"]');
       assertEquals(await zoom.innerText(), "100%");
       const at100 = await rect(page, 1);
@@ -52,7 +48,7 @@ Deno.test({
       );
 
       await page.reload();
-      await settled(page);
+      await laidOut(page);
       assertEquals(await zoom.innerText(), "200%");
       assertEquals(
         await page.evaluate(() => localStorage.getItem("preview-zoom")),

@@ -4,11 +4,6 @@ import type { OnlySpan } from "../../parser/types.ts";
 
 export type { EditionInfo };
 
-// The server already resolves the name ("Standard" for an unnamed default).
-export function editionLabel(info: EditionInfo): string {
-  return info.name;
-}
-
 export function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }

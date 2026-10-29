@@ -338,13 +338,6 @@ Deno.test("folioClash names a running head in a top folio's box", () => {
   );
 });
 
-Deno.test("is: classes come from metadata", () => {
-  assertEquals(
-    matchKey([["is-telegram"], ["chapter"], ["bml"]], catalog),
-    "is.telegram",
-  );
-});
-
 Deno.test("no match → null", () => {
   assertEquals(
     matchKey([["pagedjs_margin-top-right"], ["pagedjs_page"]], catalog),
