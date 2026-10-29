@@ -406,6 +406,7 @@ function syncChanged(s: SyncStatus): void {
     ($(id) as HTMLButtonElement).disabled = sync.manuscriptBusy();
   }
   if (diskOffer?.version === sync.base) hideDiskBanner(); // it was our own save
+  layoutCaughtUp(); // a save or reload landed on the pages' text
   showSync(s);
   const metaBusy = sync.metadataBusy();
   if (metaWasBusy && !metaBusy && metaStale) refreshConfigFromRemote();
@@ -483,6 +484,8 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
 // the book's cached render.
 let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {};
 let restore: (cached: CachedBook | null, version?: string) => void = () => {};
+// Takes a painted layout as the buffer's once the buffer reaches its text.
+let layoutCaughtUp = () => {};
 
 // The book's cached render with a URL for each image it shows, or null. An
 // image it can't read (removed, renamed, refused) is a miss, never a throw:
@@ -987,42 +990,61 @@ async function main(): Promise<void> {
       } else location.reload();
     }, 500);
   };
-  // Everything that reads the pages, once a layout is on screen. Its page
-  // turns are lines of the text it was built from (`version`), so they're
-  // taken only while the buffer is that text; otherwise the turns shown,
-  // mapped through each edit since, stay until a layout that matches.
-  const afterLayout = (version?: string) => {
+  // Everything that reads the pages, once a layout is on screen.
+  const afterLayout = () => {
     refreshPageIndicator();
     configPanel?.pagesChanged();
     followCursor(cursorLine);
-    if (version === sync.base && !sync.manuscriptDirty()) {
-      setPageTurns(editor, pageTurns(previewEl));
-    }
     textView.refresh();
-    // Counts layouts that have landed and everything above has read: what
-    // tests wait on (testing/wait.ts laidOut), rather than a sign of a page.
+  };
+  // A painted layout is the buffer's only while the buffer is the text it
+  // was built from (`version`): a late push of an older version, or edits
+  // since, leave it behind. Until then the pages stay dimmed, the turns shown
+  // (mapped through each edit since) stay, and the layout isn't counted; a
+  // save or reload that lands on its version catches it up (syncChanged).
+  let behind: string | null = null;
+  layoutCaughtUp = () => {
+    if (behind === null || behind !== sync.base || sync.manuscriptDirty()) {
+      return;
+    }
+    behind = null;
+    setPageTurns(editor, pageTurns(previewEl));
+    delete previewEl.dataset.stale;
+    countLayout();
+  };
+  // Counts layouts that hold the buffer and that everything above has read:
+  // what tests wait on (testing/wait.ts laidOut), rather than a sign of a page.
+  const countLayout = () => {
     previewEl.dataset.layouts = String(
       Number(previewEl.dataset.layouts ?? 0) + 1,
     );
   };
   paint = (msg, cacheKey: string | null = key) => {
     renderPreview(msg, previewEl, cacheKey).then((problems) => {
-      delete previewEl.dataset.stale;
       showPageProblems(problems);
-      afterLayout(msg.manuscriptVersion);
+      afterLayout();
+      behind = msg.manuscriptVersion;
+      layoutCaughtUp();
     }, (err) => {
       // The old pages stay up; their problems no longer describe this book.
       setStatus("error", `preview: ${brief(err)}`);
       showPageProblems([{ page: null, message: `preview failed: ${err}` }]);
     });
   };
+  // What is restored is what should show, so it counts whatever its text;
+  // its page turns, like a painted layout's, only if it is the buffer's.
   restore = (cached, version) => {
     delete previewEl.dataset.stale;
+    behind = null;
     // None: the pages clear, and the book's first build paints when it lands.
     if (cached) restoreCachedRender(cached, previewEl, cached.imageUrl);
     else clearPreview(previewEl);
     showPageProblems(cached?.render.problems ?? []);
-    afterLayout(version);
+    afterLayout();
+    if (version === sync.base && !sync.manuscriptDirty()) {
+      setPageTurns(editor, pageTurns(previewEl));
+    }
+    countLayout();
   };
   // Restore before opening the socket so the previous render is on screen
   // when the first update lands, instead of a blank preview. Its text may be
