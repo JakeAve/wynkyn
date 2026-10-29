@@ -5,7 +5,7 @@
 import { assert, assertEquals } from "@std/assert";
 import type { Page } from "playwright";
 import { appTest, book, openApp } from "../../testing/app.ts";
-import { laidOut } from "../../testing/wait.ts";
+import { eventually } from "../../testing/wait.ts";
 
 // The demo book open in Write with its pages laid out.
 async function withApp(fn: (page: Page) => Promise<void>): Promise<void> {
@@ -35,14 +35,16 @@ appTest({
       assertEquals(editor?.width, panes?.width, "the writing takes the row");
 
       // An edit while expanded still lands on the hidden pages.
-      const before = await laidOut(page);
       await page.locator("#editor .cm-content").click();
       await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type("\nZanzibar");
-      await laidOut(page, before);
-      const text = await page.locator("#preview > :not(.preview-stage)")
-        .first().textContent() ?? "";
-      assert(text.includes("Zanzibar"), "the preview laid out the edit");
+      const live = page.locator("#preview > :not(.preview-stage)").first();
+      await eventually(async () =>
+        assert(
+          (await live.textContent() ?? "").includes("Zanzibar"),
+          "the preview laid out the edit",
+        )
+      );
 
       // Persisted per mode: Style doesn't inherit it, Write gets it back.
       await page.keyboard.press("ControlOrMeta+2");
