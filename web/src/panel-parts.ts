@@ -7,6 +7,7 @@ import type {
   NumberingStyle,
   StructureNumbering,
 } from "../../metadata/types.ts";
+import { matterType } from "../../parser/types.ts";
 import { caseOf, caseProps, emphasisOf, parseLength } from "./config-data.ts";
 import { buildFurniture } from "./panel-furniture.ts";
 import {
@@ -201,17 +202,27 @@ function detail(ctx: PanelContext, part: BookPart): Node[] {
     } in this book`;
   const v = makeView(ctx, recount);
   const resets: Array<() => Section[]> = [];
+  const page = part.group !== "body" && matterType(part.id).display
+    ? onePage(ctx, v, part.id)
+    : null;
+  if (page) resets.push(page.reset);
   const blocks = entries.map((entry) => {
     const x = extrasFor(ctx, v, entry);
+    const rows = page && entry.key === part.id
+      ? [page.row, ...x?.rows ?? []]
+      : x?.rows;
     const controlled = [...GENERIC, ...(x?.controlled ?? [])];
     resets.push(() => {
       clear(meta, entry, controlled);
       return [entry.section, ...(x?.reset?.() ?? [])];
     });
-    return block(ctx, v, entry, labelOf(entry, part), controlled, x?.rows);
+    return block(ctx, v, entry, labelOf(entry, part), controlled, rows);
   });
   recount();
   return [
+    ...(page && !entries.some((e) => e.key === part.id)
+      ? [section("Whole page", part.id, [page.row])]
+      : []),
     ...blocks,
     footer(count, () => {
       for (const s of new Set(resets.flatMap((f) => f()))) ctx.queueSave(s);
@@ -411,6 +422,33 @@ const NUMERALS: Array<{ value: NumberingStyle; label: string; aria: string }> =
     { label: "i", value: "roman-lower", aria: "i, ii, iii" },
     { label: "One", value: "words", aria: "One, Two, Three" },
   ];
+
+function onePage(ctx: PanelContext, v: View, type: string) {
+  const { meta } = ctx;
+  const cur = () => meta["one-page"]?.[type];
+  return {
+    row: v.mark(
+      row(
+        "One page",
+        switchInput(
+          "Keep to one page; cut what runs past it",
+          cur() ?? true,
+          (on) => {
+            (meta["one-page"] ??= {})[type] = on;
+            v.changed("one-page");
+          },
+        ),
+      ),
+      () => cur() !== undefined,
+    ),
+    reset(): Section[] {
+      if (cur() === undefined) return [];
+      delete meta["one-page"]![type];
+      if (!Object.keys(meta["one-page"]!).length) delete meta["one-page"];
+      return ["one-page"];
+    },
+  };
+}
 
 function extrasFor(
   ctx: PanelContext,

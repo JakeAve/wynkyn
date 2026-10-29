@@ -1849,6 +1849,7 @@ of the book.
   foot of its text block, whole lines kept, and the page lists a warning ("Title
   page runs past one page; the rest is cut") that never blocks an export
   (§4.10). What follows it starts where it would have had the section fit.
+- The style panel's Whole page block on each display page sets it as "One page".
 - The renderer marks a held section `data-one-page`; `renderer/folios.js` ends
   its flow at the page's foot, one flow or a segment alone (§7.6).
 
