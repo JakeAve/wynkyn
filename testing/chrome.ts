@@ -5,6 +5,23 @@ import { type Browser, chromium, type Page } from "playwright";
 
 const launch = () => chromium.launch({ channel: "chrome", timeout: 15_000 });
 
+// Playwright leaves newContext, evaluate and close without a deadline, and CI
+// has hung on each; a hang must fail its own test by name, not run the job
+// out. TEST_LIMIT is ten times the slowest test on CI (14 s).
+const TEST_LIMIT = 150_000;
+const STEP_LIMIT = 30_000;
+
+function within<T>(ms: number, what: string, p: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${what}: no answer after ${ms / 1000} s`)),
+      ms,
+    );
+  });
+  return Promise.race([p, late]).finally(() => clearTimeout(timer));
+}
+
 // Detection launches for real, so a stale install path or a missing runner
 // never reads as "available". `SKIP_CHROME=1` (the `test:fast` task,
 // pre-commit) skips the browser tests outright.
@@ -12,7 +29,7 @@ export const hasChrome: boolean = Deno.env.get("SKIP_CHROME")
   ? false
   : await launch().then(
     async (b) => {
-      await b.close();
+      await within(STEP_LIMIT, "closing the probe Chrome", b.close());
       return true;
     },
     (e) => {
@@ -34,9 +51,19 @@ const open = new Set<{ close(): Promise<void> }>();
 export async function newPage(
   opts?: Parameters<Browser["newContext"]>[0],
 ): Promise<Page> {
-  const context = await (await (shared ??= launch())).newContext(opts);
+  const browser = await (shared ??= launch());
+  // A browser that stops answering is relaunched for the next test.
+  const context = await within(
+    STEP_LIMIT,
+    "a new browser context",
+    browser.newContext(opts),
+  ).catch((e) => {
+    if (shared) void browser.close().catch(() => {});
+    shared = undefined;
+    throw e;
+  });
   open.add(context);
-  return await context.newPage();
+  return await within(STEP_LIMIT, "a new page", context.newPage());
 }
 
 /** `Deno.test` on the shared Chrome. Deno's op and resource sanitizers are
@@ -56,9 +83,13 @@ export function chromeTest(
     sanitizeResources: false,
     async fn(ctx) {
       try {
-        await t.fn(ctx);
+        await within(TEST_LIMIT, t.name, t.fn(ctx));
       } finally {
-        for (const c of open) await c.close();
+        for (const c of open) {
+          await within(STEP_LIMIT, "closing a context", c.close()).catch(
+            () => {},
+          );
+        }
         open.clear();
       }
     },

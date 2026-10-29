@@ -10,7 +10,7 @@ import {
 } from "./print-export.ts";
 import { renderPdf } from "./pdf.ts";
 import type { PageProblem } from "../renderer/page-map-types.ts";
-import { hasChrome } from "../testing/chrome.ts";
+import { chromeTest } from "../testing/chrome.ts";
 
 const page = { w: 3.5, h: 8.5 };
 const imp = impose(8, {
@@ -470,9 +470,8 @@ Deno.test("exportBook: reuses page-map.json only for the identical input, and on
   await assertRejects(() => Deno.stat(map), Deno.errors.NotFound);
 });
 
-Deno.test({
+chromeTest({
   name: "exportBook: an unchanged book re-exports in one pass (real Chrome)",
-  ignore: !hasChrome,
   fn: async () => {
     const root = await Deno.makeTempDir();
     await Deno.mkdir(`${root}/book`);
