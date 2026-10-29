@@ -350,7 +350,14 @@ function swappable(
   container: HTMLElement,
   book: CachedRender,
 ): Swap | null {
-  if (u.segments.length !== book.segments.length) return null;
+  // A render that wasn't saved (a theme preview) may be on screen instead.
+  const shown = container.querySelector<HTMLElement>(
+    ":scope > :not(.preview-stage)",
+  );
+  if (
+    shown?.dataset.scope !== book.scope ||
+    u.segments.length !== book.segments.length
+  ) return null;
   let at = -1;
   for (const [i, s] of u.segments.entries()) {
     if (keyOf(u, s, seed) === book.segments[i]!.key) continue;
