@@ -344,6 +344,40 @@ Deno.test("metadata: a save broadcasts an update with its version", async () => 
   }
 });
 
+Deno.test("save: a manuscript save is sent once; a write from elsewhere still is", async () => {
+  const src = new URL("./testdata/demo-book/", import.meta.url);
+  const files = new Map<string, Uint8Array>();
+  for (const f of ["manuscript.md", "metadata.json", "editions/pocket.json"]) {
+    files.set(`demo-book/${f}`, await Deno.readFile(new URL(f, src)));
+  }
+  const store = memoryStore(files);
+  const service = new BookService({ store });
+  try {
+    const heard = listen(service, null, "s");
+    await until(() => heard.length > 0, "the initial build");
+    const saved = await service.saveManuscript("demo-book", {
+      text: "{matter: half-title}\n{title}\nOnce\n",
+    });
+    const v = "version" in saved ? saved.version : "";
+    await until(
+      () => heard.some((m) => m.manuscriptVersion === v),
+      "the save's update",
+    );
+    await quietFor(50); // an echo would be in by now
+    assertEquals(heard.filter((m) => m.manuscriptVersion === v).length, 1);
+
+    const outside = "{matter: half-title}\n{title}\nElsewhere\n";
+    await store.write("demo-book/manuscript.md", outside);
+    const w = await contentVersion(outside);
+    await until(
+      () => heard.some((m) => m.manuscriptVersion === w),
+      "the outside write's update",
+    );
+  } finally {
+    await service.stop();
+  }
+});
+
 Deno.test("editions: clients hear their own edition's builds; manuscript edits reach all", async () => {
   const service = await demoService();
   try {

@@ -89,6 +89,9 @@ export class BookService {
     { from: string; to: string; stale: Set<string> }[]
   >();
   private readonly stopWatch: () => void;
+  // path → text the service wrote and pushed at once: the watcher reports the
+  // write after its debounce, and that report is skipped (onChanged).
+  private readonly pushed = new Map<string, string>();
   // book → a rebuild held back after a change to images/ alone (onChanged).
   private readonly heldImages = new Map<
     string,
@@ -349,11 +352,16 @@ export class BookService {
         else if (clientId !== null) r.stale.delete(clientId); // caught up
       }
       this.pruneRenames(book);
+      this.pushed.set(path, text); // a store may report the write as it lands
       try {
         await this.store.write(path, text);
       } catch (err) {
+        this.pushed.delete(path);
         throw new ServiceError(500, `save failed: ${String(err)}`);
       }
+      clearTimeout(this.heldImages.get(book));
+      this.heldImages.delete(book);
+      void this.broadcast(book, undefined);
       const version = await contentVersion(text);
       return text === save.text
         ? { ok: true, version }
@@ -552,6 +560,16 @@ export class BookService {
   }
 
   private onChanged(paths: string[]) {
+    void Promise.all(paths.map(async (p) => {
+      const own = this.pushed.get(p);
+      if (own === undefined) return p;
+      if (await this.store.readText(p) === own) return null;
+      this.pushed.delete(p);
+      return p;
+    })).then((fresh) => this.rebuild(fresh.filter((p) => p !== null)));
+  }
+
+  private rebuild(paths: string[]) {
     // book → set of affected editions; undefined marks "shared: everyone".
     const changed = new Map<string, Set<string | null | undefined>>();
     const notImages = new Set<string>(); // books with a change outside images/
