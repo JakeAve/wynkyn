@@ -87,6 +87,15 @@ chromeTest({
           "typed in the browser",
         ),
       );
+      // The whole library: a books folder that Open a folder takes.
+      const [all] = await Promise.all([
+        page.waitForEvent("download"),
+        page.locator("#library-download").click(),
+      ]);
+      assert(
+        "Books/demo-book/manuscript.md" in
+          unzipSync(await Deno.readFile((await all.path())!)),
+      );
       await page.keyboard.press("Escape");
 
       // The e-book is built in the page: a blob link, no server.
@@ -183,9 +192,9 @@ chromeTest({
         await page.locator("#library-name").textContent(),
         "This browser",
       );
-      assertStringIncludes(
-        (await page.locator("#library-open").getAttribute("title")) ?? "",
-        "download a book to keep it",
+      assertEquals(
+        await page.locator("#library-icon").getAttribute("href"),
+        "#where-browser",
       );
       // Dismissed once, the notice stays away.
       await page.reload();
@@ -546,14 +555,30 @@ chromeTest({
       await page.locator("#title-input").fill("Tiny");
       await page.locator("#title-input").press("Enter");
       await page.locator('#status[data-kind="saved"]').waitFor();
+      // Downloads are for browser storage; a folder is already on disk.
       await page.locator("#book-switcher").click();
-      await page.locator("#library-note").waitFor();
-      await page.waitForFunction(() =>
-        document.getElementById("library-note")!.textContent!.includes(
-          "“My Books”",
-        )
-      );
+      await page.locator(".book-row").first().waitFor();
+      for (
+        const id of ["#book-download", "#library-download", "#library-note"]
+      ) {
+        assertEquals(await page.locator(id).isVisible(), false);
+      }
       await page.keyboard.press("Escape"); // the switcher covers the toolbar
+      // The folder icon centers on the name's caps, not its line box.
+      const offset = await page.evaluate(async () => {
+        await document.fonts.ready;
+        const mid = (r: DOMRect) => (r.top + r.bottom) / 2;
+        const probe = document.createElement("span");
+        probe.style.cssText = "display: inline-block; height: 1cap";
+        const name = document.getElementById("library-name")!;
+        name.append(probe);
+        const icon = document.querySelector("#library-open svg")!;
+        const off = mid(icon.getBoundingClientRect()) -
+          mid(probe.getBoundingClientRect());
+        probe.remove();
+        return off;
+      });
+      assert(Math.abs(offset) <= 0.5, `the icon is ${offset}px off the caps`);
       // The crumb's first step names the folder, and says where in its title.
       const lib = page.locator("#library-open");
       assertEquals(

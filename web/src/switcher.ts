@@ -1,6 +1,6 @@
 // web/src/switcher.ts — the crumb (Book / Edition · size) and the switcher it
 // opens: books with search, the selected book's editions with Rename, Delete
-// and New edition, a book's download as a zip, and where the library lives.
+// and New edition, and in browser storage the book and library as zips.
 // Installed once a book and edition are open; app.ts hands in what it owns.
 import type { EditorView } from "@codemirror/view";
 import { parse } from "../../parser/parser.ts";
@@ -18,13 +18,46 @@ import {
   slugify,
 } from "./editions.ts";
 import { titleCase } from "../../server/editions.ts";
-import { zipBook } from "./book-zip.ts";
-import { rememberedFolder } from "./fs-store.ts";
-import { changeLibrary } from "./library.ts";
+import { zipBook, zipLibrary } from "./book-zip.ts";
+import { changeLibrary, type whereBooks } from "./library.ts";
 import { $, brief } from "./dom.ts";
+
+type Where = Awaited<ReturnType<typeof whereBooks>>;
+
+const BROWSER_NOTE = "Your library is currently in browser storage and " +
+  "could be cleared by your browser at any time.";
+
+// The crumb's first step: where the library lives, and the way to a different
+// one. Set before a book is chosen; the dev server's books/ has no other.
+export function showLibrary(
+  backend: Backend,
+  where: Where,
+  leave: (href: string) => Promise<void>,
+): void {
+  const lib = $("library-open");
+  lib.hidden = $("library-slash").hidden = backend.kind !== "local";
+  if (lib.hidden) return;
+  $("library-icon").setAttribute(
+    "href",
+    where.kind === "browser" ? "#where-browser" : "#where-folder",
+  );
+  $("library-name").textContent = where.name;
+  lib.title = where.kind === "browser"
+    ? BROWSER_NOTE
+    : `Books in the “${where.name}” folder on this device. Click to change.`;
+  lib.ariaLabel = `Library: ${where.name}. Change library`;
+  // Listed afresh: another tab may have added a book since this one loaded.
+  lib.onclick = async () =>
+    changeLibrary({
+      store: backend.store!,
+      books: (await backend.listBooks()).books,
+      leave,
+    });
+}
 
 export interface SwitcherDeps {
   backend: Backend;
+  where: Where;
   book: string; // the open book and edition
   edition: string | null;
   editions: EditionInfo[]; // the open book's, for the crumb
@@ -58,6 +91,7 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
     const cur = editions.find((e) => e.slug === edition);
     const name = cur?.name ?? "";
     $("book-name").textContent = titleCase(book);
+    $("crumb-book").hidden = false;
     $("edition-name").textContent = name;
     document.title = `Wynkyn — ${book} · ${name}`;
   }
@@ -104,6 +138,7 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
 
   async function selectBook(b: string): Promise<void> {
     selBook = b;
+    $("eds-book").textContent = titleCase(b);
     renderBooks();
     hideNewForm();
     const gen = ++selGen;
@@ -337,63 +372,28 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
     dialog.close();
     createManuscript(true);
   };
-  // The selected book's folder as a zip: the way out of browser storage.
-  const download = $("book-download");
-  download.hidden = !backend.store;
-  download.onclick = async () => {
+  // Downloads are the way out of browser storage, so only it shows them.
+  for (const id of ["eds-head", "library-download", "library-note"]) {
+    $(id).hidden = d.where.kind !== "browser";
+  }
+  $("library-note").textContent = BROWSER_NOTE;
+  const save = async (name: string, zip: Promise<Uint8Array<ArrayBuffer>>) => {
     try {
-      const zip = await zipBook(backend.store!, selBook);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(
-        new Blob([zip], { type: "application/zip" }),
+        new Blob([await zip], { type: "application/zip" }),
       );
-      a.download = `${selBook}.zip`;
+      a.download = name;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (err) {
       $("book-err").textContent = brief(err);
     }
   };
-  // Where the library lives, in the switcher's foot and as the crumb's first
-  // step, which is the way to a different one: forget the choice and pick
-  // again on the next load. The dev server's books/ has no other to pick.
-  const note = $("library-note");
-  const lib = $("library-open");
-  const pref = localStorage.getItem("library");
-  note.hidden =
-    lib.hidden =
-    $("library-slash").hidden =
-      backend.kind !== "local";
-  const where = (icon: string, name: string, about: string, title: string) => {
-    $("library-icon").setAttribute("href", `#${icon}`);
-    $("library-name").textContent = name;
-    lib.title = title;
-    lib.ariaLabel = `Library: ${name}. Change library`;
-    note.textContent = about;
-  };
-  if (pref === "browser") {
-    const about = "Kept in this browser only. Browsers clear site storage " +
-      "without asking, so download a book to keep it.";
-    where("where-browser", "This browser", about, about);
-  } else if (pref === "folder") {
-    note.textContent = "Loading…";
-    rememberedFolder().then((dir) => {
-      const about = `Books in the “${dir?.name}” folder on this device.`;
-      where(
-        "where-folder",
-        dir?.name ?? "",
-        about,
-        `${about} Click to change.`,
-      );
-    });
-  }
-  // Listed afresh: another tab may have added a book since this one loaded.
-  lib.onclick = async () =>
-    changeLibrary({
-      store: backend.store!,
-      books: (await backend.listBooks()).books,
-      leave,
-    });
+  $("book-download").onclick = () =>
+    save(`${selBook}.zip`, zipBook(backend.store!, selBook));
+  $("library-download").onclick = () =>
+    save("wynkyn-books.zip", zipLibrary(backend.store!, d.books()));
 
   $("edition-new").onclick = () => {
     from.replaceChildren(

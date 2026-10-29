@@ -165,16 +165,23 @@ kbd {
 #crumb .btn[aria-expanded="true"] {
   background: var(--hover);
 }
+/* Alegreya Sans sits its caps above the middle of its line box, so a centered
+   icon or chevron hangs low; trimmed to cap height and baseline, the text
+   centers on its caps. */
+#crumb .btn > span {
+  text-box: trim-both cap alphabetic;
+}
+#crumb-book {
+  display: contents;
+}
 /* The library, the crumb's first step: muted, so the book title leads. */
 #crumb #library-open:not(:hover) {
   color: var(--muted);
 }
-#crumb #library-open[hidden] {
-  display: none;
-}
+/* Clipped across only: the trim puts descenders outside the box. */
 #library-name {
   max-width: 8.75rem;
-  overflow: hidden;
+  overflow-x: clip;
   text-overflow: ellipsis;
 }
 #book-name {
@@ -338,6 +345,25 @@ kbd {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+/* Browser storage only: the selected book, and its download. */
+#eds-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: var(--h-md);
+  padding-left: var(--s-4);
+  margin-bottom: var(--s-3);
+}
+#eds-book {
+  font: 500 var(--fs) var(--f-text);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#book-download {
+  margin-left: auto;
 }
 .ed-row {
   display: grid;
@@ -3378,9 +3404,9 @@ body.typing #editor .pane-head {
   padding-top: var(--s-4);
   border-top: 1px solid var(--line);
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-3);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
 }
 .ask {
   margin: auto;
@@ -3500,8 +3526,7 @@ body.typing #editor .pane-head {
   margin-top: var(--s-4);
 }
 .sw-note {
-  flex-basis: 100%;
-  margin: var(--s-1) 0 0;
+  margin: var(--s-2) var(--s-4) var(--s-1);
   color: var(--muted);
   font-size: var(--fs-xs);
   line-height: 1.35;

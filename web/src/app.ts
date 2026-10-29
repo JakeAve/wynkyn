@@ -49,7 +49,7 @@ import { appHref, type EditionInfo, lineFromHash } from "./editions.ts";
 import { editionToken } from "../../server/editions.ts";
 import { Sync, type SyncStatus } from "./sync.ts";
 import type { Backend } from "./backend.ts";
-import { installSwitcher, type Switcher } from "./switcher.ts";
+import { installSwitcher, showLibrary, type Switcher } from "./switcher.ts";
 import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
 import { installTextView } from "./text-view.ts";
@@ -770,6 +770,9 @@ async function main(): Promise<void> {
     location.replace(location.pathname); // someone else's place: start at home
     return;
   }
+  const where = await whereBooks(backend);
+  showLibrary(backend, where, leave);
+  $("status").textContent = ""; // connected; Sync says the rest
   // Folders whose names a book can't have are left out, and named, so one
   // never keeps the rest of the library from opening.
   const notShown = skipped.length
@@ -788,7 +791,7 @@ async function main(): Promise<void> {
   else {
     book = await chooseBook({
       books,
-      where: await whereBooks(backend),
+      where,
       onChange: backend.kind === "local"
         ? () => changeLibrary({ store: backend.store!, books, leave })
         : undefined,
@@ -815,6 +818,7 @@ async function main(): Promise<void> {
   edition = wanted && editions.some((e) => e.slug === wanted) ? wanted : null;
   switcher = installSwitcher({
     backend,
+    where,
     book,
     edition,
     editions,

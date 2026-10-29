@@ -89,6 +89,9 @@
           <path
             d="M1.5 8h13M8 1.5c-1.8 1.8-2.7 4-2.7 6.5s.9 4.7 2.7 6.5c1.8-1.8 2.7-4 2.7-6.5S9.8 3.3 8 1.5z" />
         </symbol>
+        <symbol id="download" viewBox="0 0 16 16">
+          <path d="M8 2.5v8M4.5 7L8 10.5 11.5 7M3 13.5h10" />
+        </symbol>
         <symbol id="page" viewBox="0 0 16 16">
           <rect x="3.5" y="1.5" width="9" height="13" rx="1" />
           <path d="M6 5.5h4" />
@@ -118,24 +121,26 @@
           </svg>
           <span id="library-name"></span>
         </button>
-        <span id="library-slash" class="slash" hidden>/</span>
-        <button id="book-switcher" class="btn" title="Switch book"
-          data-command="switch-book"
-          aria-haspopup="dialog" aria-expanded="false">
-          <span id="book-name"></span>
-          <svg class="chev tico" viewBox="0 0 16 16">
-            <path d="M4 6.5l4 4 4-4" />
-          </svg>
-        </button>
-        <span class="slash">/</span>
-        <button id="edition-switcher" class="btn" title="Switch edition"
-          aria-haspopup="dialog" aria-expanded="false">
-          <span id="edition-name"></span>
-          <span id="edition-size"></span>
-          <svg class="chev tico" viewBox="0 0 16 16">
-            <path d="M4 6.5l4 4 4-4" />
-          </svg>
-        </button>
+        <span id="crumb-book" hidden>
+          <span id="library-slash" class="slash" hidden>/</span>
+          <button id="book-switcher" class="btn" title="Switch book"
+            data-command="switch-book"
+            aria-haspopup="dialog" aria-expanded="false">
+            <span id="book-name"></span>
+            <svg class="chev tico" viewBox="0 0 16 16">
+              <path d="M4 6.5l4 4 4-4" />
+            </svg>
+          </button>
+          <span class="slash">/</span>
+          <button id="edition-switcher" class="btn" title="Switch edition"
+            aria-haspopup="dialog" aria-expanded="false">
+            <span id="edition-name"></span>
+            <span id="edition-size"></span>
+            <svg class="chev tico" viewBox="0 0 16 16">
+              <path d="M4 6.5l4 4 4-4" />
+            </svg>
+          </button>
+        </span>
       </span>
       <span id="status">Connecting…</span>
       <span id="modes" role="group" aria-label="Mode">
@@ -356,14 +361,29 @@
         <div id="book-list" role="listbox" aria-label="Books"></div>
         <div class="sw-foot">
           <button id="book-new" class="btn">New book</button>
-          <button id="book-download" class="btn" hidden
-            title="This book's folder as a zip">Download</button>
+          <button id="library-download" class="btn" hidden
+            title="Every book, as one zip of a books folder">
+            <svg>
+              <use href="#download" />
+            </svg>
+            Download library
+          </button>
           <span id="book-err" class="sw-err"></span>
           <p id="book-skipped" class="sw-note" hidden></p>
           <p id="library-note" class="sw-note" hidden></p>
         </div>
       </div>
       <div class="sw-eds">
+        <div id="eds-head" hidden>
+          <span id="eds-book"></span>
+          <button id="book-download" class="btn sm"
+            title="This book's folder as a zip">
+            <svg>
+              <use href="#download" />
+            </svg>
+            Download book
+          </button>
+        </div>
         <div id="edition-list"></div>
         <div class="eds-foot">
           <button id="edition-new" class="btn">New edition</button>

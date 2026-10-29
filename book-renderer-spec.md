@@ -2665,6 +2665,15 @@ there is no book behind it. Footer: _Change library…_ at the left (no server
 only), _New book_ at the right, which opens _Create a new manuscript_ over it;
 Cancel there returns to it.
 
+**Downloads, in browser storage only.** Browser storage can be cleared, so there
+the switcher offers the way out: over the editions, the selected book's name
+with _Download book_ (`<slug>.zip`, the book's folder), and under _New book_,
+_Download library_ (`wynkyn-books.zip`, every book under `Books/`, so the
+unzipped folder is one _Open a folder I already have_ takes), then "Your library
+is currently in browser storage and could be cleared by your browser at any
+time.", which is also the crumb's library tooltip. A folder library is already
+on disk and shows none of these.
+
 **Create a new manuscript.** Three rows: _Import a file_ (Word, EPUB, plain
 text, Markdown, HTML), _Import from the web_ (a Project Gutenberg book, a shared
 Google Doc, a web page), _Start blank_. The book switcher's _New manuscript…_
