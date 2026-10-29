@@ -325,22 +325,20 @@ export function renderPreview(
   return pending = runRender(update, container, cacheKey);
 }
 
-// §4.16: an edit to a one-page section can't move another page.
-interface OnePage {
-  at: number;
+// An edit that changes one segment.
+interface Swap {
   segment: Segment;
   key: string;
   was: string;
-  page: HTMLElement;
+  first: HTMLElement; // its first page on screen
   shift: { from: number; by: number } | null;
 }
-const ONE_SECTION = /^<article[^>]*><section [^>]*\bdata-one-page[ >]/;
 
 function swappable(
   u: UpdateMessage,
   container: HTMLElement,
   book: CachedRender,
-): OnePage | null {
+): Swap | null {
   if (u.segments.length !== book.segments.length) return null;
   let at = -1;
   for (const [i, s] of u.segments.entries()) {
@@ -349,56 +347,59 @@ function swappable(
     at = i;
   }
   const segment = u.segments[at];
-  if (
-    !segment || !ONE_SECTION.test(segment.html) ||
-    segment.html.match(/<section[ >]/g)?.length !== 1 ||
-    !segment.html.endsWith("</section></article>")
-  ) return null;
+  if (!segment) return null;
   const by = (u.segments[at + 1]?.line ?? 0) -
     (book.segments[at + 1]?.line ?? 0);
   const moved = u.segments.every((s, i) =>
     s.line - book.segments[i]!.line === (i > at ? by : 0)
   );
-  const page = container.querySelector(
+  const first = container.querySelector(
     `:scope > :not(.preview-stage) [id="${CSS.escape(segment.id)}"]`,
   )?.closest<HTMLElement>(".pagedjs_page");
-  if (!moved || !page) return null;
+  if (!moved || !first) return null;
   return {
-    at,
     segment,
     key: keyOf(u, segment, seed),
     was: book.segments[at]!.key,
-    page,
+    first,
     shift: by ? { from: book.segments[at + 1]!.line, by } : null,
   };
 }
 
-// Same facts, so the same number, side and folio: only the text moves.
-async function swapOnePage(
+// Laid out again to as many pages with the same facts, the segment keeps its
+// pages' numbers, sides and folios, and no other page can move: only its text
+// changes. null otherwise, and the book is laid out as usual.
+async function swapInPlace(
   u: UpdateMessage,
   container: HTMLElement,
-  one: OnePage,
+  swap: Swap,
   book: CachedRender,
   cacheKey: string,
   tick: (cb: () => void) => void,
   cancelled: () => boolean,
 ): Promise<PageProblem[] | null> {
-  const [old] = await Promise.all([loadCachedSegment(one.was), fontSheets()]);
+  const [old] = await Promise.all([loadCachedSegment(swap.was), fontSheets()]);
   if (cancelled()) throw CANCELLED;
-  if (!old || old.facts.length !== 1) return null;
+  if (!old) return null;
+  const live = [swap.first];
+  while (live.length < old.facts.length) {
+    const next = live.at(-1)!.nextElementSibling;
+    if (!(next instanceof HTMLElement)) return null;
+    live.push(next);
+  }
   const css = [u.baseCss, u.domCss, u.pagedCss].join("\n");
   const blobUrl = URL.createObjectURL(new Blob([css], { type: "text/css" }));
-  // A stage's last page is hidden (app.css); this is its only page.
   const stage = document.createElement("div");
   stage.className = "preview-stage";
   stage.dataset.scope = book.scope;
+  stage.style.visibility = "hidden"; // app.css shows a stage's finished pages
   container.append(stage);
   const previewer = new Paged.Previewer({
     pageMap: { seed, numbering: u.pageNumbering, segment: true },
   });
   previewer.chunker.q.tick = tick;
   try {
-    const flow = await previewer.preview(one.segment.html, [blobUrl], stage);
+    const flow = await previewer.preview(swap.segment.html, [blobUrl], stage);
     if (cancelled()) throw CANCELLED;
     container.dataset.segmentsLaid = String(
       Number(container.dataset.segmentsLaid ?? 0) + 1,
@@ -406,28 +407,31 @@ async function swapOnePage(
     const laid = [...flow.pagesArea.querySelectorAll(":scope > .pagedjs_page")];
     const { facts, problems: own } = flow.pageMapResult;
     if (
-      laid.length !== 1 ||
       JSON.stringify(facts) !== JSON.stringify(old.facts) ||
       sheetsOf(previewer).join("\n") !== book.styles.join("\n")
     ) return null;
     const row: CachedSegment = {
       pages: tokenImages(
-        shiftLines(laid[0]!.outerHTML, -one.segment.line),
+        shiftLines(
+          laid.map((p) => p.outerHTML).join(""),
+          -swap.segment.line,
+        ),
         u.imageUrls,
       ),
       facts,
       problems: own,
     };
-    const n = Number(one.page.dataset.pageNumber);
+    const n = Number(swap.first.dataset.pageNumber);
     const on = (list: PageProblem[]) =>
       list.map((p) => p.page === null ? p : { ...p, page: p.page - 1 + n });
+    const checked = () =>
+      live.flatMap((p, i) => BookPageMap.pageProblems(p, n + i));
     const gone = new Set(
-      [...on(old.problems), ...BookPageMap.pageProblems(one.page, n)]
-        .map((p) => JSON.stringify(p)),
+      [...on(old.problems), ...checked()].map((p) => JSON.stringify(p)),
     );
-    BookPageMap.replaceArea(one.page, laid[0]!);
-    if (one.shift) {
-      const { from, by } = one.shift;
+    live.forEach((p, i) => BookPageMap.replaceArea(p, laid[i]!));
+    if (swap.shift) {
+      const { from, by } = swap.shift;
       for (
         const el of container.querySelectorAll<HTMLElement>(
           ":scope > :not(.preview-stage) [data-line]",
@@ -440,7 +444,7 @@ async function swapOnePage(
     problems = [
       ...problems.filter((p) => !gone.has(JSON.stringify(p))),
       ...on(own),
-      ...BookPageMap.pageProblems(one.page, n),
+      ...checked(),
     ];
     const render: CachedRender = {
       ...book,
@@ -454,7 +458,7 @@ async function swapOnePage(
     };
     manifest = render;
     if (!queuedUpdate) targetHash = targetOf(u, seed);
-    void saveCachedRender(cacheKey, render, new Map([[one.key, row]]));
+    void saveCachedRender(cacheKey, render, new Map([[swap.key, row]]));
     return problems;
   } finally {
     previewer.polisher.destroy(); // the live pages keep their own copies
@@ -507,14 +511,14 @@ async function runRender(
   const keys = new Map<Segment, string>();
   const rows = new Map<string, CachedSegment>();
   try {
-    const one = book && cacheKey !== null
+    const swap = book && cacheKey !== null
       ? swappable(update, container, book)
       : null;
-    if (one) {
-      const swapped = await swapOnePage(
+    if (swap) {
+      const swapped = await swapInPlace(
         update,
         container,
-        one,
+        swap,
         book!,
         cacheKey!,
         tick,

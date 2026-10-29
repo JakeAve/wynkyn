@@ -2421,10 +2421,11 @@ cache (IndexedDB), so an edit to one chapter lays out that chapter, and the
 contents again only if its page numbers moved. Opening a book shows its cached
 pages before its first build arrives. The layout keeps going in a background
 tab. An update that arrives mid-render abandons that render and starts its own,
-so a run of edits costs one render after the last, not one per edit. An edit to
-a page held to one page (§4.16) that leaves its zone, titles and anchors as they
-were lays out that page alone and swaps its text into the page on screen; no
-other page is rebuilt, so nothing on screen moves.
+so a run of edits costs one render after the last, not one per edit. An edit
+that changes one segment, laid out again to as many pages with the same zones,
+titles and anchors, swaps those pages' text into the pages on screen; no other
+page is rebuilt, so nothing on screen moves. A display page held to one page
+(§4.16) always qualifies unless its zone, titles or anchors change.
 
 An illustration whose image is missing shows its placeholder (§4.10 item 8). In
 Write, a click on it moves the editor's cursor to its line, as any page click
