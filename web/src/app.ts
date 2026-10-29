@@ -2,7 +2,12 @@
 import { parse } from "../../parser/parser.ts";
 import type { EditorView } from "@codemirror/view";
 import type { BmlDocument } from "../../parser/types.ts";
-import { catalogFor, type EpubResult, syncIsNames } from "./style-catalog.ts";
+import {
+  catalogFor,
+  type EpubResult,
+  type StyleStep,
+  syncIsNames,
+} from "./style-catalog.ts";
 import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
   type CachedBook,
@@ -545,9 +550,9 @@ function goToLine(line: number): void {
 }
 
 // Preview click → Style on that element (spec §7.4).
-async function pickStyle(key: string): Promise<void> {
+async function pickStyle(key: string, path?: StyleStep[]): Promise<void> {
   setMode("style");
-  (await ensureConfigPanel())?.selectStyle(key);
+  (await ensureConfigPanel())?.selectStyle(key, path);
 }
 
 // The footer's Go to style: unlike a preview click, it leaves a history entry,

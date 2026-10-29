@@ -14,12 +14,14 @@ import {
   type BookPart,
   bookParts,
   catalogFor,
+  entryName,
   type EpubResult,
   type PanelContext,
   type PreviewLink,
   type Route,
   routeFor,
   setCount,
+  type StyleStep,
   syncIsNames,
 } from "./style-catalog.ts";
 
@@ -28,7 +30,7 @@ export type PanelMode = "style" | "publish";
 export interface ConfigPanel {
   setMode(mode: PanelMode): void; // swap the nav and body between style and publish
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
-  selectStyle(key: string): void; // style mode, where a catalog entry is styled (§7.4)
+  selectStyle(key: string, path?: StyleStep[]): void; // style mode, where a catalog entry is styled (§7.4); `path` crumbs the styles around it
   pagesChanged(): void; // the preview repaginated
   isNamesChanged(): void; // the manuscript was reparsed; Custom styles follow it
   open(view: string): void; // the nav row `view` (navId), if this book has it
@@ -205,10 +207,13 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   opts.overlay.replaceChildren(head, body);
 
   let tried: string | null = null;
+  // The styles under the preview click that opened the view, and the one open.
+  let trail: { steps: StyleStep[]; key: string } | null = null;
 
-  function go(next: Route): void {
+  function go(next: Route, nextTrail: typeof trail = null): void {
     if (route.tab === "themes" && next.tab !== "themes") opts.tryTheme(null);
     route = next;
+    trail = nextTrail;
     if (next.tab !== "publish") styleRoute = next;
     current = navId(next);
     opts.onRoute?.(current);
@@ -228,11 +233,13 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       "aria-label",
       route.tab === "publish" ? "Publish sections" : "Style sections",
     );
-    crumb.textContent = title.textContent = "";
-    opts.nav.replaceChildren(...groups.flatMap(([group, rows]) => {
+    crumb.replaceChildren();
+    title.textContent = "";
+    let group = "";
+    opts.nav.replaceChildren(...groups.flatMap(([navGroup, rows]) => {
       const h = document.createElement("div");
       h.className = "nh";
-      h.textContent = group;
+      h.textContent = navGroup;
       return [
         h,
         ...rows.map((r) => {
@@ -248,13 +255,44 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
           b.append(t, k);
           if (r.id === current) {
             b.setAttribute("aria-current", "true");
-            crumb.textContent = group;
+            group = navGroup;
             title.textContent = r.label;
           }
           b.onclick = () => go(r.route);
           return b;
         }),
       ];
+    }));
+    drawCrumb(group);
+  }
+
+  // A click on the pages names every style under it; one alone is no choice,
+  // so the nav group shows instead.
+  function drawCrumb(group: string): void {
+    if (!trail || trail.steps.length < 2) {
+      crumb.textContent = group;
+      return;
+    }
+    const { steps, key } = trail;
+    const catalog = catalogFor(meta);
+    crumb.replaceChildren(...steps.flatMap((step, i) => {
+      const entry = catalog.find((e) => e.key === step.key);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = entry ? entryName(entry, catalog) : step.key;
+      if (step.key === key) b.setAttribute("aria-current", "true");
+      b.onmouseenter = () => step.el.setAttribute("data-style-hl", "");
+      b.onmouseleave = () => step.el.removeAttribute("data-style-hl");
+      b.onclick = () => {
+        for (const s of steps) s.el.removeAttribute("data-style-selected");
+        step.el.setAttribute("data-style-selected", "");
+        go(routeFor(step.key, meta), { steps, key: step.key });
+      };
+      if (!i) return [b];
+      const sep = document.createElement("span");
+      sep.className = "sep";
+      sep.textContent = "›";
+      return [sep, b];
     }));
   }
 
@@ -344,9 +382,9 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       syncIsNames(meta, opts.isNames());
       renderNav(true);
     },
-    selectStyle(key) {
+    selectStyle(key, path) {
       syncIsNames(meta, opts.isNames());
-      go(routeFor(key, meta));
+      go(routeFor(key, meta), path ? { steps: path, key } : null);
     },
   };
 }

@@ -153,10 +153,6 @@ const GENERIC = [
 ];
 
 const LABELS: Record<string, string> = {
-  pullquote: "Pull quote",
-  dropcap: "Drop cap",
-  break: "Scene break",
-  footnote: "Note text",
   "verses.number": "Verse numbers",
   copyright: "Whole page",
   "copyright.isbn": "ISBN",
@@ -166,7 +162,8 @@ function labelOf(entry: StyleEntry, part: BookPart): string {
   const own = LABELS[entry.key];
   if (own) return own;
   if (entry.key.includes(".")) return entry.label;
-  return part.keys.length > 1 ? cap(entry.key) : "Text";
+  if (part.keys.length < 2) return "Text";
+  return entry.label === "Everything" ? cap(entry.key) : entry.label;
 }
 
 // The section's data-focus: the sub-element ("number"), or a flat type itself.

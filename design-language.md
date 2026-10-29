@@ -445,7 +445,10 @@ pill, whatever the corner shape.
   underline; hovering outlines every match, a click steps through them). A
   hairline below. `applies` in `panel-controls.ts` makes "On N pages"; a view
   with just one shows it in the heading, a view of several elements (an opener's
-  number and title) keeps one at each section label's right.
+  number and title) keeps one at each section label's right. A view opened by a
+  click on the pages that lands under more than one style crumbs those styles
+  instead, as the Inspect drawer does (§6.13): `›` between, the open one
+  `--acc-ink` 500, the others plain buttons that take `--hover`.
 - **Section** (`section`): `--s-5` vertical padding, a hairline below, a
   small-caps group label. (planned: the view's Reset as a small icon button at
   the label's right when the section has set values; today it sits at the view's

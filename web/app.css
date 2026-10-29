@@ -2305,8 +2305,38 @@ body.typing #editor .pane-head {
   border-bottom: 1px solid var(--line);
 }
 #config-overlay .crumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1);
   font-size: var(--fs-xs);
   color: var(--muted);
+}
+/* Flush with the heading below, so the padding hangs into the gutter. */
+#config-overlay .crumb button:first-child {
+  margin-inline-start: calc(-1 * var(--s-1));
+}
+#config-overlay .crumb button {
+  padding: 0 var(--s-1);
+  border: none;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+#config-overlay .crumb button:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+#config-overlay .crumb button[aria-current] {
+  color: var(--acc-ink);
+  font-weight: 500;
+}
+#config-overlay .crumb .sep {
+  color: color-mix(in oklab, var(--muted) 60%, var(--bg));
 }
 #config-overlay .vh-row {
   display: flex;
