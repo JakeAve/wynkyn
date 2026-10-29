@@ -25,7 +25,7 @@ import { $, brief, store } from "./dom.ts";
 type Dir = FileSystemDirectoryHandle;
 type Kind = "folder" | "browser";
 type Row = "lib-new" | "lib-pick" | "lib-browser";
-type Rows = [Row, string, string][]; // id, title, note (HTML), in order
+type Rows = [Row, string, string][]; // id, title, note (HTML)
 
 const KEEP = "Keep books in this browser";
 const WELCOME: Rows = [
@@ -91,8 +91,7 @@ export function whereBooks(
     : whereLocal();
 }
 
-// One markup, three modes (spec §7.9). Returns the dialog with its rows
-// laid out; the caller wires the clicks.
+// One markup, three modes (spec §7.9).
 function layout(
   mode: "welcome" | "back" | "change",
   rows: Rows,
@@ -188,9 +187,6 @@ async function chooseLibrary(): Promise<Dir> {
   });
 }
 
-// The folder crumb: the other kinds of library, with the current one named.
-// A pick reloads to the bare path; from this browser to a folder it first
-// offers to copy the books the folder lacks (#bring).
 export function changeLibrary(o: {
   store: BookStore;
   books: string[];
@@ -239,7 +235,6 @@ export function changeLibrary(o: {
   })();
 }
 
-// Resolves once the author has answered; a failed copy shows and stays.
 function bring(
   from: BookStore,
   to: BookStore,

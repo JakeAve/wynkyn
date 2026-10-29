@@ -351,7 +351,6 @@ kbd {
   flex-direction: column;
   min-width: 0;
 }
-/* Browser storage only: the selected book, and its download. */
 #eds-head {
   display: flex;
   align-items: center;
@@ -3590,7 +3589,6 @@ body.typing #editor .pane-head {
 .ask p .hivis {
   color: var(--fg);
 }
-/* Change library: where the books are now, in the wash (§6.7). */
 #lib-now {
   display: flex;
   align-items: center;
@@ -3642,8 +3640,6 @@ body.typing #editor .pane-head {
   color: var(--warn);
   font-size: var(--fs-xs);
 }
-/* Choose a book (§6.8): title rows in Alegreya, the text flush with the
-   heading. */
 #choose {
   width: 30rem;
 }

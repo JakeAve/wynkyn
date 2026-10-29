@@ -117,7 +117,7 @@ type StatusKind =
   | "error"
   | "offline"
   | "failed"
-  | "connected"; // Sync says the rest
+  | "connected";
 const STATUS_TEXT: Record<StatusKind, string> = {
   connecting: "Connecting…",
   saved: "Saved",

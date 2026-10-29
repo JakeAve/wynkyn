@@ -4,19 +4,17 @@
 import { zipSync } from "fflate";
 import type { BookStore } from "../../server/store.ts";
 
-/** The files a book has, relative to its folder: what a zip or a copy takes. */
 export async function bookFiles(
   store: BookStore,
   book: string,
 ): Promise<string[]> {
-  // Some may be missing; callers skip a null read. manuscript.md comes last:
-  // copyBooks counts a book present by it, so it must land after the rest.
   const rels = ["metadata.json", "dictionary.json"];
   for (const dir of ["editions", "images"]) {
     for (const name of await store.listDir(`${book}/${dir}`)) {
       rels.push(`${dir}/${name}`);
     }
   }
+  // Last: copyBooks counts a book present by its manuscript.
   return [...rels, "manuscript.md"];
 }
 
@@ -40,7 +38,7 @@ export const zipBook = (
   book: string,
 ): Promise<Uint8Array<ArrayBuffer>> => zipBooks(store, [book], "");
 
-/** Every book under `Books/`, the folder "Import a folder" takes whole. */
+// Under `Books/`, so the unzipped folder opens as a library.
 export const zipLibrary = (
   store: BookStore,
   books: string[],

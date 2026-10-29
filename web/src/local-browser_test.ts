@@ -87,7 +87,6 @@ chromeTest({
           "typed in the browser",
         ),
       );
-      // The whole library: a books folder that Open a folder takes.
       const [all] = await Promise.all([
         page.waitForEvent("download"),
         page.locator("#library-download").click(),
@@ -116,13 +115,11 @@ chromeTest({
         ),
       );
 
-      // Changing to a folder offers to bring the books along.
       await page.locator("#library-open").click();
       await page.locator("#library[open]").waitFor();
       await page.locator("#lib-pick").click();
       await page.locator("#bring[open]").waitFor();
       await page.locator("#bring-copy").click();
-      // The bare path lands on Choose a book, the last book open active.
       await page.locator("#choose[open]").waitFor();
       assertEquals(
         await page.locator('#choose-list [aria-selected="true"]')
@@ -560,7 +557,6 @@ chromeTest({
       await page.locator("#title-input").fill("Tiny");
       await page.locator("#title-input").press("Enter");
       await page.locator('#status[data-kind="saved"]').waitFor();
-      // Downloads are for browser storage; a folder is already on disk.
       await page.locator("#book-switcher").click();
       await page.locator(".book-row").first().waitFor();
       for (
@@ -614,7 +610,6 @@ chromeTest({
       assertStringIncludes(page.url(), "book=tiny");
       assertEquals(await page.locator("#book-name").textContent(), "Tiny");
 
-      // A lapsed permission: back mode offers the folder again.
       await page.addInitScript(() => {
         // deno-lint-ignore no-explicit-any
         (FileSystemHandle.prototype as any).queryPermission = () =>

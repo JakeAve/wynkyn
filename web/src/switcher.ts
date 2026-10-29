@@ -27,8 +27,7 @@ type Where = Awaited<ReturnType<typeof whereBooks>>;
 const BROWSER_NOTE = "Your library is currently in browser storage and " +
   "could be cleared by your browser at any time.";
 
-// The crumb's first step: where the library lives, and the way to a different
-// one. Set before a book is chosen; the dev server's books/ has no other.
+// Before a book is chosen; the dev server's books/ has no other library.
 export function showLibrary(
   backend: Backend,
   where: Where,

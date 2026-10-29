@@ -253,8 +253,7 @@ export async function importBooks(
   return { written: [...written].sort(), skipped };
 }
 
-/** Copies books between stores, never overwriting: a slug `to` already has is
- * skipped whole, like importBooks. */
+// A slug `to` already has is skipped whole, never merged.
 export async function copyBooks(
   from: BookStore,
   to: BookStore,
