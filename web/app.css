@@ -3549,7 +3549,10 @@ body.typing #editor .pane-head {
 .choice small:empty {
   display: none;
 }
+/* Alegreya Sans's word space is a third of the mono one, so beside a mono
+   name it all but vanishes. */
 .ask .hivis {
+  margin-inline: 0.15em;
   font: var(--fs-sm) var(--f-hivis);
 }
 .ask p .hivis {

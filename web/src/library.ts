@@ -234,6 +234,10 @@ function bring(
   const dlg = $("bring") as HTMLDialogElement;
   for (const el of dlg.querySelectorAll(".bring-name")) el.textContent = name;
   $("bring-count").textContent = count(fresh.length);
+  for (const el of dlg.querySelectorAll<HTMLElement>("[data-one]")) {
+    el.dataset.many ??= el.textContent!;
+    el.textContent = fresh.length === 1 ? el.dataset.one! : el.dataset.many;
+  }
   $("bring-clash").hidden = !clash.length;
   $("bring-clash-titles").textContent = clash.map(titleCase).join(", ");
   const err = $("bring-err");
