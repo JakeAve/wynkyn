@@ -57,7 +57,7 @@ import { installPanes } from "./panes.ts";
 import { installShortcuts } from "./shortcuts.ts";
 import { installPreviewZoom } from "./preview-zoom.ts";
 import { installInspect } from "./inspect.ts";
-import { changeLibrary, connect, whereBooks } from "./library.ts";
+import { changeLibrary, connect, lastBookKey, whereBooks } from "./library.ts";
 import { chooseBook } from "./choose-book.ts";
 import { $, brief, store } from "./dom.ts";
 import { h } from "./panel-controls.ts";
@@ -116,7 +116,8 @@ type StatusKind =
   | "saving"
   | "error"
   | "offline"
-  | "failed";
+  | "failed"
+  | "connected"; // Sync says the rest
 const STATUS_TEXT: Record<StatusKind, string> = {
   connecting: "Connecting…",
   saved: "Saved",
@@ -124,6 +125,7 @@ const STATUS_TEXT: Record<StatusKind, string> = {
   error: "Not saved",
   offline: "Disconnected",
   failed: "Couldn't load", // the app never got going; the title says why
+  connected: "",
 };
 let lastSaved: Date | null = null;
 
@@ -357,17 +359,18 @@ const fetchEditions = (name: string): Promise<EditionInfo[]> =>
   backend.editions(name);
 
 let leaving = false; // the author chose to go: beforeunload asks nothing more
-async function leave(href: string): Promise<void> {
+async function leave(href: string): Promise<boolean> {
   // No sync before a book opens (an empty library's first create).
   if (sync) {
     await sync.flush();
     if (
       sync.hasUnsaved() &&
       !confirm("Some changes aren't saved. Leave anyway?")
-    ) return;
+    ) return false;
   }
   leaving = true;
   location.href = href;
+  return true;
 }
 
 // Sync's status onto the toolbar — the only way "Saved" gets there.
@@ -770,9 +773,9 @@ async function main(): Promise<void> {
     location.replace(location.pathname); // someone else's place: start at home
     return;
   }
-  const where = await whereBooks(backend);
+  const where = whereBooks(backend);
   showLibrary(backend, where, leave);
-  $("status").textContent = ""; // connected; Sync says the rest
+  setStatus("connected");
   // Folders whose names a book can't have are left out, and named, so one
   // never keeps the rest of the library from opening.
   const notShown = skipped.length
@@ -799,7 +802,7 @@ async function main(): Promise<void> {
     });
     history.replaceState(null, "", here());
   }
-  store("last-book", book);
+  store(lastBookKey(where), book);
 
   // A failed editions fetch (old server still running, network blip) must not
   // keep the whole app from booting — fall back to a single default edition.

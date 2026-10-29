@@ -593,9 +593,9 @@ control's tooltip and `kbd` show its key as the platform writes it
   switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
   Publish (Mod+1–3); right, the theme toggle alone (Mod+Shift+L). The save
   status sits after the crumb. The crumb's text is trimmed to cap height and
-  baseline (`text-box`), so the library icon and the chevrons center on the
-  caps; until a book is chosen it shows the library step alone (nothing on the
-  dev server).
+  baseline (`text-box`), so the library icon and the chevrons center on the caps
+  (as does any button's label in a `span` after its icon); until a book is
+  chosen it shows the library step alone (nothing on the dev server).
 - **Switcher** (`#switcher`): books left, the selected book's editions right.
   The books foot holds New book; in browser storage only, Download library
   (download icon) under it and the note "Your library is currently in browser

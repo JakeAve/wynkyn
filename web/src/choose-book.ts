@@ -2,19 +2,19 @@
 // library with books opens, in place of guessing which one.
 import { titleCase } from "../../server/editions.ts";
 import { matchBooks } from "./switcher.ts";
-import type { whereBooks } from "./library.ts";
+import { lastBookKey, type whereBooks } from "./library.ts";
 import { $, store } from "./dom.ts";
 
 export function chooseBook(o: {
   books: string[];
-  where: Awaited<ReturnType<typeof whereBooks>>;
+  where: ReturnType<typeof whereBooks>;
   onChange?: () => void;
   onNew: () => void;
 }): Promise<string> {
   const dlg = $("choose") as HTMLDialogElement;
   const search = $("choose-search") as HTMLInputElement;
   const list = $("choose-list");
-  const last = store("last-book");
+  const last = store(lastBookKey(o.where));
   let sel = last && o.books.includes(last) ? last : o.books[0]!;
 
   $("choose-where").replaceChildren(
@@ -76,6 +76,9 @@ export function chooseBook(o: {
         const i = hits.indexOf(sel) + (e.key === "ArrowDown" ? 1 : -1);
         const next = hits[Math.min(Math.max(i, 0), hits.length - 1)];
         if (next) sel = next;
+        render();
+      } else if (e.key === "Escape" && search.value) {
+        search.value = "";
         render();
       } else if (e.key === "Enter" && hits.includes(sel)) {
         e.preventDefault();

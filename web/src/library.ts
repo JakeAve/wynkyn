@@ -16,6 +16,7 @@ import {
   handleStore,
   pickFolder,
   rememberedFolder,
+  rememberFolder,
   reopenFolder,
 } from "./fs-store.ts";
 import { titleCase } from "../../server/editions.ts";
@@ -69,18 +70,25 @@ const count = (n: number) => `${n} book${n === 1 ? "" : "s"}`;
 // Persisted storage is evicted last; the browser may still say no.
 const persist = () => navigator.storage.persist?.().catch(() => false);
 
-async function whereLocal(): Promise<{ kind: Kind; name: string }> {
+// The folder connect() opened: IndexedDB may not be readable again.
+let opened = "";
+
+function whereLocal(): { kind: Kind; name: string } {
   return store("library") === "browser"
     ? { kind: "browser", name: "This browser" }
-    : { kind: "folder", name: (await rememberedFolder())?.name ?? "" };
+    : { kind: "folder", name: opened };
 }
 
-export async function whereBooks(
+// Per library: a book of the same name elsewhere is another book.
+export const lastBookKey = (w: { kind: string; name: string }): string =>
+  `last-book:${w.kind}:${w.name}`;
+
+export function whereBooks(
   backend: Backend,
-): Promise<{ kind: "server" | "folder" | "browser"; name: string }> {
+): { kind: "server" | "folder" | "browser"; name: string } {
   return backend.kind === "http"
     ? { kind: "server", name: "books" }
-    : await whereLocal();
+    : whereLocal();
 }
 
 // One markup, three modes (spec §7.9). Returns the dialog with its rows
@@ -140,14 +148,15 @@ async function chooseLibrary(): Promise<Dir> {
   if (pref === "browser") return await browserFolder();
   const granted = remembered && await reopenFolder(remembered, false);
   if (granted && pref === "folder") return remembered;
-  const back = remembered && !granted;
   return new Promise((resolve) => {
     const dlg = layout(
-      back ? "back" : "welcome",
-      back ? BACK : WELCOME,
-      back
-        ? "Chrome asks again before Wynkyn can open your books folder."
-        : "Choose where your books will live. You can change it later.",
+      remembered ? "back" : "welcome",
+      remembered ? BACK : WELCOME,
+      !remembered
+        ? "Choose where your books will live. You can change it later."
+        : granted
+        ? ""
+        : "Chrome asks again before Wynkyn can open your books folder.",
     );
     const done = (dir: Dir, kind: Kind) => {
       store("library", kind);
@@ -155,9 +164,11 @@ async function chooseLibrary(): Promise<Dir> {
       dlg.close();
       resolve(dir);
     };
-    if (back) {
+    if (remembered) {
       const reopen = $("lib-reopen");
-      const last = store("last-book");
+      const last = store(
+        lastBookKey({ kind: "folder", name: remembered.name }),
+      );
       reopen.lastElementChild!.replaceChildren(
         "Open ",
         hivis(remembered.name),
@@ -183,10 +194,11 @@ async function chooseLibrary(): Promise<Dir> {
 export function changeLibrary(o: {
   store: BookStore;
   books: string[];
-  leave(href: string): Promise<void>;
+  leave(href: string): Promise<boolean>;
 }): void {
   void (async () => {
-    const now = await whereLocal();
+    const now = whereLocal();
+    const was = { pref: store("library"), dir: await rememberedFolder() };
     const fromBrowser = now.kind === "browser";
     const dlg = layout(
       "change",
@@ -201,10 +213,14 @@ export function changeLibrary(o: {
     $("lib-now-count").textContent = count(o.books.length);
     $("lib-next").hidden = !fromBrowser || !o.books.length;
     $("lib-cancel").onclick = () => dlg.close();
-    const finish = (kind: Kind) => {
+    const finish = async (kind: Kind) => {
+      dlg.close();
       store("library", kind);
       if (kind === "browser") persist();
-      void o.leave(location.pathname);
+      if (await o.leave(location.pathname)) return;
+      // Stayed for unsaved changes: the next load opens this library again.
+      if (was.pref) store("library", was.pref);
+      if (was.dir) await rememberFolder(was.dir);
     };
     wire(async (kind, get) => {
       if (kind === "browser") return finish(kind);
@@ -243,15 +259,19 @@ function bring(
   const err = $("bring-err");
   err.textContent = "";
   return new Promise((resolve) => {
+    const done = () => {
+      dlg.close();
+      resolve();
+    };
     $("bring-copy").onclick = async () => {
       try {
         await copyBooks(from, to, fresh);
-        resolve();
+        done();
       } catch (e) {
         err.textContent = brief(e);
       }
     };
-    $("bring-skip").onclick = () => resolve();
+    $("bring-skip").onclick = done;
     dlg.showModal();
   });
 }
@@ -279,5 +299,7 @@ export async function connect(): Promise<Backend> {
   if (await hasServer()) return httpBackend();
   const assets = localAssets();
   await browserNotice();
-  return await localBackend(await chooseLibrary(), await assets);
+  const dir = await chooseLibrary();
+  opened = dir.name;
+  return await localBackend(dir, await assets);
 }

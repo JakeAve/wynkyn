@@ -159,10 +159,14 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
 
 // ---- which folder --------------------------------------------------------
 
+export const rememberFolder = (dir: FileSystemDirectoryHandle): Promise<
+  IDBValidKey
+> => idb("readwrite", (s) => s.put(dir, "library"));
+
 /** The author's books/ folder, remembered across reloads in IndexedDB. */
 export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
   const dir = await showDirectoryPicker({ mode: "readwrite", id: "books" });
-  await idb("readwrite", (s) => s.put(dir, "library"));
+  await rememberFolder(dir);
   return dir;
 }
 
@@ -171,7 +175,7 @@ export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
 export async function createBooksFolder(): Promise<FileSystemDirectoryHandle> {
   const parent = await showDirectoryPicker({ mode: "readwrite", id: "books" });
   const dir = await parent.getDirectoryHandle("Books", { create: true });
-  await idb("readwrite", (s) => s.put(dir, "library"));
+  await rememberFolder(dir);
   return dir;
 }
 

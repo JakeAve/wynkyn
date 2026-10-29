@@ -32,7 +32,7 @@ const BROWSER_NOTE = "Your library is currently in browser storage and " +
 export function showLibrary(
   backend: Backend,
   where: Where,
-  leave: (href: string) => Promise<void>,
+  leave: (href: string) => Promise<boolean>,
 ): void {
   const lib = $("library-open");
   lib.hidden = $("library-slash").hidden = backend.kind !== "local";
@@ -64,7 +64,7 @@ export interface SwitcherDeps {
   books(): string[]; // the library's books, as last listed
   sync(): Sync;
   editor(): EditorView;
-  leave(href: string): Promise<void>;
+  leave(href: string): Promise<boolean>;
   setMode(mode: Mode): void;
   createManuscript(cancelable: boolean): void;
   rebaseAfterRename(): Promise<void>;

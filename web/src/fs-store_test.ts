@@ -1,5 +1,5 @@
 // web/src/fs-store_test.ts
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { copyBooks, importBooks } from "./fs-store.ts";
 import { memoryStore } from "../../testing/memory-store.ts";
 
@@ -46,5 +46,26 @@ Deno.test("copyBooks: a slug the target has is skipped, the rest copied whole", 
   assertEquals(got, { copied: ["walden"], skipped: ["moby-dick"] });
   assertEquals(text(dst.get("moby-dick/manuscript.md")), "ours\n");
   assertEquals(text(dst.get("walden/manuscript.md")), "walden\n");
+  assertEquals(text(dst.get("walden/images/a.png")), "png");
+});
+
+Deno.test("copyBooks: a copy that fails partway leaves no manuscript.md, so a retry takes it", async () => {
+  const src = new Map([
+    ["walden/manuscript.md", bytes("walden\n")],
+    ["walden/images/a.png", bytes("png")],
+  ]);
+  const dst = new Map<string, Uint8Array>();
+  const to = memoryStore(dst);
+  const failing = {
+    ...to,
+    create: (path: string, data: string | Uint8Array) =>
+      path.endsWith("a.png")
+        ? Promise.reject(new Error("disk full"))
+        : to.create(path, data),
+  };
+  await assertRejects(() => copyBooks(memoryStore(src), failing, ["walden"]));
+  assertEquals(dst.has("walden/manuscript.md"), false);
+  const got = await copyBooks(memoryStore(src), to, ["walden"]);
+  assertEquals(got, { copied: ["walden"], skipped: [] });
   assertEquals(text(dst.get("walden/images/a.png")), "png");
 });

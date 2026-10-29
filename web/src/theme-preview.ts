@@ -27,7 +27,7 @@ export interface ThemePreviewDeps {
   // null clears the pages.
   restore(cached: CachedBook | null, version?: string): void;
   loadCachedBook(): Promise<CachedBook | null>;
-  leave(href: string): Promise<void>;
+  leave(href: string): Promise<boolean>;
   setStatus(kind: "error", detail: string): void;
 }
 

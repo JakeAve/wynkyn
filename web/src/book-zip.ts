@@ -9,16 +9,15 @@ export async function bookFiles(
   store: BookStore,
   book: string,
 ): Promise<string[]> {
-  const rels: string[] = [];
-  for (const rel of ["manuscript.md", "metadata.json", "dictionary.json"]) {
-    if (await store.exists(`${book}/${rel}`)) rels.push(rel);
-  }
+  // Some may be missing; callers skip a null read. manuscript.md comes last:
+  // copyBooks counts a book present by it, so it must land after the rest.
+  const rels = ["metadata.json", "dictionary.json"];
   for (const dir of ["editions", "images"]) {
     for (const name of await store.listDir(`${book}/${dir}`)) {
       rels.push(`${dir}/${name}`);
     }
   }
-  return rels;
+  return [...rels, "manuscript.md"];
 }
 
 async function zipBooks(

@@ -22,7 +22,7 @@ export interface CreateBookDeps {
   backend(): Backend; // a Back to the Welcome connects again
   books(): string[]; // the library's books, as last listed
   setBooks(books: string[]): void; // after a folder import copied some in
-  leave(href: string): Promise<void>;
+  leave(href: string): Promise<boolean>;
   restart(): void; // main again: Back from an empty library
 }
 
