@@ -89,6 +89,11 @@ const LABELS: Record<string, string> = {
   "toc-chapter": "Chapter rows",
   "toc-heading": "Heading rows",
   "toc-back": "Back matter rows",
+  pullquote: "Pull quote",
+  dropcap: "Drop cap",
+  break: "Scene break",
+  footnote: "Note text",
+  em: "Emphasis",
 };
 
 function labelFor(sub: string): string {
@@ -108,7 +113,7 @@ const STATIC_CATALOG: StyleEntry[] = ELEMENTS.flatMap(([group, type, subs]) =>
     : [{
       key: type,
       group,
-      label: group === titleCase(type) ? "Everything" : titleCase(type),
+      label: group === titleCase(type) ? "Everything" : labelFor(type),
       path: ["elements", type],
       section: "elements" as const,
       selector: selectorFor(type),
@@ -274,6 +279,12 @@ export interface PreviewLink {
   pagesFor(key: string): number;
   highlight(key: string, on: boolean): void;
   reveal(key: string): void;
+}
+
+// One style under a preview click, and the node it styles there.
+export interface StyleStep {
+  key: string;
+  el: Element;
 }
 
 export interface PanelContext {
@@ -487,6 +498,36 @@ export function matchKey(
   chain: string[][],
   catalog: StyleEntry[],
 ): string | null {
+  return bestMatch(chain, catalog)?.key ?? null;
+}
+
+// Every style under a click, outermost first, each with the chain index of
+// the node it styles: at each node, the entry matchKey would pick for that
+// node itself. `{is}` classes are matched apart, since one wins over
+// everything and would hide the base styles around it. A key styling nested
+// nodes keeps the innermost, the one a click opens.
+export function matchPath(
+  chain: string[][],
+  catalog: StyleEntry[],
+): Array<{ key: string; depth: number }> {
+  const plain = catalog.filter((e) => e.section !== "is");
+  const is = catalog.filter((e) => e.section === "is");
+  const path: Array<{ key: string; depth: number }> = [];
+  for (let d = 0; d < chain.length; d++) {
+    for (const entries of [is, plain]) {
+      const m = bestMatch(chain.slice(d), entries);
+      if (m?.depth === 0 && !path.some((p) => p.key === m.key)) {
+        path.unshift({ key: m.key, depth: d });
+      }
+    }
+  }
+  return path;
+}
+
+function bestMatch(
+  chain: string[][],
+  catalog: StyleEntry[],
+): { key: string; is: boolean; depth: number; spec: number } | null {
   let best: { key: string; is: boolean; depth: number; spec: number } | null =
     null;
   for (const entry of catalog) {
@@ -520,7 +561,7 @@ export function matchKey(
       }
     }
   }
-  return best?.key ?? null;
+  return best;
 }
 
 // `child`: the token that follows (the next one inward) must be its child.

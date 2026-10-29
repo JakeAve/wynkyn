@@ -9,6 +9,7 @@ import {
   inheritedFont,
   inheritedValue,
   matchKey,
+  matchPath,
   routeFor,
   setCount,
   sourceOf,
@@ -45,6 +46,26 @@ Deno.test("an {is} class wins over what it wraps", () => {
   assertEquals(
     matchKey([["p"], ["is-telegram", "div"], ["chapter"], ["bml"]], catalog),
     "is.telegram",
+  );
+});
+
+Deno.test("matchPath lists every style under a click, the base under an {is} too", () => {
+  assertEquals(
+    matchPath(
+      [["em"], ["p"], ["pullquote", "div"], ["chapter", "div"], ["bml", "div"]],
+      catalog,
+    ),
+    [
+      { key: "body", depth: 4 },
+      { key: "pullquote", depth: 2 },
+      { key: "paragraph", depth: 1 },
+      { key: "em", depth: 0 },
+    ],
+  );
+  assertEquals(
+    matchPath([["p"], ["is-telegram", "div"], ["chapter"], ["bml"]], catalog)
+      .map((m) => m.key),
+    ["body", "is.telegram", "paragraph"],
   );
 });
 

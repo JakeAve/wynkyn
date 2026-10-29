@@ -5,8 +5,10 @@ import type { ServerMessage } from "../../server/pipeline.ts";
 import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
 import {
   matchKey,
+  matchPath,
   type PreviewLink,
   type StyleEntry,
+  type StyleStep,
 } from "./style-catalog.ts";
 import {
   type CachedRender,
@@ -739,21 +741,44 @@ export function resolveStyle(
   catalog: StyleEntry[],
 ): { key: string; el: Element; furniture: boolean } | null {
   if (!target || target.closest(".preview-stage")) return null;
-  const chain: string[][] = [];
-  for (
-    let el: Element | null = target;
-    el && el !== container;
-    el = el.parentElement
-  ) {
-    chain.push([...el.classList, el.localName]); // tag last: matches `.bml p`
-  }
-  const key = matchKey(chain, catalog);
+  const key = matchKey(
+    chainOf(target, container).map((c) => c.classes),
+    catalog,
+  );
   const entry = catalog.find((e) => e.key === key);
   const el = entry && target.closest(entry.selector);
   if (!entry || !el || !container.contains(el)) return null;
   const furniture = entry.section === "numbering" ||
     entry.section === "running";
   return { key: entry.key, el, furniture };
+}
+
+function chainOf(
+  target: Element,
+  container: HTMLElement,
+): Array<{ el: Element; classes: string[] }> {
+  const chain = [];
+  for (
+    let el: Element | null = target;
+    el && el !== container;
+    el = el.parentElement
+  ) {
+    chain.push({ el, classes: [...el.classList, el.localName] }); // tag last: matches `.bml p`
+  }
+  return chain;
+}
+
+// Every style under a click, outermost first, for the panel's crumb.
+export function stylePath(
+  target: Element,
+  container: HTMLElement,
+  catalog: StyleEntry[],
+): StyleStep[] {
+  const chain = chainOf(target, container);
+  return matchPath(chain.map((c) => c.classes), catalog).map((m) => ({
+    key: m.key,
+    el: chain[m.depth]!.el,
+  }));
 }
 
 // Where a click on the pages goes (spec §7.4): in Style, to the clicked
@@ -770,7 +795,7 @@ export function installPreviewClicks(
   catalog: () => StyleEntry[],
   on: {
     mode(): Mode;
-    style(key: string): void;
+    style(key: string, path: StyleStep[]): void;
     source(line: number): void;
     addImage?(slug: string, file?: File): void;
     inspecting(): boolean;
@@ -807,7 +832,7 @@ export function installPreviewClicks(
         "data-style-selected",
       );
       hit.el.setAttribute("data-style-selected", "");
-      on.style(hit.key);
+      on.style(hit.key, stylePath(target!, container, catalog()));
       return;
     }
     if (mode !== "write" || target?.closest(".preview-stage")) return;

@@ -2336,6 +2336,24 @@ body.typing #editor .pane-head {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
+#config-overlay .here {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+#config-overlay .here[hidden] {
+  display: none;
+}
+#config-overlay .here .chip[aria-current] {
+  background: var(--acc-wash);
+  box-shadow: none;
+  color: var(--acc-ink);
+  cursor: default;
+}
 #config-overlay .vh-row {
   display: flex;
   align-items: baseline;
