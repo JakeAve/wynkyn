@@ -3,13 +3,8 @@
 // (a chapter opening, a paragraph split across pages, the opener's dropped
 // running head), and none of it reaches the print sheets or prints.
 import { assert, assertEquals, assertNotEquals } from "@std/assert";
-import { chromium, type Page } from "playwright";
-import { startServer } from "../../server/dev-server.ts";
-import { hasChrome } from "../../testing/chrome.ts";
-import { laidOut } from "../../testing/wait.ts";
-
-const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
-  .then(() => true, () => false);
+import type { Page } from "playwright";
+import { appTest, book, openApp } from "../../testing/app.ts";
 
 const LIVE = "#preview > :not(.preview-stage) .pagedjs_page";
 // The long paragraph (manuscript line 20) runs from page 3 over pages 4–5.
@@ -18,38 +13,20 @@ const LONG = 'p[data-line="20"]';
 // The fixture book, plus running heads, a paragraph long enough to split
 // across pages, and a second chapter: pages 3 and 6 open chapters.
 async function withBook(fn: (page: Page) => Promise<void>) {
-  const root = await Deno.makeTempDir();
-  const fixture = new URL("../../server/testdata/demo-book", import.meta.url);
-  const cp = await new Deno.Command("cp", {
-    args: ["-R", fixture.pathname, root],
-  }).output();
-  assert(cp.success, "copy the fixture book");
-  const dir = `${root}/demo-book`;
-  const meta = JSON.parse(await Deno.readTextFile(`${dir}/metadata.json`));
-  meta.running = {
-    odd: [{ content: "book-title", area: "top-right" }],
-    even: [{ content: "chapter-title", area: "top-left" }],
-  };
-  await Deno.writeTextFile(`${dir}/metadata.json`, JSON.stringify(meta));
   const long = "The hallway smelt of boiled cabbage and old rag mats. ".repeat(
     60,
   );
-  await Deno.writeTextFile(
-    `${dir}/manuscript.md`,
-    (await Deno.readTextFile(`${dir}/manuscript.md`)) +
-      `\n${long}\n\n{chapter: two}\n{title}\nChapter Two\n\nShort.\n`,
-  );
-  const server = await startServer({ booksRoot: root, port: 0 });
-  const browser = await chromium.launch({ channel: "chrome" });
-  try {
-    const page = await browser.newPage();
-    await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-    await laidOut(page);
-    await fn(page);
-  } finally {
-    await browser.close();
-    await server.stop();
-  }
+  const b = await book({
+    metadata: (meta) => {
+      meta.running = {
+        odd: [{ content: "book-title", area: "top-right" }],
+        even: [{ content: "chapter-title", area: "top-left" }],
+      };
+    },
+    manuscript: (demo) =>
+      demo + `\n${long}\n\n{chapter: two}\n{title}\nChapter Two\n\nShort.\n`,
+  });
+  await fn(await openApp(b));
 }
 
 // The overlay redraws once a frame; two frames and it has caught up.
@@ -64,9 +41,8 @@ const why = async (page: Page) =>
     " ",
   );
 
-Deno.test({
+appTest({
   name: "inspect: at 200% the pin ring lands on the paragraph",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withBook(async (page) => {
       for (let i = 0; i < 10; i++) {
@@ -98,9 +74,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "inspect: an opening, a split paragraph and a dropped head explain",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withBook(async (page) => {
       await page.locator("#inspect").click();
@@ -133,9 +108,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "inspect: nothing of it reaches the print sheets or prints",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withBook(async (page) => {
       await page.locator("#inspect").click();

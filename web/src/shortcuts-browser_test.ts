@@ -2,59 +2,37 @@
 // Windows (navigator.platform emulated): mod is Ctrl alone, labels read
 // Ctrl+…, and the Writing keys still beat CodeMirror's own.
 import { assert, assertEquals } from "@std/assert";
-import { chromium, type Page } from "playwright";
-import { startServer } from "../../server/dev-server.ts";
-import { hasChrome } from "../../testing/chrome.ts";
+import type { Page } from "playwright";
+import { appTest, book } from "../../testing/app.ts";
+import { newPage } from "../../testing/chrome.ts";
 import { laidOut, until } from "../../testing/wait.ts";
-
-const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
-  .then(() => true, () => false);
 
 // The demo book open in Write, as on Windows.
 async function withApp(
   fn: (page: Page, saved: (has: string) => Promise<void>) => Promise<void>,
   extra = "", // appended to the manuscript
 ): Promise<void> {
-  const root = await Deno.makeTempDir();
-  const fixture = new URL("../../server/testdata/demo-book", import.meta.url);
-  const cp = await new Deno.Command("cp", {
-    args: ["-R", fixture.pathname, root],
-  }).output();
-  assert(cp.success, "copy the fixture book");
-  if (extra) {
-    const md = `${root}/demo-book/manuscript.md`;
-    await Deno.writeTextFile(md, (await Deno.readTextFile(md)) + extra);
-  }
-  const server = await startServer({ booksRoot: root, port: 0 });
-  const browser = await chromium.launch({ channel: "chrome" });
-  try {
-    const page = await browser.newPage();
-    await page.addInitScript(() =>
-      Object.defineProperty(navigator, "platform", { get: () => "Win32" })
+  const b = await book({ manuscript: (demo) => demo + extra });
+  const page = await newPage();
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "platform", { get: () => "Win32" })
+  );
+  await page.goto(b.url());
+  await page.locator("#editor .cm-content").waitFor();
+  // Saves are debounced.
+  const saved = (has: string) =>
+    until(
+      async () => (await b.read("manuscript.md"))?.includes(has) ?? false,
+      `a save of ${has}`,
     );
-    await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-    await page.locator("#editor .cm-content").waitFor();
-    // Waits for the manuscript on disk to hold `has` (saves are debounced).
-    const file = `${root}/demo-book/manuscript.md`;
-    const saved = (has: string) =>
-      until(
-        async () => (await Deno.readTextFile(file)).includes(has),
-        `a save of ${has}`,
-      );
-    await fn(page, saved);
-  } finally {
-    await browser.close();
-    await server.stop();
-    await Deno.remove(root, { recursive: true });
-  }
+  await fn(page, saved);
 }
 
 const mode = (page: Page) =>
   page.evaluate(() => document.documentElement.dataset.mode);
 
-Deno.test({
+appTest({
   name: "on Windows mod is Ctrl alone, and labels say Ctrl",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       await page.keyboard.press("Meta+2");
@@ -85,9 +63,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "Ctrl+Shift+F inserts a footnote and Ctrl+I emphasises the selection",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page, saved) => {
       await page.locator("#editor .cm-content").click();
@@ -111,9 +88,8 @@ Deno.test({
 const treeShown = (page: Page) =>
   page.locator("#tree-toggle").getAttribute("aria-pressed");
 
-Deno.test({
+appTest({
   name: "Ctrl+Shift+/ rebinds Contents to Ctrl+B, and it survives a reload",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       const row = page.locator('#shortcuts-list [data-id="toggle-tree"]');
@@ -150,9 +126,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "recording Ctrl+W says why and binds nothing",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       const row = page.locator('#shortcuts-list [data-id="toggle-tree"]');
@@ -172,10 +147,9 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name:
     "a taken key comes back from a rebound command; an open dialog holds the keys",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       const row = (id: string) =>
@@ -202,9 +176,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "Writing keys leave a text field outside the editor alone",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       await page.evaluate(() => {
@@ -228,9 +201,8 @@ const chapters =
     `\n${long}\n\n{chapter: ${c}}\n{title}\nChapter ${c}\n`
   ).join("") + `\n${long}\n`;
 
-Deno.test({
+appTest({
   name: "the new commands: theme, page and chapter steps, zoom, Style views",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       const theme = () =>
