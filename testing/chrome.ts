@@ -1,22 +1,32 @@
-// One Chrome per test process, launched here and kept: a test opens a page in
+// One Chrome per test process, kept across its tests: a test opens a page in
 // its own context (its own storage) instead of launching a browser, which
-// costs a second or more on CI. The launch is the detection too, so a stale
-// install path or a missing runner never reads as "available".
+// costs a second or more on CI.
 import { type Browser, chromium, type Page } from "playwright";
 
-// `SKIP_CHROME=1` (the `test:fast` task, pre-commit) skips the browser tests outright.
-export const chrome: Browser | null = Deno.env.get("SKIP_CHROME")
-  ? null
-  : await chromium.launch({ channel: "chrome", timeout: 15_000 }).catch(
+const launch = () => chromium.launch({ channel: "chrome", timeout: 15_000 });
+
+// Detection launches for real, so a stale install path or a missing runner
+// never reads as "available". `SKIP_CHROME=1` (the `test:fast` task,
+// pre-commit) skips the browser tests outright.
+export const hasChrome: boolean = Deno.env.get("SKIP_CHROME")
+  ? false
+  : await launch().then(
+    async (b) => {
+      await b.close();
+      return true;
+    },
     (e) => {
       // On CI a missing Chrome must fail the run, not quietly skip every
       // browser test and go green.
       if (Deno.env.get("CI")) throw e;
-      return null;
+      return false;
     },
   );
-export const hasChrome = chrome !== null;
 
+// Launched inside the first test that asks, never while modules load: a
+// browser launched at import hung the first newContext now and then, with
+// Chrome's answer left unread on the pipe.
+let shared: Promise<Browser> | undefined;
 const open = new Set<{ close(): Promise<void> }>();
 
 /** A page in a fresh context of the shared Chrome, closed when its
@@ -24,7 +34,7 @@ const open = new Set<{ close(): Promise<void> }>();
 export async function newPage(
   opts?: Parameters<Browser["newContext"]>[0],
 ): Promise<Page> {
-  const context = await chrome!.newContext(opts);
+  const context = await (await (shared ??= launch())).newContext(opts);
   open.add(context);
   return await context.newPage();
 }

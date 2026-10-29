@@ -13,7 +13,7 @@ import { toHtml } from "./export-html.ts";
 import type { PageProblem } from "../renderer/page-map-types.ts";
 import type { Metadata } from "../metadata/types.ts";
 import { parseMetadataText } from "../metadata/loader.ts";
-import { chrome, chromeTest } from "../testing/chrome.ts";
+import { chromeTest, newPage } from "../testing/chrome.ts";
 
 const ROOT = new URL("../testdata/", import.meta.url).pathname;
 const BOOKS = ["common-sense", "great-gatsby"];
@@ -134,10 +134,9 @@ async function layOut(
       : undefined,
   });
   const file = await Deno.makeTempFile({ suffix: ".html" });
-  const context = await chrome!.newContext();
+  const page = await newPage();
   try {
     await Deno.writeTextFile(file, toHtml(built, { whole }));
-    const page = await context.newPage();
     const start = performance.now();
     await page.goto(`file://${file}`);
     await page.waitForSelector("html[data-paged]", { timeout: 540_000 });
@@ -208,7 +207,7 @@ async function layOut(
       fonts,
     };
   } finally {
-    await context.close();
+    await page.context().close();
     await Deno.remove(file).catch(() => {});
   }
 }

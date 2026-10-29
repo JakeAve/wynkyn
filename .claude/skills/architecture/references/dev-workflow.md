@@ -45,7 +45,7 @@ A client with an unsaved edit does not reload itself; its status says
 | --- | --- | --- |
 | `deno test -A <file>` | the files you touched | the inner loop: this is what you run |
 | `deno task test:fast` | everything without Chrome (`SKIP_CHROME=1`), ~10 s | pre-commit hook; CI's Ubuntu `fast` job |
-| `deno task test` | all, Chrome included, test files in parallel | CI's macOS `test` job, the gate |
+| `deno task test` | all, Chrome included, ~2.5 min | CI's macOS `test` job, the gate |
 
 CI is the only place the whole Chrome suite runs. Don't run it locally to
 "make sure", and never while another worktree's suite is running: suites in
@@ -79,9 +79,10 @@ A Chrome test costs a page, never a browser or a server:
 - A test that needs the library to itself starts its own
   `startServer({ store: memoryStore(), port: 0 })` but still takes its pages
   from the shared Chrome.
-- `deno task test` runs files in parallel (`--parallel`, a worker per core),
-  so a test never writes a tracked file or a fixed path: temp dirs and
-  seeded books only.
+- The suite runs serially. `--parallel` (worker threads) and one process per
+  core both hung a first `newContext` now and then; parallel runs come back
+  only with a reason that outweighs a flake. A test still never writes a
+  tracked file or a fixed path: temp dirs and seeded books only.
 - A tracked corpus book (`testdata/`) is laid out once per variant per run and
   every assertion reads that layout; it is seconds a time on CI.
 

@@ -54,8 +54,8 @@ look; when code and it disagree, ask.
   worktree its own port); edits reload themselves
 - `deno task check` fmt, lint, types (the pre-commit hook runs it)
 - `deno test -A <file>` the files you touched: the inner loop
-- `deno task test` all tests, Chrome included, in parallel; CI runs it, so run
-  it locally only for a change to the harness itself
+- `deno task test` all tests, Chrome included (~2.5 min); CI runs it, so run it
+  locally only for a change to the harness itself
 - `deno task test:fast` without Chrome (~10 s, pre-commit)
 - `deno task build:site` the hosted site as plain files in `dist/`
 
