@@ -120,9 +120,9 @@ export function toHtml(
     "</",
     "<\\/",
   );
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${
-    escapeHtml(b.bookTitle)
-  }</title>
+  return `<!doctype html><html lang="en" style="--book-title: ${
+    escapeHtml(JSON.stringify(b.bookTitle))
+  }"><head><meta charset="utf-8"><title>${escapeHtml(b.bookTitle)}</title>
 ${b.fontLinks}
 <style id="book-css">${css}</style>
 <script>const BOOK_NUMBERING = ${json(b.pageNumbering)};

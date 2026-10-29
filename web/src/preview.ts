@@ -124,6 +124,8 @@ declare const BookPageMap: {
     pagesArea: Element,
     pageTemplate: HTMLTemplateElement,
   ): RenderResult;
+  replaceArea(live: Element, laid: Element): void;
+  pageProblems(page: Element, n: number): PageProblem[];
 };
 
 export type UpdateMessage = Extract<ServerMessage, { type: "update" }>;
@@ -298,11 +300,22 @@ function fontSheets(): Promise<unknown> {
 // Resolves to the page-map problems of the render that ends up on screen.
 // A null cacheKey renders without the cache (a theme preview, spec §7.5):
 // every segment is laid out and nothing is saved.
+// The running heads' book title (§4.8): on the root, so it reaches the print
+// sheets' copies of the pages too, and outside the page CSS, so a new title
+// lays out only the pages that print it in their text.
+function setBookTitle(title: string): void {
+  document.documentElement.style.setProperty(
+    "--book-title",
+    JSON.stringify(title),
+  );
+}
+
 export function renderPreview(
   update: UpdateMessage,
   container: HTMLElement,
   cacheKey: string | null,
 ): Promise<PageProblem[]> {
+  setBookTitle(update.bookTitle);
   const hash = targetOf(update, seed);
   // Same content as what's on screen or already on its way (e.g. the first
   // update after a restore): Paged.js would spend seconds reproducing it, so
@@ -323,6 +336,205 @@ export function renderPreview(
     return pending = queuedUpdate.done.promise;
   }
   return pending = runRender(update, container, cacheKey);
+}
+
+// An edit that changes one segment.
+interface Swap {
+  segment: Segment;
+  key: string;
+  was: string;
+  first: HTMLElement; // its first page on screen
+  shift: { from: number; by: number } | null;
+}
+
+function swappable(
+  u: UpdateMessage,
+  container: HTMLElement,
+  book: CachedRender,
+): Swap | null {
+  // A render that wasn't saved (a theme preview) may be on screen instead.
+  const shown = container.querySelector<HTMLElement>(
+    ":scope > :not(.preview-stage)",
+  );
+  if (
+    shown?.dataset.scope !== book.scope ||
+    u.segments.length !== book.segments.length
+  ) return null;
+  let at = -1;
+  for (const [i, s] of u.segments.entries()) {
+    if (keyOf(u, s, seed) === book.segments[i]!.key) continue;
+    if (at !== -1) return null;
+    at = i;
+  }
+  const segment = u.segments[at];
+  if (!segment) return null;
+  const by = (u.segments[at + 1]?.line ?? 0) -
+    (book.segments[at + 1]?.line ?? 0);
+  const moved = u.segments.every((s, i) =>
+    s.line - book.segments[i]!.line === (i > at ? by : 0)
+  );
+  const first = container.querySelector(
+    `:scope > :not(.preview-stage) [id="${CSS.escape(segment.id)}"]`,
+  )?.closest<HTMLElement>(".pagedjs_page");
+  if (!moved || !first) return null;
+  return {
+    segment,
+    key: keyOf(u, segment, seed),
+    was: book.segments[at]!.key,
+    first,
+    shift: by ? { from: book.segments[at + 1]!.line, by } : null,
+  };
+}
+
+// Laid out again to as many pages with the same facts, the segment keeps its
+// pages' numbers, sides and folios, and no other page can move: only its text
+// changes. null otherwise, and the book is laid out as usual.
+async function swapInPlace(
+  u: UpdateMessage,
+  container: HTMLElement,
+  swap: Swap,
+  book: CachedRender,
+  cacheKey: string,
+  tick: (cb: () => void) => void,
+  cancelled: () => boolean,
+): Promise<PageProblem[] | null> {
+  const [old, cached] = await Promise.all([
+    loadCachedSegment(swap.was),
+    loadCachedSegment(swap.key),
+    fontSheets(),
+  ]);
+  if (cancelled()) throw CANCELLED;
+  if (!old) return null;
+  const live = [swap.first];
+  while (live.length < old.facts.length) {
+    const next = live.at(-1)!.nextElementSibling;
+    if (!(next instanceof HTMLElement)) return null;
+    live.push(next);
+  }
+  if (cached) {
+    if (JSON.stringify(cached.facts) !== JSON.stringify(old.facts)) return null;
+    const pages = pagesOf(
+      cached,
+      swap.segment.line,
+      (n) => u.imageUrls[n] ?? "",
+    );
+    // As runRender's cached segments: assembly checks each image's resolution.
+    await Promise.all(
+      pages.flatMap((p) => [...p.querySelectorAll("img")])
+        .map((img) => img.decode().catch(() => {})),
+    );
+    if (cancelled()) throw CANCELLED;
+    return put(
+      u,
+      container,
+      swap,
+      book,
+      cacheKey,
+      live,
+      pages,
+      old,
+      cached,
+      false,
+    );
+  }
+  const css = [u.baseCss, u.domCss, u.pagedCss].join("\n");
+  const blobUrl = URL.createObjectURL(new Blob([css], { type: "text/css" }));
+  const stage = document.createElement("div");
+  stage.className = "preview-stage";
+  stage.dataset.scope = book.scope;
+  stage.style.visibility = "hidden"; // app.css shows a stage's finished pages
+  container.append(stage);
+  const previewer = new Paged.Previewer({
+    pageMap: { seed, numbering: u.pageNumbering, segment: true },
+  });
+  previewer.chunker.q.tick = tick;
+  try {
+    const flow = await previewer.preview(swap.segment.html, [blobUrl], stage);
+    if (cancelled()) throw CANCELLED;
+    container.dataset.segmentsLaid = String(
+      Number(container.dataset.segmentsLaid ?? 0) + 1,
+    );
+    const laid = [...flow.pagesArea.querySelectorAll(":scope > .pagedjs_page")];
+    const { facts, problems } = flow.pageMapResult;
+    if (
+      JSON.stringify(facts) !== JSON.stringify(old.facts) ||
+      sheetsOf(previewer).join("\n") !== book.styles.join("\n")
+    ) return null;
+    const row: CachedSegment = {
+      pages: tokenImages(
+        shiftLines(
+          laid.map((p) => p.outerHTML).join(""),
+          -swap.segment.line,
+        ),
+        u.imageUrls,
+      ),
+      facts,
+      problems,
+    };
+    return put(u, container, swap, book, cacheKey, live, laid, old, row, true);
+  } finally {
+    previewer.polisher.destroy(); // the live pages keep their own copies
+    stage.remove();
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
+function put(
+  u: UpdateMessage,
+  container: HTMLElement,
+  swap: Swap,
+  book: CachedRender,
+  cacheKey: string,
+  live: HTMLElement[],
+  pages: Element[],
+  old: CachedSegment,
+  now: CachedSegment,
+  save: boolean,
+): PageProblem[] {
+  const n = Number(swap.first.dataset.pageNumber);
+  const on = (list: PageProblem[]) =>
+    list.map((p) => p.page === null ? p : { ...p, page: p.page - 1 + n });
+  const checked = () =>
+    live.flatMap((p, i) => BookPageMap.pageProblems(p, n + i));
+  const gone = new Set(
+    [...on(old.problems), ...checked()].map((p) => JSON.stringify(p)),
+  );
+  live.forEach((p, i) => BookPageMap.replaceArea(p, pages[i]!));
+  if (swap.shift) {
+    const { from, by } = swap.shift;
+    for (
+      const el of container.querySelectorAll<HTMLElement>(
+        ":scope > :not(.preview-stage) [data-line]",
+      )
+    ) {
+      const line = Number(el.dataset.line);
+      if (line >= from) el.dataset.line = String(line + by);
+    }
+  }
+  problems = [
+    ...problems.filter((p) => !gone.has(JSON.stringify(p))),
+    ...on(now.problems),
+    ...checked(),
+  ];
+  const render: CachedRender = {
+    ...book,
+    bookTitle: u.bookTitle,
+    problems,
+    segments: u.segments.map((s) => ({
+      key: keyOf(u, s, seed),
+      line: s.line,
+      opens: s.opens,
+      ids: s.ids,
+    })),
+  };
+  manifest = render;
+  if (!queuedUpdate) targetHash = targetOf(u, seed);
+  void saveCachedRender(
+    cacheKey,
+    render,
+    new Map(save ? [[swap.key, now]] : []),
+  );
+  return problems;
 }
 
 // Lays the book out a segment at a time (spec: segmented layout), each from
@@ -369,6 +581,24 @@ async function runRender(
   const keys = new Map<Segment, string>();
   const rows = new Map<string, CachedSegment>();
   try {
+    const swap = book && cacheKey !== null
+      ? swappable(update, container, book)
+      : null;
+    if (swap) {
+      const swapped = await swapInPlace(
+        update,
+        container,
+        swap,
+        book!,
+        cacheKey!,
+        tick,
+        () => cancelled,
+      ).catch((err) => err === CANCELLED ? CANCELLED : Promise.reject(err));
+      if (swapped === CANCELLED) {
+        return queuedUpdate ? queuedUpdate.done.promise : problems;
+      }
+      if (swapped) return swapped;
+    }
     // The pages on screen keep their fonts until the swap drops them.
     setFontLinks(update.fontLinks, { keep: true });
     // pagedCss must go through the Previewer so Paged.js processes @page;
@@ -532,6 +762,7 @@ async function runRender(
     if (cacheKey !== null && !whole) {
       const render: CachedRender = {
         styleHash: sh,
+        bookTitle: update.bookTitle,
         scope: stage.dataset.scope!,
         styles: kept?.styles ?? book!.styles,
         pageTemplate: kept?.previewer.chunker.pageTemplate.innerHTML ??
@@ -608,6 +839,7 @@ export function restoreCachedRender(
   const { render } = cached;
   const dropped = dropScreen();
   setFontLinks(render.fontLinks);
+  if (render.bookTitle !== undefined) setBookTitle(render.bookTitle);
   restoredStyles = addStyles(render.styles);
   const root = document.createElement("div");
   root.dataset.scope = render.scope;

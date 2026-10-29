@@ -150,6 +150,7 @@ export interface Metadata {
   notes?: NotesConfig;
   toc?: TocConfig;
   openers?: OpenersConfig;
+  "one-page"?: Record<string, boolean>; // §4.16
   ebook?: EbookConfig;
 }
 

@@ -233,13 +233,12 @@ Deno.test("running header entries: odd→body:right, even→body:left, page-map 
         }],
       },
     },
-    { bookTitle: "Common Sense" },
   );
   assert(!css.includes("string-set"));
   assert(!css.includes("string("));
   assertStringIncludes(
     css,
-    '@page body:right {\n  @top-right {\n    content: var(--running-off, "Common Sense");\n    vertical-align: bottom;\n    padding-bottom: 4mm;\n    font-size: 8pt;',
+    "@page body:right {\n  @top-right {\n    content: var(--running-off, var(--book-title));\n    vertical-align: bottom;\n    padding-bottom: 4mm;\n    font-size: 8pt;",
   );
   assertStringIncludes(
     css,
@@ -478,7 +477,7 @@ Deno.test("running heads anchor a gap above the text block (§4.8)", () => {
   });
   assertStringIncludes(
     css,
-    `@top-right {\n    content: var(--running-off, "");\n    vertical-align: bottom;\n    padding-bottom: ${DEFAULT_HEAD_GAP};`,
+    `@top-right {\n    content: var(--running-off, var(--book-title));\n    vertical-align: bottom;\n    padding-bottom: ${DEFAULT_HEAD_GAP};`,
   );
   assertStringIncludes(
     css,

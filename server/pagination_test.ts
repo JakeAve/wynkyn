@@ -69,6 +69,16 @@ const VARIANTS = {
       },
     },
   }),
+  "overfull-title": (m: Metadata): Metadata => ({
+    ...m,
+    elements: {
+      ...m.elements,
+      "title-page": {
+        ...m.elements?.["title-page"],
+        title: { "font-size": "120pt" },
+      },
+    },
+  }),
 };
 type Variant = keyof typeof VARIANTS;
 
@@ -314,4 +324,19 @@ chromeTest({
 chromeTest({
   name: "segments: common-sense with styled parts, chapters and drop caps",
   fn: () => assertParity("common-sense", "styled-parts"),
+});
+
+chromeTest({
+  name: "segments: great-gatsby's overfull title page is cut, nothing moves",
+  fn: async () => {
+    await assertParity("great-gatsby", "overfull-title");
+    const { report } = await laidOutBook("great-gatsby", "overfull-title");
+    const { report: fits } = await laidOutBook("great-gatsby");
+    assertEquals(
+      report.problems.filter((p) => /runs past one page/.test(p.message))
+        .map((p) => p.page),
+      [3],
+    );
+    assertEquals(report.digest, fits.digest);
+  },
 });

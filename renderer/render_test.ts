@@ -33,7 +33,7 @@ Deno.test("zones, matter classes and ids", () => {
   assertStringIncludes(html, '<article class="bml">');
   assertStringIncludes(
     html,
-    '<section class="matter matter-half-title matter-display zone-front" id="matter-half-title">',
+    '<section class="matter matter-half-title matter-display zone-front" id="matter-half-title" data-one-page>',
   );
   assertStringIncludes(
     html,
@@ -41,9 +41,22 @@ Deno.test("zones, matter classes and ids", () => {
   );
   assertStringIncludes(
     html,
-    '<section class="matter matter-colophon matter-display zone-back" id="matter-colophon">',
+    '<section class="matter matter-colophon matter-display zone-back" id="matter-colophon" data-one-page>',
   );
   assert(!html.includes('class="zone'), "no zone wrapper divs");
+});
+
+Deno.test("one-page: display matter by default, any matter by the key", () => {
+  const doc = parse(
+    "{matter: half-title}\n{title}\nT\n{matter: preface}\nP.\n{chapter: one}\nX.",
+  );
+  const marked = (html: string) =>
+    [...html.matchAll(/id="([^"]*)"[^>]* data-one-page>/g)].map((m) => m[1]);
+  assertEquals(marked(render(doc)), ["matter-half-title"]);
+  assertEquals(
+    marked(render(doc, { onePage: { "half-title": false, preface: true } })),
+    ["matter-preface"],
+  );
 });
 
 Deno.test("zone class goes on parts, not on the chapters inside them", () => {

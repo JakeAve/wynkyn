@@ -230,11 +230,11 @@ export function pageNumberingConfig(metadata: Metadata): PageNumberingConfig {
 
 // Strings read through --running-off, which the page map sets on pages that
 // carry no running head (openers, blanks, display pages; §4.8).
-function runningContent(value: string, bookTitle?: string): string {
+function runningContent(value: string): string {
   const off = (s: string) => `var(--running-off, ${JSON.stringify(s)})`;
   switch (value) {
     case "book-title":
-      return off(bookTitle ?? "");
+      return "var(--running-off, var(--book-title))";
     case "chapter-title":
       return "var(--chapter-title)";
     case "part-title":
@@ -280,10 +280,7 @@ export function folioAreas(
   return [[":right", `${edge}-right`], [":left", `${edge}-left`]];
 }
 
-export function generatePagedCSS(
-  metadata: Metadata,
-  opts: { bookTitle?: string } = {},
-): string {
+export function generatePagedCSS(metadata: Metadata): string {
   const out: string[] = [];
 
   // 1. Page box (§4.3)
@@ -382,7 +379,7 @@ export function generatePagedCSS(
     for (const entry of entries ?? []) {
       if (!AREAS.has(entry.area) || typeof entry.content !== "string") continue;
       const decls = [
-        `    content: ${runningContent(entry.content, opts.bookTitle)};`,
+        `    content: ${runningContent(entry.content)};`,
       ];
       const props = { ...anchorToTextBlock(entry.area, gap), ...entry };
       for (const [k, v] of Object.entries(props)) {

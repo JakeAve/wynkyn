@@ -33,6 +33,7 @@ export interface RenderOptions {
   bookTitle?: string; // set above the first chapter's number (`openers`, §4.14)
   elements?: Metadata["elements"]; // read for breaks only, by renderSegments
   is?: Metadata["is"]; // ditto: an {is} block's forced break-after
+  onePage?: Metadata["one-page"];
 }
 
 // folios.js is a classic script (toHtml inlines it), so its formatter hangs
@@ -481,10 +482,11 @@ function renderMatter(
   rawId: string,
 ): string {
   const id = escapeHtml(rawId);
-  const display = matterType(m.type).display ? " matter-display" : "";
-  const open = `<section class="matter matter-${escapeHtml(m.type)}${display}${
-    zoneClass(zone)
-  }" id="${id}"${dl(m)}>`;
+  const { display } = matterType(m.type);
+  const onePage = opts.onePage?.[m.type] ?? display;
+  const open = `<section class="matter matter-${escapeHtml(m.type)}${
+    display ? " matter-display" : ""
+  }${zoneClass(zone)}" id="${id}"${dl(m)}${onePage ? " data-one-page" : ""}>`;
   if (m.type === "toc") {
     const onlyTitles = m.children.every((c) =>
       c.kind === "component" && c.name === "title"

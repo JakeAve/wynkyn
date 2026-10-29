@@ -396,7 +396,9 @@ on a recto (`break-before: right` in `renderer/base.css`, a blank verso inserted
 when needed), so odd folios fall on rectos. Two exceptions: the copyright page
 is the title page's verso, and the colophon is not forced to a recto because
 print imposition pins it to the last page of the last signature (§7.7). Chapters
-open on a new page of either hand unless a book says otherwise.
+open on a new page of either hand unless a book says otherwise. Display pages
+(half-title, title page, copyright, dedication, epigraph, colophon) are held to
+one page; what doesn't fit is cut, not run on (§4.16).
 
 #### 3.4.1 Half-Title Page
 
@@ -1164,6 +1166,7 @@ books/
   "notes": { ... },
   "toc": { ... },
   "openers": { ... },
+  "one-page": { ... },
   "ebook": { ... }
 }
 ```
@@ -1632,10 +1635,13 @@ each body page's chapter and part title (the first on the page, else carried
 over from the previous page) and writes them to the page as `--chapter-title`
 and `--part-title`. `chapter-title`, `part-title` and `page-number` read
 `var(--chapter-title)`, `var(--part-title)` and `var(--folio)` in the margin
-box; `book-title` and literal strings are emitted as
-`var(--running-off, "<string>")`, and the page map sets `--running-off: ""` on
-every page that carries no running head. Paged.js does the fragmentation for
-both preview and export (§5.4, §6), so no native-Chrome fallback is needed.
+box; `book-title` reads `var(--running-off, var(--book-title))` and a literal
+string `var(--running-off, "<string>")`, and the page map sets
+`--running-off: ""` on every page that carries no running head. The book's title
+is set as `--book-title` on the document's root, outside the book's CSS, so a
+new title lays out again only the pages that print it in their text. Paged.js
+does the fragmentation for both preview and export (§5.4, §6), so no
+native-Chrome fallback is needed.
 
 A top or bottom row holding a centre box and a side box (a centred head beside
 an outside folio) is laid out by `renderer/base.css`, not by Paged.js's text
@@ -1828,6 +1834,27 @@ Named book colors, like font aliases (§4.4): a name → any CSS color.
   another. Changing a color recolors everything that names it.
 - The template ships `ink` alone; a book adds its own. A book without `colors`
   sets in the browser's black.
+
+### 4.16 Section: `one-page`
+
+Which matter pages are held to a single page. A display page is one page by
+nature, and holding it there means no edit to it can push a page onto the rest
+of the book.
+
+```json
+"one-page": { "copyright": false, "foreword": true }
+```
+
+- Keys are matter types (§3.4); `true` holds that type's section to one page.
+  The display types (half-title, title-page, copyright, dedication, epigraph,
+  colophon) default to `true`, every other type to `false`.
+- A held section never breaks onto a second page: what doesn't fit is cut at the
+  foot of its text block, whole lines kept, and the page lists a warning ("Title
+  page runs past one page; the rest is cut") that never blocks an export
+  (§4.10). What follows it starts where it would have had the section fit.
+- The style panel's Whole page block on each display page sets it as "One page".
+- The renderer marks a held section `data-one-page`; `renderer/folios.js` ends
+  its flow at the page's foot, one flow or a segment alone (§7.6).
 
 ## 5. Module Contracts
 
@@ -2402,7 +2429,11 @@ cache (IndexedDB), so an edit to one chapter lays out that chapter, and the
 contents again only if its page numbers moved. Opening a book shows its cached
 pages before its first build arrives. The layout keeps going in a background
 tab. An update that arrives mid-render abandons that render and starts its own,
-so a run of edits costs one render after the last, not one per edit.
+so a run of edits costs one render after the last, not one per edit. An edit
+that changes one segment, laid out again to as many pages with the same zones,
+titles and anchors, swaps those pages' text into the pages on screen; no other
+page is rebuilt, so nothing on screen moves. A display page held to one page
+(§4.16) always qualifies unless its zone, titles or anchors change.
 
 An illustration whose image is missing shows its placeholder (§4.10 item 8). In
 Write, a click on it moves the editor's cursor to its line, as any page click
