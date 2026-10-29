@@ -56,6 +56,10 @@ whether a page actually moved, so a pagination or CSS change runs its Chrome
 files before pushing. `UPDATE_GOLDEN=1 deno test -A server/pagination_test.ts`
 rewrites `testdata/*/page-map.json`; read the diff, it is the change.
 
+The pre-commit hook gives up after 120 s and exits 142. The fast tier takes
+~10 s, so that is a stalled test, not a slow machine: find it rather than
+raise the limit.
+
 Tests are `*_test.ts` beside each module. `web/src/local-browser_test.ts`
 drives the built `dist/` with no server, so `deno task build:site` first or it
 is skipped.
