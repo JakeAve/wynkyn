@@ -748,6 +748,35 @@
 
   /** @type {any} */ (globalThis).BookPageMap.assemble = assemble;
 
+  // A one-page segment laid again (§4.16) in place of its live page, when its
+  // facts are the same: its text block moves in, and the page's side, number,
+  // folio and margins stay, as assembly would write them again. Assembly's
+  // break mark on the segment's first section carries over.
+  /** @param {Element} live @param {Element} laid */
+  function replaceArea(live, laid) {
+    const was = live.querySelector(".pagedjs_area");
+    const area = laid.querySelector(".pagedjs_area");
+    if (!was || !area) throw new Error("a page without its area");
+    const first = "section:not([data-split-from])";
+    const mark = was.querySelector(first)?.getAttribute("data-break-before");
+    if (mark) {
+      area.querySelector(first)?.setAttribute("data-break-before", mark);
+    }
+    was.replaceWith(area);
+  }
+
+  // What assembly checks on each page, for the page `n`.
+  /** @param {Element} page @param {number} n @returns {PageProblem[]} */
+  const pageProblems = (page, n) => [
+    ...wrappedMargins(page, n),
+    ...imageProblems(page, n),
+  ];
+
+  Object.assign(/** @type {any} */ (globalThis).BookPageMap, {
+    replaceArea,
+    pageProblems,
+  });
+
   Paged.registerHandlers(
     class Folios extends Paged.Handler {
       /** @param {any[]} args */

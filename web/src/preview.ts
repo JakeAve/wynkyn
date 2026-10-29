@@ -122,6 +122,8 @@ declare const BookPageMap: {
     pagesArea: Element,
     pageTemplate: HTMLTemplateElement,
   ): RenderResult;
+  replaceArea(live: Element, laid: Element): void;
+  pageProblems(page: Element, n: number): PageProblem[];
 };
 
 export type UpdateMessage = Extract<ServerMessage, { type: "update" }>;
@@ -323,6 +325,151 @@ export function renderPreview(
   return pending = runRender(update, container, cacheKey);
 }
 
+// An edit to a one-page section alone in its segment (spec §4.16) can't move
+// another page: `one` is that segment, its key on screen and its live page,
+// when it is the only segment whose key changed under the same book CSS and
+// every segment after it moved by the same number of lines.
+interface OnePage {
+  at: number;
+  segment: Segment;
+  key: string;
+  was: string;
+  page: HTMLElement;
+  shift: { from: number; by: number } | null; // later data-lines, moved
+}
+const ONE_SECTION = /^<article[^>]*><section [^>]*\bdata-one-page[ >]/;
+
+function swappable(
+  u: UpdateMessage,
+  container: HTMLElement,
+  book: CachedRender,
+): OnePage | null {
+  if (u.segments.length !== book.segments.length) return null;
+  let at = -1;
+  for (const [i, s] of u.segments.entries()) {
+    if (keyOf(u, s, seed) === book.segments[i]!.key) continue;
+    if (at !== -1) return null;
+    at = i;
+  }
+  const segment = u.segments[at];
+  if (
+    !segment || !ONE_SECTION.test(segment.html) ||
+    segment.html.match(/<section[ >]/g)?.length !== 1 ||
+    !segment.html.endsWith("</section></article>")
+  ) return null;
+  const by = (u.segments[at + 1]?.line ?? 0) -
+    (book.segments[at + 1]?.line ?? 0);
+  const moved = u.segments.every((s, i) =>
+    s.line - book.segments[i]!.line === (i > at ? by : 0)
+  );
+  const page = container.querySelector(
+    `:scope > :not(.preview-stage) [id="${CSS.escape(segment.id)}"]`,
+  )?.closest<HTMLElement>(".pagedjs_page");
+  if (!moved || !page) return null;
+  return {
+    at,
+    segment,
+    key: keyOf(u, segment, seed),
+    was: book.segments[at]!.key,
+    page,
+    shift: by ? { from: book.segments[at + 1]!.line, by } : null,
+  };
+}
+
+// Lays `one` out alone in a hidden stage and moves its text block into the
+// live page: no other page is touched. null when the new page isn't one page
+// with the old page's facts (and so the same number, side and folio) and the
+// book's sheets: the book is then laid out as usual.
+async function swapOnePage(
+  u: UpdateMessage,
+  container: HTMLElement,
+  one: OnePage,
+  book: CachedRender,
+  cacheKey: string,
+  tick: (cb: () => void) => void,
+  cancelled: () => boolean,
+): Promise<PageProblem[] | null> {
+  const [old] = await Promise.all([loadCachedSegment(one.was), fontSheets()]);
+  if (cancelled()) throw CANCELLED;
+  if (!old || old.facts.length !== 1) return null;
+  const css = [u.baseCss, u.domCss, u.pagedCss].join("\n");
+  const blobUrl = URL.createObjectURL(new Blob([css], { type: "text/css" }));
+  // Scoped like the live pages so their sheets set it; the stage's last
+  // page is hidden (app.css), and this one is its only page.
+  const stage = document.createElement("div");
+  stage.className = "preview-stage";
+  stage.dataset.scope = book.scope;
+  container.append(stage);
+  const previewer = new Paged.Previewer({
+    pageMap: { seed, numbering: u.pageNumbering, segment: true },
+  });
+  previewer.chunker.q.tick = tick;
+  try {
+    const flow = await previewer.preview(one.segment.html, [blobUrl], stage);
+    if (cancelled()) throw CANCELLED;
+    container.dataset.segmentsLaid = String(
+      Number(container.dataset.segmentsLaid ?? 0) + 1,
+    );
+    const laid = [...flow.pagesArea.querySelectorAll(":scope > .pagedjs_page")];
+    const { facts, problems: own } = flow.pageMapResult;
+    if (
+      laid.length !== 1 ||
+      JSON.stringify(facts) !== JSON.stringify(old.facts) ||
+      sheetsOf(previewer).join("\n") !== book.styles.join("\n")
+    ) return null;
+    const row: CachedSegment = {
+      pages: tokenImages(
+        shiftLines(laid[0]!.outerHTML, -one.segment.line),
+        u.imageUrls,
+      ),
+      facts,
+      problems: own,
+    };
+    const n = Number(one.page.dataset.pageNumber);
+    const on = (list: PageProblem[]) =>
+      list.map((p) => p.page === null ? p : { ...p, page: p.page - 1 + n });
+    const gone = new Set(
+      [...on(old.problems), ...BookPageMap.pageProblems(one.page, n)]
+        .map((p) => JSON.stringify(p)),
+    );
+    BookPageMap.replaceArea(one.page, laid[0]!);
+    if (one.shift) {
+      const { from, by } = one.shift;
+      for (
+        const el of container.querySelectorAll<HTMLElement>(
+          ":scope > :not(.preview-stage) [data-line]",
+        )
+      ) {
+        const line = Number(el.dataset.line);
+        if (line >= from) el.dataset.line = String(line + by);
+      }
+    }
+    problems = [
+      ...problems.filter((p) => !gone.has(JSON.stringify(p))),
+      ...on(own),
+      ...BookPageMap.pageProblems(one.page, n),
+    ];
+    const render: CachedRender = {
+      ...book,
+      problems,
+      segments: u.segments.map((s) => ({
+        key: keyOf(u, s, seed),
+        line: s.line,
+        opens: s.opens,
+        ids: s.ids,
+      })),
+    };
+    manifest = render;
+    if (!queuedUpdate) targetHash = targetOf(u, seed);
+    void saveCachedRender(cacheKey, render, new Map([[one.key, row]]));
+    return problems;
+  } finally {
+    previewer.polisher.destroy(); // the live pages' copies of its sheets stay
+    stage.remove();
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
 // Lays the book out a segment at a time (spec: segmented layout), each from
 // the cache when its key is there, else by its own Previewer in its own stage,
 // then assembles their pages into one .pagedjs_pages. One Previewer's sheets
@@ -367,6 +514,24 @@ async function runRender(
   const keys = new Map<Segment, string>();
   const rows = new Map<string, CachedSegment>();
   try {
+    const one = book && cacheKey !== null
+      ? swappable(update, container, book)
+      : null;
+    if (one) {
+      const swapped = await swapOnePage(
+        update,
+        container,
+        one,
+        book!,
+        cacheKey!,
+        tick,
+        () => cancelled,
+      ).catch((err) => err === CANCELLED ? CANCELLED : Promise.reject(err));
+      if (swapped === CANCELLED) {
+        return queuedUpdate ? queuedUpdate.done.promise : problems;
+      }
+      if (swapped) return swapped;
+    }
     // The pages on screen keep their fonts until the swap drops them.
     setFontLinks(update.fontLinks, { keep: true });
     // pagedCss must go through the Previewer so Paged.js processes @page;

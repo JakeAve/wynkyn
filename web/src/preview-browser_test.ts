@@ -77,7 +77,7 @@ appTest({
 
 appTest({
   name:
-    "preview: an edit lays out one segment, its undo and a reload none, a title-page font one",
+    "preview: an edit lays out one segment, its undo and a reload none, a title-page font one, a title-page edit in place",
   async fn() {
     const chapter = (slug: string, title: string) =>
       `{chapter: ${slug}}\n{title}\n${title}\n\nSome words in ${title}.\n`;
@@ -164,13 +164,35 @@ appTest({
     assertEquals(await laid(), 2, "only the edited chapter");
     await page.keyboard.press("ControlOrMeta+z");
     await page.locator("#preview[data-stale]").waitFor();
-    await laidOut(page, n);
+    n = await laidOut(page, n);
     assertEquals(await laid(), 2, "the undo lays out nothing");
     assertEquals(
       await page.locator("#preview .pagedjs_page", { hasText: "again" })
         .count(),
       0,
       "the undone pages",
+    );
+
+    // The title page is held to one page (§4.16), so an edit to it swaps
+    // that page's text in place: the other pages stay the same nodes.
+    const other = await page.locator("#preview .pagedjs_page", {
+      has: page.locator("#one"),
+    }).elementHandle();
+    await page.keyboard.press("ControlOrMeta+Home");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("End");
+    await page.keyboard.type(" Revised");
+    await page.locator("#preview[data-stale]").waitFor();
+    await laidOut(page, n);
+    assertEquals(await laid(), 3, "only the title page");
+    assertEquals(
+      await page.locator("#preview .matter-title-page .title").textContent(),
+      "Demo Book Revised",
+    );
+    assert(
+      await other!.evaluate((el) => el.isConnected),
+      "the chapter's page is the one that was on screen",
     );
   },
 });
