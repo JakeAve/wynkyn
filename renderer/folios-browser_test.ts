@@ -85,7 +85,7 @@ function build(
     css: [
       baseCss,
       generateDomCSS(metadata),
-      generatePagedCSS(metadata, { bookTitle: "The Book" }),
+      generatePagedCSS(metadata),
     ].join("\n"),
     numbering: pageNumberingConfig(metadata),
   };
@@ -109,7 +109,7 @@ interface Pass {
 async function withPage(fn: (page: Page) => Promise<void>) {
   const page = await newPage();
   await page.setContent(
-    `<!doctype html><script>${PAGED_JS}</script>${
+    `<!doctype html><html style='--book-title: "The Book"'><script>${PAGED_JS}</script>${
       scripts.map((s) => `<script>${s}</script>`).join("")
     }<div id="out"></div>`,
   );

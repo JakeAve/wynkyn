@@ -1635,10 +1635,13 @@ each body page's chapter and part title (the first on the page, else carried
 over from the previous page) and writes them to the page as `--chapter-title`
 and `--part-title`. `chapter-title`, `part-title` and `page-number` read
 `var(--chapter-title)`, `var(--part-title)` and `var(--folio)` in the margin
-box; `book-title` and literal strings are emitted as
-`var(--running-off, "<string>")`, and the page map sets `--running-off: ""` on
-every page that carries no running head. Paged.js does the fragmentation for
-both preview and export (§5.4, §6), so no native-Chrome fallback is needed.
+box; `book-title` reads `var(--running-off, var(--book-title))` and a literal
+string `var(--running-off, "<string>")`, and the page map sets
+`--running-off: ""` on every page that carries no running head. The book's title
+is set as `--book-title` on the document's root, outside the book's CSS, so a
+new title lays out again only the pages that print it in their text. Paged.js
+does the fragmentation for both preview and export (§5.4, §6), so no
+native-Chrome fallback is needed.
 
 A top or bottom row holding a centre box and a side box (a centred head beside
 an outside folio) is laid out by `renderer/base.css`, not by Paged.js's text

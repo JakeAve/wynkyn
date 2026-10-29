@@ -298,11 +298,22 @@ function fontSheets(): Promise<unknown> {
 // Resolves to the page-map problems of the render that ends up on screen.
 // A null cacheKey renders without the cache (a theme preview, spec §7.5):
 // every segment is laid out and nothing is saved.
+// The running heads' book title (§4.8): on the root, so it reaches the print
+// sheets' copies of the pages too, and outside the page CSS, so a new title
+// lays out only the pages that print it in their text.
+function setBookTitle(title: string): void {
+  document.documentElement.style.setProperty(
+    "--book-title",
+    JSON.stringify(title),
+  );
+}
+
 export function renderPreview(
   update: UpdateMessage,
   container: HTMLElement,
   cacheKey: string | null,
 ): Promise<PageProblem[]> {
+  setBookTitle(update.bookTitle);
   const hash = targetOf(update, seed);
   // Same content as what's on screen or already on its way (e.g. the first
   // update after a restore): Paged.js would spend seconds reproducing it, so
@@ -498,6 +509,7 @@ function put(
   ];
   const render: CachedRender = {
     ...book,
+    bookTitle: u.bookTitle,
     problems,
     segments: u.segments.map((s) => ({
       key: keyOf(u, s, seed),
@@ -741,6 +753,7 @@ async function runRender(
     if (cacheKey !== null && !whole) {
       const render: CachedRender = {
         styleHash: sh,
+        bookTitle: update.bookTitle,
         scope: stage.dataset.scope!,
         styles: kept?.styles ?? book!.styles,
         pageTemplate: kept?.previewer.chunker.pageTemplate.innerHTML ??
@@ -817,6 +830,7 @@ export function restoreCachedRender(
   const { render } = cached;
   const dropped = dropScreen();
   setFontLinks(render.fontLinks);
+  if (render.bookTitle !== undefined) setBookTitle(render.bookTitle);
   restoredStyles = addStyles(render.styles);
   const root = document.createElement("div");
   root.dataset.scope = render.scope;

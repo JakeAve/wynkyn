@@ -215,7 +215,7 @@ export async function buildBook(
     baseCss: opts.baseCss ?? await defaultBaseCss(),
     domCss: rules.map((r) => r.css).join(""),
     domRules: rules,
-    pagedCss: generatePagedCSS(m, { bookTitle }),
+    pagedCss: generatePagedCSS(m),
     pageNumbering: pageNumberingConfig(m),
     fontLinks: generateFontLinks(m),
     diagnostics: [

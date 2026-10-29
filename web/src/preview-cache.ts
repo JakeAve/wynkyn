@@ -30,6 +30,7 @@ export interface CachedRender {
   styles: string[];
   pageTemplate: string;
   fontLinks: string;
+  bookTitle?: string;
   pageNumbering: PageNumberingConfig;
   seed: Seed;
   // The book's problems as laid out: a restore assembles before its images
