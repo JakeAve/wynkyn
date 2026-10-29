@@ -4,7 +4,7 @@
 // `bml export`.
 import { NotFoundError } from "./pipeline.ts";
 import { BookService, ServiceError, themedTemplate } from "./book-service.ts";
-import { diskStore } from "./store.ts";
+import { type BookStore, diskStore } from "./store.ts";
 import { defaultPort } from "./port.ts";
 import { installedFonts } from "./local-fonts.ts";
 import type { Metadata } from "../metadata/types.ts";
@@ -50,6 +50,7 @@ const contentType = (name: string) =>
 
 export interface ServerOptions {
   booksRoot?: string; // default "books"
+  store?: BookStore; // in place of booksRoot: the Chrome tests' memory library
   port?: number; // 0 = OS-assigned (tests); default 8000
 }
 
@@ -61,15 +62,19 @@ export interface RunningServer {
 export async function startServer(
   opts: ServerOptions = {},
 ): Promise<RunningServer> {
-  const booksRoot = opts.booksRoot ?? "books";
-  try {
-    await Deno.stat(booksRoot); // fail fast at startup if the root is missing
-  } catch {
-    throw new Error(
-      `${booksRoot}/ not found — in a worktree, \`deno task setup\` links it to the main checkout's library`,
-    );
+  let store = opts.store;
+  if (!store) {
+    const booksRoot = opts.booksRoot ?? "books";
+    try {
+      await Deno.stat(booksRoot); // fail fast at startup if the root is missing
+    } catch {
+      throw new Error(
+        `${booksRoot}/ not found — in a worktree, \`deno task setup\` links it to the main checkout's library`,
+      );
+    }
+    store = diskStore(booksRoot);
   }
-  const service = new BookService({ store: diskStore(booksRoot) });
+  const service = new BookService({ store });
 
   async function json(req: Request): Promise<Record<string, unknown>> {
     try {
@@ -81,8 +86,8 @@ export async function startServer(
 
   // book/edition keys with an export running; one at a time each.
   const exporting = new Set<string>();
-  const exportDir = (book: string, edition: string | null) =>
-    `${booksRoot}/${book}/export${edition === null ? "" : `/${edition}`}`;
+  const exportPath = (book: string, edition: string | null, file: string) =>
+    `${book}/export${edition === null ? "" : `/${edition}`}/${file}`;
 
   // The Publish tab's e-book export (spec §7.8): `bml epub` behind an
   // endpoint, through the service so a style save under way lands first. The
@@ -99,9 +104,10 @@ export async function startServer(
     exporting.add(key);
     try {
       const { epub, documents } = await service.exportEpub(book, edition);
-      const dir = exportDir(book, edition);
-      await Deno.mkdir(dir, { recursive: true });
-      await Deno.writeFile(`${dir}/book.epub`, epub);
+      const path = exportPath(book, edition, "book.epub");
+      if (!await service.store.create(path, epub)) {
+        await service.store.write(path, epub);
+      }
       return Response.json({ file: "book.epub", documents });
     } catch (err) {
       return new Response((err as Error).message, { status: 500 });
@@ -132,15 +138,13 @@ export async function startServer(
   }
 
   async function serveStatic(
-    dirUrl: URL | string,
+    dirUrl: URL,
     name: string,
   ): Promise<Response> {
     const ok = dirUrl === ROOT || safeName(name);
     if (!ok) return new Response("bad path", { status: 400 });
     try {
-      const data = typeof dirUrl === "string"
-        ? await Deno.readFile(`${dirUrl}/${name}`)
-        : await Deno.readFile(new URL(name, dirUrl));
+      const data = await Deno.readFile(new URL(name, dirUrl));
       return new Response(data, {
         headers: { "content-type": contentType(name) },
       });
@@ -383,7 +387,13 @@ export async function startServer(
         return new Response("bad path", { status: 400 });
       }
       if (file && req.method === "GET") {
-        return serveStatic(exportDir(book!, edition), file);
+        if (!safeName(file)) return new Response("bad path", { status: 400 });
+        const data = await service.store.read(exportPath(book!, edition, file));
+        return data
+          ? new Response(data, {
+            headers: { "content-type": contentType(file) },
+          })
+          : new Response("not found", { status: 404 });
       }
     }
 
