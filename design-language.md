@@ -829,6 +829,13 @@ title page rubricated in light `--acc`: the sun and the inner hairline rule are
 red, the outer frame, hatching, stars and banner stay black. Re-export it with
 the icons.
 
+The README opens on the share card's banner (`readme-light.svg`,
+`readme-dark.svg`): the sun rises from behind the ribbon under twinkling stars,
+still under `prefers-reduced-motion`. GitHub strips a README's CSS and an
+`<img>` SVG loads no fonts and can't see GitHub's theme, so each file carries
+its own motion and Pirata subset, the dark one on GitHub's `#0d1117`, and a
+`<picture>` picks between them. Re-export them with the share card.
+
 ## 11. The hosted site
 
 Same tokens, a louder register: headlines (`h1`) in Fell Great Primer at

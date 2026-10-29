@@ -1,4 +1,9 @@
-# Wynkyn
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="web/brand/readme-dark.svg">
+    <img src="web/brand/readme-light.svg" alt="Wynkyn" width="480">
+  </picture>
+</h1>
 
 Typeset and print hand-bound books, free, from your own files.
 
