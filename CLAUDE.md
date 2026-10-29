@@ -44,14 +44,18 @@ look; when code and it disagree, ask.
   fails an unlabelled sleep). A CI failure that passes on re-run is a race to
   fix at its root, never a re-run, retry or longer timeout (`architecture` →
   `references/dev-workflow.md`).
+- A Chrome test takes a page from the shared harness (`testing/app.ts`,
+  `testing/chrome.ts`), never its own browser, server or copied book folder.
 
 ## Commands
 
 - `deno task setup` once per checkout: git hooks, dev port, `books/` symlink
 - `deno task dev` build the client + live server (main checkout :8000, a
   worktree its own port); edits reload themselves
-- `deno task check` fmt, lint, types (both git hooks run it)
-- `deno task test` all tests, Chrome included (minutes; ~8 on CI; pre-push)
+- `deno task check` fmt, lint, types (the pre-commit hook runs it)
+- `deno test -A <file>` the files you touched: the inner loop
+- `deno task test` all tests, Chrome included, in parallel; CI runs it, so run
+  it locally only for a change to the harness itself
 - `deno task test:fast` without Chrome (~10 s, pre-commit)
 - `deno task build:site` the hosted site as plain files in `dist/`
 

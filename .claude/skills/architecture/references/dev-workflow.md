@@ -41,20 +41,49 @@ A client with an unsaved edit does not reload itself; its status says
 
 ## Test tiers
 
-| Command | Runs | Time | When |
-| --- | --- | --- | --- |
-| `deno task test:fast` | everything except the Chrome-driven tests (`SKIP_CHROME=1` makes `hasChrome` false) | ~10 s | pre-commit hook, inner loop |
-| `deno task test` | all, including pagination goldens, print export, live sync in a real browser | ~50 s | pre-push hook, CI, after any layout change |
+| Command | Runs | When |
+| --- | --- | --- |
+| `deno test -A <file>` | the files you touched | the inner loop: this is what you run |
+| `deno task test:fast` | everything without Chrome (`SKIP_CHROME=1`), ~10 s | pre-commit hook; CI's Ubuntu `fast` job |
+| `deno task test` | all, Chrome included, test files in parallel | CI's macOS `test` job, the gate |
 
-`deno task check` (fmt, lint, types) runs in both hooks. The Chrome tests
-are the ones that know whether a page actually moved, so never finish a
-pagination or CSS change on the fast tier alone. `UPDATE_GOLDEN=1 deno task
-test` rewrites `testdata/*/page-map.json`; read the diff, it is the change.
+CI is the only place the whole Chrome suite runs. Don't run it locally to
+"make sure", and never while another worktree's suite is running: suites in
+several worktrees starve each other of CPU, which is how a passing test
+times out and a session spends an hour on a race that isn't one. Run the
+files you changed, push, and read CI. The Chrome tests are the ones that know
+whether a page actually moved, so a pagination or CSS change runs its Chrome
+files before pushing. `UPDATE_GOLDEN=1 deno test -A server/pagination_test.ts`
+rewrites `testdata/*/page-map.json`; read the diff, it is the change.
 
 Tests are `*_test.ts` beside each module. `web/src/local-browser_test.ts`
 drives the built `dist/` with no server, so `deno task build:site` first or it
-is skipped. Chrome tests gate on `hasChrome` from `testing/chrome.ts`, which
-launches Chrome once and skips them only if that fails.
+is skipped.
+
+### The Chrome harness
+
+A Chrome test costs a page, never a browser or a server:
+
+- `testing/chrome.ts` launches one Chrome per test process and keeps it.
+  `chromeTest({ name, fn })` is `Deno.test` on it (sanitizers off, since the
+  browser outlives a test); `newPage(opts?)` is a page in a fresh context, so
+  storage never leaks between tests, closed when the test ends.
+- `testing/app.ts` runs one dev server per test process over a library in
+  memory. `appTest` is `chromeTest` that also needs `web/app.js`. `book({
+  manuscript?, metadata? })` seeds the demo book under a fresh slug;
+  `openApp(b)` is a laid-out page on it. `b.write(name, data)` is an outside
+  edit the server hears synchronously; `b.read(name)` is what landed.
+- No FSEvents in an app test: a disk watch can push late or twice, the root
+  of most of this repo's flakes. Only `server/live-sync-browser_test.ts` and
+  the store contract are about the disk.
+- A test that needs the library to itself starts its own
+  `startServer({ store: memoryStore(), port: 0 })` but still takes its pages
+  from the shared Chrome.
+- `deno task test` runs files in parallel (`--parallel`, a worker per core),
+  so a test never writes a tracked file or a fixed path: temp dirs and
+  seeded books only.
+- A tracked corpus book (`testdata/`) is laid out once per variant per run and
+  every assertion reads that layout; it is seconds a time on CI.
 
 ### What earns a test
 
@@ -145,15 +174,16 @@ attribute or a count, as `afterLayout` in `app.ts` counts layouts on
 - **A CodeMirror line:** it is drawn only near the viewport. Scroll less than
   a screen at a time and wait two `requestAnimationFrame`s after each step.
 
-**5. Prove it before you push.** Run a new or changed Chrome test five times
-(`for i in 1 2 3 4 5; do deno test -A <file> --filter "<name>"; done`). For
-a wait on a transition, stretch the app's `--t` and `--t-fast` to 1 s: the
-old wait should fail and the new one pass. Forcing `transition-duration` on
-`*` animates everything and proves nothing. CPU throttling
-(`Emulation.setCPUThrottlingRate`) slows the test as much as the app, so it
-rarely opens a race. Log what the test sees at the moment it starts waiting
-(here, "0 page turns at page 2") instead. Don't judge a flake while another
-worktree's suite is running: two suites and two Chromes starve each other.
+**5. Prove a race fix, not every test.** A new Chrome test runs once,
+locally, and then on CI. A fix for a flake has to show that it fails the old
+way and passes the new: for a wait on a transition, stretch the app's `--t`
+and `--t-fast` to 1 s; the old wait should fail and the new one pass.
+Forcing `transition-duration` on `*` animates everything and proves nothing.
+CPU throttling (`Emulation.setCPUThrottlingRate`) slows the test as much as
+the app, so it rarely opens a race. Log what the test sees at the moment it
+starts waiting (here, "0 page turns at page 2") instead. Repeated runs prove
+little on a laptop that is faster than CI, and nothing at all while another
+suite shares the CPU.
 
 **6. A red CI run that passed on the PR is a race, not bad luck.** Never
 re-run it to green, add retries or raise a timeout. Read the failing line,
@@ -171,9 +201,11 @@ brought in: fix it there too.
 
 ## CI
 
-`.github/workflows/ci.yml` runs `check`, `build:web` and `test` on macOS:
-Chrome is preinstalled there, and the golden page maps need macOS font
-rasterisation.
+`.github/workflows/ci.yml` has two jobs. `fast` (Ubuntu) runs `check` and
+`test:fast`, so a lint or unit failure comes back in about a minute. `test`
+(macOS) runs `build:site` and the full suite: Chrome is preinstalled there,
+and the golden page maps need macOS font rasterisation. The `main` ruleset
+requires the check named `test`; renaming that job blocks every merge.
 
 ## Verifying a layout change for real
 
@@ -188,5 +220,5 @@ either (images don't load there). Paginate the book in Chrome and look:
    page is, measure the last text node — Paged.js's page wrapper is always
    page-tall.
 
-`server/pagination_test.ts` and `renderer/folios-browser_test.ts` show the
-harness; copy from them rather than from memory.
+`server/pagination_test.ts` and `renderer/folios-browser_test.ts` show how;
+copy from them rather than from memory.
