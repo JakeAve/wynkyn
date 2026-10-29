@@ -205,6 +205,45 @@ footer .colophon::before {
   color: var(--acc-ink);
   font-style: normal;
 }
+/* The roundel beside the colophon: its legend and sun turn apart. The sun is
+   mark.svg's own path, so it follows any redraw of the mark. */
+footer .seal {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  margin-top: var(--s-4);
+}
+footer .seal svg {
+  width: 4.5rem;
+  flex: none;
+  overflow: visible;
+  color: var(--fg);
+  fill: none;
+  stroke: currentColor;
+}
+footer .seal text {
+  fill: currentColor;
+  stroke: none;
+  font-family: var(--f-title);
+}
+footer .seal .rule {
+  stroke: var(--acc);
+}
+footer .seal use {
+  color: var(--acc);
+  stroke: none;
+  transform-origin: 50px 50px;
+  animation: turn 120s linear infinite;
+}
+footer .seal .legend {
+  transform-origin: 100px 100px;
+  animation: turn 180s linear infinite reverse;
+}
+footer .seal .colophon {
+  flex: 1;
+  margin: 0;
+}
 a:focus-visible {
   outline: var(--ring) solid var(--acc);
   outline-offset: 1px;
@@ -214,7 +253,9 @@ a:focus-visible {
   .btn {
     transition: none;
   }
-  header .mark img {
+  header .mark img,
+  footer .seal use,
+  footer .seal .legend {
     animation: none;
   }
 }
