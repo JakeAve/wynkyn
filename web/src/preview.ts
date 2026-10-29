@@ -10,16 +10,23 @@ import {
 } from "./style-catalog.ts";
 import {
   type CachedRender,
-  renderHash,
-  restoredHash,
-  restoredPageMap,
+  type CachedSegment,
+  loadCachedSegment,
   saveCachedRender,
+  segmentKey,
+  segmentStyleHash,
+  shiftLines,
+  styleHash,
+  tokenImages,
+  untokenImages,
 } from "./preview-cache.ts";
 import { scopeSheet } from "./scope-css.ts";
 import type {
+  Laid,
   PageEntry,
   PageProblem,
   Seed,
+  Segment,
 } from "../../renderer/page-map-types.ts";
 
 interface RenderResult {
@@ -35,18 +42,31 @@ interface Previewer {
     inserted: HTMLStyleElement[];
     destroy(): void;
   };
-  // The render queue's scheduler (see renderTick below).
-  chunker: { q: { tick: (cb: () => void) => void } };
+  // The render queue's scheduler (see renderTick below); the page blanks
+  // are made from.
+  chunker: {
+    q: { tick: (cb: () => void) => void };
+    pageTemplate: HTMLTemplateElement;
+  };
   // preview() resolves to the chunker; folios.js leaves the result on it.
   preview(
     html: string,
     css: string[],
     el: Element,
-  ): Promise<{ pageMapResult: RenderResult }>;
+  ): Promise<{
+    pageMapResult: RenderResult & { facts: Laid["facts"] };
+    pagesArea: HTMLElement;
+  }>;
 }
 declare const Paged: {
   Previewer: new (
-    options: { pageMap: { seed: Seed; numbering: PageNumberingConfig } },
+    options: {
+      pageMap: {
+        seed: Seed;
+        numbering: PageNumberingConfig;
+        segment?: boolean;
+      };
+    },
   ) => Previewer;
   // A handler sees the render it's part of; its hooks are its methods.
   Handler: new (...args: never[]) => {
@@ -90,6 +110,18 @@ declare const BookPageMap: {
     seed: Seed,
     maxPasses?: number,
   ): Promise<RenderResult & { passes: number }>;
+  settleSegments(
+    segments: Segment[],
+    layOut: (s: Segment, seed: Seed) => Promise<Laid>,
+    assembleAll: (laid: Laid[]) => RenderResult,
+    seed: Seed,
+  ): Promise<(RenderResult & { passes: number }) | null>;
+  assemble(
+    laid: Laid[],
+    numbering: PageNumberingConfig,
+    pagesArea: Element,
+    pageTemplate: HTMLTemplateElement,
+  ): RenderResult;
 };
 
 export type UpdateMessage = Extract<ServerMessage, { type: "update" }>;
@@ -113,13 +145,25 @@ let rendering = false;
 // Abandons the render under way: a newer update has made it pointless.
 let cancelCurrent: (() => void) | null = null;
 const CANCELLED = Symbol("render cancelled");
-// The hash of the render on screen or being produced for it; every accepted
-// call sets it synchronously, so a queued render can't be skipped as "same".
+// Thrown by a segment's layout when the book must be laid out whole.
+const WHOLE = Symbol("lay the book out whole");
+// Rules Paged.js's Counters, target-counter() and target-text() handlers
+// write for one run's elements (data-ref and the like, fresh each parse):
+// pages laid by another run, or alone, don't match them.
+const PER_RUN = /\[data-(?:ref|page-number|target-text|target-counter-[\w-]+)=/;
+// What the render on screen or being produced for it is of (`target`); every
+// accepted call sets it synchronously, so a queued render can't be skipped as
+// "same".
 let targetHash: string | null = null;
 // The Previewer whose pages are on screen; its polisher owns their sheets.
 let livePreviewer: Previewer | null = null;
-// The sheets of a render restored from the cache, which has no Previewer.
+// The sheets of a render with no Previewer of its own (restored from the
+// cache, or every segment found there).
 let restoredStyles: Element[] = [];
+// The book's cache manifest as last saved or restored. A render of the book
+// in the same styles takes its scope, so the sheets it names apply to the
+// pages of the segments found in the cache.
+let manifest: CachedRender | null = null;
 // The on-screen render's anchor folios seed the next render, so it usually
 // settles in one pass.
 let seed: Seed = {};
@@ -145,14 +189,119 @@ let queuedUpdate: {
   done: PromiseWithResolvers<PageProblem[]>;
 } | null = null;
 
+// The book's styles, each segment's key and the page numbering: two renders
+// with the same target show the same pages.
+function target(
+  styles: string,
+  keys: string[],
+  numbering: PageNumberingConfig,
+): string {
+  return [styles, ...keys, JSON.stringify(numbering)].join(" ");
+}
+
+// Each update's segment keys, with the numbers each was keyed under: a
+// segment's styles are hashed once, and its key again only when a number it
+// prints changed.
+const keyMemo = new WeakMap<
+  UpdateMessage,
+  Map<Segment, { style: string; read: string; key: string }>
+>();
+
+// A segment's cache key: its text, the styles that reach it, the numbers it
+// prints.
+function keyOf(u: UpdateMessage, s: Segment, from: Seed): string {
+  let memo = keyMemo.get(u);
+  if (!memo) keyMemo.set(u, memo = new Map());
+  const read = s.reads.map((a) => from[a] ?? "000").join("\x1f");
+  const was = memo.get(s);
+  if (was?.read === read) return was.key;
+  const style = was?.style ?? segmentStyleHash(s, u);
+  const key = segmentKey(s, style, from, u.imageUrls);
+  memo.set(s, { style, read, key });
+  return key;
+}
+
+function targetOf(u: UpdateMessage, from: Seed): string {
+  return target(
+    styleHash(u),
+    u.segments.map((s) => keyOf(u, s, from)),
+    u.pageNumbering,
+  );
+}
+
+/** Whether `render`'s pages are what rendering `u` would show. */
+export function cacheHolds(render: CachedRender, u: UpdateMessage): boolean {
+  return targetOf(u, render.seed) ===
+    target(
+      render.styleHash,
+      render.segments.map((s) => s.key),
+      render.pageNumbering,
+    );
+}
+
+// A Previewer's sheets as text, in head order (the cascade's): its base
+// sheet, the rules it generates, then the book CSS.
+function sheetsOf(p: Previewer): string[] {
+  const { styleEl, inserted } = p.polisher;
+  return [...document.head.querySelectorAll("style")]
+    .filter((el) => el === styleEl || inserted.includes(el))
+    .map((el) =>
+      [...el.sheet?.cssRules ?? []].map((r) => r.cssText).join("\n")
+    );
+}
+
+function addStyles(styles: string[]): Element[] {
+  return styles.map((css) => {
+    const el = document.createElement("style");
+    el.textContent = css;
+    document.head.appendChild(el);
+    return el;
+  });
+}
+
+function templateOf(html: string): HTMLTemplateElement {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+  return tpl;
+}
+
+// A cached segment's pages, its lines back in place and its images at this
+// session's URLs. Parsed in a div, not a template, so the images load.
+function pagesOf(
+  row: CachedSegment,
+  line: number,
+  imageUrl: (name: string) => string,
+): Element[] {
+  const div = document.createElement("div");
+  div.innerHTML = shiftLines(untokenImages(row.pages, imageUrl), line);
+  return [...div.children];
+}
+
+// Each book-font link's load or failure, watched from when setFontLinks adds
+// it: a link that has failed fires nothing more, so a listener added later
+// would wait for good (offline, fonts blocked).
+const linkSettled = new WeakMap<Element, Promise<unknown>>();
+
+// The book's font stylesheets, loaded or failed: Paged.js waits only on the
+// faces document.fonts already lists, and a link's join it once its sheet is
+// in. Without this a first segment, laid out at once, set type in a fallback
+// face.
+function fontSheets(): Promise<unknown> {
+  return Promise.all(
+    [...document.querySelectorAll("link[data-book-font][rel=stylesheet]")]
+      .map((l) => linkSettled.get(l)),
+  );
+}
+
 // Resolves to the page-map problems of the render that ends up on screen.
-// A null cacheKey renders without saving (a theme preview, spec §7.5).
+// A null cacheKey renders without the cache (a theme preview, spec §7.5):
+// every segment is laid out and nothing is saved.
 export function renderPreview(
   update: UpdateMessage,
   container: HTMLElement,
   cacheKey: string | null,
 ): Promise<PageProblem[]> {
-  const hash = renderHash(update);
+  const hash = targetOf(update, seed);
   // Same content as what's on screen or already on its way (e.g. the first
   // update after a restore): Paged.js would spend seconds reproducing it, so
   // share that render's outcome.
@@ -171,14 +320,19 @@ export function renderPreview(
     cancelCurrent?.();
     return pending = queuedUpdate.done.promise;
   }
-  return pending = runRender(update, container, cacheKey, hash);
+  return pending = runRender(update, container, cacheKey);
 }
 
+// Lays the book out a segment at a time (spec: segmented layout), each from
+// the cache when its key is there, else by its own Previewer in its own stage,
+// then assembles their pages into one .pagedjs_pages. One Previewer's sheets
+// serve every page (all are scoped alike); the others' come down. When the
+// segments' sheets differ, or hold rules for one run's elements (PER_RUN),
+// the book is laid out whole, and nothing is saved.
 async function runRender(
   update: UpdateMessage,
   container: HTMLElement,
   cacheKey: string | null,
-  hash: string,
 ): Promise<PageProblem[]> {
   rendering = true;
   // Cancelling rejects the race below and stops the queue ticking: Paged.js
@@ -193,6 +347,25 @@ async function runRender(
     if (!cancelled) renderTick(cb);
   };
   scopeRenders();
+  const sh = styleHash(update);
+  // Same book CSS as the manifest's: its sheets and scope serve this render.
+  const book = cacheKey !== null && manifest?.styleHash === sh
+    ? manifest
+    : null;
+  // The keys on screen. With new CSS a cached segment needs this run's
+  // sheets, so one segment is laid out regardless: the first whose key isn't
+  // on screen (a style change reached it), or else the last.
+  const shown = new Set(manifest?.segments.map((x) => x.key));
+  const last = update.segments.at(-1);
+  // `kept`: the first Previewer, whose sheets stay. `laying`: the one at
+  // work. `copies`: the manifest's sheets, when every segment was cached.
+  // `as`: keeps TS from narrowing these to null past the closures.
+  let kept = null as { previewer: Previewer; styles: string[] } | null;
+  let laying = null as Previewer | null;
+  let whole = null as Previewer | null;
+  let copies: Element[] = [];
+  const keys = new Map<Segment, string>();
+  const rows = new Map<string, CachedSegment>();
   try {
     // The pages on screen keep their fonts until the swap drops them.
     setFontLinks(update.fontLinks, { keep: true });
@@ -204,6 +377,8 @@ async function runRender(
     // old pages stay on screen for the seconds Paged.js takes, no white flash.
     const stage = document.createElement("div");
     stage.className = "preview-stage";
+    stage.dataset.scope = book?.scope ??
+      Math.random().toString(36).slice(2, 10);
     // app.css keys the progress message and the dimming on this attribute,
     // not on :has(> .preview-stage): Chrome re-evaluates :has() on every
     // node Paged.js inserts, which made a re-render twenty times slower.
@@ -211,30 +386,119 @@ async function runRender(
       ? "again"
       : "first";
     container.appendChild(stage);
-    // `as`: keeps TS from narrowing this to undefined past the closure.
-    let previewer = undefined as Previewer | undefined;
-    let result: RenderResult;
+    const area = document.createElement("div");
+    area.className = "pagedjs_pages";
+    stage.append(area);
+    const layOut = async (s: Segment, passSeed: Seed): Promise<Laid> => {
+      if (cancelled) throw CANCELLED;
+      const key = keyOf(update, s, passSeed);
+      keys.set(s, key);
+      const row = cacheKey !== null && await loadCachedSegment(key);
+      if (cancelled) throw CANCELLED;
+      if (row && (book || kept || (shown.has(key) && s !== last))) {
+        const pages = pagesOf(row, s.line, (n) => update.imageUrls[n] ?? "");
+        // Assembly checks each image's resolution.
+        await Promise.all(
+          pages.flatMap((p) => [...p.querySelectorAll("img")])
+            .map((img) => img.decode().catch(() => {})),
+        );
+        if (cancelled) throw CANCELLED;
+        const { facts, problems } = row;
+        return { segment: s, pages, facts, problems, sheet: null };
+      }
+      // Scoped like the rest before Paged.js parses (ScopeSheets keeps it).
+      const own = document.createElement("div");
+      own.dataset.scope = stage.dataset.scope;
+      stage.append(own);
+      const previewer = laying = new Paged.Previewer({
+        pageMap: {
+          seed: passSeed,
+          numbering: update.pageNumbering,
+          segment: true,
+        },
+      });
+      previewer.chunker.q.tick = tick;
+      const flow = await previewer.preview(s.html, [blobUrl], own);
+      laying = null;
+      container.dataset.segmentsLaid = String(
+        Number(container.dataset.segmentsLaid ?? 0) + 1,
+      );
+      const styles = sheetsOf(previewer);
+      if (kept) previewer.polisher.destroy();
+      else kept = { previewer, styles };
+      if (styles.some((css) => PER_RUN.test(css))) throw WHOLE;
+      const pages = [
+        ...flow.pagesArea.querySelectorAll(":scope > .pagedjs_page"),
+      ];
+      const { facts, problems } = flow.pageMapResult;
+      // As laid out alone: assembly renumbers and moves them next.
+      if (cacheKey !== null) {
+        rows.set(key, {
+          pages: tokenImages(
+            shiftLines(pages.map((p) => p.outerHTML).join(""), -s.line),
+            update.imageUrls,
+          ),
+          facts,
+          problems,
+        });
+      }
+      return { segment: s, pages, facts, problems, sheet: styles.join("\n") };
+    };
+    const assembleAll = (laid: Laid[]): RenderResult => {
+      // Every segment so far came from the cache, in the manifest's CSS: so
+      // do the sheets.
+      if (!kept && !copies.length) copies = addStyles(book!.styles);
+      const r = BookPageMap.assemble(
+        laid,
+        update.pageNumbering,
+        area,
+        kept?.previewer.chunker.pageTemplate ?? templateOf(book!.pageTemplate),
+      );
+      area.style.setProperty("--pagedjs-page-count", String(r.map.length));
+      return r;
+    };
+    let result: RenderResult & { passes: number } | null = null;
     try {
-      // Each pass renders into the stage; a pass that didn't settle leaves
-      // its pages and sheets behind for the next one to clear.
-      result = await Promise.race([
-        BookPageMap.settle(async (passSeed) => {
-          if (cancelled) throw CANCELLED; // no sheets for a pass nobody wants
-          if (previewer) {
-            previewer.polisher.destroy();
-            stage.replaceChildren();
-          }
-          previewer = new Paged.Previewer({
-            pageMap: { seed: passSeed, numbering: update.pageNumbering },
-          });
-          previewer.chunker.q.tick = tick;
-          return (await previewer.preview(update.html, [blobUrl], stage))
-            .pageMapResult;
-        }, seed),
-        abort.promise,
-      ]);
+      await Promise.race([fontSheets(), abort.promise]);
+      if (update.segments.length) {
+        result = await Promise.race([
+          BookPageMap.settleSegments(
+            update.segments,
+            layOut,
+            assembleAll,
+            seed,
+          ).catch((err) => err === WHOLE ? null : Promise.reject(err)),
+          abort.promise,
+        ]);
+      }
+      if (!result) {
+        kept?.previewer.polisher.destroy();
+        kept = null;
+        for (const el of copies) el.remove();
+        copies = [];
+        stage.replaceChildren();
+        // Each pass renders into the stage; a pass that didn't settle leaves
+        // its pages and sheets behind for the next one to clear.
+        result = await Promise.race([
+          BookPageMap.settle(async (passSeed) => {
+            if (cancelled) throw CANCELLED; // no sheets for a pass nobody wants
+            if (whole) {
+              whole.polisher.destroy();
+              stage.replaceChildren();
+            }
+            whole = new Paged.Previewer({
+              pageMap: { seed: passSeed, numbering: update.pageNumbering },
+            });
+            whole.chunker.q.tick = tick;
+            return (await whole.preview(update.html, [blobUrl], stage))
+              .pageMapResult;
+          }, seed),
+          abort.promise,
+        ]);
+      }
     } catch (err) {
-      previewer?.polisher.destroy();
+      for (const p of [laying, kept?.previewer, whole]) p?.polisher.destroy();
+      for (const el of copies) el.remove();
       stage.remove();
       URL.revokeObjectURL(blobUrl);
       // Whoever waited on this render gets the outcome of the one replacing it.
@@ -244,34 +508,50 @@ async function runRender(
     }
     // A copy: removing from the live collection would skip every other one.
     for (const old of [...container.children]) if (old !== stage) old.remove();
+    // The segments' own stages: their pages are in the area now.
+    if (!whole) {
+      for (const el of [...stage.children]) if (el !== area) el.remove();
+    }
     // The old sheets and fonts belong to the pages that just went away.
     livePreviewer?.polisher.destroy();
     for (const el of restoredStyles) el.remove();
     restoredStyles = [];
+    if (kept) { for (const el of copies) el.remove(); }
+    else restoredStyles = copies;
     setFontLinks(update.fontLinks);
-    livePreviewer = previewer!;
+    livePreviewer = kept?.previewer ?? whole;
     stage.className = "";
     fitPreview(container);
     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     currentBlobUrl = blobUrl;
     ({ seed, problems, map } = result);
-    if (cacheKey !== null) {
-      const { styleEl, inserted } = livePreviewer.polisher;
-      // Head order is cascade order: the base sheet, styleEl, then the book CSS.
-      const styles = [...document.head.querySelectorAll("style")]
-        .filter((el) => el === styleEl || inserted.includes(el))
-        .map((el) =>
-          [...el.sheet?.cssRules ?? []].map((r) => r.cssText).join("\n")
-        );
-      void saveCachedRender(cacheKey, {
-        hash,
-        pages: container.innerHTML,
-        styles,
+    // The pages on screen, named under the seed they settled on.
+    if (!queuedUpdate) targetHash = targetOf(update, seed);
+    if (cacheKey !== null && !whole) {
+      const render: CachedRender = {
+        styleHash: sh,
+        scope: stage.dataset.scope!,
+        styles: kept?.styles ?? book!.styles,
+        pageTemplate: kept?.previewer.chunker.pageTemplate.innerHTML ??
+          book!.pageTemplate,
         fontLinks: update.fontLinks,
+        pageNumbering: update.pageNumbering,
         seed,
         problems,
-        map,
-      }); // fire-and-forget: never throws, and the render shouldn't wait on it
+        segments: update.segments.map((s) => ({
+          key: keys.get(s)!,
+          line: s.line,
+          opens: s.opens,
+          ids: s.ids,
+        })),
+      };
+      manifest = render;
+      const named = new Set(render.segments.map((s) => s.key));
+      void saveCachedRender(
+        cacheKey,
+        render,
+        new Map([...rows].filter(([k]) => named.has(k))),
+      ); // fire-and-forget: never throws, and the render shouldn't wait on it
     }
     return problems;
   } finally {
@@ -292,35 +572,87 @@ async function runRender(
   }
 }
 
-// Put a cached render on screen without Paged.js: its pages plus the sheets
-// Paged.js had inserted for them. targetHash is set so the first WebSocket
-// update, which carries the same content, is skipped — unless the row has no
-// page map (saved before Inspect): then that update renders, the restored
-// pages on screen meanwhile. A render under way or
-// queued is dropped, and the sheets of the pages it replaces come down.
-export function restoreCachedRender(
-  cached: CachedRender,
-  container: HTMLElement,
-): void {
+/** A book's cached render, with this session's URL for each image it shows. */
+export interface CachedBook {
+  render: CachedRender;
+  segments: CachedSegment[];
+  imageUrl(name: string): string;
+}
+
+// Drops the render under way or queued and the sheets of the pages on screen;
+// returns the queued render's waiters, for the caller to answer.
+function dropScreen(): PromiseWithResolvers<PageProblem[]> | undefined {
   const dropped = queuedUpdate;
   queuedUpdate = null;
   cancelCurrent?.();
   livePreviewer?.polisher.destroy();
   livePreviewer = null;
   for (const el of restoredStyles) el.remove();
-  setFontLinks(cached.fontLinks);
-  restoredStyles = cached.styles.map((css) => {
-    const el = document.createElement("style");
-    el.textContent = css;
-    document.head.appendChild(el);
-    return el;
-  });
-  container.innerHTML = cached.pages;
-  targetHash = restoredHash(cached);
+  restoredStyles = [];
   pending = null;
-  ({ seed, problems, map } = restoredPageMap(cached));
+  return dropped?.done;
+}
+
+// Put a cached render on screen without Paged.js: every segment's pages,
+// assembled, plus the sheets Paged.js had inserted for them. targetHash is set
+// so the first WebSocket update, which carries the same content, is skipped.
+// A render under way or queued is dropped, and the sheets of the pages it
+// replaces come down. `imageUrl`: this session's URL for an image file.
+export function restoreCachedRender(
+  cached: { render: CachedRender; segments: CachedSegment[] },
+  container: HTMLElement,
+  imageUrl: (name: string) => string,
+): void {
+  const { render } = cached;
+  const dropped = dropScreen();
+  setFontLinks(render.fontLinks);
+  restoredStyles = addStyles(render.styles);
+  const root = document.createElement("div");
+  root.dataset.scope = render.scope;
+  const area = document.createElement("div");
+  area.className = "pagedjs_pages";
+  root.append(area);
+  container.replaceChildren(root);
+  const laid = render.segments.map((s, i): Laid => {
+    const row = cached.segments[i]!;
+    return {
+      segment: { ...s, id: s.key, html: "", reads: [] },
+      pages: pagesOf(row, s.line, imageUrl),
+      facts: row.facts,
+      problems: row.problems,
+      sheet: null,
+    };
+  });
+  const r = BookPageMap.assemble(
+    laid,
+    render.pageNumbering,
+    area,
+    templateOf(render.pageTemplate),
+  );
+  area.style.setProperty("--pagedjs-page-count", String(r.map.length));
+  manifest = render;
+  targetHash = target(
+    render.styleHash,
+    render.segments.map((s) => s.key),
+    render.pageNumbering,
+  );
+  // The saved problems: these images haven't loaded, so assembly can't
+  // judge them.
+  ({ seed, problems } = render);
+  map = r.map;
   fitPreview(container);
-  dropped?.done.resolve(problems);
+  dropped?.resolve(problems);
+}
+
+/** No pages: nothing to show until the next render. */
+export function clearPreview(container: HTMLElement): void {
+  const dropped = dropScreen();
+  container.replaceChildren();
+  targetHash = null;
+  seed = {};
+  problems = [];
+  map = [];
+  dropped?.resolve(problems);
 }
 
 // The book's font links, as `html` lists them. A link already in the page
@@ -338,6 +670,13 @@ export function setFontLinks(html: string, { keep = false } = {}): void {
   }
   for (const link of want.values()) {
     link.setAttribute("data-book-font", "");
+    linkSettled.set(
+      link,
+      new Promise((done) => {
+        link.addEventListener("load", done, { once: true });
+        link.addEventListener("error", done, { once: true });
+      }),
+    );
     document.head.appendChild(link);
   }
 }
