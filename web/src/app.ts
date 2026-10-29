@@ -107,9 +107,8 @@ function toStyle(next: string): void {
   history.pushState(null, "", here());
 }
 
-// Author-facing status in the toolbar: a short phrase, so it clears the mode
-// switch; the detail goes in the tooltip. "Saved" draws as a muted check (the
-// text stays for screen readers) and says when in the tooltip.
+// A short phrase, so it clears the mode switch; the detail goes in the
+// tooltip. "Saved" draws as a muted check (the text stays for screen readers).
 type StatusKind =
   | "connecting"
   | "saved"
@@ -125,7 +124,7 @@ const STATUS_TEXT: Record<StatusKind, string> = {
   offline: "Disconnected",
   failed: "Couldn't load", // the app never got going; the title says why
 };
-let lastSaved: Date | null = null; // when a manuscript or metadata save last landed
+let lastSaved: Date | null = null;
 
 function setStatus(kind: StatusKind, detail?: string): void {
   const el = $("status");
@@ -152,8 +151,6 @@ for (const type of ["dragover", "drop"] as const) {
   });
 }
 
-// The writer's footer note: after an image drop or paste, for a few seconds;
-// otherwise, with the cursor on an illustration, its print resolution.
 let imageNoteTimer: ReturnType<typeof setTimeout> | undefined;
 let cursorNote = { text: "", warn: false };
 function showImageNote({ text, warn }: typeof cursorNote): void {
@@ -174,9 +171,7 @@ function imageNote(text: string, warn = false): void {
   }, 6000);
 }
 
-// The cursor on an illustration's line or its caption (the line after): how
-// its image prints where the live pages lay it out. A plate's copy has no
-// data-line; it keeps the figure's id, the slug.
+// A plate's copy has no data-line; it keeps the figure's id, the slug.
 function noteImageDpi(lines: string[], line: number): void {
   const at = (n: number) =>
     lines[n - 1]?.match(/^\{illustration:\s*([^\s|}]+)/);
@@ -200,8 +195,7 @@ function noteImageDpi(lines: string[], line: number): void {
   if (!imageNoteTimer) showImageNote(cursorNote);
 }
 
-// An empty illustration placeholder's image (spec §7.6): the dropped file, or
-// one picked now, saved as exactly its slug; the rebuild shows it.
+// Spec §7.6: saved as exactly the slug; the rebuild shows it.
 function fillPlaceholder(host: ImageHost, slug: string, file?: File): void {
   const save = (f: File) =>
     host.add(f, slug).then(
@@ -218,13 +212,8 @@ let backend: Backend; // the dev server, or the service in-page over a folder
 let book: string;
 let edition: string | null = null; // null = the unnamed edition (metadata.json)
 let parseTimer: ReturnType<typeof setTimeout> | undefined;
-// Both save queues and the versions they are based on (`sync.base`: every
-// manuscript save names it, and one from a version that is no longer current
-// is refused instead of overwriting a change this editor never saw). Made in
-// main once the book, edition and manuscript version are known.
 let sync: Sync;
 let remoteFetchGen = 0;
-// The disk text the changed-on-disk banner is offering, while it is up.
 let diskOffer: { text: string; version: string } | null = null;
 let metaStale = false; // metadata changed while the panel had unsaved edits
 let metaFetchGen = 0;
@@ -247,14 +236,12 @@ let isNames: string[] = []; // `{is}` classes in the manuscript, from reparse
 let words = 0;
 let wordsAtOpen: number | null = null;
 
-// The buffer becomes the disk's text (a reload, another writer's change).
 function takeDiskText(text: string): void {
   if (wordsAtOpen !== null) wordsAtOpen += wordCount(text.split("\n")) - words;
   replaceBuffer(editor, text);
   reparse(text);
 }
 
-// The writer's footer: the chapter at the cursor, the words, the words added.
 function showStats(lines: string[], line: number): void {
   if (wordsAtOpen === null) return;
   const chapter = chapterAt(lines, line);
@@ -302,7 +289,6 @@ function reparse(text: string): void {
   refreshTree(doc);
 }
 
-// Page-map problems from the last render; each scrolls to its page.
 function showPageProblems(problems: PageProblem[]): void {
   $("page-problems").replaceChildren(...problems.map((p) => {
     const { page } = p;
@@ -333,8 +319,7 @@ function refreshTree(doc: BmlDocument): void {
   highlightTreeNode(cursorLine);
 }
 
-// Follow the cursor (spec §7.3): the preview outlines the block the line is
-// part of, and the footer names that block's style, a click away.
+// Spec §7.3.
 function followCursor(line: number): void {
   if (!editor) return;
   markEdited($("preview"), mode === "write" ? line : null);
@@ -353,7 +338,6 @@ function followCursor(line: number): void {
   btn.onclick = () => goToStyle(entry.key);
 }
 
-// Follow the cursor: the node whose block contains the cursor line is current.
 function highlightTreeNode(line: number): void {
   cursorLine = line;
   syncUrl();
@@ -371,8 +355,6 @@ function highlightTreeNode(line: number): void {
 const fetchEditions = (name: string): Promise<EditionInfo[]> =>
   backend.editions(name);
 
-// Every page switch: send what is waiting first, and ask before dropping an
-// edit whose save failed or that a conflict still holds.
 let leaving = false; // the author chose to go: beforeunload asks nothing more
 async function leave(href: string): Promise<void> {
   // No sync before a book opens (an empty library's first create).
@@ -396,8 +378,6 @@ function showSync(s: SyncStatus): void {
   else setStatus(s.kind);
 }
 
-// The save state onto the page: sync.ts calls this whenever a save starts,
-// lands or fails, or an edit changes what is unsaved.
 let metaWasBusy = false;
 function syncChanged(s: SyncStatus): void {
   // The banner's choices wait for a save in flight to settle: Reload under an
@@ -434,7 +414,6 @@ const styleCatalog = () => {
   return catalogFor(m);
 };
 
-// The Publish tab's e-book export, run once every style save has landed.
 async function exportEpub(): Promise<EpubResult> {
   await sync.flush();
   try {
@@ -444,7 +423,6 @@ async function exportEpub(): Promise<EpubResult> {
   }
 }
 
-// Built the first time Style or Publish opens; a failed load is retried next time.
 let panelLoad: Promise<ConfigPanel | null> | null = null;
 function ensureConfigPanel(): Promise<ConfigPanel | null> {
   return panelLoad ??= (async () => {
@@ -479,14 +457,12 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
   })();
 }
 
-// The live pages, both set in main. A null cacheKey paints without touching
-// the book's cached render.
+// A null cacheKey paints without touching the book's cached render.
 let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {};
 let restore: (cached: CachedBook | null, version?: string) => void = () => {};
 
-// The book's cached render with a URL for each image it shows, or null. An
-// image it can't read (removed, renamed, refused) is a miss, never a throw:
-// the editor starts on it.
+// An image it can't read (removed, renamed, refused) is a miss, never a
+// throw: the editor starts on it.
 async function loadCachedBook(): Promise<CachedBook | null> {
   const cached = await loadCachedRender(cacheId(book, edition));
   if (!cached) return null;
@@ -517,7 +493,7 @@ async function settledMetadata(): Promise<Metadata> {
   return (await fetchMetadata()).metadata;
 }
 
-// Theme preview and Apply (spec §7.5).
+// Spec §7.5.
 const themes = new ThemePreview({
   backend: () => backend,
   book: () => book,
@@ -537,9 +513,7 @@ const themes = new ThemePreview({
 const MODES: Mode[] = ["write", "style", "publish"];
 let mode: Mode = "write";
 
-// The mode decides all three columns (spec §7.1): Write = outline | editor |
-// pages, Style = style nav | style part | pages, Publish = publish nav |
-// print setup and exports | sheet view. Persisted across reloads.
+// Spec §7.1.
 function setMode(next: Mode): void {
   mode = next;
   document.documentElement.dataset.mode = next;
@@ -583,8 +557,6 @@ async function goToStyle(key: string): Promise<void> {
   history.pushState(null, "", appHref({ ...here, view, mode: "style" }));
 }
 
-// Back and Forward between the entries goToStyle and toStyle make: the URL's
-// mode, its Style/Publish view, and in Write its line.
 function installHistory(): void {
   addEventListener("popstate", () => {
     const p = new URLSearchParams(location.search);
@@ -655,7 +627,6 @@ function hideDiskBanner(): void {
   $("disk-banner").hidden = true;
 }
 
-// Reload: the disk wins — drop the unsaved edits and anything waiting to save.
 function reloadFromDisk(): void {
   if (!diskOffer) return;
   const { text, version } = diskOffer;
@@ -703,11 +674,11 @@ async function refreshConfigFromRemote(): Promise<void> {
   }
 }
 
-// Draggable gutters: each one writes a CSS var on :root that the grids of
-// #panes and #footer read, persisted so widths survive a reload.
+// Each gutter writes a CSS var on :root that the grids of #panes and #footer
+// read.
 function installGutters(): void {
   const panes = $("panes");
-  const root = document.documentElement; // the footer reads the widths too
+  const root = document.documentElement;
   for (
     const [id, cssVar, min] of [["gutter-tree", "--w-tree", 7.5], [
       "gutter-editor",
@@ -758,8 +729,8 @@ function installGutters(): void {
   }
 }
 
-// Light/dark toggle; an explicit choice persists, first load follows the
-// system (resolved by the inline script in index.html before first paint).
+// The first load follows the system, resolved by the inline script in
+// index.html before first paint.
 function installThemeToggle(): void {
   $("theme-toggle").onclick = () => {
     const next = document.documentElement.dataset.theme === "dark"
@@ -801,7 +772,6 @@ async function main(): Promise<void> {
   $("book-skipped").textContent = notShown;
   $("book-skipped").hidden = !notShown;
   if (!books.length) {
-    // An empty library: the first book is the only thing to do.
     createManuscript(false);
     $("create-err").textContent = notShown;
     return;
