@@ -591,11 +591,14 @@ control's tooltip and `kbd` show its key as the platform writes it
 - **Toolbar** (`--h-toolbar`): left, the Contents toggle (Mod+\) and the crumb
   (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`; the book
   switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
-  Publish (Mod+1–3); right, the theme toggle alone (Mod+Shift+L). The save
-  status sits after the crumb. The crumb's text is trimmed to cap height and
-  baseline (`text-box`), so the library icon and the chevrons center on the caps
-  (as does any button's label in a `span` after its icon); until a book is
-  chosen it shows the library step alone (nothing on the dev server).
+  Publish (Mod+1–3); right, the theme toggle alone (Mod+Shift+L), showing the
+  mode it switches to in woodcut: the sun mark (§10) without its cut lines, and
+  the man in the moon beside a share-card star. These two are filled, not
+  stroked, in the button's color (never red). The save status sits after the
+  crumb. The crumb's text is trimmed to cap height and baseline (`text-box`), so
+  the library icon and the chevrons center on the caps (as does any button's
+  label in a `span` after its icon); until a book is chosen it shows the library
+  step alone (nothing on the dev server).
 - **Switcher** (`#switcher`): books left, the selected book's editions right.
   The books foot holds New book; in browser storage only, Download library
   (download icon) under it and the note "Your library is currently in browser
@@ -806,14 +809,17 @@ Out of scope unless asked: illustrations, woodcut empty states, blackletter.
 
 ## 10. The mark
 
-The existing sun (`web/brand/mark.svg`), rays and disc, drawn in `--acc`: the
-SVG sets its own `color` (`#db3834`, `#ef6d62` under
-`prefers-color-scheme:
-dark`), since an `<img>` or favicon cannot read the
-page's tokens. The PNG icons (`icon-32`, `apple-touch-icon`, `icon-512`) are the
-same sun in the light `--acc` on the manifest's cream `#f4efe4`, filling 81%,
-86% and 62% of the square (the 512 leaves the maskable safe zone); re-export
-them from `mark.svg` whenever the red changes.
+A woodcut sun (`web/brand/mark.svg`) in `--acc`: a disc of radius 15 on the
+100-unit box, ringed by a hairline of paper, and twelve flames out to radius 49.
+Each flame waves twice and has a line cut down its middle; their lengths (within
+10%), sway and width vary as if each were cut by hand. One evenodd path, so the
+cuts show whatever is behind it. The SVG sets its own `color` (`#db3834`,
+`#ef6d62` under `prefers-color-scheme:
+dark`), since an `<img>` or favicon
+cannot read the page's tokens. The PNG icons (`icon-32`, `apple-touch-icon`,
+`icon-512`) are the same sun in the light `--acc` on the manifest's cream
+`#f4efe4`, filling 81%, 86% and 62% of the square (the 512 leaves the maskable
+safe zone); re-export them from `mark.svg` whenever the red changes.
 
 The share card (`og.svg`, exported to `og.png` at 1200×630) is a black woodcut
 title page rubricated in light `--acc`: the sun and the inner hairline rule are

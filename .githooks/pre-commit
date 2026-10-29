@@ -1,3 +1,8 @@
 #!/bin/sh
 export PATH="$HOME/.deno/bin:$PATH"
-deno task pre-commit
+# A stalled test must not hold the commit forever. macOS has no timeout(1);
+# perl's alarm outlives exec, so deno gets SIGALRM (exit 142) at the limit.
+perl -e 'alarm shift; exec @ARGV' 120 deno task pre-commit
+status=$?
+[ $status -eq 142 ] && echo "pre-commit: stopped after 120s, a test has likely stalled" >&2
+exit $status

@@ -3,12 +3,11 @@ import { PDFDocument } from "pdf-lib";
 import { renderPdf } from "./pdf.ts";
 import { buildBook } from "./pipeline.ts";
 import { toHtml } from "./export-html.ts";
-import { hasChrome } from "../testing/chrome.ts";
+import { chromeTest } from "../testing/chrome.ts";
 
 const ROOT = new URL("./testdata", import.meta.url).pathname;
-Deno.test({
+chromeTest({
   name: "renderPdf paginates the demo book at trim size",
-  ignore: !hasChrome,
   fn: async () => {
     const html = toHtml(
       await buildBook(ROOT, "demo-book", {
@@ -26,9 +25,8 @@ Deno.test({
   },
 });
 
-Deno.test({
+chromeTest({
   name: "renderPdf throws a driver failure instead of reporting a problem",
-  ignore: !hasChrome,
   fn: async () => {
     // What the toHtml driver leaves when e.g. Paged.js failed to load.
     const html = `<!doctype html><script>

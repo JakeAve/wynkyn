@@ -240,6 +240,10 @@ kbd {
   opacity: .55;
 }
 /* Theme toggle shows the icon for the mode it switches to */
+#theme-toggle svg {
+  fill: currentColor;
+  stroke: none;
+}
 :root[data-theme="dark"] .icon-moon,
 :root[data-theme="light"] .icon-sun {
   display: none;

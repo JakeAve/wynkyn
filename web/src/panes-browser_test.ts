@@ -5,7 +5,7 @@
 import { assert, assertEquals } from "@std/assert";
 import type { Page } from "playwright";
 import { appTest, book, openApp } from "../../testing/app.ts";
-import { laidOut } from "../../testing/wait.ts";
+import { eventually } from "../../testing/wait.ts";
 
 // The demo book open in Write with its pages laid out.
 async function withApp(fn: (page: Page) => Promise<void>): Promise<void> {
@@ -35,14 +35,24 @@ appTest({
       assertEquals(editor?.width, panes?.width, "the writing takes the row");
 
       // An edit while expanded still lands on the hidden pages.
-      const before = await laidOut(page);
       await page.locator("#editor .cm-content").click();
       await page.keyboard.press("ControlOrMeta+End");
       await page.keyboard.type("\nZanzibar");
-      await laidOut(page, before);
-      const text = await page.locator("#preview > :not(.preview-stage)")
-        .first().textContent() ?? "";
-      assert(text.includes("Zanzibar"), "the preview laid out the edit");
+      const live = page.locator("#preview > :not(.preview-stage)").first();
+      // Red on CI only, never locally: the failure says what the app was in.
+      await eventually(async () => {
+        if ((await live.textContent() ?? "").includes("Zanzibar")) return;
+        const seen = await page.evaluate(() => ({
+          doc: document.querySelector("#editor .cm-content")?.textContent
+            ?.slice(-30),
+          preview: { ...document.getElementById("preview")!.dataset },
+          status: document.getElementById("status")?.dataset.kind,
+          title: document.getElementById("status")?.title,
+          focus: document.activeElement?.className,
+          banner: !document.getElementById("disk-banner")?.hidden,
+        }));
+        throw new Error(`no edit in the pages: ${JSON.stringify(seen)}`);
+      });
 
       // Persisted per mode: Style doesn't inherit it, Write gets it back.
       await page.keyboard.press("ControlOrMeta+2");
