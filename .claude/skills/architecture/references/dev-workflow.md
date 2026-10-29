@@ -77,6 +77,11 @@ A Chrome test costs a page, never a browser or a server:
   manuscript?, metadata? })` seeds the demo book under a fresh slug;
   `openApp(b)` is a laid-out page on it. `b.write(name, data)` is an outside
   edit the server hears synchronously; `b.read(name)` is what landed.
+- Nothing in a Chrome test waits forever. `chromeTest` fails a test still
+  running after 150 s, and a new context, a new page or a close that takes
+  more than 30 s, by name. A context that never opens relaunches Chrome for
+  the next test. A test that drives Chrome on its own (`renderPdf`) still goes
+  through `chromeTest` for the cap. CI's jobs have their own limits on top.
 - No FSEvents in an app test: a disk watch can push late or twice, the root
   of most of this repo's flakes. Only `server/live-sync-browser_test.ts` and
   the store contract are about the disk.
