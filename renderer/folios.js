@@ -149,9 +149,9 @@
   const carried = new WeakMap();
 
   /**
-   * One page's entry from the previous page's. A page with no zone of its own
-   * (plate, padding blank) inherits the previous one and still counts. Front
-   * starts at 1, body restarts at 1, back continues body's count.
+   * A page with no zone of its own (plate, padding blank) inherits the
+   * previous one and still counts. Front starts at 1, body restarts at 1, back
+   * continues body's count.
    * @param {PageEntry | null} prev
    * @param {PageFacts} facts
    * @param {PageNumberingConfig} numbering
@@ -257,8 +257,7 @@
   }
 
   /**
-   * A short summary for golden tests: each zone's first and last physical
-   * page, each anchor's folio, and the blank pages (all 1-based).
+   * For golden tests; pages are 1-based.
    * @param {PageEntry[]} map
    * @returns {{ zones: Record<string, [number, number]>; anchors: Seed; blanks: number[] }}
    */
@@ -400,9 +399,8 @@
     else style.setProperty("--running-off", '""');
   }
 
-  // A head or folio that runs to a second line: measured against the same
-  // box held to one line, so it holds for any font or line-height, untrimmed
-  // (base.css) so each line counts whole. A warning:
+  // Measured against the same box held to one line, so it holds for any font
+  // or line-height, untrimmed (base.css) so each line counts whole. A warning:
   // it's a typographic flaw the preview shows, and never moves the text.
   /**
    * @param {Element} page @param {number} pageNumber
@@ -438,9 +436,7 @@
     return problems;
   }
 
-  // An illustration that will print badly: under 200 dpi at its laid-out size,
-  // or no image at all (its placeholder, or a file that won't load). Warnings:
-  // a proof is worth printing anyway.
+  // Warnings, not errors: a proof is worth printing anyway.
   /**
    * @param {Element} page @param {number} pageNumber
    * @returns {PageProblem[]}
