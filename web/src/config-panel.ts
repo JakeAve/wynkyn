@@ -30,7 +30,7 @@ export type PanelMode = "style" | "publish";
 export interface ConfigPanel {
   setMode(mode: PanelMode): void; // swap the nav and body between style and publish
   refresh(metadata: Metadata): void; // rebuild the form from fresh metadata
-  selectStyle(key: string, path?: StyleStep[]): void; // style mode, where a catalog entry is styled (§7.4); `path` crumbs the styles around it
+  selectStyle(key: string, path?: StyleStep[]): void; // style mode, where a catalog entry is styled (§7.4); `path`, every style under the click
   pagesChanged(): void; // the preview repaginated
   isNamesChanged(): void; // the manuscript was reparsed; Custom styles follow it
   open(view: string): void; // the nav row `view` (navId), if this book has it
@@ -199,9 +199,11 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
   const titleRow = document.createElement("div");
   titleRow.className = "vh-row";
   titleRow.append(title, where);
+  const here = document.createElement("div");
+  here.className = "here";
   const head = document.createElement("div");
   head.className = "phead";
-  head.append(crumb, titleRow);
+  head.append(crumb, titleRow, here);
   const body = document.createElement("div");
   body.className = "pbody";
   opts.overlay.replaceChildren(head, body);
@@ -263,37 +265,38 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
         }),
       ];
     }));
-    drawCrumb(group);
+    crumb.textContent = group;
+    drawHere();
   }
 
-  // A click on the pages names every style under it; one alone is no choice,
-  // so the nav group shows instead.
-  function drawCrumb(group: string): void {
-    if (!trail || trail.steps.length < 2) {
-      crumb.textContent = group;
-      return;
-    }
+  // The styles under the click on the pages that opened the view; one alone
+  // is no choice, so the row shows only for two or more.
+  function drawHere(): void {
+    here.hidden = !trail || trail.steps.length < 2;
+    if (!trail || here.hidden) return here.replaceChildren();
     const { steps, key } = trail;
     const catalog = catalogFor(meta);
-    crumb.replaceChildren(...steps.flatMap((step, i) => {
-      const entry = catalog.find((e) => e.key === step.key);
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = entry ? entryName(entry, catalog) : step.key;
-      if (step.key === key) b.setAttribute("aria-current", "true");
-      b.onmouseenter = () => step.el.setAttribute("data-style-hl", "");
-      b.onmouseleave = () => step.el.removeAttribute("data-style-hl");
-      b.onclick = () => {
-        for (const s of steps) s.el.removeAttribute("data-style-selected");
-        step.el.setAttribute("data-style-selected", "");
-        go(routeFor(step.key, meta), { steps, key: step.key });
-      };
-      if (!i) return [b];
-      const sep = document.createElement("span");
-      sep.className = "sep";
-      sep.textContent = "›";
-      return [sep, b];
-    }));
+    const label = document.createElement("span");
+    label.textContent = "Here";
+    here.replaceChildren(
+      label,
+      ...steps.map((step) => {
+        const entry = catalog.find((e) => e.key === step.key);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "chip";
+        b.textContent = entry ? entryName(entry, catalog) : step.key;
+        if (step.key === key) b.setAttribute("aria-current", "true");
+        b.onmouseenter = () => step.el.setAttribute("data-style-hl", "");
+        b.onmouseleave = () => step.el.removeAttribute("data-style-hl");
+        b.onclick = () => {
+          for (const s of steps) s.el.removeAttribute("data-style-selected");
+          step.el.setAttribute("data-style-selected", "");
+          go(routeFor(step.key, meta), { steps, key: step.key });
+        };
+        return b;
+      }),
+    );
   }
 
   function build(): Node[] {
