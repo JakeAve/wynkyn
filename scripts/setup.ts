@@ -10,9 +10,7 @@ function git(...args: string[]): string {
 }
 
 git("config", "core.hooksPath", ".githooks");
-for (const h of ["pre-commit", "pre-push"]) {
-  await Deno.chmod(`.githooks/${h}`, 0o755);
-}
+await Deno.chmod(".githooks/pre-commit", 0o755);
 
 const port = defaultPort();
 await Deno.mkdir(".claude", { recursive: true });

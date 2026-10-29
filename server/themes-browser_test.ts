@@ -1,17 +1,15 @@
 // server/themes-browser_test.ts — every preset theme on demo-book builds and
 // paginates in Chrome with no page-map problems.
 import { assertEquals } from "@std/assert";
-import { chromium } from "playwright";
 import { buildBook } from "./pipeline.ts";
 import { toHtml } from "./export-html.ts";
 import { applyTheme, THEMES } from "../metadata/themes.ts";
-import { hasChrome } from "../testing/chrome.ts";
+import { chromeTest, newPage } from "../testing/chrome.ts";
 
 const DEMO = new URL("./testdata/demo-book/", import.meta.url).pathname;
 
-Deno.test({
+chromeTest({
   name: "every theme on demo-book paginates to data-paged=done",
-  ignore: !hasChrome,
   async fn() {
     const root = await Deno.makeTempDir();
     const dir = `${root}/demo-book`;
@@ -22,7 +20,6 @@ Deno.test({
       `${dir}/images/ornament.svg`,
     );
     const meta = JSON.parse(await Deno.readTextFile(`${DEMO}metadata.json`));
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
       for (const t of THEMES) {
         await Deno.writeTextFile(
@@ -34,7 +31,7 @@ Deno.test({
         });
         const file = `${root}/${t.slug}.html`;
         await Deno.writeTextFile(file, toHtml(built));
-        const page = await browser.newPage();
+        const page = await newPage();
         await page.goto(`file://${file}`);
         await page.waitForSelector("html[data-paged]", { timeout: 120_000 });
         assertEquals(
@@ -45,7 +42,6 @@ Deno.test({
         await page.close();
       }
     } finally {
-      await browser.close();
       await Deno.remove(root, { recursive: true });
     }
   },

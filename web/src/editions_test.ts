@@ -2,25 +2,12 @@ import { assertEquals } from "@std/assert";
 import {
   appHref,
   editionHref,
-  editionLabel,
   firstSpanLine,
   freeSlug,
   lineFromHash,
-  passagesLabel,
   prettySize,
   slugify,
 } from "./editions.ts";
-
-Deno.test("editionLabel: the server's resolved name", () => {
-  assertEquals(
-    editionLabel({ slug: null, name: "Standard", summary: "", passages: 0 }),
-    "Standard",
-  );
-  assertEquals(
-    editionLabel({ slug: "pocket", name: "Pocket", summary: "", passages: 2 }),
-    "Pocket",
-  );
-});
 
 Deno.test("freeSlug: the theme's slug, then -2, -3…, never default", () => {
   assertEquals(freeSlug("caslon", []), "caslon");
@@ -49,11 +36,6 @@ Deno.test("prettySize: two lengths read as W × H unit", () => {
   assertEquals(prettySize("148mm 210mm"), "148 × 210 mm");
   assertEquals(prettySize("6in 230mm"), "6in × 230mm");
   assertEquals(prettySize("A5"), "A5");
-});
-
-Deno.test("passagesLabel: singular and plural", () => {
-  assertEquals(passagesLabel(1), "1 passage of its own");
-  assertEquals(passagesLabel(3), "3 passages of its own");
 });
 
 Deno.test("firstSpanLine: first span naming the edition; null = default", () => {

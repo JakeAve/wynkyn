@@ -2,9 +2,9 @@
 // app: a change on disk under a clean buffer, under a dirty one (the
 // changed-on-disk banner), and the editor's own save.
 import { assert, assertEquals } from "@std/assert";
-import { chromium, type Page } from "playwright";
+import type { Page } from "playwright";
 import { startServer } from "./dev-server.ts";
-import { hasChrome } from "../testing/chrome.ts";
+import { chromeTest, newPage } from "../testing/chrome.ts";
 import { until } from "../testing/wait.ts";
 
 const appBuilt = await Deno.stat(new URL("../web/app.js", import.meta.url))
@@ -38,10 +38,10 @@ const caret = (page: Page) =>
 
 const bannerShown = (page: Page) => page.locator("#disk-banner").isVisible();
 
-Deno.test({
+chromeTest({
   name: "live sync: disk changes reach the editor, conflicts get the banner, " +
     "own saves land quietly",
-  ignore: !hasChrome || !appBuilt,
+  ignore: !appBuilt,
   async fn(t) {
     const root = await Deno.makeTempDir();
     const file = `${root}/demo-book/manuscript.md`;
@@ -60,9 +60,8 @@ Deno.test({
       booksRoot: root,
       port: 0,
     });
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       let updates = 0; // build pushes over the socket
       page.on("websocket", (ws) =>
         ws.on("framereceived", ({ payload }) => {
@@ -143,7 +142,6 @@ Deno.test({
         assert(!await bannerShown(page));
       });
     } finally {
-      await browser.close();
       await server.stop();
       await Deno.remove(root, { recursive: true });
     }

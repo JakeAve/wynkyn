@@ -1,7 +1,6 @@
 import { assertEquals, assertNotEquals } from "@std/assert";
 import type { Segment } from "../../renderer/page-map-types.ts";
 import {
-  cacheId,
   reacher,
   segmentKey,
   segmentStyleHash,
@@ -121,9 +120,4 @@ Deno.test("tokenImages/untokenImages: URLs become names and back", () => {
     untokenImages(tokened, (n) => `blob:x/${n}`),
     html.replace(/src="[^"]*"/, 'src="blob:x/a b&amp;c.png"'),
   );
-});
-
-Deno.test("cacheId: book + | + edition-or-empty", () => {
-  assertEquals(cacheId("a", null), "a|");
-  assertEquals(cacheId("a", "pocket"), "a|pocket");
 });

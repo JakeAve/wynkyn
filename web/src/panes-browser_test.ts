@@ -3,34 +3,13 @@
 // esc, the expanded preview still lays out, and ⌘. hides the pages with no
 // toolbar button.
 import { assert, assertEquals } from "@std/assert";
-import { chromium, type Page } from "playwright";
-import { startServer } from "../../server/dev-server.ts";
-import { hasChrome } from "../../testing/chrome.ts";
+import type { Page } from "playwright";
+import { appTest, book, openApp } from "../../testing/app.ts";
 import { laidOut } from "../../testing/wait.ts";
-
-const appBuilt = await Deno.stat(new URL("../app.js", import.meta.url))
-  .then(() => true, () => false);
 
 // The demo book open in Write with its pages laid out.
 async function withApp(fn: (page: Page) => Promise<void>): Promise<void> {
-  const root = await Deno.makeTempDir();
-  const fixture = new URL("../../server/testdata/demo-book", import.meta.url);
-  const cp = await new Deno.Command("cp", {
-    args: ["-R", fixture.pathname, root],
-  }).output();
-  assert(cp.success, "copy the fixture book");
-  const server = await startServer({ booksRoot: root, port: 0 });
-  const browser = await chromium.launch({ channel: "chrome" });
-  try {
-    const page = await browser.newPage();
-    await page.goto(`http://localhost:${server.port}/app/?book=demo-book`);
-    await laidOut(page);
-    await fn(page);
-  } finally {
-    await browser.close();
-    await server.stop();
-    await Deno.remove(root, { recursive: true });
-  }
+  await fn(await openApp(await book()));
 }
 
 const panesClass = (page: Page) =>
@@ -38,10 +17,9 @@ const panesClass = (page: Page) =>
 const visibility = (page: Page, sel: string) =>
   page.locator(sel).evaluate((el) => getComputedStyle(el).visibility);
 
-Deno.test({
+appTest({
   name:
     "expanding the writing hides tree and pages but the preview still lays out",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       await page.locator('#editor .expand[data-pane="writing"]').click();
@@ -78,9 +56,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "esc and the corner button return from expanded",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       const corner = page.locator('#pages .expand[data-pane="pages"]');
@@ -107,9 +84,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "⌘. still hides the pages without a toolbar button",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       assertEquals(await page.locator("#toolbar #pages-toggle").count(), 0);
@@ -125,9 +101,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "with the pages hidden, the writing's corner button shows them",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       const corner = page.locator('#editor .expand[data-pane="writing"]');
@@ -148,9 +123,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "the pages hide in Write only: Style shows them and ⌘. leaves them",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       const mode = (m: string) =>
@@ -166,9 +140,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+appTest({
   name: "arrow keys on a focused gutter resize the column",
-  ignore: !hasChrome || !appBuilt,
   fn: () =>
     withApp(async (page) => {
       const gutter = page.locator("#gutter-tree");

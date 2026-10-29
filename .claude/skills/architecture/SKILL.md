@@ -99,8 +99,9 @@ pure sibling with a test. `dev-server.ts` is the HTTP surface and only routes;
   logic breaks beats a suite per function. Chrome tests gate on `hasChrome`;
   pagination truth is the golden page maps under `testdata/`. Tests wait for
   the state they assert, never a clock: `testing/wait.ts`, enforced by
-  `testing/clock_test.ts`. Read references/dev-workflow.md, "Tests that hold
-  on CI", before writing a Chrome test or touching a failing one.
+  `testing/clock_test.ts`. Read references/dev-workflow.md, "What earns a
+  test" and "Tests that hold on CI", before writing a test or touching a
+  failing one.
 - `metadata.json` carries a top-level `spec`, the spec version it complies
   with. `SPEC_VERSION` in `metadata/upgrade.ts` is the source of truth;
   `templates/metadata.json` and the spec's §3 heading must match it
@@ -122,7 +123,7 @@ itself (0.4.3 mismeasures them), keyed on Paged.js's `.pagedjs_margin-*` /
 `.hasContent`; re-check that after an upgrade too. The export lays segments
 out alone and assembles them (`BookPageMap.assemble`, redoing classes and margin
 boxes as Paged.js would), so an upgrade also re-runs
-`server/segments-browser_test.ts`: assembled pages must still match a whole-flow
+`server/pagination_test.ts`: assembled pages must still match a whole-flow
 render page for page. Its known traps are the three references below.
 
 ## Read next

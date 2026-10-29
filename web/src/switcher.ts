@@ -12,7 +12,6 @@ import { cacheId, deleteCachedRender } from "./preview-cache.ts";
 import {
   editionHref,
   type EditionInfo,
-  editionLabel,
   firstSpanLine,
   passagesLabel,
   prettySize,
@@ -49,7 +48,7 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
   // The crumb: Book / Edition, then what sets the edition apart — its page size.
   function setCrumb(editions: EditionInfo[]): void {
     const cur = editions.find((e) => e.slug === edition);
-    const name = cur ? editionLabel(cur) : "";
+    const name = cur?.name ?? "";
     $("book-name").textContent = titleCase(book);
     $("edition-name").textContent = name;
     document.title = `Wynkyn — ${book} · ${name}`;
@@ -156,7 +155,7 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
       }
       const nm = document.createElement("span");
       nm.className = "nm";
-      nm.textContent = editionLabel(e);
+      nm.textContent = e.name;
       const err = document.createElement("span");
       err.className = "sw-err";
       const acts = document.createElement("span");
@@ -177,7 +176,7 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
       };
       act("Rename", () => {
         const input = document.createElement("input");
-        input.value = editionLabel(e);
+        input.value = e.name;
         input.setAttribute("aria-label", "Edition name");
         input.onclick = (ev) => ev.stopPropagation();
         input.onkeydown = (ev) => {
@@ -200,9 +199,7 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
         act("Delete", async () => {
           if (
             !confirm(
-              `Delete the ${
-                editionLabel(e)
-              } edition? The manuscript is untouched.`,
+              `Delete the ${e.name} edition? The manuscript is untouched.`,
             )
           ) return;
           // Style edits waiting for the open edition go with it.
@@ -394,9 +391,7 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
 
   $("edition-new").onclick = () => {
     from.replaceChildren(
-      ...selEditions.map((e) =>
-        new Option(editionLabel(e), e.slug ?? "default")
-      ),
+      ...selEditions.map((e) => new Option(e.name, e.slug ?? "default")),
     );
     from.value = (selBook === book ? edition : null) ?? "default";
     nameInput.value = "";

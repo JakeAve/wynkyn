@@ -124,7 +124,9 @@ Deno.test("exportBook --proof --duplex none: fronts and backs files", async () =
   assertEquals(backs.getPageCount(), 3);
 });
 
-Deno.test("exportBook: rejects a folios value that isn't a whole number ≥ 1", async () => {
+// resolvePageSetup's messages are page-setup_test.ts's; here, that a bad
+// setup from a flag or from the page section stops the export.
+Deno.test("exportBook: rejects a bad page setup, from a flag or the page section", async () => {
   const out = await Deno.makeTempDir();
   await assertRejects(
     () =>
@@ -136,6 +138,19 @@ Deno.test("exportBook: rejects a folios value that isn't a whole number ≥ 1", 
       }),
     Error,
     "folios-per-signature must be a whole number ≥ 1 (got 0)",
+  );
+  const root = await Deno.makeTempDir();
+  const bookDir = `${root}/book`;
+  await Deno.mkdir(bookDir, { recursive: true });
+  await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
+  await Deno.writeTextFile(
+    `${bookDir}/metadata.json`,
+    JSON.stringify({ page: { size: "6in 9in", sheet: "letter" } }),
+  );
+  await assertRejects(
+    () => exportBook(root, "book", { proof: true }),
+    Error,
+    "does not fit two-up",
   );
 });
 
@@ -151,22 +166,6 @@ Deno.test("exportBook: rejects a non-integer pages value", async () => {
       }),
     Error,
     "pages must be a whole number ≥ 1 (got 2.5)",
-  );
-});
-
-Deno.test("exportBook: rejects an unrecognized duplex value", async () => {
-  const out = await Deno.makeTempDir();
-  await assertRejects(
-    () =>
-      exportBook(ROOT, "demo-book", {
-        proof: true,
-        // deno-lint-ignore no-explicit-any
-        duplex: "banana" as any,
-        sheet: "legal",
-        out,
-      }),
-    Error,
-    'duplex must be short-edge, long-edge, or none (got "banana")',
   );
 });
 
@@ -293,22 +292,6 @@ Deno.test("export reads the page setup from the page section", async () => {
   assertEquals(
     [s.setup.sheet, s.setup.duplex, s.setup.folios, s.setup.nUp],
     ["legal", "long-edge", 2, 4],
-  );
-});
-
-Deno.test("export rejects a page that cannot be printed on the sheet", async () => {
-  const root = await Deno.makeTempDir();
-  const bookDir = `${root}/book`;
-  await Deno.mkdir(bookDir, { recursive: true });
-  await Deno.writeTextFile(`${bookDir}/manuscript.md`, "{title}\nBook\n");
-  await Deno.writeTextFile(
-    `${bookDir}/metadata.json`,
-    JSON.stringify({ page: { size: "6in 9in", sheet: "letter" } }),
-  );
-  await assertRejects(
-    () => exportBook(root, "book", { proof: true }),
-    Error,
-    "does not fit two-up",
   );
 });
 
@@ -514,13 +497,8 @@ Deno.test({
     };
     await exportBook(root, "book", opts);
     await exportBook(root, "book", opts);
-    // Any change to the layout inputs starts clean, so takes 2 again.
-    await Deno.writeTextFile(
-      `${root}/book/metadata.json`,
-      JSON.stringify({ elements: { body: { "font-size": "12pt" } } }),
-    );
-    await exportBook(root, "book", opts);
-    assertEquals(passes, [2, 1, 2]);
+    // (A changed book starting clean is the stubbed test's, above.)
+    assertEquals(passes, [2, 1]);
     await Deno.stat(`${out}/page-map.json`);
   },
 });

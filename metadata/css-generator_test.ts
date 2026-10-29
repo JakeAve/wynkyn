@@ -412,11 +412,6 @@ Deno.test("toc leader content becomes the --leader custom property, not ::before
   assert(!css.includes(".matter-toc .leader::before"));
 });
 
-Deno.test("break content still goes to ::before (unchanged)", () => {
-  const css = generateDomCSS({ elements: { break: { content: "✦" } } });
-  assertStringIncludes(css, '.break::before {\n  content: "✦";\n}');
-});
-
 Deno.test("pages.css styles every zone's folio; a zone's own css overrides it (§4.7)", () => {
   const css = generatePagedCSS({
     fonts: { body: "Crimson Pro", display: "Cormorant Garamond" },

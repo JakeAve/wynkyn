@@ -6,17 +6,30 @@ on:
   pull_request:
 
 jobs:
-  test:
-    # macOS: golden page maps were generated there, and its runners ship Chrome.
-    runs-on: macos-latest
-    # A normal run is ~5 min; a hung download or test fails here, not at 6 h.
-    timeout-minutes: 15
+  # Lint, types and every test that needs no browser: a red here comes back
+  # in about a minute, before the Chrome job is half done.
+  fast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - run: deno task check
+      - run: deno task test:fast
+
+  test:
+    # Named "test": the main ruleset requires that check. macOS: golden page
+    # maps were generated there, and its runners ship Chrome.
+    runs-on: macos-latest
+    # A hung download or test fails here, not at 6 h.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       # build:site (not build:web): local-browser_test drives dist/, the
       # hosted site that every push to main deploys.
       - run: deno task build:site

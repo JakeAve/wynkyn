@@ -80,12 +80,6 @@ Deno.test("closing forms read as the insert lists show them", () => {
   assertEquals(closingForm(snippet("chapter")), "—");
 });
 
-Deno.test("{only} is listed under blocks and marked experimental", () => {
-  const only = snippet("only");
-  assertEquals(only.group, "block");
-  assertEquals(only.description.includes("experimental"), true);
-});
-
 Deno.test("wrapping a selection in a closed block keeps the text", () => {
   const state = stateWith("Before.\n\nThe text.\n\nAfter.", 9, 18);
   const tr = state.update(

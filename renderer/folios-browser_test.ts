@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { chromium, type Page } from "playwright";
+import type { Page } from "playwright";
 import { parse } from "../parser/parser.ts";
 import {
   generateDomCSS,
@@ -10,7 +10,7 @@ import type { Metadata } from "../metadata/types.ts";
 import { PAGED_JS } from "../server/export-html.ts";
 import { render } from "./render.ts";
 import "./folios.js";
-import { hasChrome } from "../testing/chrome.ts";
+import { chromeTest, newPage } from "../testing/chrome.ts";
 
 // deno-lint-ignore no-explicit-any
 const { anchorFolios } = (globalThis as any).BookPageMap;
@@ -107,18 +107,13 @@ interface Pass {
 }
 
 async function withPage(fn: (page: Page) => Promise<void>) {
-  const browser = await chromium.launch({ channel: "chrome" });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(
-      `<!doctype html><script>${PAGED_JS}</script>${
-        scripts.map((s) => `<script>${s}</script>`).join("")
-      }<div id="out"></div>`,
-    );
-    await fn(page);
-  } finally {
-    await browser.close();
-  }
+  const page = await newPage();
+  await page.setContent(
+    `<!doctype html><script>${PAGED_JS}</script>${
+      scripts.map((s) => `<script>${s}</script>`).join("")
+    }<div id="out"></div>`,
+  );
+  await fn(page);
 }
 
 // One Paged.js render of `book` from `seed`.
@@ -177,10 +172,9 @@ function pass(
   ) as Promise<Pass>;
 }
 
-Deno.test({
+chromeTest({
   name:
     "folios: the handler writes folios into margins, and the seed into the TOC",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       const book = build(manuscript, metadata);
@@ -233,10 +227,9 @@ Deno.test({
     }),
 });
 
-Deno.test({
+chromeTest({
   name: "folios: openers keep the folio but no head, blanks and the " +
     "colophon show neither (Chicago)",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       const chapter = (slug: string, title: string, n: number) =>
@@ -287,10 +280,9 @@ Deno.test({
     }),
 });
 
-Deno.test({
+chromeTest({
   name: "folios: a book ending in a long footnote is neither cut short nor " +
     "stranded",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       // The last id in the book is the note's; Paged.js moves it out of the
@@ -351,10 +343,9 @@ const centred = build(
   },
 );
 
-Deno.test({
+chromeTest({
   name: "folios: margin boxes are sized as if the page map's text were " +
     "literal CSS",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       const fromMap = await pass(page, centred, {});
@@ -387,9 +378,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+chromeTest({
   name: "folios: a page whose margins are sized before its entry is a problem",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       await page.evaluate(() => {
@@ -430,10 +420,9 @@ const outsideFolio = (head: string) =>
     },
   );
 
-Deno.test({
+chromeTest({
   name: "folios: a centred head beside an outside folio is as wide on a " +
     "recto as on a verso",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       const { result, widths } = await pass(
@@ -458,9 +447,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+chromeTest({
   name: "folios: a head that wraps to a second line is a warning",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       const { result } = await pass(
@@ -478,9 +466,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+chromeTest({
   name: "folios: a chapter without a title is still an opener",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       const literal = [{ content: "~", area: "top-right" as const }];
@@ -506,10 +493,9 @@ Deno.test({
     }),
 });
 
-Deno.test({
+chromeTest({
   name: "furniture: a head's baseline and a foot's cap height sit `gap` from " +
     "the text block, whatever their size (§4.7, §4.8)",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       const head = (size: string) => [
@@ -568,9 +554,8 @@ Deno.test({
     }),
 });
 
-Deno.test({
+chromeTest({
   name: "folios: a low-resolution image and a missing one are warnings",
-  ignore: !hasChrome,
   fn: () =>
     withPage(async (page) => {
       // 100 px wide, laid out at its own 100 CSS px (1in = 96px): 96 dpi.

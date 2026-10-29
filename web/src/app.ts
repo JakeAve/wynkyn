@@ -665,6 +665,9 @@ async function refreshConfigFromRemote(): Promise<void> {
       return;
     }
     metaStale = false;
+    // Our own save's push can beat its response; the panel already shows that
+    // version, and a rebuild would drop a value typed but not yet committed.
+    if (fresh.version === sync.metaBase) return;
     metadata = fresh.metadata;
     sync.rebaseMetadata(fresh.version);
     configPanel.refresh(metadata);

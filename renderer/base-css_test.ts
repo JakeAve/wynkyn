@@ -2,10 +2,9 @@
 // Placed beside base.css (not a .ts module, so no import — just a text-based
 // structural check), following the repo's X_test.ts-next-to-X convention.
 import { assert, assertEquals } from "@std/assert";
-import { chromium } from "playwright";
 import { generateDomCSS } from "../metadata/css-generator.ts";
 import { parse } from "../parser/parser.ts";
-import { hasChrome } from "../testing/chrome.ts";
+import { chromeTest, newPage } from "../testing/chrome.ts";
 import { render } from "./render.ts";
 
 Deno.test("TOC rules in base.css keep zero own-specificity via :where() (review fix, plan 7 task 4)", () => {
@@ -70,10 +69,9 @@ Deno.test("display matter's page rule comes after the zone rules (Paged.js goes 
   }
 });
 
-Deno.test({
+chromeTest({
   name:
     "lines and opening paragraphs stay flush even when a book sets its own paragraph indent",
-  ignore: !hasChrome,
   fn: async () => {
     const html = render(parse([
       "{matter: title-page}",
@@ -131,43 +129,36 @@ Deno.test({
           colophon: { "text-indent": "7px" },
         },
       });
-    const browser = await chromium.launch({ channel: "chrome" });
-    try {
-      const page = await browser.newPage();
-      await page.setContent(`<style>${css}</style>${html}`);
-      const indents = Object.fromEntries(
-        await page.$$eval(
-          ".bml p",
-          (ps) =>
-            ps.map((p) => [p.textContent!, getComputedStyle(p).textIndent]),
-        ),
-      );
-      assertEquals(indents, {
-        "Scribner": "0px",
-        "Once againto Zelda": "0px",
-        "Opening.": "0px",
-        "Indented.": "20px",
-        "After heading.": "0px",
-        "Pulled.": "0px",
-        "After pullquote.": "20px",
-        "A line.": "0px",
-        "Anon.": "0px",
-        "Boxed.": "0px",
-        "Left.": "0px",
-        "Right.": "0px",
-        // The section's own indent reaches its lines.
-        "Set in Garamond.": "7px",
-      });
-    } finally {
-      await browser.close();
-    }
+    const page = await newPage();
+    await page.setContent(`<style>${css}</style>${html}`);
+    const indents = Object.fromEntries(
+      await page.$$eval(
+        ".bml p",
+        (ps) => ps.map((p) => [p.textContent!, getComputedStyle(p).textIndent]),
+      ),
+    );
+    assertEquals(indents, {
+      "Scribner": "0px",
+      "Once againto Zelda": "0px",
+      "Opening.": "0px",
+      "Indented.": "20px",
+      "After heading.": "0px",
+      "Pulled.": "0px",
+      "After pullquote.": "20px",
+      "A line.": "0px",
+      "Anon.": "0px",
+      "Boxed.": "0px",
+      "Left.": "0px",
+      "Right.": "0px",
+      // The section's own indent reaches its lines.
+      "Set in Garamond.": "7px",
+    });
   },
 });
 
-Deno.test({
+chromeTest({
   name:
     "a book's quote, poem, break and illustration margins beat base.css; an epigraph centres as wide as its longest line",
-  ignore: !hasChrome,
   fn: async () => {
     const html = render(parse([
       "{chapter: a}",
@@ -201,48 +192,42 @@ Deno.test({
           illustration: { "margin-top": "60px" },
         },
       });
-    const browser = await chromium.launch({ channel: "chrome" });
-    try {
-      const page = await browser.newPage();
-      await page.setContent(
-        `<style>body { margin: 0; width: 600px }${css}</style>${html}`,
-      );
-      const m = await page.evaluate(() => {
-        const box = (s: string) => {
-          const r = document.querySelector(s)!.getBoundingClientRect();
-          return [Math.round(r.left), Math.round(r.right)];
-        };
-        const text = document.querySelector(".epigraph .text")!;
-        const range = document.createRange();
-        range.selectNodeContents(text);
-        return {
-          quote: getComputedStyle(document.querySelector(".quote")!).marginLeft,
-          poem: getComputedStyle(document.querySelector(".poem")!).marginLeft,
-          break: getComputedStyle(document.querySelector(".break")!).marginTop,
-          illustration: getComputedStyle(
-            document.querySelector(".illustration")!,
-          ).marginTop,
-          epigraph: box(".epigraph"),
-          longest: Math.round(range.getBoundingClientRect().width),
-        };
-      });
-      assertEquals(m.quote, "30px");
-      assertEquals(m.poem, "40px");
-      assertEquals(m.break, "50px");
-      assertEquals(m.illustration, "60px");
-      const [left, right] = m.epigraph as [number, number];
-      assertEquals(right - left, m.longest, "shrinks to its longest line");
-      assert(Math.abs(left - (600 - right)) <= 1, `centred: ${left}..${right}`);
-    } finally {
-      await browser.close();
-    }
+    const page = await newPage();
+    await page.setContent(
+      `<style>body { margin: 0; width: 600px }${css}</style>${html}`,
+    );
+    const m = await page.evaluate(() => {
+      const box = (s: string) => {
+        const r = document.querySelector(s)!.getBoundingClientRect();
+        return [Math.round(r.left), Math.round(r.right)];
+      };
+      const text = document.querySelector(".epigraph .text")!;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      return {
+        quote: getComputedStyle(document.querySelector(".quote")!).marginLeft,
+        poem: getComputedStyle(document.querySelector(".poem")!).marginLeft,
+        break: getComputedStyle(document.querySelector(".break")!).marginTop,
+        illustration: getComputedStyle(
+          document.querySelector(".illustration")!,
+        ).marginTop,
+        epigraph: box(".epigraph"),
+        longest: Math.round(range.getBoundingClientRect().width),
+      };
+    });
+    assertEquals(m.quote, "30px");
+    assertEquals(m.poem, "40px");
+    assertEquals(m.break, "50px");
+    assertEquals(m.illustration, "60px");
+    const [left, right] = m.epigraph as [number, number];
+    assertEquals(right - left, m.longest, "shrinks to its longest line");
+    assert(Math.abs(left - (600 - right)) <= 1, `centred: ${left}..${right}`);
   },
 });
 
-Deno.test({
+chromeTest({
   name:
     "each style key reaches its own element and no other, over base.css (CSS audit)",
-  ignore: !hasChrome,
   fn: async () => {
     const html = render(
       parse([
@@ -299,47 +284,42 @@ Deno.test({
           footnote: { "font-size": "6px" },
         },
       });
-    const browser = await chromium.launch({ channel: "chrome" });
-    try {
-      const page = await browser.newPage();
-      await page.setContent(`<style>${css}</style>${html}`);
-      const got = await page.evaluate(() => {
-        const cs = (s: string) => getComputedStyle(document.querySelector(s)!);
-        return {
-          partTitle: cs(".part > .title").color,
-          chapterTitle: cs(".chapter .title").color,
-          verseNumber: `${cs(".verse .number").fontSize} ${
-            cs(".verse .number").letterSpacing
-          }`,
-          author: cs(".author").textIndent,
-          dedication: cs(".matter-dedication p").textIndent,
-          dropcap: `${cs(".dropcap").float} ${cs(".dropcap").paddingRight}`,
-          heading: cs(".heading").hyphens,
-          columns: cs(".columns-parallel").columnGap,
-          weight: [".chapter .title", ".heading"].map((s) => cs(s).fontWeight),
-          titleSize: cs(".chapter .title").fontSize,
-          note: cs(".notes .note").fontSize,
-          ink: [".footnote-anchor a", "a.ref"].map((s) =>
-            `${cs(s).color} ${cs(s).textDecorationLine}`
-          ),
-        };
-      });
-      assertEquals(got, {
-        partTitle: "rgb(255, 0, 0)",
-        chapterTitle: "rgb(0, 0, 255)", // the part's red stays on the part
-        verseNumber: "7px normal", // no chapter or part number styles
-        author: "13px", // a line's own key beats display matter's inherit
-        dedication: "0px", // display matter ignores the paragraph indent
-        dropcap: "none 3px",
-        heading: "auto",
-        columns: "17px",
-        weight: ["400", "400"], // the text's weight, not the browser's bold
-        titleSize: "32px", // 2em of the 16px default, in any browser
-        note: "6px",
-        ink: Array(2).fill("rgb(0, 0, 0) none"),
-      });
-    } finally {
-      await browser.close();
-    }
+    const page = await newPage();
+    await page.setContent(`<style>${css}</style>${html}`);
+    const got = await page.evaluate(() => {
+      const cs = (s: string) => getComputedStyle(document.querySelector(s)!);
+      return {
+        partTitle: cs(".part > .title").color,
+        chapterTitle: cs(".chapter .title").color,
+        verseNumber: `${cs(".verse .number").fontSize} ${
+          cs(".verse .number").letterSpacing
+        }`,
+        author: cs(".author").textIndent,
+        dedication: cs(".matter-dedication p").textIndent,
+        dropcap: `${cs(".dropcap").float} ${cs(".dropcap").paddingRight}`,
+        heading: cs(".heading").hyphens,
+        columns: cs(".columns-parallel").columnGap,
+        weight: [".chapter .title", ".heading"].map((s) => cs(s).fontWeight),
+        titleSize: cs(".chapter .title").fontSize,
+        note: cs(".notes .note").fontSize,
+        ink: [".footnote-anchor a", "a.ref"].map((s) =>
+          `${cs(s).color} ${cs(s).textDecorationLine}`
+        ),
+      };
+    });
+    assertEquals(got, {
+      partTitle: "rgb(255, 0, 0)",
+      chapterTitle: "rgb(0, 0, 255)", // the part's red stays on the part
+      verseNumber: "7px normal", // no chapter or part number styles
+      author: "13px", // a line's own key beats display matter's inherit
+      dedication: "0px", // display matter ignores the paragraph indent
+      dropcap: "none 3px",
+      heading: "auto",
+      columns: "17px",
+      weight: ["400", "400"], // the text's weight, not the browser's bold
+      titleSize: "32px", // 2em of the 16px default, in any browser
+      note: "6px",
+      ink: Array(2).fill("rgb(0, 0, 0) none"),
+    });
   },
 });

@@ -31,6 +31,11 @@ look; when code and it disagree, ask.
 - Deno only, strict TS, `noUncheckedIndexedAccess`. No new deps without reason.
   Tests are plain `Deno.test` with `jsr:@std/assert`, in `*_test.ts` beside the
   module.
+- A test earns its place by catching a bug no other test catches: a pure test
+  for logic, a Chrome test only for what only a browser knows, and a new
+  assertion in an existing Chrome flow before a new one. No tests of copy,
+  constants or one-line wrappers (`architecture` → `references/dev-workflow.md`,
+  What earns a test).
 - Comments say why: a constraint, a browser quirk, a spec §, a trade-off.
   Default to none. Never restate the name below, narrate history, or describe
   the change; don't match a neighbour's density. Say nothing or less.
@@ -39,14 +44,18 @@ look; when code and it disagree, ask.
   fails an unlabelled sleep). A CI failure that passes on re-run is a race to
   fix at its root, never a re-run, retry or longer timeout (`architecture` →
   `references/dev-workflow.md`).
+- A Chrome test takes a page from the shared harness (`testing/app.ts`,
+  `testing/chrome.ts`), never its own browser, server or copied book folder.
 
 ## Commands
 
 - `deno task setup` once per checkout: git hooks, dev port, `books/` symlink
 - `deno task dev` build the client + live server (main checkout :8000, a
   worktree its own port); edits reload themselves
-- `deno task check` fmt, lint, types (both git hooks run it)
-- `deno task test` all tests, Chrome included (~50 s, pre-push)
+- `deno task check` fmt, lint, types (the pre-commit hook runs it)
+- `deno test -A <file>` the files you touched: the inner loop
+- `deno task test` all tests, Chrome included (~2.5 min); CI runs it, so run it
+  locally only for a change to the harness itself
 - `deno task test:fast` without Chrome (~10 s, pre-commit)
 - `deno task build:site` the hosted site as plain files in `dist/`
 

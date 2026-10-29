@@ -10,7 +10,6 @@
     "dev": "deno task build:web && (deno bundle --watch --platform browser --output web/app.js web/src/app.ts & deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys --watch=web/app.js,web/index.html,web/tokens.css,web/app.css,renderer/,vendor/ server/dev-server.ts)",
     "bml": "deno run --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys bml.ts",
     "pre-commit": "deno task check && deno task test:fast",
-    "pre-push": "deno task check && deno task test",
     "fonts": "deno run --allow-net=fonts.google.com --allow-write=metadata metadata/update-fonts.ts && deno fmt metadata/fonts-catalog.ts"
   },
   "imports": {
