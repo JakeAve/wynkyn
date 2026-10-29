@@ -837,11 +837,12 @@ Same tokens, a louder register: headlines (`h1`) in Fell Great Primer at
 editor", §6.1); section heads (`h2`) in Fell at `--fs-hero`; feature heads
 (`.facts h3`) and the FAQ's questions in Fell at `--fs-h`, the feature heads
 behind a ❦ in `--acc-ink`; the sun beside the wordmark "Wynkyn" in Fell at
-`--fs-h`. The foot is a `--fs-xs` link line and the colophon, "Set in IM Fell
-Great Primer and Alegreya.", in Alegreya italic behind the same red ❦. The site
-pages have no `data-theme` and follow the system (`tokens.css`'s
-`prefers-color-scheme` block); they link the same `web/tokens.css` as the app,
-before `web/site/site.css`, which holds no tokens of its own.
+`--fs-h`, turning once every two minutes (still under `prefers-reduced-motion`).
+The foot is a `--fs-xs` link line and the colophon, "Set in IM Fell Great Primer
+and Alegreya.", in Alegreya italic behind the same red ❦. The site pages have no
+`data-theme` and follow the system (`tokens.css`'s `prefers-color-scheme`
+block); they link the same `web/tokens.css` as the app, before
+`web/site/site.css`, which holds no tokens of its own.
 
 ## 12. Motion (planned)
 

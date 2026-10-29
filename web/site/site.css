@@ -42,6 +42,12 @@ header .mark {
 header .mark img {
   width: var(--h-md);
   height: var(--h-md);
+  animation: turn 120s linear infinite;
+}
+@keyframes turn {
+  to {
+    transform: rotate(1turn);
+  }
 }
 header nav {
   margin-left: auto;
@@ -207,5 +213,8 @@ a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .btn {
     transition: none;
+  }
+  header .mark img {
+    animation: none;
   }
 }
