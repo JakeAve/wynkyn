@@ -1,5 +1,5 @@
 // server/book-service_test.ts
-import { assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { BookService, ServiceError } from "./book-service.ts";
 import { diskStore, withTabs } from "./store.ts";
 import { memoryStore } from "../testing/memory-store.ts";
@@ -301,5 +301,88 @@ Deno.test("tabs: concurrent saves from one base across services — one lands, o
   } finally {
     await a.stop();
     await b.stop();
+  }
+});
+
+// The fixture book and its pocket edition in memory: a save's broadcast needs
+// no disk, watch or clock.
+async function demoService(): Promise<BookService> {
+  const src = new URL("./testdata/demo-book/", import.meta.url);
+  const files = new Map<string, Uint8Array>();
+  for (const f of ["manuscript.md", "metadata.json", "editions/pocket.json"]) {
+    files.set(`demo-book/${f}`, await Deno.readFile(new URL(f, src)));
+  }
+  return new BookService({ store: memoryStore(files) });
+}
+
+// The updates a client on `edition` is sent, as they arrive.
+function listen(service: BookService, edition: string | null, client: string) {
+  const heard: Extract<ServerMessage, { type: "update" }>[] = [];
+  service.subscribe("demo-book", edition, client, (m) => {
+    if (m.type === "update") heard.push(m);
+  });
+  return heard;
+}
+
+Deno.test("metadata: a save broadcasts an update with its version", async () => {
+  const service = await demoService();
+  try {
+    const heard = listen(service, null, "cfg-1");
+    await until(() => heard.length > 0, "the initial build");
+    const { version } = await service.saveMetadata("demo-book", null, {
+      notes: { placement: "footnote" },
+    });
+    await until(
+      () => heard.some((m) => m.metadataVersion === version),
+      "the save's broadcast",
+    );
+    const msg = heard.find((m) => m.metadataVersion === version)!;
+    assertEquals("origin" in msg, false);
+    assert(msg.pagedCss.includes("float: footnote"));
+  } finally {
+    await service.stop();
+  }
+});
+
+Deno.test("editions: clients hear their own edition's builds; manuscript edits reach all", async () => {
+  const service = await demoService();
+  try {
+    const unnamed = listen(service, null, "u");
+    const pocket = listen(service, "pocket", "p");
+    await until(
+      () => unnamed.length > 0 && pocket.length > 0,
+      "both initial builds",
+    );
+    assertEquals([unnamed[0]!.edition, pocket[0]!.edition], [null, "pocket"]);
+    assert(pocket[0]!.pagedCss.includes("3.5in 5in"));
+
+    // A pocket save reaches the pocket client only. A broadcast sends to all
+    // its clients at once, so by the time pocket has it, so would unnamed.
+    const { version } = await service.saveMetadata("demo-book", "pocket", {
+      notes: { placement: "footnote" },
+    });
+    await until(
+      () => pocket.some((m) => m.metadataVersion === version),
+      "the pocket save's broadcast",
+    );
+    assert(
+      pocket.find((m) => m.metadataVersion === version)!.pagedCss.includes(
+        "float: footnote",
+      ),
+    );
+    assert(!unnamed.some((m) => m.pagedCss.includes("float: footnote")));
+
+    // A manuscript save reaches both, each built with its own edition.
+    const saved = await service.saveManuscript("demo-book", {
+      text: "{matter: half-title}\n{title}\nRenamed\n",
+    });
+    const v = "version" in saved ? saved.version : "";
+    const of = (heard: typeof unnamed) =>
+      heard.find((m) => m.manuscriptVersion === v);
+    await until(() => !!of(unnamed) && !!of(pocket), "both rebuilds");
+    assert(of(unnamed)!.pagedCss.includes("5.5in 8.5in"));
+    assert(of(pocket)!.pagedCss.includes("3.5in 5in"));
+  } finally {
+    await service.stop();
   }
 });

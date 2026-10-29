@@ -33,16 +33,20 @@ export async function newPage(
  * off: they would count Chrome's pipe, open across tests, as this test's
  * leak. */
 export function chromeTest(
-  t: { name: string; ignore?: boolean; fn: () => Promise<void> },
+  t: {
+    name: string;
+    ignore?: boolean;
+    fn: (t: Deno.TestContext) => Promise<void>;
+  },
 ): void {
   Deno.test({
     name: t.name,
     ignore: !hasChrome || t.ignore,
     sanitizeOps: false,
     sanitizeResources: false,
-    async fn() {
+    async fn(ctx) {
       try {
-        await t.fn();
+        await t.fn(ctx);
       } finally {
         for (const c of open) await c.close();
         open.clear();

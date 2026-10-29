@@ -2,7 +2,7 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { startServer } from "./dev-server.ts";
 import { contentVersion } from "./pipeline.ts";
-import { quietFor, until } from "../testing/wait.ts";
+import { until } from "../testing/wait.ts";
 
 // Tests copy the fixture into a temp dir: later tasks write to it, and the
 // watcher must not fire on tracked files under server/testdata/.
@@ -99,28 +99,6 @@ function nextMessage(
   });
 }
 
-function nextMessageWhere(
-  ws: WebSocket,
-  pred: (m: Record<string, unknown>) => boolean,
-  timeoutMs = 5000,
-): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    // clock: a deadline for a hang, not a wait
-    const t = setTimeout(
-      () => reject(new Error("timed out waiting for a matching ws message")),
-      timeoutMs,
-    );
-    const onMessage = (e: Event) => {
-      const m = JSON.parse((e as MessageEvent).data);
-      if (!pred(m)) return;
-      clearTimeout(t);
-      ws.removeEventListener("message", onMessage);
-      resolve(m);
-    };
-    ws.addEventListener("message", onMessage);
-  });
-}
-
 Deno.test("epub: the export lands in the edition's export folder", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });
@@ -139,19 +117,13 @@ Deno.test("epub: the export lands in the edition's export folder", async () => {
   }
 });
 
-Deno.test("save: each post lands before it is answered; POST and broadcast carry the version", async () => {
+// The broadcast of a save is book-service_test.ts's.
+Deno.test("save: each post lands before it is answered, with its version", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
-  const ws = new WebSocket(
-    `ws://localhost:${server.port}/ws?book=demo-book&client=observer`,
-  );
   const manuscript = `${root}/demo-book/manuscript.md`;
   try {
-    await nextMessage(ws); // initial build
-    // clock: a fresh FSEvents watch has no ready signal; give it a beat.
-    await new Promise((r) => setTimeout(r, 300));
-
     const post = (text: string) =>
       fetch(`${base}/api/books/demo-book/manuscript`, {
         method: "POST",
@@ -168,20 +140,10 @@ Deno.test("save: each post lands before it is answered; POST and broadcast carry
       version: await contentVersion(draftA),
     });
     assertEquals(await Deno.readTextFile(manuscript), draftA);
-    const versionB = await contentVersion(draftB);
-    const pushed = nextMessageWhere(
-      ws,
-      (m) => m.manuscriptVersion === versionB,
-    );
     const r2 = await post(draftB);
     assertEquals(r2.status, 200);
-    assertEquals((await r2.json()).version, versionB);
+    assertEquals((await r2.json()).version, await contentVersion(draftB));
     assertEquals(await Deno.readTextFile(manuscript), draftB);
-
-    const msg = await pushed;
-    assertEquals(msg.type, "update");
-    assertEquals("origin" in msg, false);
-    assert((msg.html as string).includes("Draft B"));
 
     const bad = await fetch(`${base}/api/books/demo-book/manuscript`, {
       method: "POST",
@@ -190,7 +152,6 @@ Deno.test("save: each post lands before it is answered; POST and broadcast carry
     assertEquals(bad.status, 400);
     await bad.body?.cancel();
   } finally {
-    ws.close();
     await server.stop();
     await Deno.remove(root, { recursive: true });
   }
@@ -476,48 +437,6 @@ Deno.test("metadata: missing metadata.json GETs as {} and POST creates it", asyn
   }
 });
 
-Deno.test("metadata: the write broadcasts an update with the POSTed version", async () => {
-  const root = await makeBooksRoot();
-  const server = await startServer({ booksRoot: root, port: 0 });
-  const ws = new WebSocket(
-    `ws://localhost:${server.port}/ws?book=demo-book&client=cfg-1`,
-  );
-  try {
-    await nextMessage(ws); // initial build
-    // The save's own broadcast, not a stray build from the fixture's copy.
-    const pushed = nextMessageWhere(
-      ws,
-      (m) =>
-        (m.pagedCss as string | undefined)?.includes("float: footnote") ??
-          false,
-    );
-
-    const post = await fetch(
-      `http://localhost:${server.port}/api/books/demo-book/metadata`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          sections: { notes: { placement: "footnote" } },
-          clientId: "cfg-1",
-        }),
-      },
-    );
-    const { ok, version } = await post.json();
-    assertEquals(ok, true);
-
-    const msg = await pushed;
-    assertEquals(msg.type, "update");
-    assertEquals("origin" in msg, false);
-    assertEquals(msg.metadataVersion, version); // spec §6: echo known by version
-    assert((msg.pagedCss as string).includes("float: footnote"));
-  } finally {
-    ws.close();
-    await server.stop();
-    await Deno.remove(root, { recursive: true });
-  }
-});
-
 Deno.test("metadata: an outside edit to another section survives a save", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });
@@ -792,7 +711,7 @@ Deno.test("rename rewrites {only} tokens in manuscript.md", async () => {
   }
 });
 
-Deno.test("rename: a stale save carrying the old token lands with the new one", async () => {
+Deno.test("rename: a stale save carrying the old token lands with the new one, and returns it", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });
   const base = `http://localhost:${server.port}`;
@@ -813,49 +732,11 @@ Deno.test("rename: a stale save carrying the old token lands with the new one", 
     await nextMessage(ws);
     const renamed = await post("/editions/pocket/rename", { slug: "travel" });
     assertEquals((await renamed.json()).ok, true);
-    await (await post("/manuscript", {
-      text: "{chapter: one}\n\n{only: pocket | default}\nP\n{/only}\n",
-      clientId: "tab",
-    })).body?.cancel();
-    await lands("{chapter: one}\n\n{only: travel | default}\nP\n{/only}\n");
-    // Once the tab saves without the old token it has caught up: `pocket`
-    // is free again for a new edition of that name.
-    await (await post("/manuscript", {
-      text: "{chapter: one}\n",
-      clientId: "tab",
-    }))
-      .body?.cancel();
-    await (await post("/manuscript", {
-      text: "{chapter: one}\n\n{only: pocket}\nP\n{/only}\n",
-      clientId: "tab",
-    })).body?.cancel();
-    await lands("{chapter: one}\n\n{only: pocket}\nP\n{/only}\n");
-  } finally {
-    ws.close();
-    await server.stop();
-    await Deno.remove(root, { recursive: true });
-  }
-});
-
-Deno.test("rename: a rewritten save returns text; an untouched one does not", async () => {
-  const root = await makeBooksRoot();
-  const server = await startServer({ booksRoot: root, port: 0 });
-  const base = `http://localhost:${server.port}`;
-  const post = (path: string, body: unknown) =>
-    fetch(`${base}/api/books/demo-book${path}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  const ws = new WebSocket(
-    `ws://localhost:${server.port}/ws?book=demo-book&client=tab`,
-  );
-  try {
-    await nextMessage(ws);
-    await (await post("/editions/pocket/rename", { slug: "travel" })).json();
-    const rewritten = "{chapter: one}\n\n{only: travel}\nP\n{/only}\n";
+    // A rewritten save returns the text that landed; an untouched one does not.
+    const rewritten =
+      "{chapter: one}\n\n{only: travel | default}\nP\n{/only}\n";
     const res = await post("/manuscript", {
-      text: "{chapter: one}\n\n{only: pocket}\nP\n{/only}\n",
+      text: "{chapter: one}\n\n{only: pocket | default}\nP\n{/only}\n",
       clientId: "tab",
     });
     assertEquals(await res.json(), {
@@ -863,11 +744,19 @@ Deno.test("rename: a rewritten save returns text; an untouched one does not", as
       version: await contentVersion(rewritten),
       text: rewritten,
     });
+    await lands(rewritten);
+    // Once the tab saves without the old token it has caught up: `pocket`
+    // is free again for a new edition of that name.
     const plain = await post("/manuscript", {
       text: "{chapter: one}\n",
       clientId: "tab",
     });
     assertEquals("text" in await plain.json(), false);
+    await (await post("/manuscript", {
+      text: "{chapter: one}\n\n{only: pocket}\nP\n{/only}\n",
+      clientId: "tab",
+    })).body?.cancel();
+    await lands("{chapter: one}\n\n{only: pocket}\nP\n{/only}\n");
   } finally {
     ws.close();
     await server.stop();
@@ -918,77 +807,8 @@ Deno.test("editions: the default edition renames by display name, keeping a styl
   }
 });
 
-Deno.test("editions: ws clients get their own edition's builds; manuscript edits reach all", async () => {
-  const root = await makeBooksRoot();
-  const server = await startServer({ booksRoot: root, port: 0 });
-  const base = `http://localhost:${server.port}`;
-  const unnamed = new WebSocket(
-    `ws://localhost:${server.port}/ws?book=demo-book&client=u`,
-  );
-  const pocket = new WebSocket(
-    `ws://localhost:${server.port}/ws?book=demo-book&edition=pocket&client=p`,
-  );
-  const post = (url: string, body: unknown) =>
-    fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }).then((r) => r.body?.cancel());
-  try {
-    // Attach both listeners before awaiting either, or the second socket's
-    // initial message arrives before anyone is listening and is lost.
-    const u0p = nextMessage(unnamed);
-    const p0p = nextMessage(pocket);
-    const u0 = await u0p;
-    const p0 = await p0p;
-    assertEquals(u0.edition, null);
-    assertEquals(p0.edition, "pocket");
-    assert((p0.pagedCss as string).includes("3.5in 5in"));
-    // clock: a fresh FSEvents watch has no ready signal; give it a beat.
-    await new Promise((r) => setTimeout(r, 300));
-
-    // Pocket metadata write → only the pocket client hears it. A late watch
-    // event can still push the unnamed client a rebuild of what it has, so
-    // what must not arrive is a build carrying the pocket write.
-    let unnamedHeard = false;
-    const hear = (e: MessageEvent) =>
-      unnamedHeard ||= String(e.data).includes("float: footnote");
-    unnamed.addEventListener("message", hear);
-    const p1 = nextMessageWhere(
-      pocket,
-      (m) => m.metadataVersion !== p0.metadataVersion,
-    );
-    await post(`${base}/api/books/demo-book/editions/pocket/metadata`, {
-      sections: { notes: { placement: "footnote" } },
-    });
-    const msg = await p1;
-    assertEquals(msg.edition, "pocket");
-    assert((msg.pagedCss as string).includes("float: footnote"));
-    await quietFor(300);
-    unnamed.removeEventListener("message", hear);
-    assertEquals(unnamedHeard, false);
-
-    // Manuscript write → both clients, each built with its own edition.
-    const text = "{matter: half-title}\n{title}\nRenamed\n";
-    const version = await contentVersion(text);
-    const u2 = nextMessageWhere(
-      unnamed,
-      (m) => m.manuscriptVersion === version,
-    );
-    const p2 = nextMessageWhere(pocket, (m) => m.manuscriptVersion === version);
-    await post(`${base}/api/books/demo-book/manuscript`, { text });
-    const [um, pm] = await Promise.all([u2, p2]);
-    assert((um.pagedCss as string).includes("5.5in 8.5in"));
-    assert((pm.pagedCss as string).includes("3.5in 5in"));
-  } finally {
-    unnamed.close();
-    pocket.close();
-    await server.stop();
-    await Deno.remove(root, { recursive: true });
-  }
-});
-
-Deno.test("try: builds in the posted style, writes nothing; bad body 400, missing edition 404", async () => {
+// Building in the posted style is pipeline_test.ts's.
+Deno.test("try: a bad body is a 400", async () => {
   const root = await makeBooksRoot();
   const server = await startServer({ booksRoot: root, port: 0 });
   const url = `http://localhost:${server.port}/api/books/demo-book/try`;
@@ -999,18 +819,6 @@ Deno.test("try: builds in the posted style, writes nothing; bad body 400, missin
       body: JSON.stringify(body),
     });
   try {
-    const file = `${root}/demo-book/metadata.json`;
-    const before = await Deno.readTextFile(file);
-    const ok = await post({
-      edition: null,
-      metadata: { fonts: { body: "Playfair Display" } },
-    });
-    assertEquals(ok.status, 200);
-    const built = await ok.json();
-    assert(built.fontLinks.includes("family=Playfair+Display"));
-    assertEquals(built.metadataVersion, await contentVersion(before));
-    assertEquals(await Deno.readTextFile(file), before);
-
     for (
       const bad of [
         { edition: null },
@@ -1023,9 +831,6 @@ Deno.test("try: builds in the posted style, writes nothing; bad body 400, missin
       assertEquals(res.status, 400);
       await res.body?.cancel();
     }
-    const missing = await post({ edition: "nope", metadata: {} });
-    assertEquals(missing.status, 404);
-    await missing.body?.cancel();
   } finally {
     await server.stop();
     await Deno.remove(root, { recursive: true });

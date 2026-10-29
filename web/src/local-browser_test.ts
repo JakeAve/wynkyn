@@ -3,9 +3,8 @@
 // storage. Imports the fixture book, edits it, and finds the edit in storage
 // and again after a reload.
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { chromium } from "playwright";
 import { strToU8, unzipSync, zipSync } from "fflate";
-import { hasChrome } from "../../testing/chrome.ts";
+import { chromeTest, newPage } from "../../testing/chrome.ts";
 import { until } from "../../testing/wait.ts";
 import { serveSite } from "../../scripts/serve-site.ts";
 
@@ -23,15 +22,14 @@ async function importDemoBook(page: import("playwright").Page): Promise<void> {
   );
 }
 
-Deno.test({
+chromeTest({
   name: "local library: import into the browser, edit, the file changes, " +
     "the edit survives a reload",
-  ignore: !hasChrome || !siteBuilt,
+  ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       const url = `http://localhost:${site.addr.port}/app/`;
       await page.goto(url);
       await page.locator("#library[open]").waitFor();
@@ -101,21 +99,19 @@ Deno.test({
         ),
       );
     } finally {
-      await browser.close();
       await site.shutdown();
     }
   },
 });
 
-Deno.test({
+chromeTest({
   name: "local library: a browser without the File System Access API " +
     "gets the notice, tagged folder buttons, and Import from a folder in the browser",
-  ignore: !hasChrome || !siteBuilt,
+  ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       await page.addInitScript(() => {
         // deno-lint-ignore no-explicit-any
         delete (globalThis as any).showDirectoryPicker;
@@ -163,7 +159,6 @@ Deno.test({
       await page.locator('#status[data-kind="saved"]').waitFor();
       assertEquals(await page.locator("#browser-notice[open]").count(), 0);
     } finally {
-      await browser.close();
       await site.shutdown();
     }
   },
@@ -210,18 +205,17 @@ const docx = (): Uint8Array => {
   });
 };
 
-Deno.test({
+chromeTest({
   name: "import a Word file: the typed title, its picture and its footnote " +
     "reach the pages",
-  ignore: !hasChrome || !siteBuilt,
+  ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
-    const browser = await chromium.launch({ channel: "chrome" });
     const tmp = await Deno.makeTempDir();
     const file = `${tmp}/Manuscript_final_v3.docx`;
     await Deno.writeFile(file, docx());
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       await page.goto(`http://localhost:${site.addr.port}/app/`);
       await page.locator("#library[open]").waitFor();
       await page.locator("#lib-browser").click();
@@ -273,7 +267,6 @@ Deno.test({
       );
       await page.close();
     } finally {
-      await browser.close();
       await site.shutdown();
       await Deno.remove(tmp, { recursive: true });
     }
@@ -299,18 +292,17 @@ And then it was over.
 *** END OF THE PROJECT GUTENBERG EBOOK TINY BOOK ***
 `;
 
-Deno.test({
+chromeTest({
   name: "first run: Welcome → browser storage → import a text file → title → " +
     "the editor, with import notes in the footer",
-  ignore: !hasChrome || !siteBuilt,
+  ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
-    const browser = await chromium.launch({ channel: "chrome" });
     const tmp = await Deno.makeTempDir();
     const file = `${tmp}/tiny-book.txt`;
     await Deno.writeTextFile(file, TINY);
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       await page.goto(`http://localhost:${site.addr.port}/app/`);
       await page.locator("#library[open]").waitFor();
       const welcome = await page.locator("#library").innerText();
@@ -401,22 +393,20 @@ Deno.test({
       );
       await page.close();
     } finally {
-      await browser.close();
       await site.shutdown();
       await Deno.remove(tmp, { recursive: true });
     }
   },
 });
 
-Deno.test({
+chromeTest({
   name: "import from the web: a fetched address, and a paste when the site " +
     "blocks the page",
-  ignore: !hasChrome || !siteBuilt,
+  ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       const address = "https://books.example/tiny.txt";
       await page.route(address, (r) =>
         r.fulfill({
@@ -490,21 +480,19 @@ Deno.test({
       await page.locator("#title-ok").click();
       await page.waitForURL(/book=tiny-book-two/);
     } finally {
-      await browser.close();
       await site.shutdown();
     }
   },
 });
 
-Deno.test({
+chromeTest({
   name: "local library: a picked folder is named in the switcher, and " +
     "Change library… goes back to the Welcome with it on offer",
-  ignore: !hasChrome || !siteBuilt,
+  ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       // The picker can't be driven, so it hands out a private-storage folder
       // named like the author's: same handle API, no dialog.
       await page.addInitScript(() => {
@@ -554,7 +542,6 @@ Deno.test({
         "My Books",
       );
     } finally {
-      await browser.close();
       await site.shutdown();
     }
   },
@@ -596,14 +583,13 @@ async function switchToDemoBook(page: import("playwright").Page) {
   await page.locator('.book-row[title="demo-book"]').dblclick();
 }
 
-Deno.test({
+chromeTest({
   name: "local library: an edit typed just before switching book is saved",
-  ignore: !hasChrome || !siteBuilt,
+  ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       await page.goto(`http://localhost:${site.addr.port}/app/`);
       await twoBooks(page);
       await page.locator("#editor .cm-content").click();
@@ -620,21 +606,19 @@ Deno.test({
         "Typed just before the switch.",
       );
     } finally {
-      await browser.close();
       await site.shutdown();
     }
   },
 });
 
-Deno.test({
+chromeTest({
   name: "local library: switching with a save that fails asks first; " +
     "staying keeps the edit and the retry lands it",
-  ignore: !hasChrome || !siteBuilt,
+  ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       await page.goto(`http://localhost:${site.addr.port}/app/`);
       await twoBooks(page);
       // Every write to storage fails until put back.
@@ -679,7 +663,6 @@ Deno.test({
         "Typed while saves fail.",
       );
     } finally {
-      await browser.close();
       await site.shutdown();
     }
   },

@@ -1,9 +1,9 @@
 import { assert, assertEquals } from "@std/assert";
-import { chromium, type Page } from "playwright";
+import type { Page } from "playwright";
 import { pageNumberingConfig } from "../metadata/css-generator.ts";
 import { parse } from "../parser/parser.ts";
 import { PAGED_JS, toHtml } from "../server/export-html.ts";
-import { hasChrome } from "../testing/chrome.ts";
+import { chromeTest, newPage } from "../testing/chrome.ts";
 
 const para = (n: number) =>
   `<p>${
@@ -21,12 +21,7 @@ const platesJs = await Deno.readTextFile(
 const pagedCss = "@page { size: 4in 6in; margin: 0.5in; }";
 
 async function withChrome(fn: (page: Page) => Promise<void>) {
-  const browser = await chromium.launch({ channel: "chrome" });
-  try {
-    await fn(await browser.newPage());
-  } finally {
-    await browser.close();
-  }
+  await fn(await newPage());
 }
 
 // The plate is alone on its page, text on either side, and the page before
@@ -60,9 +55,8 @@ async function assertPlate(page: Page) {
   assertEquals(pages.filter((p) => p.plate).length, 1);
 }
 
-Deno.test({
+chromeTest({
   name: "plates: toHtml (render, export) fills the page, then the plate",
-  ignore: !hasChrome,
   fn: () =>
     withChrome(async (page) => {
       await page.setContent(toHtml({
@@ -88,10 +82,9 @@ Deno.test({
     }),
 });
 
-Deno.test({
+chromeTest({
   name:
     "plates: Previewer.preview(htmlString), as the web preview calls it, fills the page, then the plate",
-  ignore: !hasChrome,
   fn: () =>
     withChrome(async (page) => {
       await page.setContent(

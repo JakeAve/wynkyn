@@ -1,16 +1,14 @@
 // web/src/store-browser_test.ts — the store contract (server/store-contract.ts)
 // against handleStore in Chrome, over the browser's private storage: the same
 // cases diskStore and the memory store pass, one step each.
-import { chromium } from "playwright";
-import { hasChrome } from "../../testing/chrome.ts";
+import { chromeTest, newPage } from "../../testing/chrome.ts";
 import { contractCases } from "../../server/store-contract.ts";
 
 type Contract = { run(name: string): Promise<string | null> };
 const ENTRY = new URL("../../testing/store-contract-page.ts", import.meta.url);
 
-Deno.test({
+chromeTest({
   name: "handleStore over OPFS passes the store contract",
-  ignore: !hasChrome,
   async fn(t) {
     const tmp = await Deno.makeTempDir();
     const out = `${tmp}/contract.js`;
@@ -39,9 +37,8 @@ Deno.test({
             { headers: { "content-type": "text/html" } },
           ),
     );
-    const browser = await chromium.launch({ channel: "chrome" });
     try {
-      const page = await browser.newPage();
+      const page = await newPage();
       await page.goto(`http://localhost:${server.addr.port}/`);
       await page.waitForFunction(() => "contract" in globalThis);
       for (const c of contractCases) {
@@ -55,7 +52,6 @@ Deno.test({
         });
       }
     } finally {
-      await browser.close();
       await server.shutdown();
       await Deno.remove(tmp, { recursive: true });
     }

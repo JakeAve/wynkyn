@@ -17,7 +17,7 @@ export const appBuilt = await Deno.stat(
 
 /** A Chrome test of the app; skipped until `deno task build:web`. */
 export const appTest = (
-  t: { name: string; ignore?: boolean; fn: () => Promise<void> },
+  t: Parameters<typeof chromeTest>[0],
 ) => chromeTest({ ...t, ignore: !appBuilt || t.ignore });
 
 const DEMO = new URL("../server/testdata/demo-book/", import.meta.url);
