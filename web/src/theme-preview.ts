@@ -5,14 +5,8 @@
 import type { Backend } from "./backend.ts";
 import type { ConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
-import type { UpdateMessage } from "./preview.ts";
+import { type CachedBook, cacheHolds, type UpdateMessage } from "./preview.ts";
 import type { Sync } from "./sync.ts";
-import {
-  type CachedRender,
-  cacheId,
-  loadCachedRender,
-  renderHash,
-} from "./preview-cache.ts";
 import { editionHref, freeSlug } from "./editions.ts";
 import { applyTheme, THEMES } from "../../metadata/themes.ts";
 import { $, brief } from "./dom.ts";
@@ -30,7 +24,9 @@ export interface ThemePreviewDeps {
   // A null cacheKey paints without touching the book's cached render.
   paint(msg: UpdateMessage, cacheKey?: string | null): void;
   // `version`: the manuscript version the cached pages were built from.
-  restore(cached: CachedRender, version?: string): void;
+  // null clears the pages.
+  restore(cached: CachedBook | null, version?: string): void;
+  loadCachedBook(): Promise<CachedBook | null>;
   leave(href: string): Promise<void>;
   setStatus(kind: "error", detail: string): void;
 }
@@ -103,25 +99,14 @@ export class ThemePreview {
     gen: number,
   ): Promise<void> {
     const d = this.#d;
-    const cached = await loadCachedRender(cacheId(d.book(), d.edition()));
+    const cached = await d.loadCachedBook();
     if (gen !== this.#gen) return; // a new preview since
-    if (next && cached?.hash !== renderHash(next)) {
+    if (next && !(cached && cacheHolds(cached.render, next))) {
       this.lastShown = next;
       return d.paint(next);
     }
-    d.restore(
-      cached ??
-        {
-          hash: "",
-          pages: "",
-          styles: [],
-          fontLinks: "",
-          seed: {},
-          problems: [],
-        },
-      // the cache holds `next`'s pages (same hash); without it, unknown
-      cached && next ? next.manuscriptVersion : undefined,
-    );
+    // the cache holds `next`'s pages; without it, unknown
+    d.restore(cached, cached && next ? next.manuscriptVersion : undefined);
   }
 
   // A push while previewing: held, and a manuscript change rebuilds the theme.

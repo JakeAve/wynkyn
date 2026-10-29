@@ -18,6 +18,50 @@ export interface PageEntry {
   anchors: string[];
 }
 
+/** What one laid-out page says about itself; see the PageFacts JSDoc in folios.js. */
+export interface PageFacts {
+  zone: "front" | "body" | "back" | null;
+  display: boolean;
+  blank: boolean;
+  empty: boolean;
+  opener: boolean;
+  chapterTitles: string[];
+  partTitles: string[];
+  anchors: string[];
+}
+
+/** A run of the book laid out alone: where pages are forced to break
+ * (renderer/render.ts `renderSegments`). */
+export interface Segment {
+  id: string; // the first section's slug or matter id: stable across edits
+  html: string; // a whole <article class="bml">; data-line absolute
+  line: number; // the first section's manuscript line
+  opens: "page" | "right" | "left"; // the forced break at its start
+  reads: string[]; // anchors whose page numbers it prints (TOC, {ref})
+  ids: string[]; // every id it renders
+}
+
+/** A segment laid out by its own Previewer (`pageMap.segment: true`): its
+ * pages, their raw facts and its layout problems (pages numbered within the
+ * segment), and its stylesheet text, which every segment laid in one run
+ * must share; null for a segment from the cache, which takes that run's. */
+export interface Laid {
+  segment: Segment;
+  pages: Element[];
+  facts: PageFacts[];
+  problems: PageProblem[];
+  sheet: string | null;
+}
+
+/** `BookPageMap.planAssembly`: the book's pages in order, each a segment's
+ * page or `null` for a blank, and the page map they make. */
+export interface AssemblyPlan {
+  slots: Array<{ part: number; page: number } | null>;
+  map: PageEntry[];
+  seed: Seed;
+  problems: PageProblem[];
+}
+
 /** Anchor id → the page number printed for it (TOC rows, `{ref}`). */
 export type Seed = Record<string, string>;
 

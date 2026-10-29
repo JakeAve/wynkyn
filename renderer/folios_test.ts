@@ -1,6 +1,12 @@
 import { assertEquals } from "@std/assert";
 import type { NumberingStyle } from "../metadata/types.ts";
-import type { PageProblem, Seed } from "./page-map-types.ts";
+import type {
+  AssemblyPlan,
+  Laid,
+  PageProblem,
+  Seed,
+  Segment,
+} from "./page-map-types.ts";
 import "./folios.js";
 
 type Zone = "front" | "body" | "back";
@@ -38,6 +44,8 @@ const {
   checkPageMap,
   digest,
   settle,
+  planAssembly,
+  settleSegments,
 } = (globalThis as unknown as {
   BookPageMap: {
     formatFolio(n: number, style: NumberingStyle): string;
@@ -55,6 +63,25 @@ const {
       seed: Seed,
       maxPasses?: number,
     ): Promise<RenderResult & { passes: number }>;
+    planAssembly(
+      parts: Array<
+        {
+          opens: Segment["opens"];
+          facts: PageFacts[];
+          problems: PageProblem[];
+          ids: string[];
+          reads: string[];
+        }
+      >,
+      n: PageNumberingConfig,
+    ): AssemblyPlan;
+    settleSegments(
+      segments: Segment[],
+      layOut: (s: Segment, seed: Seed) => Promise<Laid>,
+      assembleAll: (laid: Laid[]) => RenderResult,
+      seed: Seed,
+      maxPasses?: number,
+    ): Promise<(RenderResult & { passes: number }) | null>;
   };
 }).BookPageMap;
 
@@ -248,4 +275,179 @@ Deno.test("settle stops at a fixed point and gives up after 3 passes", async () 
   assertEquals(flipping.problems, [
     { page: null, message: "no fixed point after 3 passes" },
   ]);
+});
+
+const part = (
+  opens: Segment["opens"],
+  facts: PageFacts[],
+  problems: PageProblem[] = [],
+) => ({
+  opens,
+  facts,
+  problems,
+  ids: facts.flatMap((f) => f.anchors),
+  reads: [] as string[],
+});
+
+Deno.test("planAssembly adds a blank only where a segment would miss its side", () => {
+  const body = (id: string) => page({ zone: "body", anchors: [id] });
+  const plan = planAssembly([
+    part("right", [body("a")]), // page 1: a recto already
+    part("right", [body("b")]), // page 2 is a verso: blank, then 3
+    part("left", [body("c")]), // page 4: a verso already
+    part("left", [body("d")]), // page 5 is a recto: blank, then 6
+    part("page", [body("e")]), // 7, wherever it falls
+    part("right", [body("f")]), // 8 is a verso: blank, then 9
+  ], numbering);
+  assertEquals(plan.slots, [
+    { part: 0, page: 0 },
+    null,
+    { part: 1, page: 0 },
+    { part: 2, page: 0 },
+    null,
+    { part: 3, page: 0 },
+    { part: 4, page: 0 },
+    null,
+    { part: 5, page: 0 },
+  ]);
+  assertEquals(digest(plan.map).blanks, [2, 5, 8]);
+  assertEquals(plan.problems, []);
+
+  // Page 1 never gets a leading blank, whatever side it asks for.
+  assertEquals(planAssembly([part("left", [body("a")])], numbering).slots, [
+    { part: 0, page: 0 },
+  ]);
+});
+
+Deno.test("planAssembly continues folios across segments and offsets problems", () => {
+  const plan = planAssembly([
+    part("right", [
+      page({ zone: "front", anchors: ["toc"] }),
+      page({ zone: "front" }),
+    ], [{ page: 2, message: "late", warn: true }]),
+    part("right", [
+      page({ zone: "body", opener: true, anchors: ["one"] }),
+      page({ zone: "body", chapterTitles: [] }),
+      page({ zone: "body" }),
+    ]),
+    part("page", [
+      page({ zone: "body", opener: true, anchors: ["two"] }),
+      page({ zone: "body", empty: true }),
+    ], [{ page: 1, message: "early" }, { page: null, message: "book" }]),
+  ], numbering);
+  assertEquals(plan.map.map((p) => p.folioText), [
+    "i",
+    "ii",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+  ]);
+  assertEquals(plan.seed, { toc: "i", one: "1", two: "4" });
+  assertEquals(plan.problems, [
+    { page: 2, message: "late", warn: true },
+    { page: 6, message: "early" },
+    { page: null, message: "book" },
+    { page: 7, message: "stranded page: no text or image" },
+  ]);
+});
+
+Deno.test("planAssembly reports an id no page carries", () => {
+  const plan = planAssembly([
+    { ...part("page", [page({ zone: "body", anchors: ["a"] })]), ids: ["a"] },
+    // A segment cut short: its last id never reached a page.
+    {
+      ...part("page", [page({ zone: "body", anchors: ["b"] })]),
+      ids: ["b", "c"],
+    },
+    { ...part("page", [page({ zone: "back", anchors: ["z"] })]), ids: ["z"] },
+  ], numbering);
+  assertEquals(plan.problems, [{ page: null, message: '"#c" is on no page' }]);
+});
+
+Deno.test("planAssembly reports a {ref} to an id no segment renders", () => {
+  const plan = planAssembly([
+    {
+      ...part("page", [page({ zone: "body", anchors: ["a"] })]),
+      reads: ["missing-slug", "z"],
+    },
+    part("page", [page({ zone: "back", anchors: ["z"] })]),
+  ], numbering);
+  assertEquals(plan.problems, [
+    { page: null, message: '"#missing-slug" is on no page' },
+  ]);
+});
+
+Deno.test("settleSegments re-lays only the segments whose numbers moved", async () => {
+  const seg = (id: string, reads: string[] = []): Segment => ({
+    id,
+    html: "",
+    line: 1,
+    opens: "page",
+    reads,
+    ids: [id],
+  });
+  const segments = [seg("toc", ["one"]), seg("one"), seg("ref", ["toc"])];
+  const lays: string[] = [];
+  const layOut = (s: Segment, seed: Seed): Promise<Laid> => {
+    lays.push(`${s.id}:${s.reads.map((r) => seed[r] ?? "000").join()}`);
+    return Promise.resolve({
+      segment: s,
+      pages: [],
+      // The TOC runs long while its number is unknown.
+      facts: s.id === "toc" && !seed.one
+        ? [page({ zone: "body", anchors: ["toc"] }), page({ zone: "body" })]
+        : [page({ zone: "body", anchors: [s.id] })],
+      problems: [],
+      sheet: "css",
+    });
+  };
+  const assembleAll = (laid: Laid[]) => {
+    const { map, seed, problems } = planAssembly(
+      laid.map((l) => ({
+        ...l,
+        opens: l.segment.opens,
+        ids: l.segment.ids,
+        reads: l.segment.reads,
+      })),
+      numbering,
+    );
+    return { map, seed, problems };
+  };
+  const result = await settleSegments(segments, layOut, assembleAll, {});
+  // "one" prints no number: laid out once.
+  assertEquals(lays, [
+    "toc:000",
+    "one:",
+    "ref:000",
+    "toc:3",
+    "ref:1",
+    "toc:2",
+  ]);
+  assertEquals(result?.seed, { toc: "1", one: "2", ref: "3" });
+  assertEquals(result?.passes, 3);
+
+  const odd = await settleSegments(
+    segments,
+    async (s, seed) => ({
+      ...(await layOut(s, seed)),
+      sheet: s.id === "ref" ? "other" : "css",
+    }),
+    assembleAll,
+    {},
+  );
+  assertEquals(odd, null);
+
+  // A cached segment takes this run's sheets: its old ones don't count.
+  const cached = await settleSegments(
+    segments,
+    async (s, seed) => ({
+      ...(await layOut(s, seed)),
+      sheet: s.id === "ref" ? null : "css",
+    }),
+    assembleAll,
+    {},
+  );
+  assertEquals(cached?.seed, { toc: "1", one: "2", ref: "3" });
 });

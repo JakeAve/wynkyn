@@ -22,10 +22,32 @@ Deno.test("buildBook produces html, css, font links, and title", async () => {
   assert(b.html.includes("/books/demo-book/images/ornament.svg"));
   assert(b.baseCss.length > 0);
   assert(b.domCss.length > 0);
+  assertEquals(b.domRules.map((r) => r.css).join(""), b.domCss);
   assert(b.pagedCss.includes("@page"));
   assertEquals(b.pageNumbering.body.show, true);
   assert(b.fontLinks.includes("family=EB+Garamond"));
   assertEquals(b.diagnostics, []);
+});
+
+Deno.test("buildBook carries segments of the same html and the image URLs it used", async () => {
+  const b = await buildBook(ROOT, "demo-book", {
+    imageUrl: (book, name) => `blob:${book}/${name}`,
+    metadata: { elements: { chapter: { "break-before": "left" } } },
+  });
+  assert(b.segments.length > 1);
+  const strip = (h: string) =>
+    h.replace(/^<article[^>]*>|<\/article>$/g, "").replace(
+      /<\/section><section class="part zone-body" data-split-from="[^"]*">/g,
+      "",
+    );
+  assertEquals(b.segments.map((s) => strip(s.html)).join(""), strip(b.html));
+  // metadata elements reach opens
+  assert(
+    b.segments.some((s) => s.opens === "left"),
+    "a chapter opens on a verso",
+  );
+  assertEquals(b.imageUrls["ornament.svg"], "blob:demo-book/ornament.svg");
+  assert(b.html.includes("blob:demo-book/ornament.svg"));
 });
 
 Deno.test("openers.book-title sets the title over the first chapter only (§4.14)", async () => {

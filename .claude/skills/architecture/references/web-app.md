@@ -30,8 +30,10 @@ calls it), `bml-language.ts`,
 `editor-insert.ts` + `snippets.ts` (inserting sentinels), `editor-images.ts`
 (dropped/pasted images), `search-panel.ts`, `spelling.ts`, `diagnostics.ts`.
 Outline: `tree-data.ts` (pure) → `tree-view.ts`. Storage in the page:
-`fs-store.ts`, `book-zip.ts`, `preview-cache.ts` (one cached render per book +
-edition in IndexedDB), `web-source.ts` (a web page as an import source).
+`fs-store.ts`, `book-zip.ts`, `preview-cache.ts` (IndexedDB: each segment's
+laid-out pages by content key, plus a manifest per book + edition that
+`preview.ts` restores from and assembles), `web-source.ts` (a web page as an
+import source).
 
 ## Talking to the book
 

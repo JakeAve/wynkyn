@@ -5,6 +5,8 @@ import type { BmlDocument } from "../../parser/types.ts";
 import { catalogFor, type EpubResult, syncIsNames } from "./style-catalog.ts";
 import { parseSentinelLine } from "../../parser/sentinel.ts";
 import {
+  type CachedBook,
+  clearPreview,
   fitPreview,
   installPageIndicator,
   installPreviewClicks,
@@ -21,11 +23,7 @@ import {
   type UpdateMessage,
 } from "./preview.ts";
 import type { ServerMessage } from "../../server/pipeline.ts";
-import {
-  type CachedRender,
-  cacheId,
-  loadCachedRender,
-} from "./preview-cache.ts";
+import { cacheId, loadCachedRender, untokenImages } from "./preview-cache.ts";
 import {
   formatProblem,
   type PageProblem,
@@ -461,7 +459,31 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
 
 // A null cacheKey paints without touching the book's cached render.
 let paint: (msg: UpdateMessage, cacheKey?: string | null) => void = () => {};
-let restore: (cached: CachedRender, version?: string) => void = () => {};
+let restore: (cached: CachedBook | null, version?: string) => void = () => {};
+
+// The book's cached render with a URL for each image it shows, or null. An
+// image it can't read (removed, renamed, refused) is a miss, never a throw:
+// the editor starts on it.
+async function loadCachedBook(): Promise<CachedBook | null> {
+  const cached = await loadCachedRender(cacheId(book, edition));
+  if (!cached) return null;
+  const names = new Set<string>(); // the images it names, read as untokenImages does
+  for (const s of cached.segments) {
+    untokenImages(s.pages, (n) => (names.add(n), ""));
+  }
+  try {
+    const urls = new Map(
+      await Promise.all(
+        [...names].map(async (n) =>
+          [n, await backend.imageUrl(book, n)] as const
+        ),
+      ),
+    );
+    return { ...cached, imageUrl: (n) => urls.get(n) ?? "" };
+  } catch {
+    return null;
+  }
+}
 
 // The edition's metadata with every style edit landed, so a theme goes over
 // what the author sees. The held copy is current unless another writer changed
@@ -484,6 +506,7 @@ const themes = new ThemePreview({
   saveSections: saveMetadataSections,
   paint: (msg, cacheKey) => paint(msg, cacheKey),
   restore: (cached, version) => restore(cached, version),
+  loadCachedBook,
   leave,
   setStatus,
 });
@@ -965,15 +988,17 @@ async function main(): Promise<void> {
     });
   };
   restore = (cached, version) => {
-    restoreCachedRender(cached, previewEl);
     delete previewEl.dataset.stale;
-    showPageProblems(cached.problems ?? []);
+    // None: the pages clear, and the book's first build paints when it lands.
+    if (cached) restoreCachedRender(cached, previewEl, cached.imageUrl);
+    else clearPreview(previewEl);
+    showPageProblems(cached?.render.problems ?? []);
     afterLayout(version);
   };
   // Restore before opening the socket so the previous render is on screen
   // when the first update lands, instead of a blank preview. Its text may be
   // older than the buffer's, so its page turns wait for that update.
-  const cached = await loadCachedRender(key);
+  const cached = await loadCachedBook();
   if (cached) restore(cached);
   themes.installApply();
   const onMessage = (msg: ServerMessage) => {

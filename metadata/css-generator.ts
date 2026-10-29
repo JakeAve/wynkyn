@@ -127,11 +127,18 @@ function rule(
   return out;
 }
 
+/** One emitted DOM rule and the selector it was written for (`::before` and
+ * its declarations included in `css`). */
+export interface DomRule {
+  selector: string;
+  css: string;
+}
+
 function emitStyle(
   selector: string,
   style: ElementStyle,
   aliases: Aliases,
-  out: string[],
+  out: DomRule[],
 ): void {
   const flat: CssProps = {};
   const nested: Array<[string, ElementStyle]> = [];
@@ -141,7 +148,7 @@ function emitStyle(
       nested.push([prop, value]);
     }
   }
-  if (Object.keys(flat).length) out.push(rule(selector, flat, aliases));
+  if (Object.keys(flat).length) push(out, selector, flat, aliases);
   for (const [sub, subStyle] of nested) {
     // `em` is the emphasis element ({em}, §3.2.7); every other key a class.
     const part = sub === "em" ? "em" : `.${sub}`;
@@ -154,15 +161,31 @@ function emitStyle(
   }
 }
 
-export function generateDomCSS(metadata: Metadata): string {
-  const out: string[] = [];
+function push(
+  out: DomRule[],
+  selector: string,
+  props: CssProps,
+  aliases: Aliases,
+): void {
+  const css = rule(selector, props, aliases);
+  if (css) out.push({ selector, css });
+}
+
+/** The book's DOM CSS rule by rule, so a cache can tell which sections a
+ * style change reaches (font and color aliases are already resolved). */
+export function domRules(metadata: Metadata): DomRule[] {
+  const out: DomRule[] = [];
   for (const [key, style] of Object.entries(metadata.elements ?? {})) {
     if (KEY_RE.test(key)) emitStyle(selectorFor(key), style, metadata, out);
   }
   for (const [cls, props] of Object.entries(metadata.is ?? {})) {
-    if (CLASS_NAME_RE.test(cls)) out.push(rule(`.is-${cls}`, props, metadata));
+    if (CLASS_NAME_RE.test(cls)) push(out, `.is-${cls}`, props, metadata);
   }
-  return out.join("");
+  return out;
+}
+
+export function generateDomCSS(metadata: Metadata): string {
+  return domRules(metadata).map((r) => r.css).join("");
 }
 
 export interface ZoneNumbering {

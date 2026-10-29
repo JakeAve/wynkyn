@@ -1909,14 +1909,23 @@ written into the flow before layout from a _seed_ (anchor id → folio text), so
 render is only right once the folios it produces are the ones it was seeded
 with. `toHtml` (shared by `bml render` and print export) sets
 `PagedConfig.auto = false` and inlines a driver that runs on load: it takes the
-book's `<style>` and body once, then renders with a fresh `Paged.Previewer` per
-pass — first seed `{}`, each next pass seeded from the last — until the seed
-settles (normally two passes), at most three. It then sets
+book's `<style>` once and lays the book out through its segments
+(`BuildResult.segments`, cut where pages are forced to break): each with its own
+`Paged.Previewer` in an off-screen stage, then assembled into one run of pages —
+blanks where a side is forced, every page renumbered and its folio, heads and
+margin boxes redone (`BookPageMap.assemble`). The first pass is seeded `{}` (or
+the last export's folios); a next pass re-lays only the segments that print a
+number that changed (the TOC, `{ref}`), until the seed settles (normally two
+passes), at most three. One Previewer's sheets are kept for printing; if the
+segments' sheets differ, the book is laid out whole instead, as one flow with a
+fresh Previewer per pass (`toHtml(b, { whole: true })` does that directly, and a
+Chrome test holds the two to the same pages). It then sets
 `html[data-paged=done|error]` and a JSON report in `html[data-paged-report]`:
 `{ problems, passes, digest }`.
 
-**Checks** run on the map after every pass; each problem names its 1-based
-physical page where it has one:
+**Checks** run on the map after every pass — after assembly, on the book's
+pages, never on a segment alone; each problem names its 1-based physical page
+where it has one:
 
 - a stranded page: no text and no image, and not a deliberate blank;
 - a `{ref}` or TOC target that is on no page;
@@ -2379,11 +2388,16 @@ contents exactly as the print export (§7.7) will — the whole point of the liv
 preview is that it is not an approximation.
 
 A re-render is staged over the pages on screen, which stay up but dimmed from
-the moment of the edit; each new page lands over the old one it replaces as it
-is laid out, with a "Setting type… N pages" count at the pane's foot (the first
-load shows the count alone). The layout keeps going in a background tab. An
-update that arrives mid-render abandons that render and starts its own, so a run
-of edits costs one render after the last, not one per edit.
+the moment of the edit, with a "Setting type… N pages" count at the pane's foot
+(the first load shows the count alone); the new pages swap in at once when the
+book is assembled. The preview lays the book out a segment at a time, as export
+does (§5.4): each front or back matter section, part opening and chapter whose
+text, styles and printed page numbers are unchanged comes from the browser's
+cache (IndexedDB), so an edit to one chapter lays out that chapter, and the
+contents again only if its page numbers moved. Opening a book shows its cached
+pages before its first build arrives. The layout keeps going in a background
+tab. An update that arrives mid-render abandons that render and starts its own,
+so a run of edits costs one render after the last, not one per edit.
 
 An illustration whose image is missing shows its placeholder (§4.10 item 8). In
 Write, a click on it moves the editor's cursor to its line, as any page click
