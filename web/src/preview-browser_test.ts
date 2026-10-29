@@ -173,8 +173,6 @@ appTest({
       "the undone pages",
     );
 
-    // The title page is held to one page (§4.16), so an edit to it swaps
-    // that page's text in place: the other pages stay the same nodes.
     const other = await page.locator("#preview .pagedjs_page", {
       has: page.locator("#one"),
     }).elementHandle();

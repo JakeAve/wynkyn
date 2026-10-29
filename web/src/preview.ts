@@ -325,17 +325,14 @@ export function renderPreview(
   return pending = runRender(update, container, cacheKey);
 }
 
-// An edit to a one-page section alone in its segment (spec §4.16) can't move
-// another page: `one` is that segment, its key on screen and its live page,
-// when it is the only segment whose key changed under the same book CSS and
-// every segment after it moved by the same number of lines.
+// §4.16: an edit to a one-page section can't move another page.
 interface OnePage {
   at: number;
   segment: Segment;
   key: string;
   was: string;
   page: HTMLElement;
-  shift: { from: number; by: number } | null; // later data-lines, moved
+  shift: { from: number; by: number } | null;
 }
 const ONE_SECTION = /^<article[^>]*><section [^>]*\bdata-one-page[ >]/;
 
@@ -376,10 +373,7 @@ function swappable(
   };
 }
 
-// Lays `one` out alone in a hidden stage and moves its text block into the
-// live page: no other page is touched. null when the new page isn't one page
-// with the old page's facts (and so the same number, side and folio) and the
-// book's sheets: the book is then laid out as usual.
+// Same facts, so the same number, side and folio: only the text moves.
 async function swapOnePage(
   u: UpdateMessage,
   container: HTMLElement,
@@ -394,8 +388,7 @@ async function swapOnePage(
   if (!old || old.facts.length !== 1) return null;
   const css = [u.baseCss, u.domCss, u.pagedCss].join("\n");
   const blobUrl = URL.createObjectURL(new Blob([css], { type: "text/css" }));
-  // Scoped like the live pages so their sheets set it; the stage's last
-  // page is hidden (app.css), and this one is its only page.
+  // A stage's last page is hidden (app.css); this is its only page.
   const stage = document.createElement("div");
   stage.className = "preview-stage";
   stage.dataset.scope = book.scope;
@@ -464,7 +457,7 @@ async function swapOnePage(
     void saveCachedRender(cacheKey, render, new Map([[one.key, row]]));
     return problems;
   } finally {
-    previewer.polisher.destroy(); // the live pages' copies of its sheets stay
+    previewer.polisher.destroy(); // the live pages keep their own copies
     stage.remove();
     URL.revokeObjectURL(blobUrl);
   }
