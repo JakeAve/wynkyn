@@ -66,6 +66,36 @@
           <circle cx="3.6" cy="4.5" r=".35" style="fill: currentColor" />
           <circle cx="5.2" cy="4.5" r=".35" style="fill: currentColor" />
         </symbol>
+        <symbol id="folder-plus" viewBox="0 0 16 16">
+          <path
+            d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z" />
+          <path d="M8 7.5v4M6 9.5h4" />
+        </symbol>
+        <symbol id="folder-open" viewBox="0 0 16 16">
+          <path d="M1.5 12.5v-8a1 1 0 0 1 1-1h4L8 5h5a1 1 0 0 1 1 1v1" />
+          <path d="M1.5 12.5l2-5h11l-2 5z" />
+        </symbol>
+        <symbol id="copy" viewBox="0 0 16 16">
+          <rect x="5" y="5" width="9" height="9" rx="1" />
+          <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2" />
+        </symbol>
+        <symbol id="file" viewBox="0 0 16 16">
+          <path
+            d="M9.5 1.5h-5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-9z" />
+          <path d="M9.5 1.5v3h3M5.5 8.5h5M5.5 11h5" />
+        </symbol>
+        <symbol id="globe" viewBox="0 0 16 16">
+          <circle cx="8" cy="8" r="6.5" />
+          <path
+            d="M1.5 8h13M8 1.5c-1.8 1.8-2.7 4-2.7 6.5s.9 4.7 2.7 6.5c1.8-1.8 2.7-4 2.7-6.5S9.8 3.3 8 1.5z" />
+        </symbol>
+        <symbol id="download" viewBox="0 0 16 16">
+          <path d="M8 2.5v8M4.5 7L8 10.5 11.5 7M3 13.5h10" />
+        </symbol>
+        <symbol id="page" viewBox="0 0 16 16">
+          <rect x="3.5" y="1.5" width="9" height="13" rx="1" />
+          <path d="M6 5.5h4" />
+        </symbol>
         <symbol id="inspect-icon" viewBox="0 0 16 16">
           <path
             d="M6.5 13.5H3.5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V6" />
@@ -91,24 +121,26 @@
           </svg>
           <span id="library-name"></span>
         </button>
-        <span id="library-slash" class="slash" hidden>/</span>
-        <button id="book-switcher" class="btn" title="Switch book"
-          data-command="switch-book"
-          aria-haspopup="dialog" aria-expanded="false">
-          <span id="book-name"></span>
-          <svg class="chev tico" viewBox="0 0 16 16">
-            <path d="M4 6.5l4 4 4-4" />
-          </svg>
-        </button>
-        <span class="slash">/</span>
-        <button id="edition-switcher" class="btn" title="Switch edition"
-          aria-haspopup="dialog" aria-expanded="false">
-          <span id="edition-name"></span>
-          <span id="edition-size"></span>
-          <svg class="chev tico" viewBox="0 0 16 16">
-            <path d="M4 6.5l4 4 4-4" />
-          </svg>
-        </button>
+        <span id="crumb-book" hidden>
+          <span id="library-slash" class="slash" hidden>/</span>
+          <button id="book-switcher" class="btn" title="Switch book"
+            data-command="switch-book"
+            aria-haspopup="dialog" aria-expanded="false">
+            <span id="book-name"></span>
+            <svg class="chev tico" viewBox="0 0 16 16">
+              <path d="M4 6.5l4 4 4-4" />
+            </svg>
+          </button>
+          <span class="slash">/</span>
+          <button id="edition-switcher" class="btn" title="Switch edition"
+            aria-haspopup="dialog" aria-expanded="false">
+            <span id="edition-name"></span>
+            <span id="edition-size"></span>
+            <svg class="chev tico" viewBox="0 0 16 16">
+              <path d="M4 6.5l4 4 4-4" />
+            </svg>
+          </button>
+        </span>
       </span>
       <span id="status">Connecting…</span>
       <span id="modes" role="group" aria-label="Mode">
@@ -329,14 +361,29 @@
         <div id="book-list" role="listbox" aria-label="Books"></div>
         <div class="sw-foot">
           <button id="book-new" class="btn">New book</button>
-          <button id="book-download" class="btn" hidden
-            title="This book's folder as a zip">Download</button>
+          <button id="library-download" class="btn" hidden
+            title="Every book, as one zip of a books folder">
+            <svg>
+              <use href="#download" />
+            </svg>
+            Download library
+          </button>
           <span id="book-err" class="sw-err"></span>
           <p id="book-skipped" class="sw-note" hidden></p>
           <p id="library-note" class="sw-note" hidden></p>
         </div>
       </div>
       <div class="sw-eds">
+        <div id="eds-head" hidden>
+          <span id="eds-book"></span>
+          <button id="book-download" class="btn sm"
+            title="This book's folder as a zip">
+            <svg>
+              <use href="#download" />
+            </svg>
+            Download book
+          </button>
+        </div>
         <div id="edition-list"></div>
         <div class="eds-foot">
           <button id="edition-new" class="btn">New edition</button>
@@ -364,27 +411,73 @@
     </dialog>
     <dialog id="library" class="ask" aria-labelledby="library-title">
       <h2 id="library-title" tabindex="-1" autofocus>Welcome to Wynkyn</h2>
-      <p>It looks like you don’t have any manuscripts yet. Choose where to keep
-        them to get started.</p>
+      <p id="lib-lead"></p>
+      <div id="lib-now" hidden><svg class="ico"><use href="#check" /></svg><span
+          id="lib-now-where"></span><span id="lib-now-count"></span></div>
       <div class="choices">
-        <button id="lib-reopen" class="choice primary" hidden></button>
-        <button id="lib-new" class="choice">Create a new folder on my device
-          <span class="pill" hidden>Chromium only</span>
-          <small>Wynkyn creates a Books folder where you choose. Chrome or
-            Edge.</small></button>
-        <button id="lib-pick" class="choice">Select an existing folder on my
-          device
-          <span class="pill" hidden>Chromium only</span>
-          <small>You already have a Wynkyn books folder on your
-            device.</small></button>
-        <button id="lib-browser" class="choice">Keep books in this browser
-          <small>Works in this browser, but browsers can clear site storage, so
-            <b>download what you want to keep</b>.</small></button>
+        <button id="lib-reopen" class="choice primary"
+          hidden><svg class="ico"><use href="#where-folder" /></svg><span></span></button>
       </div>
+      <div id="lib-else" class="nh" hidden>Or keep books somewhere else</div>
+      <div id="lib-rows" class="choices">
+        <button id="lib-new"
+          class="choice"><svg class="ico"><use href="#folder-plus" /></svg><span><span
+              class="t"></span><span class="pill" hidden>Chromium
+              only</span><small></small></span></button>
+        <button id="lib-pick"
+          class="choice"><svg class="ico"><use href="#folder-open" /></svg><span><span
+              class="t"></span><span class="pill" hidden>Chromium
+              only</span><small></small></span></button>
+        <button id="lib-browser"
+          class="choice"><svg class="ico"><use href="#where-browser" /></svg><span><span
+              class="t"></span><small></small></span></button>
+      </div>
+      <p id="lib-next" class="hint" hidden>Next you choose whether your books
+        come along.</p>
       <p class="privacy"><b>Your books are yours.</b> Wynkyn never reads,
         analyses, trains on, shares or sells your manuscripts, and never will.
         Free users store everything on device.</p>
       <span id="lib-err" class="sw-err"></span>
+      <div id="lib-foot" class="ask-foot" hidden>
+        <button id="lib-cancel" class="btn" type="button">Cancel</button>
+      </div>
+    </dialog>
+    <dialog id="bring" class="ask" aria-labelledby="bring-title">
+      <h2 id="bring-title" tabindex="-1" autofocus>Bring your books along?</h2>
+      <p>You have <span id="bring-count"></span> in this browser that <span data-one="is">are</span> not
+        saved to the <span class="hivis bring-name"></span> folder. Would you
+        like to copy <span data-one="it">them</span> to your folder?</p>
+      <div class="choices">
+        <button id="bring-copy"
+          class="choice primary"><svg class="ico"><use href="#copy" /></svg><span>Copy
+            <span data-one="it">them</span> into <span class="hivis bring-name"></span>
+            <small>This browser keeps its copies too.</small></span></button>
+        <button id="bring-skip"
+          class="choice"><svg class="ico"><use href="#where-folder" /></svg><span>Open
+            <span class="hivis bring-name"></span> without <span data-one="it">them</span>
+            <small><span data-one="It stays">They stay</span> in this browser. Switch back any time from the
+              library.</small></span></button>
+      </div>
+      <p id="bring-clash" hidden>Already in <span
+          class="hivis bring-name"></span>, so not copied: <span
+          id="bring-clash-titles"></span>.</p>
+      <span id="bring-err" class="sw-err"></span>
+    </dialog>
+    <dialog id="choose" class="ask" aria-labelledby="choose-title">
+      <div class="choose-head">
+        <h2 id="choose-title">Choose a book</h2>
+        <span id="choose-where"></span>
+      </div>
+      <input id="choose-search" type="search" placeholder="Find a book…"
+        autocomplete="off" aria-label="Find a book" autofocus>
+      <div id="choose-list" role="listbox" aria-label="Books"></div>
+      <div class="ask-foot">
+        <button id="choose-change" class="btn" type="button"
+          hidden><svg><use href="#where-folder" /></svg><span>Change
+            library…</span></button>
+        <button id="choose-new" class="btn outline" type="button">New
+          book</button>
+      </div>
     </dialog>
     <dialog id="create" class="ask" aria-labelledby="create-title">
       <div id="create-head">
@@ -393,17 +486,24 @@
         <p id="create-sub">How do you want to begin?</p>
       </div>
       <div class="choices">
-        <button id="create-import" class="choice">Import a file
-          <small>Word, EPUB, plain text, Markdown or HTML. From Google Docs:
-            File › Download › Microsoft Word.</small></button>
-        <button id="create-folder" class="choice" hidden>Import from a folder
-          <small>Copies the books in a Wynkyn folder into this
-            browser.</small></button>
-        <button id="create-web" class="choice">Import from the web
-          <small>Paste the address of a Project Gutenberg book or a web page.
-            EPUB files: use Import a file.</small></button>
-        <button id="create-blank" class="choice">Start blank
-          <small>A title page and nothing else.</small></button>
+        <button id="create-import"
+          class="choice"><svg class="ico"><use href="#file" /></svg><span>Import a
+            file
+            <small>Word, EPUB, plain text, Markdown or HTML. From Google Docs:
+              File › Download › Microsoft Word.</small></span></button>
+        <button id="create-folder" class="choice"
+          hidden><svg class="ico"><use href="#folder-open" /></svg><span>Import
+            from a folder
+            <small>Copies the books in a Wynkyn folder into this
+              browser.</small></span></button>
+        <button id="create-web"
+          class="choice"><svg class="ico"><use href="#globe" /></svg><span>Import from
+            the web
+            <small>Paste the address of a Project Gutenberg book or a web page.
+              EPUB files: use Import a file.</small></span></button>
+        <button id="create-blank"
+          class="choice"><svg class="ico"><use href="#page" /></svg><span>Start blank
+            <small>A title page and nothing else.</small></span></button>
       </div>
       <input id="create-file" type="file" hidden
         accept=".txt,.md,.markdown,.html,.htm,.xhtml,.epub,.docx,text/plain,text/markdown,text/html,application/epub+zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
@@ -469,14 +569,14 @@
       <p>Fonts, part styles, chapter numbering and running heads change. Page
         size, margins and your custom styles stay.</p>
       <div class="choices">
-        <button id="theme-new" class="choice primary" type="button">Apply as
-          new edition
-          <small><span class="e-name"></span> stays as it is. A new edition,
-            <span class="t-name"></span>, gets this theme.</small></button>
-        <button id="theme-replace" class="choice" type="button">Replace this
-          edition's style
-          <small><span class="e-name"></span>'s current fonts and styles are
-            replaced. This can't be undone.</small></button>
+        <button id="theme-new" class="choice primary" type="button"><span>Apply
+            as new edition
+            <small><span class="e-name"></span> stays as it is. A new edition,
+              <span class="t-name"></span>, gets this theme.</small></span></button>
+        <button id="theme-replace" class="choice" type="button"><span>Replace
+            this edition's style
+            <small><span class="e-name"></span>'s current fonts and styles are
+              replaced. This can't be undone.</small></span></button>
       </div>
       <div class="ask-foot">
         <span id="theme-err" class="sw-err"></span>

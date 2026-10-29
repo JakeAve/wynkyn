@@ -30,6 +30,14 @@ chromeTest({
     const site = serveSite(DIST, 0);
     try {
       const page = await newPage();
+      // An OPFS folder stands in for the picker, which can't be driven.
+      await page.addInitScript(() => {
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).showDirectoryPicker = async () => {
+          const root = await navigator.storage.getDirectory();
+          return root.getDirectoryHandle("My Books", { create: true });
+        };
+      });
       const url = `http://localhost:${site.addr.port}/app/`;
       await page.goto(url);
       await page.locator("#library[open]").waitFor();
@@ -79,6 +87,14 @@ chromeTest({
           "typed in the browser",
         ),
       );
+      const [all] = await Promise.all([
+        page.waitForEvent("download"),
+        page.locator("#library-download").click(),
+      ]);
+      assert(
+        "Books/demo-book/manuscript.md" in
+          unzipSync(await Deno.readFile((await all.path())!)),
+      );
       await page.keyboard.press("Escape");
 
       // The e-book is built in the page: a blob link, no server.
@@ -98,6 +114,29 @@ chromeTest({
           "typed in the browser",
         ),
       );
+
+      await page.locator("#library-open").click();
+      await page.locator("#library[open]").waitFor();
+      await page.locator("#lib-pick").click();
+      await page.locator("#bring[open]").waitFor();
+      await page.locator("#bring-copy").click();
+      await page.locator("#choose[open]").waitFor();
+      assertEquals(
+        await page.locator('#choose-list [aria-selected="true"]')
+          .getAttribute("title"),
+        "demo-book",
+      );
+      await page.keyboard.press("Enter");
+      await page.waitForURL(/book=demo-book/);
+      await page.locator("#library-name", { hasText: "My Books" }).waitFor();
+      const copied = await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory();
+        const dir = await root.getDirectoryHandle("My Books");
+        const book = await dir.getDirectoryHandle("demo-book");
+        const fh = await book.getFileHandle("manuscript.md");
+        return await (await fh.getFile()).text();
+      });
+      assertStringIncludes(copied, "typed in the browser");
     } finally {
       await site.shutdown();
     }
@@ -150,9 +189,9 @@ chromeTest({
         await page.locator("#library-name").textContent(),
         "This browser",
       );
-      assertStringIncludes(
-        (await page.locator("#library-open").getAttribute("title")) ?? "",
-        "download a book to keep it",
+      assertEquals(
+        await page.locator("#library-icon").getAttribute("href"),
+        "#where-browser",
       );
       // Dismissed once, the notice stays away.
       await page.reload();
@@ -491,8 +530,8 @@ chromeTest({
 });
 
 chromeTest({
-  name: "local library: a picked folder is named in the switcher, and " +
-    "Change library… goes back to the Welcome with it on offer",
+  name: "local library: a picked folder is named in the switcher and in " +
+    "Change library, and offered again once its permission lapses",
   ignore: !siteBuilt,
   async fn() {
     const site = serveSite(DIST, 0);
@@ -519,13 +558,28 @@ chromeTest({
       await page.locator("#title-input").press("Enter");
       await page.locator('#status[data-kind="saved"]').waitFor();
       await page.locator("#book-switcher").click();
-      await page.locator("#library-note").waitFor();
-      await page.waitForFunction(() =>
-        document.getElementById("library-note")!.textContent!.includes(
-          "“My Books”",
-        )
-      );
+      await page.locator(".book-row").first().waitFor();
+      for (
+        const id of ["#book-download", "#library-download", "#library-note"]
+      ) {
+        assertEquals(await page.locator(id).isVisible(), false);
+      }
       await page.keyboard.press("Escape"); // the switcher covers the toolbar
+      // The folder icon centers on the name's caps, not its line box.
+      const offset = await page.evaluate(async () => {
+        await document.fonts.ready;
+        const mid = (r: DOMRect) => (r.top + r.bottom) / 2;
+        const probe = document.createElement("span");
+        probe.style.cssText = "display: inline-block; height: 1cap";
+        const name = document.getElementById("library-name")!;
+        name.append(probe);
+        const icon = document.querySelector("#library-open svg")!;
+        const off = mid(icon.getBoundingClientRect()) -
+          mid(probe.getBoundingClientRect());
+        probe.remove();
+        return off;
+      });
+      assert(Math.abs(offset) <= 0.5, `the icon is ${offset}px off the caps`);
       // The crumb's first step names the folder, and says where in its title.
       const lib = page.locator("#library-open");
       assertEquals(
@@ -540,12 +594,32 @@ chromeTest({
         (await lib.getAttribute("title")) ?? "",
         "“My Books”",
       );
+      // A mark that a reload would wipe.
+      // deno-lint-ignore no-explicit-any
+      await page.evaluate(() => (globalThis as any).stayed = true);
       await lib.click();
       await page.locator("#library[open]").waitFor();
       assertStringIncludes(
-        (await page.locator("#lib-reopen").textContent()) ?? "",
+        (await page.locator("#lib-now").textContent()) ?? "",
         "My Books",
       );
+      await page.locator("#lib-cancel").click();
+      await page.locator("#library").waitFor({ state: "hidden" });
+      // deno-lint-ignore no-explicit-any
+      assert(await page.evaluate(() => (globalThis as any).stayed));
+      assertStringIncludes(page.url(), "book=tiny");
+      assertEquals(await page.locator("#book-name").textContent(), "Tiny");
+
+      await page.addInitScript(() => {
+        // deno-lint-ignore no-explicit-any
+        (FileSystemHandle.prototype as any).queryPermission = () =>
+          Promise.resolve("prompt");
+      });
+      await page.reload();
+      await page.locator("#library[open]").waitFor();
+      await page.getByRole("button", { name: /Open My Books again/ }).click();
+      await page.locator('#status[data-kind="saved"]').waitFor();
+      assertEquals(await page.locator("#book-name").textContent(), "Tiny");
     } finally {
       await site.shutdown();
     }

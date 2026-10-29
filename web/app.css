@@ -165,16 +165,24 @@ kbd {
 #crumb .btn[aria-expanded="true"] {
   background: var(--hover);
 }
+/* Alegreya Sans sits its caps above the middle of its line box, so a centered
+   icon or chevron hangs low; trimmed to cap height and baseline, the text
+   centers on its caps. */
+#crumb .btn > span,
+.btn > svg + span {
+  text-box: trim-both cap alphabetic;
+}
+#crumb-book {
+  display: contents;
+}
 /* The library, the crumb's first step: muted, so the book title leads. */
 #crumb #library-open:not(:hover) {
   color: var(--muted);
 }
-#crumb #library-open[hidden] {
-  display: none;
-}
+/* Clipped across only: the trim puts descenders outside the box. */
 #library-name {
   max-width: 8.75rem;
-  overflow: hidden;
+  overflow-x: clip;
   text-overflow: ellipsis;
 }
 #book-name {
@@ -269,7 +277,8 @@ kbd {
   background: var(--desk);
   padding: var(--s-4);
 }
-#book-search {
+#book-search,
+#choose-search {
   width: 100%;
   height: var(--h-md);
   border: 1px solid var(--line);
@@ -279,7 +288,8 @@ kbd {
   padding: 0 var(--s-4);
   margin-bottom: var(--s-3);
 }
-#book-search::placeholder {
+#book-search::placeholder,
+#choose-search::placeholder {
   color: var(--muted);
 }
 #book-list,
@@ -340,6 +350,24 @@ kbd {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+#eds-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: var(--h-md);
+  padding-left: var(--s-4);
+  margin-bottom: var(--s-3);
+}
+#eds-book {
+  font: 500 var(--fs) var(--f-text);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#book-download {
+  margin-left: auto;
 }
 .ed-row {
   display: grid;
@@ -418,7 +446,7 @@ kbd {
   min-width: 0;
 }
 /* Fields (§6.3) outside the panel: focus turns the border red. */
-:is(#switcher, .ask .field, #editor .cm-bml-palette, #config-overlay .fontpop) :is(input, select, textarea):focus-visible,
+:is(#switcher, #choose, .ask .field, #editor .cm-bml-palette, #config-overlay .fontpop) :is(input, select, textarea):focus-visible,
 .cm-bml-find .field:focus-within {
   outline: none;
   border-color: var(--acc);
@@ -3380,9 +3408,9 @@ body.typing #editor .pane-head {
   padding-top: var(--s-4);
   border-top: 1px solid var(--line);
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-3);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
 }
 .ask {
   margin: auto;
@@ -3417,22 +3445,22 @@ body.typing #editor .pane-head {
 .ask .empty p {
   margin: 0;
 }
-/* Choice list (§6.7): full-width rows, each a 500 title over an optional
-   <small> note, for a dialog that asks one question. `.primary`, the
-   recommended one, takes the red wash and a red title. */
+/* Choice list (§6.7). */
 .choices {
   display: grid;
-  gap: var(--s-1);
-  margin: 0 calc(var(--s-5) * -1);
+  gap: var(--s-3);
 }
 .choice {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
   width: 100%;
   margin: 0;
   padding: var(--s-4) var(--s-5);
   border: 0;
   border-radius: var(--r);
   corner-shape: var(--corner);
+  box-shadow: inset 0 0 0 var(--hair) var(--line);
   background: none;
   color: var(--fg);
   font: inherit;
@@ -3446,6 +3474,30 @@ body.typing #editor .pane-head {
 .choice:hover {
   background: var(--hover);
 }
+.choice::after {
+  content: "";
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-left: auto;
+  background: var(--muted);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5l4.5 4.5L6 12.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+.choice .ico {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  padding: var(--s-4);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: var(--hover);
+  stroke: var(--muted);
+  fill: none;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .choice small {
   display: block;
   margin-top: var(--s-1);
@@ -3456,15 +3508,29 @@ body.typing #editor .pane-head {
 }
 .choice.primary {
   background: var(--acc-wash);
+  box-shadow: inset 0 0 0 var(--hair)
+    color-mix(in srgb, var(--acc) 45%, transparent);
   color: var(--acc-ink);
+}
+.choice.primary .ico {
+  background: var(--acc-wash);
+  stroke: currentColor;
+}
+.choice.sm {
+  padding: var(--s-3) var(--s-5);
+  font-size: var(--fs-sm);
+}
+.choice.sm .ico {
+  width: var(--h-sm);
+  height: var(--h-sm);
+  padding: 0.3125rem;
 }
 .ask .sw-err {
   display: block;
   margin-top: var(--s-4);
 }
 .sw-note {
-  flex-basis: 100%;
-  margin: var(--s-1) 0 0;
+  margin: var(--s-2) var(--s-4) var(--s-1);
   color: var(--muted);
   font-size: var(--fs-xs);
   line-height: 1.35;
@@ -3510,6 +3576,132 @@ body.typing #editor .pane-head {
 }
 .ask .privacy b {
   color: var(--fg);
+}
+.choice small:empty {
+  display: none;
+}
+/* Alegreya Sans's word space is a third of the mono one, so beside a mono
+   name it all but vanishes. */
+.ask .hivis {
+  margin-inline: 0.15em;
+  font: var(--fs-sm) var(--f-hivis);
+}
+.ask p .hivis {
+  color: var(--fg);
+}
+#lib-now {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  margin: var(--s-4) 0 var(--s-6);
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+#lib-now .ico {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#lib-now-where {
+  flex: 1;
+  font-weight: 500;
+}
+#lib-now-count {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+#lib-reopen {
+  padding: var(--s-5);
+}
+#lib-reopen .ico {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+#lib-else {
+  margin: var(--s-6) 0 var(--s-3);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+}
+#lib-next {
+  margin-top: var(--s-5);
+}
+#bring-clash {
+  margin: var(--s-5) 0 0;
+  color: var(--warn);
+  font-size: var(--fs-xs);
+}
+#choose {
+  width: 30rem;
+}
+.choose-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+#choose h2 {
+  margin: 0;
+}
+#choose-where {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+#choose-list {
+  display: grid;
+  gap: var(--s-1);
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-inline: calc(-1 * var(--s-5));
+}
+.choose-row {
+  display: block;
+  width: 100%;
+  padding: var(--s-4) var(--s-5);
+  border: none;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.choose-row span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--fs-lg) / var(--lh-tight) var(--f-text);
+}
+.choose-row small {
+  display: block;
+  margin-top: var(--s-1);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.choose-row:hover {
+  background: var(--hover);
+}
+.choose-row[aria-selected="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+#choose .ask-foot {
+  padding-top: var(--s-5);
+  border-top: var(--hair) solid var(--line);
+}
+#choose-change {
+  margin-right: auto;
 }
 /* A dialog opens with its title focused (announced, nothing pre-chosen);
    Tab moves to the first choice. */

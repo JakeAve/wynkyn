@@ -4,6 +4,7 @@
 // handle API either way, so one store serves both.
 import type { BookStore } from "../../server/store.ts";
 import { slugify } from "./editions.ts";
+import { bookFiles } from "./book-zip.ts";
 
 declare global {
   interface FileSystemHandle {
@@ -158,10 +159,14 @@ export function handleStore(root: FileSystemDirectoryHandle): BookStore {
 
 // ---- which folder --------------------------------------------------------
 
+export const rememberFolder = (dir: FileSystemDirectoryHandle): Promise<
+  IDBValidKey
+> => idb("readwrite", (s) => s.put(dir, "library"));
+
 /** The author's books/ folder, remembered across reloads in IndexedDB. */
 export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
   const dir = await showDirectoryPicker({ mode: "readwrite", id: "books" });
-  await idb("readwrite", (s) => s.put(dir, "library"));
+  await rememberFolder(dir);
   return dir;
 }
 
@@ -170,7 +175,7 @@ export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
 export async function createBooksFolder(): Promise<FileSystemDirectoryHandle> {
   const parent = await showDirectoryPicker({ mode: "readwrite", id: "books" });
   const dir = await parent.getDirectoryHandle("Books", { create: true });
-  await idb("readwrite", (s) => s.put(dir, "library"));
+  await rememberFolder(dir);
   return dir;
 }
 
@@ -246,6 +251,28 @@ export async function importBooks(
     written.add(book);
   }
   return { written: [...written].sort(), skipped };
+}
+
+// A slug `to` already has is skipped whole, never merged.
+export async function copyBooks(
+  from: BookStore,
+  to: BookStore,
+  books: string[],
+): Promise<{ copied: string[]; skipped: string[] }> {
+  const copied: string[] = [];
+  const skipped: string[] = [];
+  for (const book of books) {
+    if (await to.exists(`${book}/manuscript.md`)) {
+      skipped.push(book);
+      continue;
+    }
+    for (const rel of await bookFiles(from, book)) {
+      const data = await from.read(`${book}/${rel}`);
+      if (data) await to.create(`${book}/${rel}`, data);
+    }
+    copied.push(book);
+  }
+  return { copied, skipped };
 }
 
 function idb<T>(

@@ -494,21 +494,42 @@ row takes the red wash. Nesting indents by `--s-4` per level. No separators. In
 
 ### 6.7 Choice list
 
-How a dialog asks one question. Full-width rows: a 500 title over a `--fs-xs`
-`--muted` note, padding `--s-4 --s-5`, `--s-1` apart. Hover wash; the
-recommended choice carries the red wash and a red title (Ink's `.choice.primary`
-black pill became this). The library dialog stays the reference. `.choices`
-bleeds `--s-5` into the dialog's padding so the titles line up with its heading;
-a tag on a choice ("Chromium only") is the experimental chip (`.pill`, §6.10).
+How a dialog asks one question. Full-width framed rows, `--s-3` apart: an inset
+`--hair` `--line` ring, `--r` + corner, padding `--s-4 --s-5`, `--s-5` between
+the parts. Each row is an optional icon tile, then a 500 title over a `--fs-xs`
+`--muted` note (`<small>`), then a `--muted` chevron pushed to the end. The tile
+(`.ico`) is a 2rem `--hover` square with `--r` + corner holding an `--icon`
+glyph in `--muted`. Hover wash. The recommended choice (`.primary`) carries the
+red wash, a ring of `--acc` at 45% and `--acc-ink` text; its tile takes the wash
+again and the red glyph. `.sm`, for secondary rows under a primary one, is
+padding `--s-3 --s-5`, `--fs-sm` and a `--h-sm` tile. `.choices` sits inside the
+dialog's padding, never bleeding into it, so the frames line up with the
+heading. A tag on a choice ("Chromium only") is the experimental chip (`.pill`,
+§6.10) inside the title. The library and Create dialogs carry tiles; a question
+whose answers have no natural picture (Apply a theme) leaves them out. Change
+library opens with the current row: unframed, in the wash with `--acc-ink`, a
+check, the place and a `--muted` `--fs-xs` count at the end. Compact rows sit
+under a small-caps group label (`--fs-sm`, `--track-caps`, `--muted`). Folder
+names in titles and leads are `--f-hivis` `--fs-sm`.
 
 ### 6.8 Dialog
 
 `--bg`, `--r-dlg` + corner, `--shadow-dlg` over `--backdrop`; width by content
-up to about 26rem (wider only for the font picker and themes). Header: title in
-Fell `--fs-h`, optional lead in `--muted`. Padding `--s-6`. Footer: actions
-right-aligned, `--s-3` apart, ghost first, primary last. `esc` closes it unless
-it guards unsaved work (closing on a backdrop click: planned). In `web/app.css`:
-`.ask` with `.ask-foot`; fields in a dialog (`.ask .field`) are §6.3 frames.
+up to about 26rem (wider only for the font picker, themes and Choose a book).
+Header: title in Fell `--fs-h`, optional lead in `--muted`. Padding `--s-6`.
+Footer: actions right-aligned, `--s-3` apart, ghost first, primary last. `esc`
+closes it unless it guards unsaved work (closing on a backdrop click: planned).
+In `web/app.css`: `.ask` with `.ask-foot`; fields in a dialog (`.ask .field`)
+are §6.3 frames.
+
+**Choose a book** (`#choose`, 30rem): the title, then "N in `<name>`" in
+`--fs-xs` `--muted` at the right (the name in `--f-hivis` for a folder or
+`books`); the search field (§6.3); then §6.6 rows (`.choose-row`) set in
+Alegreya 500 `--fs-lg`, padding `--s-4 --s-5`, bled by `--s-5` so the titles
+line up with the heading. The active row takes the red wash; "Last open" sits
+under its title in `--fs-xs` `--muted`. The footer is ruled by a `--hair`
+`--line` top: Change library… (ghost, folder glyph) left, New book (outline)
+right.
 
 **Keyboard shortcuts** (`#shortcuts`, Ctrl+Shift+/ or ⌘?): an `.ask` with a
 filter field, then every command under its section's small-caps group label
@@ -574,7 +595,16 @@ control's tooltip and `kbd` show its key as the platform writes it
   mode it switches to in woodcut: the sun mark (§10) without its cut lines, and
   the man in the moon beside a share-card star. These two are filled, not
   stroked, in the button's color (never red). The save status sits after the
-  crumb.
+  crumb. The crumb's text is trimmed to cap height and baseline (`text-box`), so
+  the library icon and the chevrons center on the caps (as does any button's
+  label in a `span` after its icon); until a book is chosen it shows the library
+  step alone (nothing on the dev server).
+- **Switcher** (`#switcher`): books left, the selected book's editions right.
+  The books foot holds New book; in browser storage only, Download library
+  (download icon) under it and the note "Your library is currently in browser
+  storage and could be cleared by your browser at any time." in `--fs-xs`
+  `--muted`, and over the editions a head (`#eds-head`) naming the selected book
+  in Alegreya 500 `--muted` with a small Download book at its right.
 - **Pane header** (`--h-pane` at least, `.pane-head`): the pane's own controls
   at left in small sizes, `--s-2` apart; its expand button
   (`.btn.sm.icon
