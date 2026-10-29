@@ -2224,10 +2224,10 @@ The panel exposes the selector model already implicit in `elements`/`is` (§4.5,
   separately — and a preview click resolves to the deepest matching selector, so
   clicking a part number in the contents opens `elements.toc.toc-part.number`.
   One spot can sit under several styles (a drop cap in a paragraph in the body),
-  so a "Here" row under the view heading lists them all, outermost first, the
-  opened one current: hovering one outlines what it styles there, clicking it
-  opens it. An `{is}` class counts beside the base style it wraps, not instead
-  of it.
+  so a "Styles here" row under the view heading lists them all, outermost first,
+  the opened one current: hovering one outlines what it styles there, clicking
+  it opens it. An `{is}` class counts beside the base style it wraps, not
+  instead of it.
 - **By slug** — every sentinel sharing this slug (e.g. every
   `{is: handwritten-letter}`) → writes to `is.handwritten-letter`.
 - **By single instance** — this one occurrence only, addressed by its slug, so

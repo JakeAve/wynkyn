@@ -277,7 +277,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     const { steps, key } = trail;
     const catalog = catalogFor(meta);
     const label = document.createElement("span");
-    label.textContent = "Here";
+    label.textContent = "Styles here";
     here.replaceChildren(
       label,
       ...steps.map((step) => {

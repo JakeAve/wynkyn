@@ -447,8 +447,8 @@ pill, whatever the corner shape.
   with just one shows it in the heading, a view of several elements (an opener's
   number and title) keeps one at each section label's right. A view opened by a
   click on the pages that lands under more than one style adds a row below the
-  title: "Here" (`--fs-xs`, `--muted`), then a chip (§6.10) per style, outermost
-  first, `--s-2` apart; the open one takes the red wash, no ring.
+  title: "Styles here" (`--fs-xs`, `--muted`), then a chip (§6.10) per style,
+  outermost first, `--s-2` apart; the open one takes the red wash, no ring.
 - **Section** (`section`): `--s-5` vertical padding, a hairline below, a
   small-caps group label. (planned: the view's Reset as a small icon button at
   the label's right when the section has set values; today it sits at the view's
