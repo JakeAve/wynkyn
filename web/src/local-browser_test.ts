@@ -5,7 +5,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { strToU8, unzipSync, zipSync } from "fflate";
 import { chromeTest, newPage } from "../../testing/chrome.ts";
-import { until } from "../../testing/wait.ts";
+import { eventually, until } from "../../testing/wait.ts";
 import { serveSite } from "../../scripts/serve-site.ts";
 
 const DIST = new URL("../../dist/", import.meta.url);
@@ -335,15 +335,20 @@ chromeTest({
         .first().waitFor();
       // The tree, not the editor's DOM: CodeMirror draws only the lines near
       // the viewport, so how far down a chapter is depends on the text size.
-      const tree = await page.locator("#tree").innerText();
-      assert(
-        tree.includes("The Start") && tree.includes("The End"),
-        `the import landed: ${tree}`,
-      );
+      // It and the notes follow the parse, which waits on a debounce.
+      await eventually(async () => {
+        const tree = await page.locator("#tree").innerText();
+        assert(
+          tree.includes("The Start") && tree.includes("The End"),
+          `the import landed: ${tree}`,
+        );
+      });
       // In Prose a `%%` note is a ☞ in the margin, its text in the title.
-      const flags = await page.locator("#editor .cm-prose-note")
-        .evaluateAll((els) => els.map((e) => e.getAttribute("title") ?? ""));
-      assert(flags.some((t) => t.includes("check:")), "guesses are flagged");
+      await eventually(async () => {
+        const flags = await page.locator("#editor .cm-prose-note")
+          .evaluateAll((els) => els.map((e) => e.getAttribute("title") ?? ""));
+        assert(flags.some((t) => t.includes("check:")), "guesses are flagged");
+      });
       const notes = page.locator("#import-notes");
       await notes.waitFor({ state: "visible" });
       assert(
@@ -592,14 +597,27 @@ chromeTest({
       const page = await newPage();
       await page.goto(`http://localhost:${site.addr.port}/app/`);
       await twoBooks(page);
+      // Writes to storage wait until let through, so the edit is unsaved
+      // when the switch starts however slow the run: its debounce or its
+      // save is still pending, never landed already.
+      await page.evaluate(() => {
+        const p = FileSystemFileHandle.prototype;
+        const real = p.createWritable;
+        const gate = new Promise<void>((open) =>
+          // deno-lint-ignore no-explicit-any
+          (globalThis as any).letWritesThrough = open
+        );
+        p.createWritable = async function (...args) {
+          await gate;
+          return real.apply(this, args);
+        };
+      });
       await page.locator("#editor .cm-content").click();
       await page.keyboard.press("Control+End");
       await page.keyboard.type("\nTyped just before the switch.");
-      assert(
-        !(await storedManuscript(page, "other")).includes("before the switch"),
-        "still inside the debounce, or this proves nothing",
-      );
       await switchToDemoBook(page);
+      // deno-lint-ignore no-explicit-any
+      await page.evaluate(() => (globalThis as any).letWritesThrough());
       await page.waitForURL(/book=demo-book/);
       assertStringIncludes(
         await storedManuscript(page, "other"),

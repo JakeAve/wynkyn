@@ -107,10 +107,17 @@ appTest({
       async () => (await b.read("manuscript.md"))!.includes(block),
       "the manuscript to gain the block",
     );
-    await quietFor(2000); // any second push would land by now
+    // The push of the saved text, matched by its version; any new text
+    // pushed ahead of it was a pagination of its own.
+    await page.locator('#status[data-kind="saved"]').waitFor();
+    const { version } = await (await fetch(
+      new URL(`/api/books/${b.slug}/manuscript`, b.url()),
+    )).json();
+    await until(() => pushed.includes(version), "the save's push");
     assertEquals(
-      pushed.filter((v) => !opening.has(v)).length,
-      1,
+      pushed.slice(0, pushed.indexOf(version) + 1)
+        .filter((v) => !opening.has(v)),
+      [version],
       "one rebuild push per drop",
     );
     // Prose lists the images again after the drop and draws the new one.
