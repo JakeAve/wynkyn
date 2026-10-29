@@ -378,7 +378,11 @@ async function swapInPlace(
   tick: (cb: () => void) => void,
   cancelled: () => boolean,
 ): Promise<PageProblem[] | null> {
-  const [old] = await Promise.all([loadCachedSegment(swap.was), fontSheets()]);
+  const [old, cached] = await Promise.all([
+    loadCachedSegment(swap.was),
+    loadCachedSegment(swap.key),
+    fontSheets(),
+  ]);
   if (cancelled()) throw CANCELLED;
   if (!old) return null;
   const live = [swap.first];
@@ -386,6 +390,32 @@ async function swapInPlace(
     const next = live.at(-1)!.nextElementSibling;
     if (!(next instanceof HTMLElement)) return null;
     live.push(next);
+  }
+  if (cached) {
+    if (JSON.stringify(cached.facts) !== JSON.stringify(old.facts)) return null;
+    const pages = pagesOf(
+      cached,
+      swap.segment.line,
+      (n) => u.imageUrls[n] ?? "",
+    );
+    // As runRender's cached segments: assembly checks each image's resolution.
+    await Promise.all(
+      pages.flatMap((p) => [...p.querySelectorAll("img")])
+        .map((img) => img.decode().catch(() => {})),
+    );
+    if (cancelled()) throw CANCELLED;
+    return put(
+      u,
+      container,
+      swap,
+      book,
+      cacheKey,
+      live,
+      pages,
+      old,
+      cached,
+      false,
+    );
   }
   const css = [u.baseCss, u.domCss, u.pagedCss].join("\n");
   const blobUrl = URL.createObjectURL(new Blob([css], { type: "text/css" }));
@@ -405,7 +435,7 @@ async function swapInPlace(
       Number(container.dataset.segmentsLaid ?? 0) + 1,
     );
     const laid = [...flow.pagesArea.querySelectorAll(":scope > .pagedjs_page")];
-    const { facts, problems: own } = flow.pageMapResult;
+    const { facts, problems } = flow.pageMapResult;
     if (
       JSON.stringify(facts) !== JSON.stringify(old.facts) ||
       sheetsOf(previewer).join("\n") !== book.styles.join("\n")
@@ -419,52 +449,71 @@ async function swapInPlace(
         u.imageUrls,
       ),
       facts,
-      problems: own,
-    };
-    const n = Number(swap.first.dataset.pageNumber);
-    const on = (list: PageProblem[]) =>
-      list.map((p) => p.page === null ? p : { ...p, page: p.page - 1 + n });
-    const checked = () =>
-      live.flatMap((p, i) => BookPageMap.pageProblems(p, n + i));
-    const gone = new Set(
-      [...on(old.problems), ...checked()].map((p) => JSON.stringify(p)),
-    );
-    live.forEach((p, i) => BookPageMap.replaceArea(p, laid[i]!));
-    if (swap.shift) {
-      const { from, by } = swap.shift;
-      for (
-        const el of container.querySelectorAll<HTMLElement>(
-          ":scope > :not(.preview-stage) [data-line]",
-        )
-      ) {
-        const line = Number(el.dataset.line);
-        if (line >= from) el.dataset.line = String(line + by);
-      }
-    }
-    problems = [
-      ...problems.filter((p) => !gone.has(JSON.stringify(p))),
-      ...on(own),
-      ...checked(),
-    ];
-    const render: CachedRender = {
-      ...book,
       problems,
-      segments: u.segments.map((s) => ({
-        key: keyOf(u, s, seed),
-        line: s.line,
-        opens: s.opens,
-        ids: s.ids,
-      })),
     };
-    manifest = render;
-    if (!queuedUpdate) targetHash = targetOf(u, seed);
-    void saveCachedRender(cacheKey, render, new Map([[swap.key, row]]));
-    return problems;
+    return put(u, container, swap, book, cacheKey, live, laid, old, row, true);
   } finally {
     previewer.polisher.destroy(); // the live pages keep their own copies
     stage.remove();
     URL.revokeObjectURL(blobUrl);
   }
+}
+
+function put(
+  u: UpdateMessage,
+  container: HTMLElement,
+  swap: Swap,
+  book: CachedRender,
+  cacheKey: string,
+  live: HTMLElement[],
+  pages: Element[],
+  old: CachedSegment,
+  now: CachedSegment,
+  save: boolean,
+): PageProblem[] {
+  const n = Number(swap.first.dataset.pageNumber);
+  const on = (list: PageProblem[]) =>
+    list.map((p) => p.page === null ? p : { ...p, page: p.page - 1 + n });
+  const checked = () =>
+    live.flatMap((p, i) => BookPageMap.pageProblems(p, n + i));
+  const gone = new Set(
+    [...on(old.problems), ...checked()].map((p) => JSON.stringify(p)),
+  );
+  live.forEach((p, i) => BookPageMap.replaceArea(p, pages[i]!));
+  if (swap.shift) {
+    const { from, by } = swap.shift;
+    for (
+      const el of container.querySelectorAll<HTMLElement>(
+        ":scope > :not(.preview-stage) [data-line]",
+      )
+    ) {
+      const line = Number(el.dataset.line);
+      if (line >= from) el.dataset.line = String(line + by);
+    }
+  }
+  problems = [
+    ...problems.filter((p) => !gone.has(JSON.stringify(p))),
+    ...on(now.problems),
+    ...checked(),
+  ];
+  const render: CachedRender = {
+    ...book,
+    problems,
+    segments: u.segments.map((s) => ({
+      key: keyOf(u, s, seed),
+      line: s.line,
+      opens: s.opens,
+      ids: s.ids,
+    })),
+  };
+  manifest = render;
+  if (!queuedUpdate) targetHash = targetOf(u, seed);
+  void saveCachedRender(
+    cacheKey,
+    render,
+    new Map(save ? [[swap.key, now]] : []),
+  );
+  return problems;
 }
 
 // Lays the book out a segment at a time (spec: segmented layout), each from
