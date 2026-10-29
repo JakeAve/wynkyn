@@ -570,8 +570,11 @@ control's tooltip and `kbd` show its key as the platform writes it
 - **Toolbar** (`--h-toolbar`): left, the Contents toggle (Mod+\) and the crumb
   (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`; the book
   switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
-  Publish (Mod+1–3); right, the theme toggle alone (Mod+Shift+L). The save
-  status sits after the crumb.
+  Publish (Mod+1–3); right, the theme toggle alone (Mod+Shift+L), showing the
+  mode it switches to in woodcut: the sun mark (§10) without its cut lines, and
+  the man in the moon beside a share-card star. These two are filled, not
+  stroked, in the button's color (never red). The save status sits after the
+  crumb.
 - **Pane header** (`--h-pane` at least, `.pane-head`): the pane's own controls
   at left in small sizes, `--s-2` apart; its expand button
   (`.btn.sm.icon
