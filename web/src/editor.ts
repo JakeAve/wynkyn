@@ -18,6 +18,8 @@ import {
   StateEffect,
   StateField,
   type Text,
+  Transaction,
+  type TransactionSpec,
 } from "@codemirror/state";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { bml, ClassMarker } from "./bml-language.ts";
@@ -288,17 +290,34 @@ export function applyDiagnostics(view: EditorView, diags: Diagnostic[]): void {
   );
 }
 
-// Replace the whole buffer from an external change, preserving the cursor
-// position as far as the new text allows.
+// A reload from disk swaps only the stretch that differs, so the cursor and
+// the edits ⌘Z can still undo map through it; the change itself stays off the
+// history, or ⌘Z would put back what the reload replaced.
+export function reloadSpec(old: string, text: string): TransactionSpec | null {
+  if (old === text) return null;
+  let from = 0;
+  while (from < old.length && old[from] === text[from]) from++;
+  let end = 0;
+  while (
+    end < old.length - from && end < text.length - from &&
+    old[old.length - 1 - end] === text[text.length - 1 - end]
+  ) end++;
+  return {
+    changes: {
+      from,
+      to: old.length - end,
+      insert: text.slice(from, text.length - end),
+    },
+    annotations: Transaction.addToHistory.of(false),
+  };
+}
+
 export function replaceBuffer(view: EditorView, text: string): void {
-  if (view.state.doc.toString() === text) return;
-  const head = Math.min(view.state.selection.main.head, text.length);
+  const spec = reloadSpec(view.state.doc.toString(), text);
+  if (!spec) return;
   suppressChanges = true;
   try {
-    view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: text },
-      selection: { anchor: head },
-    });
+    view.dispatch(spec);
   } finally {
     suppressChanges = false;
   }

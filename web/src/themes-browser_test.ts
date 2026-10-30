@@ -1,7 +1,8 @@
 // web/src/themes-browser_test.ts — a theme previewed and applied in the real
 // app (spec §7.5): previewing writes nothing and holds live pushes, Discard
 // restores the book's look, a failed try ends the preview, and Apply asks: a
-// new edition, a replace, or Cancel; a new edition whose save fails is undone.
+// new edition, a replace (which Mod+Z undoes), or Cancel; a new edition whose
+// save fails is undone.
 import { assert, assertEquals } from "@std/assert";
 import type { Page } from "playwright";
 import { appTest, book } from "../../testing/app.ts";
@@ -128,8 +129,7 @@ appTest({
         "Apply as new edition",
         "Standard stays as it is. A new edition, Caslon, gets this theme.",
         "Replace this edition's style",
-        "Standard's current fonts and styles are replaced. This can't be " +
-        "undone.",
+        "Standard's current fonts and styles are replaced.",
         "Cancel",
       ]
     ) assert(copy.includes(line), `dialog says: ${line}`);
@@ -154,6 +154,17 @@ appTest({
       JSON.stringify(JSON.parse(metaBefore).page),
     );
     assertEquals(await editions(), edsBefore);
+    const bodyFont = async () => JSON.parse(await meta()).fonts?.body;
+    await page.keyboard.press("ControlOrMeta+z");
+    await until(
+      async () => await bodyFont() === JSON.parse(metaBefore).fonts?.body,
+      "Mod+Z puts the book's fonts back",
+    );
+    await page.keyboard.press("ControlOrMeta+Shift+z");
+    await until(
+      async () => await bodyFont() === "Libre Caslon Text",
+      "Mod+Shift+Z replaces them again",
+    );
 
     // Apply as new edition: editions/aldine.json, and the app moves to it.
     await page.locator('#config-overlay .tcard[data-slug="aldine"]').click();

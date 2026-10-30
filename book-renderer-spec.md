@@ -2056,7 +2056,10 @@ table (`web/src/shortcuts.ts`), and the chrome labels them for the platform
 The toolbar holds only what is global: the Contents toggle at the far left
 before the crumb (Mod+\), drawn as a panel icon whose side is half filled while
 the left column shows; the crumb (Mod+O switches the book, Mod+Alt+N starts a
-new one); the modes; and the light/dark toggle alone at the right (Mod+Shift+L).
+new one); the modes; and at the right Undo and Redo (Mod+Z, Mod+Shift+Z, also
+Ctrl+Y off the Mac), then the light/dark toggle (Mod+Shift+L). Undo and Redo
+work on what the mode edits: the text in Write (the editor's history), the
+styles in Style and Publish (§7.5); a button is disabled with nothing to undo.
 In Write the pages hide with Mod+. (no button; while they are hidden the write
 pane's corner button reads "Show the pages" and brings them back); Style and
 Publish always show them. Both choices persist. The crumb reads library / book /
@@ -2319,6 +2322,13 @@ Includes:
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)
+- Undo for style edits (the toolbar's Undo and Redo, §7.1): in Style and Publish
+  they take back the session's style edits one at a time, a theme's Replace
+  included, opening the view each was made in so the change shows. Quick edits
+  to one section, a stepper's clicks or a typed number, are one step. A change
+  to `metadata.json` from outside (another tab, the disk) clears both, since an
+  old step would overwrite it. A reload from disk never joins the editor's
+  history.
 - Style's Book group opens from the keyboard too: Mod+Shift+1–4 for Theme, Page
   size & margins, Fonts and Body (⌥⌘1–4 on a Mac, where ⌘⇧3 and ⌘⇧4 take
   screenshots).
@@ -2346,7 +2356,7 @@ Includes:
     switches to it.
   - **Replace this edition's style**: the theme's `fonts`, `elements`,
     `numbering` and `running` replace the edition's, saved like any panel edit
-    (version checks and the changed-on-disk banner apply). It can't be undone.
+    (version checks and the changed-on-disk banner apply). Mod+Z undoes it.
   - **Cancel** closes the dialog and keeps the preview.
 
 ### 7.6 Preview Pane

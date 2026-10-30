@@ -594,9 +594,10 @@ control's tooltip and `kbd` show its key as the platform writes it
 - **Toolbar** (`--h-toolbar`): left, the Contents toggle (Mod+\) and the crumb
   (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`; the book
   switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
-  Publish (Mod+1–3); right, the theme toggle alone (Mod+Shift+L), showing the
-  mode it switches to in woodcut: the sun mark (§10) without its cut lines, and
-  the man in the moon beside a share-card star. These two are filled, not
+  Publish (Mod+1–3); right, Undo and Redo (`.btn.icon`, curved arrows, disabled
+  while there is nothing to undo), then the theme toggle (Mod+Shift+L), showing
+  the mode it switches to in woodcut: the sun mark (§10) without its cut lines,
+  and the man in the moon beside a share-card star. These two are filled, not
   stroked, in the button's color (never red). The save status sits after the
   crumb. The crumb's text is trimmed to cap height and baseline (`text-box`), so
   the library icon and the chevrons center on the caps (as does any button's

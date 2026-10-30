@@ -57,6 +57,8 @@ import type { Backend } from "./backend.ts";
 import { installSwitcher, showLibrary, type Switcher } from "./switcher.ts";
 import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
+import { StyleUndo } from "./style-undo.ts";
+import { installUndo, type Undo } from "./undo.ts";
 import { installTextView } from "./text-view.ts";
 import { installPanes } from "./panes.ts";
 import { installShortcuts } from "./shortcuts.ts";
@@ -234,6 +236,7 @@ function onDocChanged(text: string): void {
   clearTimeout(parseTimer);
   parseTimer = setTimeout(() => reparse(text), PARSE_DEBOUNCE_MS);
   sync.editManuscript(text);
+  undoUi?.refresh();
 }
 
 let isNames: string[] = []; // `{is}` classes in the manuscript, from reparse
@@ -247,6 +250,7 @@ let wordsAtOpen: number | null = null;
 function takeDiskText(text: string): void {
   if (wordsAtOpen !== null) wordsAtOpen += wordCount(text.split("\n")) - words;
   replaceBuffer(editor, text);
+  undoUi?.refresh();
   reparse(text);
 }
 
@@ -402,7 +406,17 @@ function syncChanged(s: SyncStatus): void {
   metaWasBusy = metaBusy;
 }
 
-function saveMetadataSections(sections: Partial<Metadata>): void {
+const styleUndo = new StyleUndo();
+let undoUi: Undo | undefined;
+
+function saveMetadataSections(
+  sections: Partial<Metadata>,
+  record = true,
+): void {
+  if (record) {
+    styleUndo.record(sections, view ?? "");
+    undoUi?.refresh();
+  }
   if ("page" in sections) {
     switcher.setCrumbSize(sections.page?.size);
     setPaperStock(sections.page?.paper);
@@ -440,6 +454,8 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
       const loaded = await fetchMetadata();
       metadata = loaded.metadata;
       sync.rebaseMetadata(loaded.version);
+      styleUndo.reset(metadata);
+      undoUi?.refresh();
       return configPanel = createConfigPanel({
         overlay: $("config-overlay"),
         nav: $("style-nav"),
@@ -528,6 +544,7 @@ let mode: Mode = "write";
 // Spec §7.1.
 function setMode(next: Mode): void {
   mode = next;
+  undoUi?.refresh();
   document.documentElement.dataset.mode = next;
   for (const b of $("modes").querySelectorAll<HTMLElement>("button")) {
     b.setAttribute("aria-pressed", String(b.dataset.mode === next));
@@ -682,11 +699,28 @@ async function refreshConfigFromRemote(): Promise<void> {
     if (fresh.version === sync.metaBase) return;
     metadata = fresh.metadata;
     sync.rebaseMetadata(fresh.version);
+    styleUndo.reset(metadata);
+    undoUi?.refresh();
     configPanel.refresh(metadata);
     setPaperStock(metadata.page?.paper);
   } catch {
     // 409/network — leave the panel as-is; the user can close and reopen.
   }
+}
+
+// Opens the view the step was made in, when it is in this mode's panel, so
+// the author sees what changed back.
+function stepStyle(dir: "undo" | "redo"): void {
+  const step = metadata && styleUndo[dir](metadata);
+  if (!step) return;
+  saveMetadataSections(step.sections, false);
+  metadata = step.metadata;
+  $("preview").dataset.stale = "";
+  configPanel?.refresh(metadata);
+  if (
+    step.view !== view &&
+    step.view.startsWith("publish:") === (mode === "publish")
+  ) configPanel?.open(step.view);
 }
 
 // Each gutter writes a CSS var on :root that the grids of #panes and #footer
@@ -934,6 +968,16 @@ async function main(): Promise<void> {
     preview: $("preview"),
     createManuscript,
     ensureConfigPanel,
+  });
+  undoUi = installUndo({
+    mode: () => mode,
+    editor: () => editor,
+    styles: {
+      canUndo: styleUndo.canUndo,
+      canRedo: styleUndo.canRedo,
+      undo: () => stepStyle("undo"),
+      redo: () => stepStyle("redo"),
+    },
   });
   $("modes").onclick = (e) => {
     const m = (e.target as Element).closest<HTMLElement>("[data-mode]")?.dataset

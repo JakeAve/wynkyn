@@ -13,6 +13,7 @@
     "fonts": "deno run --allow-net=fonts.google.com --allow-write=metadata metadata/update-fonts.ts && deno fmt metadata/fonts-catalog.ts"
   },
   "imports": {
+    "@codemirror/commands": "npm:@codemirror/commands@^6.10.4",
     "@codemirror/autocomplete": "npm:@codemirror/autocomplete@^6.20.3",
     "@codemirror/language": "npm:@codemirror/language@^6.11.0",
     "@codemirror/lint": "npm:@codemirror/lint@^6.8.0",

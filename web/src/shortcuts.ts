@@ -80,6 +80,17 @@ function table(d: ShortcutDeps): Command[] {
     when: writing,
     run: () => insertSnippet(d.editor(), SNIPPETS.find((s) => s.label === id)!),
   });
+  // A text field keeps its own Mod+Z, the editor included, but not the
+  // panel's: they commit on change, so there it means the last edit.
+  const undoable = () => {
+    const a = document.activeElement;
+    return !(a instanceof HTMLTextAreaElement ||
+      (a instanceof HTMLElement && a.isContentEditable) ||
+      (a instanceof HTMLInputElement && a.type === "text" &&
+        !a.closest("#config-overlay")));
+  };
+  const undoB = button("#undo");
+  const redoB = button("#redo");
   const switcher = button("#book-switcher");
   const zoomIn = button('[data-zoom="in"]');
   const step = (
@@ -236,6 +247,23 @@ function table(d: ShortcutDeps): Command[] {
       section: "Publish",
       keys: "mod+shift+e",
       ...button('[data-command="export-epub"]'),
+    },
+    {
+      id: "undo",
+      label: "Undo",
+      section: "App",
+      keys: "mod+z",
+      when: () => undoable() && undoB.when!(),
+      run: undoB.run,
+    },
+    {
+      id: "redo",
+      label: "Redo",
+      section: "App",
+      keys: "mod+shift+z",
+      win: "ctrl+y, ctrl+shift+z",
+      when: () => undoable() && redoB.when!(),
+      run: redoB.run,
     },
     // macOS keeps ⌘⇧3 and ⌘⇧4 for screenshots, so the Mac set is ⌥⌘1–4.
     view("style-theme", "Theme", "themes", "1"),
