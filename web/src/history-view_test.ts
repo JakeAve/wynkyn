@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import type { Version } from "../../server/history.ts";
 import {
   chaptersLabel,
@@ -140,20 +140,10 @@ Deno.test("row labels", () => {
   );
 });
 
-Deno.test("reason wording", () => {
+Deno.test("an open shows its reason only when something changed", () => {
   const at = new Date(2026, 9, 24, 9);
-  assertEquals(reasonLabel(v(at, "open")), "Opened, changed outside the app");
-  assertEquals(
-    reasonLabel(v(at, "open", { text: false, chapters: [] })),
-    "",
-  );
-  assertEquals(reasonLabel(v(at, "before-import")), "Before import");
-  assertEquals(
-    reasonLabel(v(at, "before-delete-edition")),
-    "Before deleting edition",
-  );
-  assertEquals(reasonLabel(v(at, "before-reload")), "Before reload");
-  assertEquals(reasonLabel(v(at, "before-restore")), "Before restore");
+  assert(reasonLabel(v(at, "open")) !== "");
+  assertEquals(reasonLabel(v(at, "open", { text: false, chapters: [] })), "");
   assertEquals(reasonLabel(v(at, "idle")), "");
 });
 

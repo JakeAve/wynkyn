@@ -832,7 +832,7 @@ body.typing #editor .pane-head {
   padding: var(--s-4);
 }
 /* Lists (§6.6): a small-caps group label, then rows --s-1 apart. */
-:is(#tree, #style-nav, #shortcuts-list) .nh {
+:is(#tree, #style-nav, #shortcuts-list, .history-list) .nh {
   font-size: var(--fs-sm);
   font-variant-caps: all-small-caps;
   letter-spacing: var(--track-caps);
@@ -840,7 +840,7 @@ body.typing #editor .pane-head {
   color: var(--muted);
   padding: var(--s-5) var(--s-4) var(--s-1);
 }
-:is(#tree, #style-nav, #shortcuts-list) .nh:first-child {
+:is(#tree, #style-nav, #shortcuts-list, .history-list) .nh:first-child {
   padding-top: 0;
 }
 #tree :is(ul.tree-list, li) {
@@ -1310,7 +1310,7 @@ body.typing #editor .pane-head {
 /* Banners (§6.10): a strip across the top of the pane they concern, small
    ghost buttons at the right. Changed on disk: the buffer has unsaved edits
    and the file moved under it, so saving stops; its lead says so in --err. */
-:is(#disk-banner, #spec-banner) {
+:is(#disk-banner, #spec-banner, .banner) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1319,7 +1319,7 @@ body.typing #editor .pane-head {
   border-bottom: 1px solid var(--line);
   font-size: var(--fs-sm);
 }
-:is(#disk-banner, #spec-banner)[hidden] {
+:is(#disk-banner, #spec-banner, .banner)[hidden] {
   display: none;
 }
 #disk-banner .msg {
@@ -2326,13 +2326,13 @@ body.typing #editor .pane-head {
 }
 /* View heading (§6.5): the nav group over the view's name in Fell, and
    where it applies at the right. */
-#config-overlay .phead {
+:is(#config-overlay, .history-changes) .phead {
   display: grid;
   gap: var(--s-1);
   padding: var(--s-5) var(--s-6) var(--s-4);
   border-bottom: 1px solid var(--line);
 }
-#config-overlay .crumb {
+:is(#config-overlay, .history-changes) .crumb {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
@@ -2361,7 +2361,7 @@ body.typing #editor .pane-head {
   gap: var(--s-4);
   min-width: 0;
 }
-#config-overlay .phead h2 {
+:is(#config-overlay, .history-changes) .phead h2 {
   margin: 0;
   font: 400 var(--fs-h)/var(--lh-tight) var(--f-title);
   min-width: 0;
@@ -2381,14 +2381,14 @@ body.typing #editor .pane-head {
   background: none;
   color: var(--fg);
 }
-#config-overlay .pbody {
+:is(#config-overlay, .history-changes) .pbody {
   overflow-y: auto;
   padding: var(--s-2) var(--s-6) var(--s-7);
   flex: 1;
   min-height: 0;
   container-type: inline-size;
 }
-#config-overlay .sec {
+:is(#config-overlay, .history-changes) .sec {
   padding: var(--s-5) 0;
   border-bottom: 1px solid var(--line);
   display: grid;
@@ -2515,14 +2515,14 @@ body.typing #editor .pane-head {
 .tcard.sm .tspec {
   padding: var(--s-4) var(--s-2);
 }
-#config-overlay .sech {
+:is(#config-overlay, .history-changes) .sech {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-4);
 }
 /* A group label (§3): small caps, tracked, muted. */
-#config-overlay .sech h3 {
+:is(#config-overlay, .history-changes) .sech h3 {
   margin: 0;
   font-size: var(--fs-sm);
   font-weight: 500;
@@ -2564,7 +2564,7 @@ body.typing #editor .pane-head {
   width: 0.8125rem;
   height: 0.8125rem;
 }
-#config-overlay .row {
+:is(#config-overlay, .history-changes) .row {
   display: grid;
   grid-template-columns: 8.5rem minmax(0,1fr);
   align-items: center;
@@ -2579,7 +2579,7 @@ body.typing #editor .pane-head {
 #config-overlay .row[hidden] {
   display: none;
 }
-#config-overlay .lbl {
+:is(#config-overlay, .history-changes) .lbl {
   position: relative;
   padding-left: var(--s-5);
 }
@@ -2597,7 +2597,7 @@ body.typing #editor .pane-head {
 #config-overlay .lbl .from {
   display: block;
 }
-#config-overlay .ctl {
+:is(#config-overlay, .history-changes) .ctl {
   display: flex;
   align-items: center;
   gap: var(--s-4);
@@ -2679,7 +2679,7 @@ body.typing #editor .pane-head {
   color: var(--fg);
   background: var(--hover);
 }
-:is(#config-overlay, #text-view) .seg {
+:is(#config-overlay, #text-view, .history-list) .seg {
   display: inline-flex;
   gap: var(--s-1);
   padding: var(--s-1);
@@ -2688,7 +2688,7 @@ body.typing #editor .pane-head {
   corner-shape: var(--corner);
   flex-wrap: wrap;
 }
-:is(#config-overlay, #text-view) .seg button {
+:is(#config-overlay, #text-view, .history-list) .seg button {
   background: none;
   border: 0;
   border-radius: var(--r);
@@ -2701,11 +2701,12 @@ body.typing #editor .pane-head {
   align-items: center;
   gap: var(--s-2);
 }
-:is(#config-overlay, #text-view) .seg button:hover {
+:is(#config-overlay, #text-view, .history-list) .seg button:hover {
   color: var(--fg);
 }
 #config-overlay .seg button[aria-checked="true"],
 #text-view .seg button[aria-checked="true"],
+.history-list .seg button[aria-checked="true"],
 #config-overlay .tog[aria-pressed="true"] {
   background: var(--acc-wash);
   color: var(--acc-ink);
@@ -3896,175 +3897,105 @@ body.typing #editor .pane-head {
   font: var(--fs-2xs) var(--f-mono);
 }
 
-/* ---- History: versions by day (left), what one changed (middle) ---- */
+/* ---- History (design-language §6.14): the version list reads like the style
+   nav; the changes column reuses the panel's heading, sections and rows. ---- */
 .history-list {
-  padding: 8px;
-  overflow: auto;
+  overflow-y: auto;
+  padding: var(--s-4);
 }
-.h-filter {
-  display: flex;
-  gap: 2px;
-  padding: 0 2px 4px;
-}
-.h-filter .btn[aria-pressed="true"],
-.h-row[aria-pressed="true"] {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
-}
-.h-day {
-  padding: 12px 10px 4px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-.h-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.history-list .h-row {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  column-gap: var(--s-4);
+  align-items: baseline;
   width: 100%;
-  margin: 0 0 1px;
-  padding: 8px 10px;
+  padding: var(--s-2) var(--s-4);
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
   background: none;
   color: var(--fg);
-  font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.h-row:hover {
+.history-list .h-row + :is(.h-row, .btn) {
+  margin-top: var(--s-1);
+}
+.history-list .h-row:hover {
   background: var(--hover);
 }
-.h-row:focus-visible,
-.h-filter .btn:focus-visible,
-.history-changes .btn:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 1px;
+.history-list .h-row[aria-current="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
 }
-.h-line {
-  display: flex;
-  gap: 8px;
+.history-list .h-row > :not(.h-time) {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.h-time {
-  flex: 0 0 56px;
+.history-list .h-time {
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
-.h-head {
-  font-weight: 600;
+.history-list :is(.h-detail, .h-reason) {
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
-.h-detail,
-.h-reason {
-  padding-left: 64px;
-  font-size: 12px;
-  opacity: .75;
-}
-.h-detail:empty {
+.history-list .h-detail:empty {
   display: none;
 }
-.h-reason {
-  font-size: var(--fs-sm);
-  font-style: italic;
+.history-list .h-row[aria-current="true"] :is(.h-time, .h-detail, .h-reason) {
+  color: inherit;
+  opacity: .6;
 }
-.h-more {
-  margin-left: 56px;
-  font-size: 12px;
+.history-list .h-row + .btn {
+  margin-left: calc(4rem + var(--s-4));
 }
 .history-changes {
-  min-width: 0;
-  padding: 20px 28px;
-  overflow: auto;
-}
-.history-changes h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-.h-when {
-  margin-top: 4px;
-  color: var(--muted);
-}
-.h-actions {
   display: flex;
-  gap: 8px;
-  margin: 16px 0 4px;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
-.h-name {
-  color: var(--fg);
+.history-changes .h-actions {
+  display: flex;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
 }
-.h-menu-wrap {
-  position: relative;
+.history-changes .h-summary {
+  max-width: 36em;
+  margin: var(--s-5) 0 0;
+  color: var(--muted);
 }
-.history-changes .h-restore {
-  background: var(--inv-bg);
-  color: var(--inv-fg);
+.history-changes .h-to {
+  overflow-wrap: anywhere;
 }
-.h-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 5;
-  width: 260px;
+.history-changes .h-from {
+  color: var(--muted);
+}
+/* Text diffs: an insert is underlined in --acc (an edit mark, like the set
+   dot); a delete is struck in --muted. Never a tint, never --err. */
+.history-changes .h-para {
+  max-width: 36em;
   margin: 0;
-  padding: 4px 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--bg);
-  box-shadow: var(--page-shadow);
-}
-.h-menu[hidden] {
-  display: none;
-}
-.h-summary {
-  max-width: 52ch;
-  color: var(--muted);
-  line-height: 1.5;
-}
-.h-group {
-  margin-top: 18px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-}
-.h-part {
-  margin-bottom: 6px;
-  font-weight: 600;
-}
-.h-style {
-  display: grid;
-  grid-template-columns: 130px minmax(0, 1fr);
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--soft);
-}
-.h-prop,
-.h-from {
-  color: var(--muted);
-}
-.h-from {
-  text-decoration: line-through;
-}
-.h-para {
-  max-width: 60ch;
-  margin: 6px 0 10px;
-  font-family: Georgia, serif;
-  font-size: 16px;
-  line-height: 1.5;
+  font: var(--fs-lg) / 1.62 var(--f-text);
   user-select: text;
 }
-.h-para del {
-  color: var(--err);
-  background: color-mix(in srgb, var(--err) 12%, transparent);
+.history-changes .h-para ins {
+  text-decoration: underline var(--acc) var(--ring);
+  text-underline-offset: 0.2em;
 }
-.h-para ins {
-  color: var(--ok);
-  background: color-mix(in srgb, var(--ok) 12%, transparent);
-  text-decoration: none;
-}
-.h-note {
-  margin-top: 12px;
+.history-changes .h-para del {
   color: var(--muted);
-  font-size: 12px;
+  text-decoration: line-through var(--muted);
 }
-.h-err {
+.history-changes .h-note {
+  margin: var(--s-5) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.banner.err strong {
   color: var(--err);
 }

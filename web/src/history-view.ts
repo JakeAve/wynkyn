@@ -1,7 +1,5 @@
-// web/src/history-view.ts — the History takeover's left and middle columns:
-// versions grouped by day (left) and what the picked one changed (middle),
-// with Restore ▾ and Name…. The pure parts (grouping, folds, row and reason
-// wording, style rows) are exported and tested in Deno; the rest is DOM.
+// The History takeover's versions (left) and what one changed (middle);
+// design-language §6.14.
 import type { Metadata } from "../../metadata/types.ts";
 import {
   type ChapterDiff,
@@ -10,8 +8,22 @@ import {
 } from "../../server/history-diff.ts";
 import type { RestoreScope, Version } from "../../server/history.ts";
 import type { Backend } from "./backend.ts";
-import { h } from "./panel-controls.ts";
-import { catalogFor, type StyleEntry } from "./style-catalog.ts";
+import { h, row, section, seg } from "./panel-controls.ts";
+import { catalogFor, entryName } from "./style-catalog.ts";
+
+export interface HistoryBackend {
+  history(book: string): Promise<Version[]>;
+  versionFiles(
+    book: string,
+    id: string,
+  ): Promise<{ version: Version; files: Record<string, string> }>;
+  restoreVersion(
+    book: string,
+    id: string,
+    scope: RestoreScope,
+  ): Promise<Version | null>;
+  nameVersion(book: string, id: string | null, name: string): Promise<Version>;
+}
 
 export type Filter = "edition" | "all";
 export type DayItem = Version | { fold: Version[] };
@@ -21,28 +33,15 @@ export interface Day {
 }
 
 const DAY_MS = 86_400_000;
+// Not Intl: its punctuation differs between engines and versions.
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
 
 const startOfDay = (d: Date) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
-/** "Today", "Yesterday", else "Tue 21 Oct" (with the year if not this one). */
 export function dayLabel(at: Date, now: Date): string {
-  // ponytail: whole-day count by rounding, so a DST shift doesn't skip a day.
+  // Rounded: a day across a DST change is 23 or 25 hours.
   const days = Math.round((startOfDay(now) - startOfDay(at)) / DAY_MS);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
@@ -54,21 +53,18 @@ export function dayLabel(at: Date, now: Date): string {
   }${year}`;
 }
 
-/** "3:42 pm". */
 export function timeLabel(at: Date): string {
   const hr = at.getHours();
   const m = String(at.getMinutes()).padStart(2, "0");
   return `${hr % 12 || 12}:${m} ${hr < 12 ? "am" : "pm"}`;
 }
 
-/** "Today, 3:42 pm". */
 export const whenLabel = (v: Version, now: Date) =>
   `${dayLabel(new Date(v.at), now)}, ${timeLabel(new Date(v.at))}`;
 
 const changed = (v: Version) =>
   v.changes.text || v.changes.images || v.changes.editions.length > 0;
 
-/** Only another edition's styles changed. */
 const otherEditionOnly = (v: Version, edition: string | null) =>
   !v.changes.text && !v.changes.images && v.changes.editions.length > 0 &&
   v.changes.editions.every((e) => e !== edition);
@@ -82,7 +78,6 @@ export function visible(
   return filter === "all" || !otherEditionOnly(v, edition);
 }
 
-/** The italic line under a row; "" when there is none. */
 export function reasonLabel(v: Version): string {
   switch (v.reason) {
     case "open":
@@ -137,7 +132,6 @@ export function groupVersions(
 
 const words = (s: string) => s.replace(/-/g, " ");
 
-/** "Chapter three", "Chapters three, four", "Front matter". */
 export function chaptersLabel(chapters: string[]): string {
   const ch = chapters.filter((c) => c !== "Front matter").map(words);
   const front = chapters.includes("Front matter") ? ["Front matter"] : [];
@@ -157,8 +151,7 @@ export const editionLabel = (
     names.get(slug) ?? (slug === null ? "Standard" : cap(words(slug)))
   } edition`;
 
-/** The row's bold head and the line under it. `styleParts` are the changed
- * parts' labels per edition, once known. */
+/** `styleParts`: the changed parts' labels per edition, once fetched. */
 export function rowLabel(
   v: Version,
   edition: string | null,
@@ -189,9 +182,7 @@ export function rowLabel(
   };
 }
 
-// ---- style rows ----
-
-// The words the style panel's rows use (panel-parts.ts, panel-furniture.ts).
+// The panel builds its rows inline, so it has no label map to share.
 const PROP_LABELS: Record<string, string> = {
   "font-family": "Font",
   "font-size": "Size",
@@ -220,14 +211,6 @@ const SECTION_LABELS: Record<string, string> = {
   spec: "Spec version",
 };
 
-function partLabel(e: StyleEntry): string {
-  if (e.label === "Everything" || e.label.startsWith("All ")) return e.group;
-  if (e.section === "elements" && e.key.includes(".")) {
-    return `${e.group} ${e.label.toLowerCase()}`;
-  }
-  return e.label;
-}
-
 const show = (x: unknown) =>
   x === undefined ? "unset" : typeof x === "string" ? x : JSON.stringify(x);
 
@@ -237,20 +220,24 @@ export interface StyleRow {
   to: string;
 }
 
-/** Metadata changes as plain-worded rows grouped by part. */
 export function styleGroups(
   before: Metadata | null,
   after: Metadata | null,
 ): Map<string, StyleRow[]> {
-  const catalog = catalogFor(after ?? before ?? {})
-    .sort((a, b) => b.path.length - a.path.length);
+  const catalog = catalogFor(after ?? before ?? {});
+  const deepestFirst = [...catalog].sort((a, b) =>
+    b.path.length - a.path.length
+  );
   const out = new Map<string, StyleRow[]>();
   for (const c of diffMetadata(before, after)) {
-    const e = catalog.find((e) => e.path.every((p, i) => c.path[i] === p));
+    const e = deepestFirst.find((e) => e.path.every((p, i) => c.path[i] === p));
     const [part, rest] = e
-      ? [partLabel(e), c.path.slice(e.path.length).filter((p) => p !== "css")]
+      ? [
+        entryName(e, catalog),
+        c.path.slice(e.path.length).filter((p) => p !== "css"),
+      ]
       : [
-        SECTION_LABELS[c.path[0]!] ?? cap(words(c.path[0] ?? "")),
+        SECTION_LABELS[c.path[0] ?? ""] ?? cap(words(c.path[0] ?? "")),
         c.path.slice(1),
       ];
     const last = rest.at(-1);
@@ -283,12 +270,14 @@ interface VersionDiff {
   styles: { edition: string | null; groups: Map<string, StyleRow[]> }[];
 }
 
-const RESTORES: {
+interface Restore {
   label: string;
   note: string;
   what: string;
   scope: (edition: string | null) => RestoreScope;
-}[] = [
+}
+
+const RESTORES: Restore[] = [
   {
     label: "Everything",
     note: "Text and every edition’s styles",
@@ -333,9 +322,14 @@ function summaryOf(
     case "before-restore":
       return "The book just before a restore. Restore this to undo it.";
   }
-  if (otherEditionOnly(v, edition) && v.changes.editions.length === 1) {
-    const ed = editionLabel(v.changes.editions[0]!, names);
-    return `Only the ${ed} changed. The manuscript is shared, so its text is untouched.`;
+  const only = v.changes.editions[0];
+  if (
+    only !== undefined && v.changes.editions.length === 1 &&
+    otherEditionOnly(v, edition)
+  ) {
+    return `Only the ${
+      editionLabel(only, names)
+    } changed. The manuscript is shared, so its text is untouched.`;
   }
   return "";
 }
@@ -350,24 +344,32 @@ function headingOf(
   const reason = reasonLabel(v);
   if (reason) return reason;
   const styles = v.changes.editions.length > 0;
+  const only = v.changes.editions[0];
   if (v.changes.text && styles) return "Text and styles changed";
   if (v.changes.text) return "Text changed";
-  if (otherEditionOnly(v, edition) && v.changes.editions.length === 1) {
-    return `${editionLabel(v.changes.editions[0]!, names)}: styles changed`;
+  if (
+    only !== undefined && v.changes.editions.length === 1 &&
+    otherEditionOnly(v, edition)
+  ) {
+    return `${editionLabel(only, names)}: styles changed`;
   }
   if (styles) return "Styles changed";
   if (v.changes.images) return "Images changed";
   return "No changes";
 }
 
+const message = (err: unknown) =>
+  err instanceof Error ? err.message : String(err);
+
 export function createHistoryView(opts: {
   list: HTMLElement;
   changes: HTMLElement;
-  backend: Backend;
+  backend: HistoryBackend & Pick<Backend, "editions">;
   book: string;
   edition: string | null;
   onSelect(v: Version | "now"): void;
-  onRestored(before: Version | null, label: string): void;
+  /** `scope` is the one restored, so an Undo can restore `before` the same way. */
+  onRestored(before: Version | null, label: string, scope: RestoreScope): void;
   onName(target: Version | "now"): void;
 }): {
   refresh(): Promise<void>;
@@ -382,7 +384,7 @@ export function createHistoryView(opts: {
   let filter: Filter = "edition";
   let selected: string = "now";
   let alive = true;
-  const open = new Set<string>(); // folds expanded, by their first id
+  const open = new Set<string>(); // expanded folds, by their first id
   const files = new Map<string, Promise<Record<string, string>>>();
   const diffs = new Map<string, Promise<VersionDiff>>();
   const parts = new Map<string, Map<string | null, string[]>>();
@@ -395,17 +397,16 @@ export function createHistoryView(opts: {
     }
     return p;
   };
-  const prevOf = (v: Version) => versions[versions.indexOf(v) + 1];
 
-  // The version against the one before it (all editions, not the filter's).
+  // Against the version before it in every edition, whatever the filter shows.
   const diffOf = (v: Version): Promise<VersionDiff> => {
     let p = diffs.get(v.id);
     if (p) return p;
     p = (async () => {
-      const prev = prevOf(v);
+      const prev = versions[versions.indexOf(v) + 1];
       const [after, before] = await Promise.all([
         filesOf(v.id),
-        prev ? filesOf(prev.id) : Promise.resolve({} as Record<string, string>),
+        prev ? filesOf(prev.id) : Promise.resolve<Record<string, string>>({}),
       ]);
       return {
         text: v.changes.text
@@ -428,11 +429,22 @@ export function createHistoryView(opts: {
     return p;
   };
 
+  const alert = (lead: string, err: unknown) => {
+    changes.querySelector(":scope > .banner")?.remove();
+    changes.prepend(
+      h(
+        "div",
+        { class: "banner err", role: "alert" },
+        h("strong", {}, lead),
+        message(err),
+      ),
+    );
+  };
+
   const rowButton = (
     id: string,
     time: string,
-    head: string,
-    detail: string,
+    label: { head: string; detail: string },
     reason: string,
   ) => {
     const b = h(
@@ -441,107 +453,86 @@ export function createHistoryView(opts: {
         type: "button",
         class: "h-row",
         "data-id": id,
-        "aria-pressed": String(id === selected),
+        "aria-current": id === selected ? "true" : undefined,
       },
-      h(
-        "span",
-        { class: "h-line" },
-        h("span", { class: "h-time" }, time),
-        h("span", { class: "h-head" }, head),
-      ),
-      h("span", { class: "h-detail" }, detail),
+      h("span", { class: "h-time" }, time),
+      h("span", { class: "h-head" }, label.head),
+      h("span", { class: "h-detail" }, label.detail),
     );
-    if (reason) b.append(h("span", { class: "h-reason" }, reason));
+    if (reason) b.append(h("i", { class: "h-reason" }, reason));
     b.onclick = () => {
       select(id);
-      const v = versions.find((x) => x.id === id);
-      opts.onSelect(v ?? "now");
+      opts.onSelect(versions.find((x) => x.id === id) ?? "now");
     };
     return b;
   };
 
   const versionRow = (v: Version) => {
-    const label = rowLabel(v, edition, { names, styleParts: parts.get(v.id) });
+    const label = () =>
+      rowLabel(v, edition, { names, styleParts: parts.get(v.id) });
     const b = rowButton(
       v.id,
       timeLabel(new Date(v.at)),
-      label.head,
-      label.detail,
+      label(),
       reasonLabel(v),
     );
-    // Part names need the files; fill them in once fetched.
-    // ponytail: two versionFiles calls per style row, cached; a per-version
-    // summary from the service if long histories feel slow.
+    // ponytail: two versionFiles calls per style row to name its parts, cached;
+    // a per-version summary from the service if long histories feel slow.
     if (v.changes.editions.length && !parts.has(v.id)) {
       diffOf(v).then((d) => {
         parts.set(
           v.id,
           new Map(d.styles.map((s) => [s.edition, [...s.groups.keys()]])),
         );
-        if (!alive || !b.isConnected) return;
-        const l = rowLabel(v, edition, { names, styleParts: parts.get(v.id) });
-        b.querySelector(".h-detail")!.textContent = l.detail;
+        const detail = b.querySelector(".h-detail");
+        if (alive && detail) detail.textContent = label().detail;
       }, () => {});
     }
     return b;
   };
 
   const drawList = () => {
-    const now = new Date();
-    const days = groupVersions(versions, now, edition, filter);
+    const days = groupVersions(versions, new Date(), edition, filter);
     if (days[0]?.label !== "Today") days.unshift({ label: "Today", items: [] });
-    const filterBtn = (f: Filter, label: string) => {
-      const b = h("button", {
-        type: "button",
-        class: "btn",
-        "aria-pressed": String(f === filter),
-      }, label);
-      b.onclick = () => {
-        filter = f;
-        const v = versions.find((x) => x.id === selected);
-        if (v && !visible(v, edition, filter)) select("now");
-        else drawList();
-      };
-      return b;
-    };
-    const body: Node[] = [
-      h(
-        "div",
-        {
-          class: "h-filter",
-          role: "group",
-          "aria-label": "Show versions from",
+    const body: Node[] = [];
+    if (names.size > 1) {
+      body.push(seg(
+        [
+          { value: "edition", label: "This edition" },
+          { value: "all", label: "All editions" },
+        ],
+        filter,
+        (f) => {
+          if (!f) return;
+          filter = f;
+          const v = versions.find((x) => x.id === selected);
+          if (v && !visible(v, edition, filter)) select("now");
+          else drawList();
         },
-        filterBtn("edition", "This edition"),
-        filterBtn("all", "All editions"),
-      ),
-    ];
+        "Show versions from",
+      ));
+    }
     days.forEach((day, i) => {
-      body.push(h("div", { class: "h-day" }, day.label));
+      body.push(h("div", { class: "nh" }, day.label));
       if (i === 0) {
-        body.push(
-          rowButton(
-            "now",
-            "Now",
-            "Current version",
-            "Everything saved so far",
-            "",
-          ),
-        );
+        body.push(rowButton("now", "Now", {
+          head: "Current version",
+          detail: "Everything saved so far",
+        }, ""));
       }
       for (const item of day.items) {
         if (!("fold" in item)) {
           body.push(versionRow(item));
           continue;
         }
-        const key = item.fold[0]!.id;
+        const key = item.fold[0]?.id ?? "";
         if (open.has(key) || item.fold.some((v) => v.id === selected)) {
           body.push(...item.fold.map(versionRow));
           continue;
         }
         const more = h("button", {
           type: "button",
-          class: "btn h-more",
+          class: "btn sm",
           "aria-expanded": "false",
         }, `▸ ${item.fold.length} more`);
         more.onclick = () => {
@@ -554,106 +545,107 @@ export function createHistoryView(opts: {
     list.replaceChildren(...body);
   };
 
-  let menuClose: (() => void) | null = null;
-  const closeMenu = () => menuClose?.();
+  async function restore(v: Version, r: Restore) {
+    const scope = r.scope(edition);
+    const label = `${r.what} from ${whenLabel(v, new Date())}`;
+    let before: Version | null;
+    try {
+      before = await backend.restoreVersion(book, v.id, scope);
+    } catch (err) {
+      if (alive) alert("Couldn’t restore. ", err);
+      return;
+    }
+    if (!alive) return;
+    opts.onRestored(before, label, scope);
+    selected = "now";
+    await refresh();
+  }
 
+  // A native popover, like the zoom menu: light dismiss, Esc and the
+  // trigger's expanded state come with it.
   const restoreMenu = (v: Version) => {
+    const menu = h("div", { class: "menu", role: "menu", popover: "" });
     const btn = h("button", {
       type: "button",
-      class: "btn h-restore",
+      class: "btn primary",
       "aria-haspopup": "menu",
-      "aria-expanded": "false",
     }, "Restore ▾");
-    const menu = h("div", { class: "h-menu choices", role: "menu" });
-    menu.hidden = true;
+    btn.popoverTargetElement = menu;
+    menu.addEventListener("beforetoggle", (e) => {
+      if ((e as ToggleEvent).newState !== "open") return;
+      const r = btn.getBoundingClientRect();
+      menu.style.top = `${r.bottom}px`;
+      menu.style.left = `${r.left}px`;
+    });
+    menu.addEventListener("toggle", (e) => {
+      if ((e as ToggleEvent).newState === "open") {
+        (menu.firstElementChild as HTMLElement | null)?.focus();
+      }
+    });
     menu.append(...RESTORES.map((r) => {
       const item = h(
         "button",
-        { type: "button", class: "choice", role: "menuitem" },
+        { type: "button", role: "menuitem" },
         r.label,
-        h("small", {}, r.note),
+        h("span", { class: "d" }, r.note),
       );
-      item.onclick = async () => {
-        closeMenu();
-        const label = `${r.what} from ${whenLabel(v, new Date())}`;
-        const before = await backend.restoreVersion(
-          book,
-          v.id,
-          r.scope(edition),
-        );
-        if (!alive) return;
-        opts.onRestored(before, label);
-        selected = "now";
-        await refresh();
+      item.onclick = () => {
+        menu.hidePopover();
+        void restore(v, r);
       };
       return item;
     }));
-    const onDoc = (e: Event) => {
-      if (
-        e instanceof KeyboardEvent
-          ? e.key === "Escape"
-          : !wrap.contains(e.target as Node)
-      ) {
-        closeMenu();
-      }
-    };
-    menuClose = () => {
-      menu.hidden = true;
-      btn.setAttribute("aria-expanded", "false");
-      document.removeEventListener("pointerdown", onDoc);
-      document.removeEventListener("keydown", onDoc);
-      menuClose = null;
-    };
-    btn.onclick = () => {
-      if (!menu.hidden) return closeMenu();
-      menu.hidden = false;
-      btn.setAttribute("aria-expanded", "true");
-      document.addEventListener("pointerdown", onDoc);
-      document.addEventListener("keydown", onDoc);
-      (menu.firstElementChild as HTMLElement | null)?.focus();
-    };
-    const wrap = h("div", { class: "h-menu-wrap" }, btn, menu);
-    return wrap;
+    return [btn, menu];
   };
+
+  const heading = (crumb: Node[], title: string, actions: Node[]) =>
+    h(
+      "div",
+      { class: "phead" },
+      h("div", { class: "crumb" }, ...crumb),
+      h("h2", {}, title),
+      h("div", { class: "h-actions" }, ...actions),
+    );
 
   let drawToken = 0;
   const drawChanges = () => {
-    closeMenu();
     const token = ++drawToken;
     const v = versions.find((x) => x.id === selected);
-    const nameBtn = h(
-      "button",
-      { type: "button", class: "btn h-name" },
-      "Name…",
-    );
+    const nameBtn = h("button", { type: "button", class: "btn" }, "Name…");
     nameBtn.onclick = () => opts.onName(v ?? "now");
     if (!v) {
       changes.replaceChildren(
-        h("h2", {}, "Current version"),
-        h("div", { class: "h-actions" }, nameBtn),
+        heading([document.createTextNode("Now")], "Current version", [
+          nameBtn,
+        ]),
         h(
-          "p",
-          { class: "h-summary" },
-          "This is the book right now. Name it to keep a checkpoint, like “Sent to printer”.",
+          "div",
+          { class: "pbody" },
+          h(
+            "p",
+            { class: "h-summary" },
+            "This is the book right now. Name it to keep a checkpoint, like “Sent to printer”.",
+          ),
         ),
       );
       return;
     }
-    const now = new Date();
     const reason = reasonLabel(v);
-    const when = h("div", { class: "h-when" }, whenLabel(v, now));
-    if (reason) when.append(" · ", h("i", {}, reason));
+    const crumb: Node[] = [document.createTextNode(whenLabel(v, new Date()))];
+    if (reason) crumb.push(document.createTextNode(" · "), h("i", {}, reason));
     const summary = summaryOf(v, edition, names);
-    const body = h("div", { class: "h-diffs" });
+    const body = h("div", { class: "pbody" });
+    if (summary) body.append(h("p", { class: "h-summary" }, summary));
     changes.replaceChildren(
-      h("h2", {}, headingOf(v, edition, names)),
-      when,
-      h("div", { class: "h-actions" }, restoreMenu(v), nameBtn),
-      ...(summary ? [h("p", { class: "h-summary" }, summary)] : []),
+      heading(crumb, headingOf(v, edition, names), [
+        ...restoreMenu(v),
+        nameBtn,
+      ]),
       body,
     );
     if (!v.changes.text && !v.changes.editions.length) return;
-    body.append(h("p", { class: "h-note" }, "Loading changes…"));
+    const loading = h("p", { class: "h-note" }, "Loading changes…");
+    body.append(loading);
     diffOf(v).then((d) => {
       if (token !== drawToken || !alive) return;
       const out: Node[] = [];
@@ -662,21 +654,18 @@ export function createHistoryView(opts: {
           ? ""
           : `${editionLabel(s.edition, names)} · `;
         for (const [part, rows] of s.groups) {
-          out.push(h(
-            "section",
-            { class: "h-group" },
-            h("div", { class: "h-part" }, prefix + part),
-            ...rows.map((r) =>
-              h(
-                "div",
-                { class: "h-style" },
-                h("span", { class: "h-prop" }, r.prop),
+          out.push(section(
+            prefix + part,
+            "",
+            rows.map((r) =>
+              row(
+                r.prop,
                 h(
                   "span",
-                  {},
+                  { class: "h-to" },
                   h("span", { class: "h-from" }, r.from),
                   " → ",
-                  h("b", {}, r.to),
+                  r.to,
                 ),
               )
             ),
@@ -684,11 +673,10 @@ export function createHistoryView(opts: {
         }
       }
       for (const c of d.text) {
-        out.push(h(
-          "section",
-          { class: "h-group" },
-          h("div", { class: "h-part" }, chaptersLabel([c.chapter])),
-          ...c.paras.map((p) =>
+        out.push(section(
+          chaptersLabel([c.chapter]),
+          "",
+          c.paras.map((p) =>
             h(
               "p",
               { class: "h-para" },
@@ -702,26 +690,17 @@ export function createHistoryView(opts: {
         ));
       }
       if (d.text.length) {
-        out.push(
-          h(
-            "p",
-            { class: "h-note" },
-            "Select any text to copy it. Nothing changes until you restore.",
-          ),
-        );
+        out.push(h(
+          "p",
+          { class: "h-note" },
+          "Select any text to copy it. Nothing changes until you restore.",
+        ));
       }
-      body.replaceChildren(...out);
+      loading.replaceWith(...out);
     }, (err) => {
       if (token !== drawToken || !alive) return;
-      body.replaceChildren(
-        h(
-          "p",
-          { class: "h-note h-err" },
-          `Couldn’t load the changes: ${
-            err instanceof Error ? err.message : err
-          }`,
-        ),
-      );
+      loading.remove();
+      alert("Couldn’t load the changes. ", err);
     });
   };
 
@@ -747,7 +726,6 @@ export function createHistoryView(opts: {
     select,
     destroy() {
       alive = false;
-      closeMenu();
       list.replaceChildren();
       changes.replaceChildren();
       list.classList.remove("history-list");

@@ -104,7 +104,7 @@ any surface.
 - Focus rings and focused field borders.
 - The selected thing: nav rows, segments, the recommended choice, a pressed
   toggle button, the current menu item.
-- Edited-value dots.
+- Edited-value dots, and the underline under inserted text in History (§6.14).
 - The outline on the pages around what is being styled or where the cursor is.
 - Switches that are on.
 - At most one primary action per screen.
@@ -493,7 +493,8 @@ Group label (§3) then rows: padding `--s-2 --s-4`, `--r` + corner, `--s-1`
 apart, a right-aligned count in `--fs-2xs` `--muted`. Hover wash; the current
 row takes the red wash. Nesting indents by `--s-4` per level. No separators. In
 `web/app.css`: `:is(#tree, #style-nav) .nh` is the label, `#style-nav .ni` and
-`#tree .tree-node` the rows; the switcher's `.book-row` follows the same rules.
+`#tree .tree-node` the rows; the switcher's `.book-row` and History's version
+list (§6.14) follow the same rules.
 
 ### 6.7 Choice list
 
@@ -570,9 +571,10 @@ at the right.
 - **Banner:** a strip across the top of the pane it concerns, never a toast. A
   hairline below (the bar above it draws the one above), padding `--s-3 --s-5`,
   `--fs-sm` message, small ghost buttons (`.btn.sm`) right. A warning banner
-  adds `--warn-wash` and a warn icon. Changed on disk (`#disk-banner`) is plain
-  with its lead in `--err`, because saving has stopped; the spec-version banner
-  (`#spec-banner`) is the warning.
+  adds `--warn-wash` and a warn icon. `.banner` is the class for any new one;
+  `.banner.err` sets its lead (`strong`) in `--err`. Changed on disk
+  (`#disk-banner`) is plain with its lead in `--err`, because saving has
+  stopped; the spec-version banner (`#spec-banner`) is the warning.
 - **Status** (planned): icon + bold lead word + plain sentence in the status
   color: "Can't save: the folder is read-only." Never color alone. Today's lines
   are the sentence in the status color (`.sw-err`, `#image-note.warn`).
@@ -663,6 +665,44 @@ marks' colors (§2.4).
 - **Type:** label column 4rem; the value over where it comes from: "Style ›
   Chapter title" when this element sets it, else the value `--muted` with "from
   Body" or "Book default".
+
+### 6.14 History
+
+The takeover's left and middle columns (`web/src/history-view.ts`); the pages
+take the right.
+
+- **Version list** (`.history-list`): reads like the style nav (§6.6). At the
+  top, "This edition | All editions" as a `seg` (§6.2), only when the book has
+  more than one edition. Each day is a group label (`.nh`: Today, Yesterday,
+  "Tue 20 Oct"), then rows (`.h-row`): a 4rem column holding the time in
+  `--fs-xs` `--muted` tabular figures, and beside it what changed over the parts
+  it touched in `--fs-xs` `--muted`, then the reason (Before import…) in the
+  same, italic. "Now · Current version" heads Today. The selected row takes the
+  red wash (`aria-current`), its muted lines in the wash's ink at 60%. A folded
+  run of thinned versions is a small ghost "▸ N more" lined up with the rows'
+  text.
+- **Changes column** (`.history-changes`): the panel's view heading (§6.5): the
+  crumb is when it was taken and the reason, the heading in Fell is what changed
+  or the version's name, then the actions: Restore ▾ (the one primary) and Name…
+  (ghost). Below, a `--muted` summary up to 36em, then a section (§6.5) per
+  changed part. Style changes are rows: the property's plain name, then the old
+  value in `--muted`, →, the new in `--fg`. Text changes are a section per
+  chapter, paragraphs in Alegreya at the writing's size and leading, selectable:
+  inserted text keeps its ink with a `--ring` `--acc` underline (an edit mark,
+  like the set dot); deleted text is struck through in `--muted`. Never a tint
+  behind either, and never `--err`: a delete is not an error. A `--fs-xs`
+  `--muted` note ends the text.
+- **Restore menu:** a §6.9 `.menu` popover under Restore ▾: Everything, Text
+  only, Styles only, This edition's styles, each with its note in the right
+  column (`.d`). No checks: nothing in it is current.
+- **Failure:** a restore or a diff that fails puts a `.banner.err` (§6.10)
+  across the top of the changes column, `role="alert"`: the lead ("Couldn't
+  restore.") in `--err`, then the reason. Never a toast.
+- **Preview banner:** while a version is selected, a plain banner across the top
+  of the pages pane: "Previewing Today, 3:42 pm. Nothing changes until you
+  restore." After a restore the same strip says "Restored the styles from
+  Yesterday, 9:10 am" with a small ghost Undo (`.btn.sm`) at the right, which
+  restores the before-restore version with the same scope.
 
 ## 7. Layout and expanded views
 
