@@ -1,6 +1,7 @@
 // web/src/history-browser_test.ts — History in the real app: name a version
-// from the toolbar's menu, preview it on the pages, Esc back to now, then
-// restore its styles only and undo that from the pages' banner.
+// from the toolbar's menu; pick it and what it changed replaces the editor
+// side while its pages show; Back to editing returns to the same place;
+// restore its styles (this edition's file only) and undo that from the banner.
 import { assert, assertEquals } from "@std/assert";
 import type { Page } from "playwright";
 import { appTest, book, openApp } from "../../testing/app.ts";
@@ -15,36 +16,41 @@ const ratio = (page: Page) =>
     });
 
 appTest({
-  name: "history: preview a styles version, Esc, restore its styles, undo",
+  name: "history: pick a styles version, back to editing, restore, undo",
   async fn() {
     const b = await book({ metadata: (m) => m.page!.size = "4in 8in" });
     const size = async () =>
       JSON.parse((await b.read("metadata.json"))!).page.size as string;
     const manuscript = await b.read("manuscript.md");
-    const page = await openApp(b);
-    const menuButton = page.getByRole("button", {
+    const page = await openApp(b, "&mode=style&view=fonts");
+    const historyBtn = page.getByRole("button", {
       name: "History",
       exact: true,
     });
     const banner = page.locator("#version-banner");
+    const changes = page.locator("#history-changes");
     const historyParam = () => new URL(page.url()).searchParams.get("history");
 
-    await menuButton.click();
+    await historyBtn.click();
     await page.getByRole("button", { name: "Name this version…" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Tall");
     await page.getByRole("button", { name: "Save name" }).click();
     await page.locator("#name-dlg").waitFor({ state: "hidden" });
 
-    // The book now is square.
+    // Now the book is square, and the pocket edition changed too.
     let n = await laidOut(page);
     const meta = JSON.parse((await b.read("metadata.json"))!);
     meta.page.size = "6in 6in";
     await b.write("metadata.json", JSON.stringify(meta));
+    const pocket = JSON.parse((await b.read("editions/pocket.json"))!);
+    pocket.language = "fr";
+    await b.write("editions/pocket.json", JSON.stringify(pocket));
+    const pocketNow = await b.read("editions/pocket.json");
     n = await laidOut(page, n);
     assertEquals(await ratio(page), 1);
 
     const pickTall = async () => {
-      await menuButton.click();
+      await historyBtn.click();
       const tall = page.locator("#history-list .h-row", { hasText: "Tall" });
       const id = await tall.getAttribute("data-id");
       await tall.click();
@@ -54,20 +60,27 @@ appTest({
     await pickTall();
     assertEquals(await ratio(page), 0.5);
     assert((await banner.innerText()).startsWith("Previewing Tall"));
-    assertEquals(await size(), "6in 6in", "previewing writes nothing");
+    await changes.getByRole("heading", { name: "Tall" }).waitFor();
+    assert(!await page.locator("#config-overlay").isVisible());
+    assert(await page.locator('#modes [data-mode="write"]').isDisabled());
     assert(await page.locator("#undo").isDisabled());
-    assert(await page.locator("#editor").isVisible(), "Write stays");
+    assertEquals(await size(), "6in 6in", "previewing writes nothing");
 
-    await page.keyboard.press("Escape");
-    await until(() => historyParam() === null, "back to now");
+    await changes.getByRole("button", { name: "← Back to editing" }).click();
+    await until(() => historyParam() === null, "editing again");
+    const url = new URL(page.url()).searchParams;
+    assertEquals([url.get("mode"), url.get("view")], ["style", "fonts"]);
+    assert(await page.locator("#config-overlay").isVisible());
+    assertEquals(await historyBtn.getAttribute("aria-pressed"), "false");
     n = await laidOut(page, n);
     assertEquals(await ratio(page), 1);
 
     await pickTall();
-    await banner.getByRole("button", { name: "Restore ▾" }).click();
+    await changes.getByRole("button", { name: "Restore ▾" }).click();
     await page.getByRole("menuitem", { name: /^Styles only/ }).click();
     await until(async () => await size() === "4in 8in", "the styles restored");
     assertEquals(await b.read("manuscript.md"), manuscript);
+    assertEquals(await b.read("editions/pocket.json"), pocketNow);
     await until(() => historyParam() === null, "the preview ended");
 
     await banner.getByRole("button", { name: "Undo" }).click();

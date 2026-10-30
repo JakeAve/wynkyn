@@ -606,9 +606,11 @@ async function goToStyle(key: string): Promise<void> {
 function installHistory(): void {
   addEventListener("popstate", () => {
     const p = new URLSearchParams(location.search);
+    // Into or out of a preview: the place under it never moved (spec §7.10).
+    const at = p.get("history");
+    if (versions && at !== versions.at()) return void versions.follow(at);
     const m = MODES.find((m) => m === p.get("mode")) ?? "write";
     view = p.get("view");
-    void versions?.follow(p.get("history"));
     setMode(m);
     if (m !== "write" && view) configPanel?.open(view);
     const line = lineFromHash(location.hash);
@@ -997,7 +999,10 @@ async function main(): Promise<void> {
     panes: installPanes({ mode: () => mode }),
     textView,
     inspect,
-    history: { escape: () => versions?.escape() ?? false },
+    history: {
+      open: () => versions?.at() != null,
+      escape: () => versions?.escape() ?? false,
+    },
     editor: () => editor,
     preview: $("preview"),
     createManuscript,

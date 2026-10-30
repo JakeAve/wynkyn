@@ -34,7 +34,7 @@ export interface Version {
   };
 }
 
-export type RestoreScope = "all" | "text" | "styles" | {
+export type RestoreScope = "all" | "text" | {
   edition: string | null;
 };
 
@@ -286,8 +286,6 @@ export async function restore(
     ? all
     : scope === "text"
     ? ["manuscript.md"]
-    : scope === "styles"
-    ? all.filter(isStyle)
     : [
       scope.edition === null
         ? "metadata.json"

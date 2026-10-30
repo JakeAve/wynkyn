@@ -27,7 +27,8 @@ export interface ShortcutDeps {
   panes: Panes;
   textView: TextView;
   inspect: { escape(): boolean };
-  history: { escape(): boolean };
+  /** `open`: a version is previewed, and nothing may edit the book. */
+  history: { open(): boolean; escape(): boolean };
   editor(): EditorView;
   /** The pages pane, `#preview`. */
   preview: HTMLElement;
@@ -62,7 +63,7 @@ function table(d: ShortcutDeps): Command[] {
   // a filter) keeps it: only the editor or no field at all.
   const writing = () => {
     const a = document.activeElement;
-    return write() && (!(a instanceof HTMLElement) ||
+    return write() && !d.history.open() && (!(a instanceof HTMLElement) ||
       d.editor().contentDOM.contains(a) ||
       !(a.matches("input, textarea, select") || a.isContentEditable));
   };

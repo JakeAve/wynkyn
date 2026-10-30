@@ -124,7 +124,7 @@ Deno.test("diffMetadata: added and removed leaves, null sides", () => {
       { path: ["name"], from: undefined, to: "Pocket" },
     ],
   );
-  assertEquals(diffMetadata(null, { language: "es" }), [
+  assertEquals(diffMetadata(null, { spec: "0.6", language: "es" }), [
     { path: ["language"], from: undefined, to: "es" },
   ]);
   assertEquals(diffMetadata(null, null), []);

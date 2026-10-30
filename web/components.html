@@ -744,9 +744,9 @@
 
       <section class="part">
         <h2>History <span>§6.14</span></h2>
-        <p>The toolbar's menu of versions, read like the style nav; every
-          change one made, read like the panel; the pages pane's banner says
-          what is on the pages.</p>
+        <p>The toolbar's menu of versions, read like the style nav; what a
+          previewed one changed, read like the panel, in place of the editor's
+          columns; the pages pane's banner says what is on the pages.</p>
         <div class="board">
           <div id="history-menu" class="menu"
             style="position: static; display: flex; flex-direction: column">
@@ -769,42 +769,44 @@
               <button type="button" class="btn sm">▸ 4 more</button>
             </nav>
             <div class="h-foot"><button type="button">Name this
-              version…</button><button type="button"
-              id="history-changes-open">See every change</button></div>
+                version…</button></div>
           </div>
-          <div class="history-changes surface" style="width: 26rem">
-            <div class="phead">
-              <div class="crumb">Today, 3:42 pm</div>
-              <h2>Text and styles changed</h2>
-              <div class="h-actions"><button type="button"
+          <div class="surface"
+            style="display: flex; flex-direction: column; width: 26rem; padding: 0">
+            <div class="pane-head"><button type="button" class="btn sm">←
+                Back to editing</button></div>
+            <div class="history-changes">
+              <div class="phead">
+                <div class="crumb">Today, 3:42 pm</div>
+                <h2>Text and styles changed</h2>
+                <div class="h-actions"><button type="button"
                   class="btn primary">Restore ▾</button><button type="button"
-                  class="btn">Name…</button></div>
-            </div>
-            <div class="pbody">
-              <section class="sec">
-                <div class="sech">
-                  <h3>Page setup</h3>
-                </div>
-                <div class="row"><span class="lbl">Size</span><div
+                  class="btn">Name this version…</button></div>
+              </div>
+              <div class="pbody">
+                <section class="sec">
+                  <div class="sech">
+                    <h3>Page setup</h3>
+                  </div>
+                  <div class="row"><span class="lbl">Size</span><div
                     class="ctl"><span class="h-to"><span class="h-from">5.5in
                         8.5in</span> → 4.25in 7in</span></div></div>
-              </section>
-              <section class="sec">
-                <div class="sech">
-                  <h3>Chapter one</h3>
-                </div>
-                <p class="h-para">It was a bright cold day in April, and
+                </section>
+                <section class="sec">
+                  <div class="sech">
+                    <h3>Chapter one</h3>
+                  </div>
+                  <p class="h-para">It was a bright cold day in April, and
                   <del>the</del><ins>THE</ins> clocks were striking
                   thirteen.</p>
-              </section>
+                </section>
+              </div>
             </div>
           </div>
           <div class="surface" style="width: 100%; padding: 0">
             <div id="version-banner" class="banner"><span
                 class="msg">Previewing Text · Styles, Today, 3:42 pm. Nothing
-                changes until you restore.</span><button type="button"
-                class="btn sm">Back to now</button><button type="button"
-                class="btn sm primary">Restore ▾</button></div>
+                changes until you restore.</span></div>
             <div class="banner"><span class="msg">Restored the styles from
                 Today, 3:42 pm.</span><button type="button"
                 class="btn sm">Undo</button><button type="button"

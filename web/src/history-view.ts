@@ -1,5 +1,5 @@
-// History's versions (the toolbar menu's rows) and what one changed (the
-// middle column, on request);
+// History's versions (the toolbar menu's rows) and what one changed (in place
+// of the editor's columns while it is previewed);
 // design-language §6.14.
 import type { Metadata } from "../../metadata/types.ts";
 import {
@@ -209,7 +209,6 @@ const SECTION_LABELS: Record<string, string> = {
   ebook: "E-book",
   language: "Language",
   name: "Edition name",
-  spec: "Spec version",
 };
 
 const show = (x: unknown) =>
@@ -291,16 +290,12 @@ const RESTORES: Restore[] = [
     what: "the text",
     scope: () => "text",
   },
+  // An edition is a whole file, inheriting nothing, so the edition in hand is
+  // the one whose styles come back.
   {
     label: "Styles only",
     note: "Keep the current text",
     what: "the styles",
-    scope: () => "styles",
-  },
-  {
-    label: "This edition’s styles",
-    note: "Other editions stay as they are",
-    what: "this edition’s styles",
     scope: (edition) => ({ edition }),
   },
 ];
@@ -310,7 +305,7 @@ function summaryOf(
   edition: string | null,
   names: Map<string | null, string>,
 ): string {
-  if (v.name !== undefined) return "Named versions are kept forever.";
+  if (v.name !== undefined) return "Named versions are kept indefinitely.";
   switch (v.reason) {
     case "open":
       return "Something changed the book’s files while the app was closed: an agent, the CLI or another editor.";
@@ -374,6 +369,11 @@ function star(): SVGSVGElement {
   return svg;
 }
 
+export const nameLabel = (v: Version | "now") =>
+  v !== "now" && v.name !== undefined
+    ? "Rename version…"
+    : "Name this version…";
+
 const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
@@ -390,8 +390,6 @@ export function createHistoryView(opts: {
 }): {
   refresh(): Promise<void>;
   select(id: string | "now"): void;
-  /** Restore ▾ and its menu for the selected version, small for a banner. */
-  restoreControl(): Node[];
   destroy(): void;
 } {
   const { list, changes, backend, book, edition } = opts;
@@ -584,11 +582,11 @@ export function createHistoryView(opts: {
 
   // A native popover, like the zoom menu: light dismiss, Esc and the
   // trigger's expanded state come with it.
-  const restoreMenu = (v: Version, small = false) => {
+  const restoreMenu = (v: Version) => {
     const menu = h("div", { class: "menu", role: "menu", popover: "" });
     const btn = h("button", {
       type: "button",
-      class: small ? "btn sm primary" : "btn primary",
+      class: "btn primary",
       "aria-haspopup": "menu",
     }, "Restore ▾");
     btn.popoverTargetElement = menu;
@@ -599,13 +597,9 @@ export function createHistoryView(opts: {
       menu.style.left = `${r.left}px`;
     });
     menu.addEventListener("toggle", (e) => {
-      if ((e as ToggleEvent).newState !== "open") return;
-      // Under a button at the window's right edge it opens leftward.
-      const r = btn.getBoundingClientRect();
-      if (r.left + menu.offsetWidth > innerWidth) {
-        menu.style.left = `${r.right - menu.offsetWidth}px`;
+      if ((e as ToggleEvent).newState === "open") {
+        (menu.firstElementChild as HTMLElement | null)?.focus();
       }
-      (menu.firstElementChild as HTMLElement | null)?.focus();
     });
     menu.append(...RESTORES.map((r) => {
       const item = h(
@@ -636,7 +630,11 @@ export function createHistoryView(opts: {
   const drawChanges = () => {
     const token = ++drawToken;
     const v = versions.find((x) => x.id === selected);
-    const nameBtn = h("button", { type: "button", class: "btn" }, "Name…");
+    const nameBtn = h(
+      "button",
+      { type: "button", class: "btn" },
+      nameLabel(v ?? "now"),
+    );
     nameBtn.onclick = () => opts.onName(v ?? "now");
     if (!v) {
       changes.replaceChildren(
@@ -714,13 +712,6 @@ export function createHistoryView(opts: {
           ),
         ));
       }
-      if (d.text.length) {
-        out.push(h(
-          "p",
-          { class: "h-note" },
-          "Select any text to copy it. Nothing changes until you restore.",
-        ));
-      }
       loading.replaceWith(...out);
     }, (err) => {
       if (token !== drawToken || !alive) return;
@@ -749,10 +740,6 @@ export function createHistoryView(opts: {
   return {
     refresh,
     select,
-    restoreControl() {
-      const v = versions.find((x) => x.id === selected);
-      return v ? restoreMenu(v, true) : [];
-    },
     destroy() {
       alive = false;
       list.replaceChildren();

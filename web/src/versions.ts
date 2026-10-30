@@ -1,11 +1,16 @@
 // web/src/versions.ts — History (design-language §6.14, spec §7.10): the
-// toolbar's menu of versions, a version previewed on the pages
-// (`?history=<id>`) while the editor's own columns stay, and every change it
-// made in the middle column on request. Pushed builds are held meanwhile.
+// toolbar's menu of versions; a picked version (`?history=<id>`) on the pages,
+// with what it changed in place of the editor's columns, so nothing can be
+// edited meanwhile. Pushed builds are held while it shows.
 import type { EditorView } from "@codemirror/view";
 import type { RestoreScope, Version } from "../../server/history.ts";
 import type { Backend } from "./backend.ts";
-import { createHistoryView, rowLabel, whenLabel } from "./history-view.ts";
+import {
+  createHistoryView,
+  nameLabel,
+  rowLabel,
+  whenLabel,
+} from "./history-view.ts";
 import type { UpdateMessage } from "./preview.ts";
 import type { Sync } from "./sync.ts";
 import { h } from "./panel-controls.ts";
@@ -41,9 +46,6 @@ export interface Versions {
   snapshot(reason: "close" | "before-reload"): void;
 }
 
-// What hides the pages or the middle column, set aside during a preview.
-const HIDING = ["pages-hidden", "expand-writing", "expand-pages"];
-
 export function installVersions(d: VersionsDeps): Versions {
   const root = document.documentElement;
   const panes = $("panes");
@@ -63,18 +65,25 @@ export function installVersions(d: VersionsDeps): Versions {
       String(at !== null || menu.matches(":popover-open")),
     );
 
-  // Kept as panes.ts last set them (a mode change re-applies them), and put
-  // back when the preview ends.
+  // The panes' hidden and expanded classes wait aside during a preview, kept
+  // as panes.ts last set them, and come back with editing.
   let paneClasses = "";
   const setAside = () => {
     paneClasses = panes.className;
-    panes.classList.remove(...HIDING);
+    panes.className = "";
   };
   new MutationObserver(() => {
-    if (at !== null && HIDING.some((c) => panes.classList.contains(c))) {
-      setAside();
-    }
+    if (at !== null && panes.className) setAside();
   }).observe(panes, { attributeFilter: ["class"] });
+  // Nothing is edited under a preview: the modes and the Contents toggle
+  // hold, and the middle gutter would resize a column that isn't showing.
+  const lock = (on: boolean) => {
+    for (const b of $("modes").querySelectorAll("button")) b.disabled = on;
+    ($("tree-toggle") as HTMLButtonElement).disabled = on;
+    $("gutter-editor").inert = on;
+  };
+  // Hidden, a list loses its scroll position (CodeMirror keeps its own).
+  let scrolls: [Element, number][] = [];
 
   // A version's pages are to look at: no click to the source or a style.
   for (const type of ["click", "mousemove", "dragover", "drop"]) {
@@ -142,8 +151,14 @@ export function installVersions(d: VersionsDeps): Versions {
   function start(v: Version) {
     if (at === null) {
       d.themes.end();
+      scrolls = [
+        ...document.querySelectorAll(
+          "#tree, #style-nav, #config-overlay .pbody",
+        ),
+      ].map((el) => [el, el.scrollTop]);
       setAside();
-      root.dataset.history = "preview";
+      lock(true);
+      root.dataset.history = "";
     }
     at = v.id;
     view.select(v.id);
@@ -160,8 +175,6 @@ export function installVersions(d: VersionsDeps): Versions {
         `Previewing ${what}, ${whenLabel(v, new Date())}. ` +
         "Nothing changes until you restore.",
       ],
-      false,
-      [button("Back to now", backToNow), ...view.restoreControl()],
     );
     try {
       const built = await d.backend().buildVersion(d.book(), v.id, d.edition());
@@ -174,9 +187,6 @@ export function installVersions(d: VersionsDeps): Versions {
         say(
           [h("strong", {}, "Couldn’t show this version. "), brief(err)],
           true,
-          [
-            button("Back to now", backToNow),
-          ],
         );
       }
     }
@@ -188,6 +198,8 @@ export function installVersions(d: VersionsDeps): Versions {
     back = false;
     delete root.dataset.history;
     panes.className = paneClasses;
+    lock(false);
+    for (const [el, top] of scrolls) el.scrollTop = top;
     view.select("now");
     if (!restoredShown) banner.hidden = true;
     bookPages();
@@ -229,6 +241,10 @@ export function installVersions(d: VersionsDeps): Versions {
     const input = $("name-input") as HTMLInputElement;
     const err = $("name-err");
     input.value = target === "now" ? "" : target.name ?? "";
+    $("name-dlg-title").textContent =
+      target !== "now" && target.name !== undefined
+        ? "Rename this version"
+        : "Name this version";
     err.textContent = "";
     $("name-cancel").onclick = () => dlg.close();
     ($("name-form") as HTMLFormElement).onsubmit = async (e) => {
@@ -258,6 +274,9 @@ export function installVersions(d: VersionsDeps): Versions {
     const r = btn.getBoundingClientRect();
     menu.style.top = `${r.bottom}px`;
     menu.style.right = `${innerWidth - r.right}px`;
+    $("history-name").textContent = nameLabel(
+      known.find((v) => v.id === at) ?? "now",
+    );
     view.refresh().then(
       () => menu.querySelector<HTMLElement>('[aria-current="true"]')?.focus(),
       (err) =>
@@ -273,29 +292,13 @@ export function installVersions(d: VersionsDeps): Versions {
     menu.hidePopover();
     askName(known.find((v) => v.id === at) ?? "now");
   };
-  // With nothing previewed, the newest version listed.
-  $("history-changes-open").onclick = () => {
-    const id = at ??
-      menu.querySelector<HTMLElement>('.h-row:not([data-id="now"])')?.dataset
-        .id;
-    const v = known.find((x) => x.id === id);
-    if (!v) return;
-    menu.hidePopover();
-    if (at === null) {
-      d.pushPlace(() => start(v));
-      back = true;
-    }
-    root.dataset.history = "changes";
-  };
-  $("history-changes-close").onclick = () => root.dataset.history = "preview";
+  $("history-changes-close").onclick = backToNow;
   btn.disabled = false;
 
   return {
     at: () => at,
     escape() {
-      if (root.dataset.history === "changes") {
-        root.dataset.history = "preview";
-      } else if (at !== null) backToNow();
+      if (at !== null) backToNow();
       else if (!banner.hidden) banner.hidden = true;
       else return false;
       return true;

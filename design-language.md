@@ -673,21 +673,15 @@ marks' colors (§2.4).
 
 ### 6.14 History
 
-A menu under the toolbar's History button, a version previewed on the pages
-(`web/src/versions.ts`), and on request every change it made in the middle
-column (`web/src/history-view.ts`). The editor's own columns stay as they are.
+A menu under the toolbar's History button (`web/src/versions.ts`); a picked
+version on the pages, with what it changed (`web/src/history-view.ts`) in place
+of the editor's left and middle columns, so nothing can be edited meanwhile.
 
 - **Menu** (`#history-menu`): a §6.9 `.menu` popover right-aligned under the
   button, 21.25rem wide, no taller than the window; the version list, then a
-  footer ruled by a hairline: "Name this version…" at left and "See every
-  change" at right in `--fg` with a dotted underline (no red: a link is not one
-  of §2.2's places); with nothing previewed it opens the newest version. Picking
-  a row closes the menu; picking Now goes back to now.
-- **Preview:** the pages show the picked version even where the mode shows
-  sheets, and are only to look at; anything hiding the pages (Write's hidden
-  pages, an expanded pane) waits aside until the preview ends. Inspect and the
-  expand buttons go meanwhile, and Undo and Redo are disabled. Esc closes the
-  menu, then every change, then goes back to now.
+  footer ruled by a hairline holding "Name this version…" ("Rename version…"
+  when the previewed version has a name). Picking a row closes the menu and
+  previews it; picking Now goes back to editing.
 - **Version list** (`.history-list`, in the menu): reads like the style nav
   (§6.6). At the top, "This edition | All editions" as a `seg` (§6.2), only when
   the book has more than one edition. Each day is a group label (`.nh`: Today,
@@ -696,40 +690,46 @@ column (`web/src/history-view.ts`). The editor's own columns stay as they are.
   parts it touched in `--fs-xs` `--muted`, then the reason (Before import…) in
   the same, italic. A named version shows its name after a small outline star
   (`.h-star`, the icons' 16-unit grid and 1.4 stroke). "Now · Current version"
-  heads Today. The selected row takes the red wash (`aria-current`), its muted
+  heads Today. The previewed row takes the red wash (`aria-current`), its muted
   lines in the wash's ink at 60%. A folded run of thinned versions is a small
   ghost "▸ N more" lined up with the rows' text.
-- **Every change** (`#history-changes`, from "See every change"): takes the
-  middle column, under a pane header (§6.11) holding "← Back to editing" (small
-  ghost); its body (`.history-changes`) is the panel's view heading (§6.5): the
+- **Preview:** what changed (`#history-changes`) takes the left and middle
+  columns as one, whatever the mode; the pages show the version even where the
+  mode shows sheets, and are only to look at; anything hiding the pages (Write's
+  hidden pages, an expanded pane) waits aside. The mode switch and the Contents
+  toggle are disabled, as are Undo and Redo; Inspect and the expand buttons go.
+  "← Back to editing" (a small ghost in the column's pane header, §6.11) or Esc,
+  once the menu is closed, ends it: the mode, view, panes and scroll come back
+  as they were, and the History button leaves the wash.
+- **What changed** (`.history-changes`): the panel's view heading (§6.5): the
   crumb is when it was taken and the reason, the heading in Fell is what changed
-  or the version's name, then the actions: Restore ▾ (the one primary) and Name…
-  (ghost). Below, a `--muted` summary up to 36em, then a section (§6.5) per
-  changed part. Style changes are rows: the property's plain name, then the old
-  value in `--muted`, →, the new in `--fg`. Text changes are a section per
-  chapter, paragraphs in Alegreya at the writing's size and leading, selectable:
-  inserted text keeps its ink with a `--ring` `--acc` underline (an edit mark,
-  like the set dot); deleted text is struck through in `--muted`. Never a tint
-  behind either, and never `--err`: a delete is not an error. A `--fs-xs`
-  `--muted` note ends the text.
+  or the version's name, then the actions: Restore ▾ (the one primary) and "Name
+  this version…" or "Rename version…" (ghost). Below, a `--muted` summary up to
+  36em, then a section (§6.5) per changed part. Style changes are rows: the
+  property's plain name, then the old value in `--muted`, →, the new in `--fg`;
+  the file's `spec` version is housekeeping, never listed. Text changes are a
+  section per chapter, paragraphs in Alegreya at the writing's size and leading,
+  selectable: inserted text keeps its ink with a `--ring` `--acc` underline (an
+  edit mark, like the set dot); deleted text is struck through in `--muted`.
+  Never a tint behind either, and never `--err`: a delete is not an error.
 - **Restore menu:** a §6.9 `.menu` popover under Restore ▾: Everything, Text
-  only, Styles only, This edition's styles, each with its note in the right
+  only, Styles only (the edition being edited), each with its note in the right
   column (`.d`). No checks: nothing in it is current.
 - **Failure:** a restore or a diff that fails puts a `.banner.err` (§6.10)
   across the top of the changes column, `role="alert"`: the lead ("Couldn't
   restore.") in `--err`, then the reason. Never a toast.
-- **Preview banner** (`#version-banner`): while a version is previewed, a plain
-  banner across the top of the pages pane, under its header: "Previewing Sent to
-  printer, Today, 3:42 pm. Nothing changes until you restore." (the name, else
-  what changed), then at the right a small ghost "Back to now" and the small
-  primary Restore ▾. After a restore the preview ends and the same strip says
-  "Restored the styles from Yesterday, 9:10 am." with a small ghost Undo
-  (`.btn.sm`), which restores the before-restore version with the same scope,
-  then "Restore undone."; a small ✕ (or Esc) dismisses it. A version that can't
-  be built, or an Undo that fails, turns it into a `.banner.err` there.
-- **Name…** opens a §6.8 dialog (`#name-dlg`): "Name this version", a Name
-  field, a `--muted` hint that named versions are kept for good, Cancel and the
-  primary Save name.
+- **Pages banner** (`#version-banner`): while a version is previewed, a plain
+  banner across the top of the pages pane, under its header, the message alone:
+  "Previewing Sent to printer, Today, 3:42 pm. Nothing changes until you
+  restore." (the name, else what changed). After a restore the preview ends and
+  the same strip says "Restored the styles from Yesterday, 9:10 am." with a
+  small ghost Undo (`.btn.sm`), which restores the before-restore version with
+  the same scope, then "Restore undone."; a small ✕ (or Esc) dismisses it. A
+  version that can't be built, or an Undo that fails, turns it into a
+  `.banner.err` there.
+- **Name** opens a §6.8 dialog (`#name-dlg`): "Name this version" or "Rename
+  this version", a Name field, a `--muted` hint that named versions are kept
+  indefinitely, Cancel and the primary Save name.
 
 ## 7. Layout and expanded views
 

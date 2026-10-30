@@ -4025,17 +4025,11 @@ body.typing #editor .pane-head {
   padding: var(--s-2);
 }
 #history-menu .h-foot {
-  display: flex;
-  justify-content: space-between;
   padding: var(--s-2);
   border-top: 1px solid var(--line);
 }
 #history-menu :is(.h-foot button, .history-list .btn) {
   width: auto;
-}
-#history-changes-open {
-  text-decoration: underline dotted;
-  text-underline-offset: 0.1875rem;
 }
 .history-list .h-star {
   display: inline;
@@ -4053,13 +4047,16 @@ body.typing #editor .pane-head {
   background: var(--acc-wash);
   color: var(--acc-ink);
 }
-/* A version on the pages (:root[data-history]): the editor's columns stay;
-   the pages show even where the mode shows sheets, and are only to look at.
-   With "changes", every change takes the middle column. */
-:root:not([data-history="changes"]) #history-changes,
-:root[data-history="changes"] :is(#editor, #config-overlay, #writer-foot > *),
-:root[data-history] :is(#sheet-view, #inspect, #inspect-overlay, #inspect-drawer, .pane-head .expand) {
+/* A version on the pages (:root[data-history]): what it changed takes the
+   editor's two columns as one, whatever the mode; the pages show even where
+   the mode shows sheets, and are only to look at. */
+:root:not([data-history]) #history-changes,
+:root[data-history] :is(#tree, #style-nav, #gutter-tree, #editor, #config-overlay, #sheet-view, #inspect, #inspect-overlay, #inspect-drawer, .pane-head .expand, #foot-tree, #foot-gutter-tree, #writer-foot > *) {
   display: none;
+}
+:root[data-history] :is(#panes, #footer) {
+  grid-template-columns: calc(var(--w-tree) + 0.3125rem + var(--w-editor))
+    0.3125rem minmax(0, 1fr);
 }
 :root[data-history] #preview {
   position: relative;

@@ -180,6 +180,9 @@ export function diffMetadata(
       out.push({ path, from: a, to: b });
     }
   };
-  walk(before ?? {}, after ?? {}, []);
+  // `spec` is the file's format version (spec §3), not a style.
+  const { spec: _a, ...a } = before ?? {};
+  const { spec: _b, ...b } = after ?? {};
+  walk(a, b, []);
   return out;
 }

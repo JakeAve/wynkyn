@@ -888,7 +888,7 @@ export async function libraryId(store: BookStore): Promise<string> {
 const IMAGE_HOLD_MS = 1200;
 
 function checkScope(scope: unknown): asserts scope is RestoreScope {
-  if (scope === "all" || scope === "text" || scope === "styles") return;
+  if (scope === "all" || scope === "text") return;
   if (
     typeof scope === "object" && scope !== null && !Array.isArray(scope) &&
     Object.keys(scope).length === 1 && "edition" in scope
