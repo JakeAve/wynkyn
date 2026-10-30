@@ -418,6 +418,7 @@ const NUMERALS: Array<{ value: NumberingStyle; label: string; aria: string }> =
     { label: "I", value: "roman-upper", aria: "I, II, III" },
     { label: "i", value: "roman-lower", aria: "i, ii, iii" },
     { label: "One", value: "words", aria: "One, Two, Three" },
+    { label: "First", value: "ordinal", aria: "First, Second, Third" },
   ];
 
 function onePage(ctx: PanelContext, v: View, type: string) {

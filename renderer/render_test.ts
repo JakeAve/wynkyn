@@ -513,6 +513,13 @@ Deno.test("formatNumber words: spelled out to ninety-nine, digits after (§4.7)"
   assertEquals(formatNumber(21, "words"), "Twenty-One");
   assertEquals(formatNumber(99, "words"), "Ninety-Nine");
   assertEquals(formatNumber(100, "words"), "100");
+  assertEquals(formatNumber(1, "ordinal"), "First");
+  assertEquals(formatNumber(12, "ordinal"), "Twelfth");
+  assertEquals(formatNumber(13, "ordinal"), "Thirteenth");
+  assertEquals(formatNumber(20, "ordinal"), "Twentieth");
+  assertEquals(formatNumber(23, "ordinal"), "Twenty-Third");
+  assertEquals(formatNumber(99, "ordinal"), "Ninety-Ninth");
+  assertEquals(formatNumber(100, "ordinal"), "100");
 });
 
 const HEADINGS_BOOK = [

@@ -82,12 +82,13 @@ export const NUMBERING_STYLES: NumberingStyle[] = [
   "alpha-upper",
   "alpha-lower",
   "words",
+  "ordinal",
   "none",
 ];
-// Page counters are CSS counters; "words" has no CSS equivalent (§4.7).
+// Page counters are CSS counters; spelled numbers have no CSS equivalent (§4.7).
 export const PAGE_NUMBERING_STYLES: NumberingStyle[] = NUMBERING_STYLES.filter((
   s,
-) => s !== "words");
+) => s !== "words" && s !== "ordinal");
 
 export const RUNNING_CONTENT_CHOICES = [
   "book-title",

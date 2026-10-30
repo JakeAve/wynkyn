@@ -112,6 +112,27 @@
     return ones ? `${tens}-${ones}` : tens;
   }
 
+  const IRREGULAR = /** @type {Record<string, string>} */ ({
+    One: "First",
+    Two: "Second",
+    Three: "Third",
+    Five: "Fifth",
+    Eight: "Eighth",
+    Nine: "Ninth",
+    Twelve: "Twelfth",
+  });
+
+  // No Intl API spells ordinals (PluralRules "ordinal" only picks 1st/2nd's
+  // suffix), so only the last word of the cardinal changes.
+  /** @param {number} n */
+  function ordinal(n) {
+    const w = words(n);
+    if (!/[a-z]$/.test(w)) return w;
+    return w.replace(/[A-Za-z]+$/, (last) =>
+      IRREGULAR[last] ??
+        (last.endsWith("y") ? `${last.slice(0, -1)}ieth` : `${last}th`));
+  }
+
   /**
    * The one number formatter: page folios here, and chapter and part numbers
    * through renderer/render.ts.
@@ -131,6 +152,8 @@
         return alpha(n).toUpperCase();
       case "words":
         return words(n);
+      case "ordinal":
+        return ordinal(n);
       case "none":
         return "";
       default:
@@ -139,12 +162,15 @@
   }
 
   /**
-   * "words" is arabic for pages (§4.7).
+   * "words" and "ordinal" are arabic for pages (§4.7).
    * @param {number} n
    * @param {NumberingStyle} style
    */
   const formatFolio = (n, style) =>
-    formatNumber(n, style === "words" ? "arabic" : style);
+    formatNumber(
+      n,
+      style === "words" || style === "ordinal" ? "arabic" : style,
+    );
 
   // Running titles carry over through display pages, which show none, so the
   // carried value can't be read back off the previous entry.
