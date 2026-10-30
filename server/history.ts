@@ -252,6 +252,7 @@ export function versionStore(
     create: readOnly,
     rename: readOnly,
     remove: readOnly,
+    watch: () => () => {},
   };
 }
 

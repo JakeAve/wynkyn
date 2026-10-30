@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
-import { type BookStore, toBytes } from "./store.ts";
+import type { BookStore } from "./store.ts";
+import { memoryStore } from "../testing/memory-store.ts";
 import {
   listVersions,
   restore,
@@ -9,37 +10,6 @@ import {
   type Version,
   versionStore,
 } from "./history.ts";
-
-function memoryStore(): BookStore {
-  const files = new Map<string, Uint8Array<ArrayBuffer>>();
-  const store: BookStore = {
-    list: () => Promise.resolve([]),
-    read: (p) => Promise.resolve(files.get(p) ?? null),
-    readText: async (p) => {
-      const b = await store.read(p);
-      return b ? new TextDecoder().decode(b) : null;
-    },
-    exists: (p) => Promise.resolve(files.has(p)),
-    write: (p, d) => {
-      files.set(p, new Uint8Array(toBytes(d)));
-      return Promise.resolve();
-    },
-    create: async (p, d) => {
-      if (files.has(p)) return false;
-      await store.write(p, d);
-      return true;
-    },
-    rename: () => Promise.reject(new Error("unused")),
-    remove: (p) => Promise.resolve(files.delete(p)),
-    listDir: (dir) =>
-      Promise.resolve(
-        [...files.keys()].filter((k) =>
-          k.startsWith(dir + "/") && !k.slice(dir.length + 1).includes("/")
-        ).map((k) => k.slice(dir.length + 1)).sort(),
-      ),
-  };
-  return store;
-}
 
 async function book() {
   const s = memoryStore();
