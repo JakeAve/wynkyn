@@ -342,15 +342,3 @@ export async function prune(
     if (!live.has(hash)) await store.remove(objectPath(book, hash));
   }
 }
-
-/** Whether an idle or max-gap snapshot is due (times in ms). */
-export function snapshotDue(
-  lastSnapshotAt: number | null,
-  firstEditSince: number | null,
-  lastEditAt: number,
-  now: number,
-): boolean {
-  if (now - lastEditAt >= IDLE_MS) return true;
-  return firstEditSince !== null &&
-    now - Math.max(firstEditSince, lastSnapshotAt ?? 0) >= MAX_GAP_MS;
-}

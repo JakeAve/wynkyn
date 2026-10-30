@@ -3,7 +3,9 @@
 // a server (the hosted site) the app runs the same BookService itself, over
 // the author's own folder (fs-store.ts). app.ts never knows which.
 import type { BuildResult, ServerMessage } from "../../server/pipeline.ts";
+import type { Version } from "../../server/history.ts";
 import type { Metadata } from "../../metadata/types.ts";
+import type { HistoryBackend } from "./history-view.ts";
 import type { EditionInfo } from "../../server/editions.ts";
 import {
   BookService,
@@ -18,7 +20,7 @@ import { handleStore } from "./fs-store.ts";
 import type { ImageFile } from "../../server/images.ts";
 import type { EpubResult } from "./style-catalog.ts";
 
-export interface Backend {
+export interface Backend extends HistoryBackend {
   readonly kind: "http" | "local";
   /** The folder the service runs over; only in-page (the app zips from it). */
   readonly store?: BookStore;
@@ -69,6 +71,17 @@ export interface Backend {
   deleteEdition(book: string, edition: string): Promise<void>;
   /** The e-book, as a link to open or save; `error` when it failed. */
   exportEpub(book: string, edition: string | null): Promise<EpubResult>;
+  /** A build of the book as the version had it, painted like a live update. */
+  buildVersion(
+    book: string,
+    id: string,
+    edition: string | null,
+  ): Promise<BuildResult>;
+  takeSnapshot(
+    book: string,
+    reason: "close" | "before-reload",
+    overrides?: Record<string, string>,
+  ): Promise<Version | null>;
   /** Builds now and on every change; `onClose` when the server goes away. */
   subscribe(
     book: string,
@@ -97,6 +110,8 @@ const dictionaryUrl = (book: string) =>
   `/api/books/${encodeURIComponent(book)}/dictionary`;
 const imagesUrl = (book: string) =>
   `/api/books/${encodeURIComponent(book)}/images`;
+const historyUrl = (book: string) =>
+  `/api/books/${encodeURIComponent(book)}/history`;
 const query = (book: string, edition: string | null) =>
   `?book=${encodeURIComponent(book)}` +
   (edition === null ? "" : `&edition=${encodeURIComponent(edition)}`);
@@ -242,6 +257,22 @@ export function httpBackend(): Backend {
         },
       };
     },
+    history: (book) => call(historyUrl(book)),
+    versionFiles: (book, id) =>
+      call(`${historyUrl(book)}/${encodeURIComponent(id)}`),
+    buildVersion: (book, id, edition) =>
+      call(
+        `${historyUrl(book)}/${encodeURIComponent(id)}/build${
+          edition === null ? "" : `?edition=${encodeURIComponent(edition)}`
+        }`,
+      ),
+    restoreVersion: (book, id, scope) =>
+      post(`${historyUrl(book)}/${encodeURIComponent(id)}/restore`, { scope }),
+    nameVersion: (book, id, name) =>
+      post(`${historyUrl(book)}/name`, { id, name }),
+    // send(): keepalive so it outlives a closing tab, within its 64 KB budget.
+    takeSnapshot: async (book, reason, overrides) =>
+      answer(await send(`${historyUrl(book)}/snapshot`, { reason, overrides })),
     subscribe(book, edition, clientId, onMessage, onClose) {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const ws = new WebSocket(
@@ -352,6 +383,15 @@ export async function localBackend(
       );
       return { documents, file: { name: "book.epub", url } };
     },
+    history: (book) => service.history(book),
+    versionFiles: (book, id) => service.versionFiles(book, id),
+    buildVersion: (book, id, edition) =>
+      service.buildVersion(book, id, edition),
+    restoreVersion: (book, id, scope) =>
+      service.restoreVersion(book, id, scope),
+    nameVersion: (book, id, name) => service.nameVersion(book, id, name),
+    takeSnapshot: (book, reason, overrides) =>
+      service.takeSnapshot(book, reason, overrides),
     subscribe: (book, edition, clientId, onMessage) =>
       service.subscribe(book, edition, clientId, onMessage),
   };

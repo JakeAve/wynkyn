@@ -286,6 +286,12 @@ Deno.test("http: GET manuscript returns source; saves read through", async () =>
       ),
     );
 
+    const history = `${base}/api/books/demo-book/history`;
+    const named = await (await fetch(`${history}/name`, {
+      method: "POST",
+      body: JSON.stringify({ id: null, name: "before" }),
+    })).json();
+
     const post = await fetch(`${base}/api/books/demo-book/manuscript`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -299,6 +305,26 @@ Deno.test("http: GET manuscript returns source; saves read through", async () =>
       .json();
     assertEquals(after.text, "{chapter: two}\nNew text.");
     assertEquals(after.version, await contentVersion(after.text));
+
+    const listed = (await (await fetch(history)).json()).length;
+    const restored = await fetch(`${history}/${named.id}/restore`, {
+      method: "POST",
+      body: JSON.stringify({ scope: "text" }),
+    });
+    assert((await restored.json()).id);
+    assertEquals(
+      (await (await fetch(`${base}/api/books/demo-book/manuscript`)).json())
+        .text,
+      text,
+    );
+    assertEquals((await (await fetch(history)).json()).length, listed + 1);
+
+    const badScope = await fetch(`${history}/${named.id}/restore`, {
+      method: "POST",
+      body: JSON.stringify({ scope: "nope" }),
+    });
+    assertEquals(badScope.status, 400);
+    await badScope.body?.cancel();
 
     const missing = await fetch(`${base}/api/books/no-such/manuscript`);
     assertEquals(missing.status, 404);

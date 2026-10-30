@@ -5,7 +5,6 @@ import {
   listVersions,
   restore,
   snapshot,
-  snapshotDue,
   thin,
   type Version,
   versionStore,
@@ -99,12 +98,4 @@ Deno.test("thin keeps recent, one per bucket, and every named version", () => {
     "2026-10-01T08-00-00.000Z",
     "2026-10-20T09-10-00.000Z",
   ]);
-});
-
-Deno.test("snapshotDue: idle after 3 min, max gap after 20", () => {
-  const m = 60_000;
-  assertEquals(snapshotDue(null, 0, 2 * m, 4 * m), false);
-  assertEquals(snapshotDue(null, 0, 2 * m, 5 * m), true);
-  assertEquals(snapshotDue(0, 1 * m, 20 * m, 21 * m), true);
-  assertEquals(snapshotDue(10 * m, 1 * m, 29 * m, 29.5 * m), false);
 });
