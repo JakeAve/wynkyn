@@ -74,6 +74,7 @@ import { chooseBook } from "./choose-book.ts";
 import { $, brief, store } from "./dom.ts";
 import { h } from "./panel-controls.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
+import "../../renderer/ornaments.js"; // registers the corner ornament handler
 import "../../renderer/folios.js"; // registers the page-map handler
 // folios.js is a classic script (toHtml inlines it), so its helpers hang off
 // this global rather than being exported.
@@ -489,6 +490,11 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
         exportEpub,
+        images: {
+          list: () => backend.images(book),
+          url: (name) => backend.imageUrl(book, name),
+          add: (file, slug) => backend.addImage(book, file, slug),
+        },
         toStyle,
         tryTheme: (slug) => void themes.try(slug),
         applyTheme: (slug) => themes.askApply(slug),
@@ -1100,6 +1106,10 @@ async function main(): Promise<void> {
   installPreviewClicks(previewEl, styleCatalog, {
     mode: () => mode,
     style: pickStyle,
+    ornament: (part) => {
+      setMode("style");
+      void ensureConfigPanel().then((panel) => panel?.open(part));
+    },
     source: (line) => scrollEditorToLine(editor, line),
     addImage: (slug, file) => fillPlaceholder(images, slug, file),
     inspecting: inspect.active,

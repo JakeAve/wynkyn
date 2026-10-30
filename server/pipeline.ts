@@ -203,6 +203,7 @@ export async function buildBook(
     elements: m.elements,
     is: m.is,
     onePage: m["one-page"],
+    ornaments: m.ornaments,
   };
   return {
     book,

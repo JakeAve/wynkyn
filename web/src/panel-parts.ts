@@ -8,6 +8,7 @@ import type {
   StructureNumbering,
 } from "../../metadata/types.ts";
 import { matterType } from "../../parser/types.ts";
+import { ornamentsBlock } from "./panel-ornaments.ts";
 import { caseOf, caseProps, emphasisOf, parseLength } from "./config-data.ts";
 import { buildFurniture } from "./panel-furniture.ts";
 import {
@@ -35,6 +36,7 @@ import {
   getProps,
   inheritedFont,
   inheritedValue,
+  ornamentType,
   type PanelContext,
   setCount,
   type StyleEntry,
@@ -216,7 +218,12 @@ function detail(ctx: PanelContext, part: BookPart): Node[] {
     return block(ctx, v, entry, labelOf(entry, part), controlled, rows);
   });
   recount();
+  const ornaments = ornamentType(part.id)
+    ? ornamentsBlock(ctx, v, ornamentType(part.id)!)
+    : null;
+  if (ornaments) resets.push(ornaments.reset);
   return [
+    ...(ornaments ? [ornaments.el] : []),
     ...(page && !entries.some((e) => e.key === part.id)
       ? [section("Whole page", part.id, [page.row])]
       : []),

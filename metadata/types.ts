@@ -136,6 +136,21 @@ export interface OpenersConfig {
   "book-title"?: boolean; // the book's title above the first chapter's number
 }
 
+export type OrnamentCorner =
+  | "top-left"
+  | "top-right"
+  | "bottom-right"
+  | "bottom-left";
+
+// Art set in a page's corners, measured from the trim (spec §4.17).
+export interface OrnamentPlacement {
+  image: string; // slug in images/
+  "drawn-for"?: OrnamentCorner; // the corner the art faces as drawn; default top-left
+  corners: OrnamentCorner[];
+  size?: string; // the square each sits in; default 25mm
+  inset?: string; // from the page's edges; default 6mm
+}
+
 export interface Metadata {
   spec?: string; // the spec version this file complies with (§4.2); missing = pre-versioned
   name?: string; // the default edition's display name (§4.1); named editions use their slug
@@ -152,6 +167,7 @@ export interface Metadata {
   toc?: TocConfig;
   openers?: OpenersConfig;
   "one-page"?: Record<string, boolean>; // §4.16
+  ornaments?: Record<string, OrnamentPlacement[]>; // §4.17, by matter type, "part" or "chapter"
   ebook?: EbookConfig;
 }
 

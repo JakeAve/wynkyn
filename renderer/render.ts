@@ -20,6 +20,7 @@ import type {
   NotesConfig,
   Numbering,
   NumberingStyle,
+  OrnamentCorner,
   StructureNumbering,
   TocConfig,
 } from "../metadata/types.ts";
@@ -34,6 +35,7 @@ export interface RenderOptions {
   elements?: Metadata["elements"]; // read for breaks only, by renderSegments
   is?: Metadata["is"]; // ditto: an {is} block's forced break-after
   onePage?: Metadata["one-page"];
+  ornaments?: Metadata["ornaments"];
 }
 
 // folios.js is a classic script (toHtml inlines it), so its formatter hangs
@@ -53,6 +55,36 @@ export function escapeHtml(s: string): string {
     "&gt;",
   )
     .replaceAll('"', "&quot;");
+}
+
+const CORNERS: OrnamentCorner[] = [
+  "top-left",
+  "top-right",
+  "bottom-right",
+  "bottom-left",
+];
+
+// For renderer/ornaments.js, which sets them on the section's first page: a
+// section knows its page type, and only the laid-out page knows its box.
+export function ornamentsAttr(type: string, opts: RenderOptions): string {
+  const items = (opts.ornaments?.[type] ?? []).flatMap((o) => {
+    const src = opts.images?.[o.image];
+    if (!src) return [];
+    const from = CORNERS.indexOf(o["drawn-for"] ?? "top-left");
+    return o.corners.map((corner) => ({
+      type,
+      slug: o.image,
+      src,
+      corner,
+      from: CORNERS[from],
+      turns: (CORNERS.indexOf(corner) - from + 4) % 4,
+      size: o.size ?? "25mm",
+      inset: o.inset ?? "6mm",
+    }));
+  });
+  return items.length
+    ? ` data-ornaments="${escapeHtml(JSON.stringify(items))}"`
+    : "";
 }
 
 // Every block carries its manuscript line so a click in the preview can find
@@ -443,7 +475,7 @@ function renderChapter(
     const inner = renderChildren(ch.children, ctx, opts);
     return `<section class="chapter${zoneClass(zone)}${
       start ? " body-start" : ""
-    }" id="${escapeHtml(ch.slug)}"${dl(ch)}>${
+    }" id="${escapeHtml(ch.slug)}"${dl(ch)}${ornamentsAttr("chapter", opts)}>${
       n === 1 && opts.bookTitle
         ? `<p class="book-title">${escapeHtml(opts.bookTitle)}</p>`
         : ""
@@ -486,7 +518,9 @@ function renderMatter(
   const onePage = opts.onePage?.[m.type] ?? display;
   const open = `<section class="matter matter-${escapeHtml(m.type)}${
     display ? " matter-display" : ""
-  }${zoneClass(zone)}" id="${id}"${dl(m)}${onePage ? " data-one-page" : ""}>`;
+  }${zoneClass(zone)}" id="${id}"${dl(m)}${onePage ? " data-one-page" : ""}${
+    ornamentsAttr(m.type, opts)
+  }>`;
   if (m.type === "toc") {
     const onlyTitles = m.children.every((c) =>
       c.kind === "component" && c.name === "title"
@@ -613,7 +647,7 @@ function partOpener(
   );
   return `<section class="part${zoneClass(zone)}${
     start ? " body-start" : ""
-  }" id="${escapeHtml(part.slug)}"${dl(part)}>${
+  }" id="${escapeHtml(part.slug)}"${dl(part)}${ornamentsAttr("part", opts)}>${
     numberDiv(partNo, opts.numbering?.parts)
   }${head}`;
 }

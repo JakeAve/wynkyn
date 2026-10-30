@@ -6,6 +6,7 @@ import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
 import {
   matchKey,
   matchPath,
+  ornamentPart,
   type PreviewLink,
   type StyleEntry,
   type StyleStep,
@@ -1028,6 +1029,7 @@ export function installPreviewClicks(
   on: {
     mode(): Mode;
     style(key: string, path: StyleStep[]): void;
+    ornament?(part: string): void;
     source(line: number): void;
     addImage?(slug: string, file?: File): void;
     inspecting(): boolean;
@@ -1057,6 +1059,12 @@ export function installPreviewClicks(
     if (on.inspecting()) return;
     const target = e.target as Element | null;
     const mode = on.mode();
+    const ornament = target?.closest<HTMLElement>(".page-ornament");
+    if (ornament && on.ornament) {
+      e.preventDefault();
+      on.ornament(ornamentPart(ornament.dataset.type ?? ""));
+      return;
+    }
     const hit = resolveStyle(target, container, catalog());
     if (hit && (hit.furniture || mode === "style")) {
       e.preventDefault();

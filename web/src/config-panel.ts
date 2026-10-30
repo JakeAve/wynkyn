@@ -17,6 +17,7 @@ import {
   entryName,
   type EpubResult,
   type PanelContext,
+  type PanelImages,
   type PreviewLink,
   type Route,
   routeFor,
@@ -47,6 +48,7 @@ export interface ConfigPanelOptions {
   preview: PreviewLink;
   isNames(): string[]; // `{is}` classes the manuscript uses
   exportEpub(): Promise<EpubResult>;
+  images: PanelImages;
   toStyle(view: string): void; // leave Publish for a Style view, Back returns
   view?: string | null; // the nav row to open on (navId); unknown = default
   onRoute?(id: string): void; // the nav row changed (for the URL)
@@ -307,6 +309,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       go,
       preview: opts.preview,
       sheetView: opts.sheetView,
+      images: opts.images,
       exportEpub: () => opts.exportEpub(),
       toStyle: (view, from) => {
         current = `publish:${from}`; // Back lands on the section left from

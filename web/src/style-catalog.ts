@@ -2,6 +2,7 @@
 // numbers + running heads + `is:` classes), how a preview click resolves to
 // one, and how entries group into the style panel's book parts and tabs.
 // Pure: the DOM adapter lives in preview.ts, so this is unit-tested in Deno.
+import type { ImageFile } from "../../server/images.ts";
 import {
   folioAreas,
   selectorFor,
@@ -298,8 +299,36 @@ export interface PanelContext {
   onPages(redraw: () => void): void; // called after each preview render
   tryTheme(slug: string | null): void; // the Theme view: preview a theme; null discards
   applyTheme(slug: string): void; // the Theme view's Apply…: the app asks how
+  images: PanelImages;
   themeTried: string | null; // the theme being previewed, if any
 }
+
+// The book's images/, for a view that offers them (the corner ornaments).
+export interface PanelImages {
+  list(): Promise<ImageFile[]>;
+  url(name: string): Promise<string>;
+  add(file: File, slug?: string): Promise<ImageFile>;
+}
+
+// The Style views with corner ornaments, and the page type each sets them on
+// (metadata `ornaments`, spec §4.17).
+const ORNAMENT_PARTS: Record<string, string> = {
+  "half-title": "half-title",
+  "title-page": "title-page",
+  copyright: "copyright",
+  dedication: "dedication",
+  contents: "toc",
+  part: "part",
+  chapter: "chapter",
+  appendix: "appendix",
+  colophon: "colophon",
+};
+
+export const ornamentType = (part: string): string | undefined =>
+  ORNAMENT_PARTS[part];
+
+export const ornamentPart = (type: string): string =>
+  Object.keys(ORNAMENT_PARTS).find((p) => ORNAMENT_PARTS[p] === type) ?? type;
 
 export interface EpubResult {
   error?: string; // the export failed outright

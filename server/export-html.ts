@@ -13,6 +13,9 @@ export const PAGED_JS = await Deno.readTextFile(
 const PLATES_JS = await Deno.readTextFile(
   new URL("../renderer/plates.js", import.meta.url),
 );
+const ORNAMENTS_JS = await Deno.readTextFile(
+  new URL("../renderer/ornaments.js", import.meta.url),
+);
 const FOLIOS_JS = await Deno.readTextFile(
   new URL("../renderer/folios.js", import.meta.url),
 );
@@ -130,6 +133,7 @@ const BOOK_SEED = ${json(opts.seed ?? {})};
 const BOOK_SEGMENTS = ${json(opts.whole ? null : b.segments)};</script>
 <script>${PAGED_JS}</script>
 <script>${PLATES_JS}</script>
+<script>${ORNAMENTS_JS}</script>
 <script>${FOLIOS_JS}</script>
 <script>${DRIVER_JS}</script>
 </head><body>${b.html}</body></html>`;

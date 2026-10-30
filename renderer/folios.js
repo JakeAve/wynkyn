@@ -638,6 +638,17 @@
         warn(`${slug} prints at ${dpi} dpi (300 looks sharp)`);
       }
     }
+    for (
+      const el of /** @type {NodeListOf<HTMLImageElement>} */ (
+        page.querySelectorAll(".page-ornament img")
+      )
+    ) {
+      const dpi = printDpi(el);
+      if (dpi !== null && dpi < 200) {
+        const slug = /** @type {HTMLElement} */ (el.parentElement).dataset.slug;
+        warn(`${slug} prints at ${dpi} dpi (300 looks sharp)`);
+      }
+    }
     return problems;
   }
 
@@ -782,6 +793,9 @@
       area.querySelector(first)?.setAttribute("data-break-before", mark);
     }
     was.replaceWith(area);
+    // Corner ornaments sit on the page box, outside the area (ornaments.js).
+    for (const o of live.querySelectorAll(".page-ornament")) o.remove();
+    area.parentElement?.append(...laid.querySelectorAll(".page-ornament"));
   }
 
   /** @param {Element} page @param {number} n @returns {PageProblem[]} */
