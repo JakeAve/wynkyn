@@ -606,15 +606,24 @@ async function goToStyle(key: string): Promise<void> {
 function installHistory(): void {
   addEventListener("popstate", () => {
     const p = new URLSearchParams(location.search);
-    // Into or out of a preview: the place under it never moved (spec §7.10).
     const at = p.get("history");
-    if (versions && at !== versions.at()) return void versions.follow(at);
+    const step = versions !== undefined && at !== versions.at();
+    // Out of a preview first, so the place below it is editable again.
+    if (step && at === null) void versions?.follow(null);
     const m = MODES.find((m) => m === p.get("mode")) ?? "write";
-    view = p.get("view");
-    setMode(m);
-    if (m !== "write" && view) configPanel?.open(view);
+    const v = p.get("view");
     const line = lineFromHash(location.hash);
-    if (m === "write" && line !== null) scrollEditorToLine(editor, line);
+    // A step into or out of a preview reapplies only what differs, so the
+    // place it returns to keeps its scroll (spec §7.10).
+    if (!step || m !== mode || v !== view) {
+      view = v;
+      setMode(m);
+      if (m !== "write" && view) configPanel?.open(view);
+    }
+    if (m === "write" && line !== null && (!step || line !== cursorLine)) {
+      scrollEditorToLine(editor, line);
+    }
+    if (step && at !== null) void versions?.follow(at);
   });
 }
 

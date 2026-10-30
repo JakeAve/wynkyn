@@ -270,35 +270,50 @@ interface VersionDiff {
   styles: { edition: string | null; groups: Map<string, StyleRow[]> }[];
 }
 
-interface Restore {
+export interface RestoreChoice {
   label: string;
   note: string;
+  /** What the banner says came back. */
   what: string;
-  scope: (edition: string | null) => RestoreScope;
+  scope: RestoreScope;
+  disabled: boolean;
 }
 
-const RESTORES: Restore[] = [
-  {
-    label: "Everything",
-    note: "Text and every edition’s styles",
-    what: "everything",
-    scope: () => "all",
-  },
-  {
-    label: "Text only",
-    note: "Keep the current styles",
-    what: "the text",
-    scope: () => "text",
-  },
+/** `editionName`: how the edition being edited is called ("Standard"). */
+export function restoreChoices(
+  v: Version,
+  edition: string | null,
+  editionName: string,
+): RestoreChoice[] {
   // An edition is a whole file, inheriting nothing, so the edition in hand is
-  // the one whose styles come back.
-  {
-    label: "Styles only",
-    note: "Keep the current text",
-    what: "the styles",
-    scope: (edition) => ({ edition }),
-  },
-];
+  // the one whose styles come back; a version made before it has none.
+  const has = metaPath(edition) in v.files;
+  return [
+    {
+      label: "Everything",
+      note: "Text and every edition’s styles",
+      what: "everything",
+      scope: "all",
+      disabled: false,
+    },
+    {
+      label: "Text only",
+      note: "Keep the current styles",
+      what: "the text",
+      scope: "text",
+      disabled: false,
+    },
+    {
+      label: "Styles only",
+      note: has
+        ? `${editionName}’s styles; the text stays`
+        : `${editionName} didn’t exist yet`,
+      what: `${editionName}’s styles`,
+      scope: { edition },
+      disabled: !has,
+    },
+  ];
+}
 
 function summaryOf(
   v: Version,
@@ -390,7 +405,6 @@ export function createHistoryView(opts: {
 }): {
   refresh(): Promise<void>;
   select(id: string | "now"): void;
-  destroy(): void;
 } {
   const { list, changes, backend, book, edition } = opts;
   list.classList.add("history-list");
@@ -399,7 +413,6 @@ export function createHistoryView(opts: {
   let names = new Map<string | null, string>();
   let filter: Filter = "edition";
   let selected: string = "now";
-  let alive = true;
   const open = new Set<string>(); // expanded folds, by their first id
   const files = new Map<string, Promise<Record<string, string>>>();
   const diffs = new Map<string, Promise<VersionDiff>>();
@@ -504,7 +517,7 @@ export function createHistoryView(opts: {
           new Map(d.styles.map((s) => [s.edition, [...s.groups.keys()]])),
         );
         const detail = b.querySelector(".h-detail");
-        if (alive && detail) detail.textContent = label().detail;
+        if (detail) detail.textContent = label().detail;
       }, () => {});
     }
     return b;
@@ -564,18 +577,16 @@ export function createHistoryView(opts: {
     list.replaceChildren(...body);
   };
 
-  async function restore(v: Version, r: Restore) {
-    const scope = r.scope(edition);
+  async function restore(v: Version, r: RestoreChoice) {
     const label = `${r.what} from ${whenLabel(v, new Date())}`;
     let before: Version | null;
     try {
-      before = await backend.restoreVersion(book, v.id, scope);
+      before = await backend.restoreVersion(book, v.id, r.scope);
     } catch (err) {
-      if (alive) alert("Couldn’t restore. ", err);
+      alert("Couldn’t restore. ", err);
       return;
     }
-    if (!alive) return;
-    opts.onRestored(before, label, scope);
+    opts.onRestored(before, label, r.scope);
     selected = "now";
     await refresh();
   }
@@ -601,19 +612,26 @@ export function createHistoryView(opts: {
         (menu.firstElementChild as HTMLElement | null)?.focus();
       }
     });
-    menu.append(...RESTORES.map((r) => {
-      const item = h(
-        "button",
-        { type: "button", role: "menuitem" },
-        r.label,
-        h("span", { class: "d" }, r.note),
-      );
-      item.onclick = () => {
-        menu.hidePopover();
-        void restore(v, r);
-      };
-      return item;
-    }));
+    const name = names.get(edition) ?? editionLabel(edition);
+    menu.append(
+      ...restoreChoices(v, edition, name).map((r) => {
+        const item = h(
+          "button",
+          {
+            type: "button",
+            role: "menuitem",
+            disabled: r.disabled ? "" : undefined,
+          },
+          r.label,
+          h("span", { class: "d" }, r.note),
+        );
+        item.onclick = () => {
+          menu.hidePopover();
+          void restore(v, r);
+        };
+        return item;
+      }),
+    );
     return [btn, menu];
   };
 
@@ -630,29 +648,9 @@ export function createHistoryView(opts: {
   const drawChanges = () => {
     const token = ++drawToken;
     const v = versions.find((x) => x.id === selected);
-    const nameBtn = h(
-      "button",
-      { type: "button", class: "btn" },
-      nameLabel(v ?? "now"),
-    );
-    nameBtn.onclick = () => opts.onName(v ?? "now");
-    if (!v) {
-      changes.replaceChildren(
-        heading([document.createTextNode("Now")], "Current version", [
-          nameBtn,
-        ]),
-        h(
-          "div",
-          { class: "pbody" },
-          h(
-            "p",
-            { class: "h-summary" },
-            "This is the book right now. Name it to keep a checkpoint, like “Sent to printer”.",
-          ),
-        ),
-      );
-      return;
-    }
+    if (!v) return;
+    const nameBtn = h("button", { type: "button", class: "btn" }, nameLabel(v));
+    nameBtn.onclick = () => opts.onName(v);
     const reason = reasonLabel(v);
     const crumb: Node[] = [document.createTextNode(whenLabel(v, new Date()))];
     if (reason) crumb.push(document.createTextNode(" · "), h("i", {}, reason));
@@ -670,7 +668,7 @@ export function createHistoryView(opts: {
     const loading = h("p", { class: "h-note" }, "Loading changes…");
     body.append(loading);
     diffOf(v).then((d) => {
-      if (token !== drawToken || !alive) return;
+      if (token !== drawToken) return;
       const out: Node[] = [];
       for (const s of d.styles) {
         const prefix = s.edition === edition
@@ -714,7 +712,7 @@ export function createHistoryView(opts: {
       }
       loading.replaceWith(...out);
     }, (err) => {
-      if (token !== drawToken || !alive) return;
+      if (token !== drawToken) return;
       loading.remove();
       alert("Couldn’t load the changes. ", err);
     });
@@ -723,29 +721,23 @@ export function createHistoryView(opts: {
   function select(id: string | "now") {
     selected = versions.some((v) => v.id === id) ? id : "now";
     drawList();
-    drawChanges();
+    if (selected !== "now") drawChanges();
   }
 
-  async function refresh() {
-    const [vs, eds] = await Promise.all([
-      backend.history(book),
-      backend.editions(book),
-    ]);
-    if (!alive) return;
-    versions = vs;
-    names = new Map(eds.map((e) => [e.slug, e.name]));
-    select(selected);
+  // One fetch for every caller while it is under way (a hover, the menu
+  // opening, a link at boot); the list on screen stays until it lands.
+  let loading: Promise<void> | null = null;
+  function refresh() {
+    return loading ??= (async () => {
+      const [vs, eds] = await Promise.all([
+        backend.history(book),
+        backend.editions(book),
+      ]);
+      versions = vs;
+      names = new Map(eds.map((e) => [e.slug, e.name]));
+      select(selected);
+    })().finally(() => loading = null);
   }
 
-  return {
-    refresh,
-    select,
-    destroy() {
-      alive = false;
-      list.replaceChildren();
-      changes.replaceChildren();
-      list.classList.remove("history-list");
-      changes.classList.remove("history-changes");
-    },
-  };
+  return { refresh, select };
 }

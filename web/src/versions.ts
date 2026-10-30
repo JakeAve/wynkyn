@@ -57,6 +57,7 @@ export function installVersions(d: VersionsDeps): Versions {
   let known: Version[] = [];
   let held: UpdateMessage | null = null;
   let gen = 0;
+  let follows = 0; // only the latest Back/Forward or link acts
   let restoredShown = false;
 
   const pressed = () =>
@@ -149,6 +150,7 @@ export function installVersions(d: VersionsDeps): Versions {
   };
 
   function start(v: Version) {
+    follows++;
     if (at === null) {
       d.themes.end();
       scrolls = [
@@ -193,6 +195,7 @@ export function installVersions(d: VersionsDeps): Versions {
   }
 
   function end() {
+    follows++;
     if (at === null) return;
     at = null;
     back = false;
@@ -225,6 +228,7 @@ export function installVersions(d: VersionsDeps): Versions {
         await d.sync().flush();
         await d.backend().restoreVersion(d.book(), before.id, scope);
         say(["Restore undone."], false, [dismiss()]);
+        await view.refresh();
       } catch (err) {
         say([h("strong", {}, "Couldn’t undo. "), brief(err)], true, [
           dismiss(),
@@ -286,8 +290,10 @@ export function installVersions(d: VersionsDeps): Versions {
     );
   });
   menu.addEventListener("toggle", pressed);
-  // Listed ahead, so the menu never opens empty while its list loads.
-  void view.refresh().catch(() => {});
+  // Listed ahead of a click, so the menu opens filled.
+  for (const type of ["pointerenter", "focus"]) {
+    btn.addEventListener(type, () => void view.refresh().catch(() => {}));
+  }
   $("history-name").onclick = () => {
     menu.hidePopover();
     askName(known.find((v) => v.id === at) ?? "now");
@@ -298,9 +304,8 @@ export function installVersions(d: VersionsDeps): Versions {
   return {
     at: () => at,
     escape() {
-      if (at !== null) backToNow();
-      else if (!banner.hidden) banner.hidden = true;
-      else return false;
+      if (at === null) return false;
+      backToNow();
       return true;
     },
     hold(msg) {
@@ -311,8 +316,10 @@ export function installVersions(d: VersionsDeps): Versions {
     async follow(next, behind = true) {
       if (next === null) return end();
       if (next === at) return;
+      const mine = ++follows;
       if (!known.some((x) => x.id === next)) {
         await view.refresh().catch(() => {});
+        if (mine !== follows) return;
       }
       const v = known.find((x) => x.id === next);
       if (!v) {

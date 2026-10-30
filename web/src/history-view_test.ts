@@ -5,6 +5,7 @@ import {
   dayLabel,
   groupVersions,
   reasonLabel,
+  restoreChoices,
   rowLabel,
   styleGroups,
   timeLabel,
@@ -159,4 +160,15 @@ Deno.test("style rows use part and property words", () => {
     ["Chapter title", [{ prop: "Size", from: "18pt", to: "22pt" }]],
     ["Page setup", [{ prop: "Size", from: "unset", to: "a5" }]],
   ]);
+});
+
+Deno.test("Styles only restores this edition, never one the version lacks", () => {
+  const old = { ...v(NOW), files: { "metadata.json": "a" } };
+  const styles = (edition: string | null, name: string) =>
+    restoreChoices(old, edition, name).find((c) => c.label === "Styles only")!;
+  const std = styles(null, "Standard");
+  assertEquals([std.scope, std.disabled], [{ edition: null }, false]);
+  assert(std.note.startsWith("Standard"));
+  const gift = styles("gift", "Gift");
+  assertEquals([gift.scope, gift.disabled], [{ edition: "gift" }, true]);
 });

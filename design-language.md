@@ -713,8 +713,10 @@ of the editor's left and middle columns, so nothing can be edited meanwhile.
   edit mark, like the set dot); deleted text is struck through in `--muted`.
   Never a tint behind either, and never `--err`: a delete is not an error.
 - **Restore menu:** a §6.9 `.menu` popover under Restore ▾: Everything, Text
-  only, Styles only (the edition being edited), each with its note in the right
-  column (`.d`). No checks: nothing in it is current.
+  only, Styles only (the edition being edited, its note naming it: "Standard's
+  styles; the text stays"), each with its note in the right column (`.d`). No
+  checks: nothing in it is current. Styles only is disabled (45%), its note
+  "Pocket didn't exist yet", for a version made before the edition.
 - **Failure:** a restore or a diff that fails puts a `.banner.err` (§6.10)
   across the top of the changes column, `role="alert"`: the lead ("Couldn't
   restore.") in `--err`, then the reason. Never a toast.
@@ -724,8 +726,8 @@ of the editor's left and middle columns, so nothing can be edited meanwhile.
   restore." (the name, else what changed). After a restore the preview ends and
   the same strip says "Restored the styles from Yesterday, 9:10 am." with a
   small ghost Undo (`.btn.sm`), which restores the before-restore version with
-  the same scope, then "Restore undone."; a small ✕ (or Esc) dismisses it. A
-  version that can't be built, or an Undo that fails, turns it into a
+  the same scope, then "Restore undone."; a small ✕ dismisses it (Esc leaves it
+  be). A version that can't be built, or an Undo that fails, turns it into a
   `.banner.err` there.
 - **Name** opens a §6.8 dialog (`#name-dlg`): "Name this version" or "Rename
   this version", a Name field, a `--muted` hint that named versions are kept

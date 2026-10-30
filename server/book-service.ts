@@ -568,6 +568,14 @@ export class BookService {
   ): Promise<Version | null> {
     checkScope(scope);
     const v = await this.version(book, id);
+    if (typeof scope === "object") {
+      const rel = scope.edition === null
+        ? "metadata.json"
+        : `editions/${scope.edition}.json`;
+      if (!(rel in v.files)) {
+        throw bad("that version has no styles for this edition");
+      }
+    }
     return await this.serialize(book, async () => {
       const before = await this.snapNow(book, "before-restore") ??
         (await listVersions(this.store, book))[0] ?? null;

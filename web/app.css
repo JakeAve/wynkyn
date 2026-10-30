@@ -714,6 +714,10 @@ kbd {
 .menu button:hover {
   background: var(--hover);
 }
+.menu button:disabled {
+  opacity: .45;
+  pointer-events: none;
+}
 .menu button svg {
   width: var(--icon);
   height: var(--icon);

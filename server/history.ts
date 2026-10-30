@@ -297,7 +297,9 @@ export async function restore(
     const want = v.files[rel];
     if (want === now[rel]) continue;
     if (want === undefined) {
-      if (await store.remove(path)) changed.push(path);
+      // Only Everything puts back a book without the file; an edition's own
+      // styles never delete it (BookService refuses that restore).
+      if (scope === "all" && await store.remove(path)) changed.push(path);
       continue;
     }
     const bytes = await readObject(store, book, want);

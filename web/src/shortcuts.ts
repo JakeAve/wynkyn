@@ -44,6 +44,21 @@ export interface ShortcutDeps {
 const POPUPS =
   "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
 
+// What may run while a version is previewed: nothing that edits the book or
+// moves the editing place under it.
+const IN_PREVIEW = new Set([
+  "history",
+  "theme",
+  "shortcuts",
+  "zoom-in",
+  "zoom-out",
+  "zoom-fit",
+  "page-next",
+  "page-prev",
+  "chapter-next",
+  "chapter-prev",
+]);
+
 // A command that mirrors a button clicks it, so the behaviour never forks; it
 // runs while the button is shown and enabled.
 function button(sel: string): Pick<Command, "when" | "run"> {
@@ -63,7 +78,7 @@ function table(d: ShortcutDeps): Command[] {
   // a filter) keeps it: only the editor or no field at all.
   const writing = () => {
     const a = document.activeElement;
-    return write() && !d.history.open() && (!(a instanceof HTMLElement) ||
+    return write() && (!(a instanceof HTMLElement) ||
       d.editor().contentDOM.contains(a) ||
       !(a.matches("input, textarea, select") || a.isContentEditable));
   };
@@ -339,6 +354,7 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     if (cmd.id !== "shortcuts" && document.querySelector("dialog[open]")) {
       return;
     }
+    if (deps.history.open() && !IN_PREVIEW.has(cmd.id)) return;
     cmd.run();
     e.preventDefault();
   }, true);

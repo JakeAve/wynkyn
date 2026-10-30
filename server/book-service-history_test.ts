@@ -137,6 +137,11 @@ Deno.test("history: bad input is a 400 before any snapshot", async () => {
         JSON.stringify(scope),
         () => service.restoreVersion(book, v.id, scope as never),
       ]),
+      // made before that edition: restoring its styles would delete the file
+      [
+        "an edition the version lacks",
+        () => service.restoreVersion(book, v.id, { edition: "later" }),
+      ],
       ["bad id", () => service.restoreVersion(book, "../x", "all")],
       ["bad id", () => service.versionFiles(book, "../x")],
     ];

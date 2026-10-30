@@ -65,6 +65,8 @@ appTest({
     assert(await page.locator('#modes [data-mode="write"]').isDisabled());
     assert(await page.locator("#undo").isDisabled());
     assertEquals(await size(), "6in 6in", "previewing writes nothing");
+    // Ignored under a preview; it would expand the pages once editing is back.
+    await page.keyboard.press("ControlOrMeta+Shift+Enter");
 
     await changes.getByRole("button", { name: "← Back to editing" }).click();
     await until(() => historyParam() === null, "editing again");

@@ -2867,8 +2867,10 @@ scroll as they were.
   since) are removed;
 - **Text only**: `manuscript.md`;
 - **Styles only**: the edition being edited, its one file (`metadata.json` or
-  `editions/<slug>.json`). Editions inherit nothing from each other, so the
-  others stay as they are.
+  `editions/<slug>.json`), named in the menu. Editions inherit nothing from each
+  other, so the others stay as they are. A version made before that edition has
+  no styles for it: the choice is disabled, and the service refuses it (400)
+  rather than delete the edition.
 
 Unsaved edits are saved first, the book is snapshotted (Before restore), and the
 files are put back; open tabs take the change as any outside one, so the editor
