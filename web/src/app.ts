@@ -922,8 +922,8 @@ async function main(): Promise<void> {
   // anything is unsaved (keepalive carries a save sent as the tab goes).
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "hidden") return;
-    versions?.snapshot("close");
     void sync.flush();
+    versions?.snapshot("close");
   });
   addEventListener("pagehide", () => void sync.flush());
   addEventListener("beforeunload", (e) => {

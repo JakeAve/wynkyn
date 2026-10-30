@@ -40,6 +40,7 @@ import {
   MAX_GAP_MS,
   nameVersion,
   readObject,
+  readVersion,
   restore,
   type RestoreScope,
   snapshot,
@@ -304,6 +305,7 @@ export class BookService {
       if (!await this.store.create(path, bytes)) {
         throw new ServiceError(409, "an image with that name is already there");
       }
+      this.markEdit(book);
       return { slug: name.slice(0, -parsed.ext.length - 1), name };
     });
   }
@@ -450,6 +452,7 @@ export class BookService {
     if (!await createEdition(this.store, book, slug, source.metadata)) {
       throw new ServiceError(409, "edition already exists");
     }
+    this.markEdit(book);
   }
 
   async renameEdition(
@@ -470,6 +473,7 @@ export class BookService {
     const from = metadataKey(book, edition);
     const moved = await this.serialize(from, () => this.store.rename(from, to));
     if (!moved) throw notFound("edition not found");
+    this.markEdit(book);
     // EXPERIMENTAL (§3.2.9): the edition's {only} token follows its slug.
     // Later saves carrying the old token are rewritten as they arrive.
     const stale = new Set(
@@ -511,6 +515,7 @@ export class BookService {
     const path = metadataKey(book, edition);
     const removed = await this.serialize(path, () => this.store.remove(path));
     if (!removed) throw notFound("edition not found");
+    this.markEdit(book);
   }
 
   // ---- history ----------------------------------------------------------
@@ -566,8 +571,21 @@ export class BookService {
     return await this.serialize(book, async () => {
       const before = await this.snapNow(book, "before-restore") ??
         (await listVersions(this.store, book))[0] ?? null;
-      await this.settleWrites(book);
-      await restore(this.store, book, v, scope);
+      // Held, not settled: a save queued from here on would read the file
+      // before the restore and write it after.
+      const styles = new Set([
+        metadataKey(book, null),
+        ...(await this.store.listDir(`${book}/editions`)).map((n) =>
+          `${book}/editions/${n}`
+        ),
+        ...Object.keys(v.files).filter((r) => r.startsWith("editions/")).map(
+          (r) => `${book}/${r}`,
+        ),
+      ]);
+      await this.holding(
+        [...styles].sort(), // one order across tabs' locks: no deadlock
+        () => restore(this.store, book, v, scope),
+      );
       return before;
     });
   }
@@ -654,13 +672,20 @@ export class BookService {
     return run;
   }
 
+  private holding<T>(keys: string[], fn: () => Promise<T>): Promise<T> {
+    const [key, ...rest] = keys;
+    return key === undefined
+      ? fn()
+      : this.serialize(key, () => this.holding(rest, fn));
+  }
+
   private async version(book: string, id: string): Promise<Version> {
     checkNames(book, null);
     if (typeof id !== "string" || !VERSION_ID.test(id)) {
       throw bad("bad version id");
     }
     await this.requireBook(book);
-    const v = (await listVersions(this.store, book)).find((x) => x.id === id);
+    const v = await readVersion(this.store, book, id);
     if (!v) throw notFound("version not found");
     return v;
   }

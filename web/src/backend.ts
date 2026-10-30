@@ -136,10 +136,14 @@ export function httpBackend(): Backend {
   // allows only while every keepalive body in flight totals under 64 KB.
   // Past that a save goes plain and relies on the leave prompt.
   let keptAlive = 0; // keepalive body bytes in flight
-  async function send(url: string, body: unknown): Promise<Response> {
+  async function send(
+    url: string,
+    body: unknown,
+    keep = true,
+  ): Promise<Response> {
     const json = JSON.stringify(body);
     const size = new TextEncoder().encode(json).length;
-    const keepalive = keptAlive + size < 65536;
+    const keepalive = keep && keptAlive + size < 65536;
     if (keepalive) keptAlive += size;
     try {
       return await fetch(url, {
@@ -270,9 +274,16 @@ export function httpBackend(): Backend {
       post(`${historyUrl(book)}/${encodeURIComponent(id)}/restore`, { scope }),
     nameVersion: (book, id, name) =>
       post(`${historyUrl(book)}/name`, { id, name }),
-    // send(): keepalive so it outlives a closing tab, within its 64 KB budget.
+    // A closing tab's save goes in the same moment and owns the keepalive
+    // budget: an unsaved buffer is as big as that save, so it goes plain.
     takeSnapshot: async (book, reason, overrides) =>
-      answer(await send(`${historyUrl(book)}/snapshot`, { reason, overrides })),
+      answer(
+        await send(
+          `${historyUrl(book)}/snapshot`,
+          { reason, overrides },
+          !overrides,
+        ),
+      ),
     subscribe(book, edition, clientId, onMessage, onClose) {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const ws = new WebSocket(

@@ -61,10 +61,13 @@ function chapterNamer(source: string): (line: number) => string {
   };
 }
 
+const LCS_MAX_CELLS = 4_000_000; // ~16 MB of Uint32 table
+
 /** LCS alignment of two sequences: matched index pairs, in order. */
 function lcs<T>(a: T[], b: T[]): [number, number][] {
   const n = a.length, m = b.length, w = m + 1;
-  // ponytail: O(n·m) table; fine after prefix/suffix trimming, Myers if huge rewrites get slow.
+  // ponytail: O(n·m) table; fine after prefix/suffix trimming, and diffText
+  // skips it past LCS_MAX_CELLS. Myers if mid-size rewrites get slow.
   const t = new Uint32Array((n + 1) * w);
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
@@ -124,6 +127,12 @@ export function diffText(before: string, after: string): ChapterDiff[] {
     else out.push({ chapter, paras: [{ segs }] });
   };
 
+  // A rewrite too big to align: the whole middle out, then the whole middle in.
+  if (am.length * bm.length > LCS_MAX_CELLS) {
+    for (const p of am) add(nameBefore(p.line), [{ t: p.text, op: "del" }]);
+    for (const p of bm) add(nameAfter(p.line), [{ t: p.text, op: "ins" }]);
+    return out;
+  }
   let i = 0, j = 0;
   const matches = lcs(am.map((p) => p.text), bm.map((p) => p.text));
   for (const [mi, mj] of [...matches, [am.length, bm.length]]) {

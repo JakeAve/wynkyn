@@ -1,4 +1,9 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertObjectMatch,
+  assertRejects,
+} from "@std/assert";
 import { BookService, ServiceError } from "./book-service.ts";
 import type { BookStore } from "./store.ts";
 import { memoryStore } from "../testing/memory-store.ts";
@@ -67,14 +72,18 @@ Deno.test("history: first subscribe snapshots; restore snapshots first and reach
   }
 });
 
-Deno.test("history: a metadata save in flight lands in the before-restore snapshot, not over the restore", async () => {
+Deno.test("history: a metadata save in flight lands in the before-restore snapshot, one made during the restore lands after it", async () => {
   const base = await demoStore();
-  let release!: () => void;
-  const gate = new Promise<void>((r) => release = r);
+  let release!: () => void, releaseRestore!: () => void;
+  const gates = [
+    new Promise<void>((r) => release = r),
+    new Promise<void>((r) => releaseRestore = r),
+  ];
+  let writes = 0;
   const store: BookStore = {
     ...base,
     async write(path, data) {
-      if (path === `${book}/metadata.json`) await gate;
+      if (path === `${book}/metadata.json`) await gates[writes++];
       return base.write(path, data);
     },
   };
@@ -90,12 +99,22 @@ Deno.test("history: a metadata save in flight lands in the before-restore snapsh
     assertEquals(done, false, "the restore waits for the save under way");
     release();
     await saved;
+    await until(() => writes === 2, "the restore's write");
+    const late = service.saveMetadata(book, null, { name: "Late" });
+    await quietFor(50);
+    assertEquals(writes, 2, "the late save waits for the restore");
+    releaseRestore();
     const before = await restoring;
-    assertEquals(await store.readText(`${book}/metadata.json`), original);
+    await late;
+    assertObjectMatch(
+      JSON.parse((await store.readText(`${book}/metadata.json`))!),
+      { ...JSON.parse(original!), name: "Late" },
+    );
     const { files } = await service.versionFiles(book, before!.id);
     assert(files["metadata.json"]?.includes("Changed"));
   } finally {
     release();
+    releaseRestore();
     await service.stop();
   }
 });

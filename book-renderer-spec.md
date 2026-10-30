@@ -2708,7 +2708,8 @@ folder?" _Copy them into `<name>`_ (recommended; this browser keeps its copies
 too) or _Open `<name>` without them_ (they stay in this browser; switch back any
 time from the library). Copying never overwrites: a book the folder already has
 is left out of N and named in a warning line ("Already in `<name>`, so not
-copied: …"). A failed copy shows in the dialog, which stays open.
+copied: …"). A copied book keeps its history (§7.10). A failed copy shows in the
+dialog, which stays open.
 
 **Create a new folder.** A location picker and a folder name (default `Books`),
 with the resulting path shown. Then _Create a new manuscript_.
@@ -2818,8 +2819,9 @@ over the browser's own storage: one service does the work in either.
 the editions, the dictionary and the images (§6). One identical to the latest is
 not written. They are taken:
 
-- 3 minutes after the last save (idle), and at most 20 minutes apart while saves
-  keep coming (max gap);
+- 3 minutes after the last change (idle): a save, an image added, an edition
+  made, renamed or deleted; and at most 20 minutes apart while changes keep
+  coming (max gap);
 - when a book is first opened by a client, which catches changes made outside
   the app while it was closed (an agent, the CLI, another editor); that version
   is listed only when something differs from the one before it;
@@ -2875,7 +2877,9 @@ which restores the Before restore snapshot with the same scope. The snapshot
 stays in the list, so a restore can also be undone later by restoring it.
 
 **Name version.** Name… in the middle column names the selected version, or with
-Now takes a snapshot of the book as it is and names it ("Sent to printer"). A
+Now takes a snapshot of the book as it is and names it ("Sent to printer"). When
+nothing changed since the latest version, Now names that one instead, unless it
+already has a name: then a new version with the same files takes this one. A
 named version is kept forever.
 
 **Download book.** The switcher's Download book zips the book without

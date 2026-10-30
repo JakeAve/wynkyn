@@ -86,6 +86,22 @@ Deno.test("diffText: a 3000-paragraph manuscript diffs fast", () => {
   assertEquals(d.map((c) => c.chapter), ["c1500"]);
 });
 
+Deno.test("diffText: a 12k-paragraph full rewrite skips the LCS, stays fast", () => {
+  const book = (tag: string) =>
+    Array.from(
+      { length: 12_000 },
+      (_, i) => `${i % 100 ? "" : `{chapter: c${i / 100}}\n\n`}${tag} ${i}.`,
+    ).join("\n\n");
+  const t = performance.now();
+  const d = diffText(book("Old"), book("New"));
+  assert(performance.now() - t < 2000);
+  const segs = d.flatMap((c) => c.paras.flatMap((p) => p.segs));
+  // the first chapter tag is the shared prefix; the other 119 are in the middle
+  assertEquals(segs.filter((s) => s.op === "del").length, 12_119);
+  assertEquals(segs.filter((s) => s.op === "ins").length, 12_119);
+  assertEquals(d[0]?.chapter, "c0");
+});
+
 Deno.test("diffMetadata: font-size change under elements", () => {
   assertEquals(
     diffMetadata(

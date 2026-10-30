@@ -393,6 +393,7 @@ export function createHistoryView(opts: {
     let p = files.get(id);
     if (!p) {
       p = backend.versionFiles(book, id).then((r) => r.files);
+      p.catch(() => files.delete(id));
       files.set(id, p);
     }
     return p;

@@ -335,11 +335,11 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     const c = combo(e);
     const cmd = c ? byId.get(map.byCombo.get(c) ?? "") : undefined;
     if (!cmd || (cmd.when && !cmd.when())) return;
-    if (cmd.id !== "history" && deps.history.open()) return;
     // A modal dialog owns the keys; only the shortcuts list still toggles.
     if (cmd.id !== "shortcuts" && document.querySelector("dialog[open]")) {
       return;
     }
+    if (cmd.id !== "history" && deps.history.open()) return;
     cmd.run();
     e.preventDefault();
   }, true);

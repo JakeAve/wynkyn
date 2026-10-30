@@ -129,6 +129,16 @@ export async function listVersions(
   return out;
 }
 
+/** One version by id, read straight from its file; null when absent. */
+export async function readVersion(
+  store: BookStore,
+  book: string,
+  id: string,
+): Promise<Version | null> {
+  const text = await store.readText(versionPath(book, id));
+  return text ? JSON.parse(text) as Version : null;
+}
+
 export async function snapshot(
   store: BookStore,
   book: string,
@@ -146,18 +156,25 @@ export async function snapshot(
     current.set(rel, enc.encode(text));
   }
   const files = await hashAll(current);
-  const prev = (await listVersions(store, book))[0];
-  if (prev && sameFiles(prev.files, files)) {
-    if (reason !== "named" || opts.name === undefined) return null;
-    await nameVersion(store, book, prev.id, opts.name);
-    return { ...prev, name: opts.name };
-  }
-
-  for (const [rel, hash] of Object.entries(files)) {
-    await store.create(objectPath(book, hash), deflateSync(current.get(rel)!));
-  }
-
+  const versions = await listVersions(store, book);
+  const prev = versions[0];
   const before = prev?.files ?? {};
+  if (prev && sameFiles(before, files)) {
+    if (reason !== "named" || opts.name === undefined) return null;
+    // A name is never overwritten: a named version gets a named twin instead.
+    if (prev.name === undefined) {
+      await nameVersion(store, book, prev.id, opts.name);
+      return { ...prev, name: opts.name };
+    }
+  }
+
+  const stored = new Set(Object.values(before));
+  for (const [rel, hash] of Object.entries(files)) {
+    const path = objectPath(book, hash);
+    if (stored.has(hash) || await store.exists(path)) continue;
+    await store.create(path, deflateSync(current.get(rel)!));
+  }
+
   const differs = (rel: string) => before[rel] !== files[rel];
   const all = [...new Set([...Object.keys(before), ...Object.keys(files)])];
   const text = differs("manuscript.md");
@@ -191,7 +208,7 @@ export async function snapshot(
   }
   // ponytail: prune runs in the same call, so it can't race this snapshot's
   // objects; two snapshotting writers on one book would need a lock.
-  await prune(store, book, now);
+  await prune(store, book, now, [v, ...versions]);
   return v;
 }
 
@@ -329,8 +346,8 @@ export async function prune(
   store: BookStore,
   book: string,
   now: Date,
+  versions: Version[],
 ): Promise<void> {
-  const versions = await listVersions(store, book);
   const drop = new Set(thin(versions, now));
   for (const id of drop) await store.remove(versionPath(book, id));
   const live = new Set(
