@@ -1802,7 +1802,12 @@ Never touched: `page`, `is`, `notes`, `toc`, `openers`, `ebook`, `language`,
 `name`, `spec`, and any key this schema doesn't know.
 
 **A new book** can start from any theme: its `metadata.json` is the template
-with the theme applied (§7.9). House, or no theme, is the template as it is.
+with the theme applied (§7.9). House, or no theme, is the template as it is. One
+made in the app also gets the paper the author's browser locale suggests:
+`sheet` `"letter"` and `size` `"5.5in 8.5in"` where letter is the local paper
+(CLDR's US-Letter regions: the US, Canada, Mexico, the Philippines and parts of
+Latin America), otherwise `sheet` `"A4"` and `size` `"A5"`. `bml new` keeps the
+template's own page.
 
 ### 4.14 Section: `openers`
 

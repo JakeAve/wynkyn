@@ -876,10 +876,17 @@ Deno.test("create and import: a posted theme's fonts; unknown theme 400", async 
   const fonts = async (book: string) =>
     JSON.parse(await Deno.readTextFile(`${root}/${book}/metadata.json`)).fonts;
   try {
-    const made = await post("/api/books", { slug: "c", theme: "caslon" });
+    const made = await post("/api/books", {
+      slug: "c",
+      theme: "caslon",
+      locale: "en-GB",
+    });
     assertEquals(made.status, 201);
     await made.body?.cancel();
-    assertEquals((await fonts("c")).body, "Libre Caslon Text");
+    const c = JSON.parse(await Deno.readTextFile(`${root}/c/metadata.json`));
+    assertEquals(c.fonts.body, "Libre Caslon Text");
+    assertEquals([c.page.size, c.page.sheet], ["A5", "A4"]);
+    assertEquals(c.page.margins.inside, "22mm"); // the template's, kept
 
     const imported = await post("/api/books/i/import", {
       manuscript: "{title}\nI\n",
@@ -894,6 +901,7 @@ Deno.test("create and import: a posted theme's fonts; unknown theme 400", async 
       const [path, body] of [
         ["/api/books", { slug: "u", theme: "nope" }],
         ["/api/books", { slug: "u", theme: 3 }],
+        ["/api/books", { slug: "u", locale: 3 }],
         ["/api/books/u/import", { manuscript: "", images: {}, theme: "nope" }],
       ] as const
     ) {

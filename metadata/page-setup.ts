@@ -241,6 +241,23 @@ export function foldedSize(sheet: string, cols: number, rows: number): string {
 
 export const DEFAULT_SIZE = "5.5in 8.5in";
 const DEFAULT_SHEET = "letter";
+
+// CLDR's US-Letter territories; everywhere else loads A4.
+const LETTER_REGIONS = new Set(
+  "BZ CA CL CO CR GT MX NI PA PE PH PR SV US VE".split(" "),
+);
+
+/** A new book's page and sheet for a BCP 47 locale: half the paper a printer
+ * there loads, on that paper ("en" counts as US, Intl's likely region). */
+export function localPaper(locale: string): { size: string; sheet: string } {
+  let region: string | undefined;
+  try {
+    region = new Intl.Locale(locale).maximize().region;
+  } catch { /* not a locale tag: A4, the world's default */ }
+  return region && LETTER_REGIONS.has(region)
+    ? { size: DEFAULT_SIZE, sheet: "letter" }
+    : { size: "A5", sheet: "A4" };
+}
 const DEFAULT_FOLIOS = 4;
 const DEFAULT_DUPLEX: Duplex = "short-edge";
 

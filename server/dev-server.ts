@@ -18,12 +18,18 @@ const TEMPLATE = new URL("../templates/metadata.json", import.meta.url);
 
 // A new book's metadata.json text with the posted theme applied, or a 400
 // for an unknown one (never a silent House).
-async function template(theme: unknown): Promise<string | Response> {
+async function template(
+  theme: unknown,
+  locale: unknown,
+): Promise<string | Response> {
   if (theme !== undefined && typeof theme !== "string") {
     return new Response("bad theme", { status: 400 });
   }
+  if (locale !== undefined && typeof locale !== "string") {
+    return new Response("bad locale", { status: 400 });
+  }
   try {
-    return themedTemplate(await Deno.readTextFile(TEMPLATE), theme);
+    return themedTemplate(await Deno.readTextFile(TEMPLATE), theme, locale);
   } catch {
     return new Response(`no such theme: ${theme}`, { status: 400 });
   }
@@ -179,11 +185,11 @@ export async function startServer(
       return Response.json(await service.list());
     }
     if (path === "/api/books" && req.method === "POST") {
-      const { slug, title, theme } = await json(req);
+      const { slug, title, theme, locale } = await json(req);
       if (typeof slug !== "string" || !safeName(slug)) {
         return new Response("bad book slug", { status: 400 });
       }
-      const meta = await template(theme);
+      const meta = await template(theme, locale);
       if (meta instanceof Response) return meta;
       const made = await service.createBook(
         slug,
@@ -331,7 +337,7 @@ export async function startServer(
         }
         images[path] = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       }
-      const meta = await template(body.theme);
+      const meta = await template(body.theme, body.locale);
       if (meta instanceof Response) return meta;
       const made = await service.importBook(
         p[0]!,
