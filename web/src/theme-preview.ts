@@ -91,6 +91,12 @@ export class ThemePreview {
     if (!applied) void this.#showBookPages(next, gen);
   }
 
+  /** The book's own pages again after another look held them back (History):
+   * `next`, a push held meanwhile, or the last build shown. */
+  showBook(next: UpdateMessage | null): Promise<void> {
+    return this.#showBookPages(next ?? this.lastShown, ++this.#gen);
+  }
+
   // The book's cached render when it is what should show (no Paged.js pass),
   // else a fresh render of `next`. With neither, the pages clear: the book's
   // first build paints when it lands.

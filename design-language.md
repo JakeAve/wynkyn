@@ -597,20 +597,24 @@ control's tooltip and `kbd` show its key as the platform writes it
   (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`; the book
   switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
   Publish (Mod+1–3); right, Undo and Redo (`.btn.icon`, curved arrows, disabled
-  while there is nothing to undo), then the theme toggle (Mod+Shift+L), showing
-  the mode it switches to in woodcut: the sun mark (§10) without its cut lines,
-  and the man in the moon beside a share-card star. These two are filled, not
-  stroked, in the button's color (never red). The save status sits after the
-  crumb. The crumb's text is trimmed to cap height and baseline (`text-box`), so
-  the library icon and the chevrons center on the caps (as does any button's
-  label in a `span` after its icon); until a book is chosen it shows the library
-  step alone (nothing on the dev server).
+  while there is nothing to undo), History (`#history-open`, `.btn.icon`, a
+  clock with a back arrow; ⌥⌘Y on a Mac, Ctrl+Shift+Y elsewhere; the red wash
+  while open, §6.14), then the theme toggle (Mod+Shift+L), showing the mode it
+  switches to in woodcut: the sun mark (§10) without its cut lines, and the man
+  in the moon beside a share-card star. These two are filled, not stroked, in
+  the button's color (never red). The save status sits after the crumb. The
+  crumb's text is trimmed to cap height and baseline (`text-box`), so the
+  library icon and the chevrons center on the caps (as does any button's label
+  in a `span` after its icon); until a book is chosen it shows the library step
+  alone (nothing on the dev server).
 - **Switcher** (`#switcher`): books left, the selected book's editions right.
   The books foot holds New book; in browser storage only, Download library
   (download icon) under it and the note "Your library is currently in browser
   storage and could be cleared by your browser at any time." in `--fs-xs`
   `--muted`, and over the editions a head (`#eds-head`) naming the selected book
-  in Alegreya 500 `--muted` with a small Download book at its right.
+  in Alegreya 500 `--muted` with a small Download book at its right, and before
+  it a "With history" switch (§6.4) in `--fs-sm` `--muted` that adds the book's
+  `.history` folder to the zip.
 - **Pane header** (`--h-pane` at least, `.pane-head`): the pane's own controls
   at left in small sizes, `--s-2` apart; its expand button
   (`.btn.sm.icon
@@ -669,7 +673,14 @@ marks' colors (§2.4).
 ### 6.14 History
 
 The takeover's left and middle columns (`web/src/history-view.ts`); the pages
-take the right.
+take the right (`web/src/versions.ts`), whatever the mode underneath and however
+the panes were hidden or expanded.
+
+- **Toolbar:** "← Back to editing" (a ghost `.btn` in `--fg`) takes the Contents
+  toggle's place and the mode switch goes; the crumb stays. History's toolbar
+  button sits in the red wash, Undo and Redo are disabled, and the pages pane
+  keeps zoom but loses Inspect and expand. Esc or Back returns to the mode and
+  panes as they were.
 
 - **Version list** (`.history-list`): reads like the style nav (§6.6). At the
   top, "This edition | All editions" as a `seg` (§6.2), only when the book has
@@ -698,11 +709,16 @@ take the right.
 - **Failure:** a restore or a diff that fails puts a `.banner.err` (§6.10)
   across the top of the changes column, `role="alert"`: the lead ("Couldn't
   restore.") in `--err`, then the reason. Never a toast.
-- **Preview banner:** while a version is selected, a plain banner across the top
-  of the pages pane: "Previewing Today, 3:42 pm. Nothing changes until you
-  restore." After a restore the same strip says "Restored the styles from
-  Yesterday, 9:10 am" with a small ghost Undo (`.btn.sm`) at the right, which
-  restores the before-restore version with the same scope.
+- **Preview banner** (`#version-banner`): while a version is selected, a plain
+  banner across the top of the pages pane, under its header: "Previewing Today,
+  3:42 pm. Nothing changes until you restore." After a restore the same strip
+  says "Restored the styles from Yesterday, 9:10 am." with a small ghost Undo
+  (`.btn.sm`) at the right, which restores the before-restore version with the
+  same scope, then "Restore undone." A version that can't be built, or an Undo
+  that fails, turns it into a `.banner.err` there.
+- **Name…** opens a §6.8 dialog (`#name-dlg`): "Name this version", a Name
+  field, a `--muted` hint that named versions are kept for good, Cancel and the
+  primary Save name.
 
 ## 7. Layout and expanded views
 

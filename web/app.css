@@ -366,8 +366,15 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-#book-download {
+/* Download book's "With history" switch, at the right beside it. */
+#eds-head .eds-history {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
   margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
 }
 .ed-row {
   display: grid;
@@ -2813,7 +2820,7 @@ body.typing #editor .pane-head {
 }
 /* switch (panel-controls.ts switchInput, §6.4): always a pill; a --line
    track, --acc when on, a paper knob that slides */
-:is(#config-overlay, #text-view) .sw {
+:is(#config-overlay, #text-view, #eds-head) .sw {
   appearance: none;
   position: relative;
   flex: none;
@@ -2826,7 +2833,7 @@ body.typing #editor .pane-head {
   cursor: pointer;
   transition: background var(--t-fast);
 }
-:is(#config-overlay, #text-view) .sw::before {
+:is(#config-overlay, #text-view, #eds-head) .sw::before {
   content: "";
   position: absolute;
   top: var(--s-1);
@@ -2838,10 +2845,10 @@ body.typing #editor .pane-head {
   box-shadow: 0 1px 2px rgb(0 0 0 / .2);
   transition: transform var(--t-fast);
 }
-:is(#config-overlay, #text-view) .sw:checked {
+:is(#config-overlay, #text-view, #eds-head) .sw:checked {
   background: var(--acc);
 }
-:is(#config-overlay, #text-view) .sw:checked::before {
+:is(#config-overlay, #text-view, #eds-head) .sw:checked::before {
   transform: translateX(0.8125rem);
 }
 :is(#config-overlay, #text-view) .sw:disabled {
@@ -3998,4 +4005,39 @@ body.typing #editor .pane-head {
 }
 .banner.err strong {
   color: var(--err);
+}
+
+/* The takeover (versions.ts): :root[data-history] gives the three columns to
+   versions | changes | the pages, whatever the mode underneath, and the
+   toolbar's mode switch to Back to editing. Last in the file, so it outranks
+   Publish's hidden preview. */
+:root:not([data-history]) :is(#history-list, #history-changes, #history-back),
+:root[data-history] :is(#tree, #style-nav, #editor, #config-overlay, #sheet-view, #modes, #tree-toggle, #inspect, #inspect-overlay, #inspect-drawer, #pages .expand, #writer-foot > *) {
+  display: none;
+}
+:root[data-history] #preview {
+  grid-row: 3;
+  position: relative;
+  inset: auto;
+  visibility: visible;
+}
+:root[data-history] #pages #zoom {
+  display: flex;
+}
+#history-back {
+  color: var(--fg);
+}
+#history-open[aria-pressed="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+/* The pages' banner (§6.14) sits between the pane's header and the pages. */
+:root[data-history] #pages {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+#version-banner {
+  grid-row: 2;
+}
+#version-banner .msg {
+  flex: 1 1 15rem;
 }

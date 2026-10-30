@@ -639,8 +639,8 @@
         <div class="board">
           <div id="disk-banner" role="alert">
             <div class="msg"><strong>Save failed because something else touched
-                the manuscript.</strong><span>Load it and lose your unsaved
-                edits, or keep yours and overwrite it.</span></div>
+                the manuscript.</strong><span>Load it (your unsaved edits are
+                kept in History), or keep yours and overwrite it.</span></div>
             <div
               class="acts"><button class="btn sm" type="button">Load file from
                 disk</button><button class="btn sm" type="button">Keep my
@@ -738,6 +738,67 @@
                 </section>
               </div>
             </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="part">
+        <h2>History <span>§6.14</span></h2>
+        <p>The takeover's versions, read like the style nav, and what one
+          changed, read like the panel; the pages pane's banner says what is
+          on it.</p>
+        <div class="board">
+          <nav class="history-list surface" style="width: 16rem"
+            aria-label="Versions">
+            <div class="nh">Today</div>
+            <button type="button" class="h-row"><span
+                class="h-time">Now</span><span class="h-head">Current
+                version</span><span class="h-detail">Everything saved so
+                far</span></button>
+            <button type="button" class="h-row" aria-current="true"><span
+                class="h-time">3:42 pm</span><span
+                class="h-head">Text · Styles</span><span class="h-detail">Chapter
+                one · Page setup</span></button>
+            <button type="button" class="h-row"><span
+                class="h-time">3:10 pm</span><span class="h-head">★ Sent to
+                printer</span><span class="h-detail">Text</span><i
+                class="h-reason">Before import</i></button>
+            <button type="button" class="btn sm">▸ 4 more</button>
+          </nav>
+          <div class="history-changes surface" style="width: 26rem">
+            <div class="phead">
+              <div class="crumb">Today, 3:42 pm</div>
+              <h2>Text and styles changed</h2>
+              <div class="h-actions"><button type="button"
+                  class="btn primary">Restore ▾</button><button type="button"
+                  class="btn">Name…</button></div>
+            </div>
+            <div class="pbody">
+              <section class="sec">
+                <div class="sech">
+                  <h3>Page setup</h3>
+                </div>
+                <div class="row"><span class="lbl">Size</span><div
+                    class="ctl"><span class="h-to"><span class="h-from">5.5in
+                        8.5in</span> → 4.25in 7in</span></div></div>
+              </section>
+              <section class="sec">
+                <div class="sech">
+                  <h3>Chapter one</h3>
+                </div>
+                <p class="h-para">It was a bright cold day in April, and
+                  <del>the</del><ins>THE</ins> clocks were striking
+                  thirteen.</p>
+              </section>
+            </div>
+          </div>
+          <div class="surface" style="width: 100%; padding: 0">
+            <div id="version-banner" class="banner"><span
+                class="msg">Restored the styles from Today, 3:42 pm.</span><button
+                type="button" class="btn sm">Undo</button></div>
+            <div class="banner err"><span class="msg"><strong>Couldn’t show
+                  this version. </strong>The version is missing a
+                file.</span></div>
           </div>
         </div>
       </section>

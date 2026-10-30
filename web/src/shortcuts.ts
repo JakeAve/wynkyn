@@ -27,6 +27,8 @@ export interface ShortcutDeps {
   panes: Panes;
   textView: TextView;
   inspect: { escape(): boolean };
+  /** History owns the keys while open, but for its own toggle and esc. */
+  history: { open(): boolean; escape(): boolean };
   editor(): EditorView;
   /** The pages pane, `#preview`. */
   preview: HTMLElement;
@@ -178,6 +180,15 @@ function table(d: ShortcutDeps): Command[] {
       keys: "mod+shift+l",
       ...button("#theme-toggle"),
     },
+    // ⌘⇧Y is taken on a Mac (Services: Make Sticky Note).
+    {
+      id: "history",
+      label: "History",
+      section: "App",
+      keys: "mod+shift+y",
+      mac: "alt+cmd+y",
+      ...button("#history-open"),
+    },
     {
       id: "switch-book",
       label: "Switch book",
@@ -314,14 +325,17 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !document.querySelector(POPUPS)) {
-      // Inspect first: it unpins, then leaves; then an expanded pane returns.
-      if (deps.inspect.escape() || deps.panes.returnFromExpand()) {
-        e.preventDefault();
-      }
+      // History, then Inspect: it unpins, then leaves; then an expanded pane
+      // returns.
+      if (
+        deps.history.escape() || deps.inspect.escape() ||
+        deps.panes.returnFromExpand()
+      ) e.preventDefault();
     }
     const c = combo(e);
     const cmd = c ? byId.get(map.byCombo.get(c) ?? "") : undefined;
     if (!cmd || (cmd.when && !cmd.when())) return;
+    if (cmd.id !== "history" && deps.history.open()) return;
     // A modal dialog owns the keys; only the shortcuts list still toggles.
     if (cmd.id !== "shortcuts" && document.querySelector("dialog[open]")) {
       return;

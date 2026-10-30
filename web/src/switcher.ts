@@ -390,7 +390,12 @@ export function installSwitcher(d: SwitcherDeps): Switcher {
     }
   };
   $("book-download").onclick = () =>
-    save(`${selBook}.zip`, zipBook(backend.store!, selBook));
+    save(
+      `${selBook}.zip`,
+      zipBook(backend.store!, selBook, {
+        history: ($("zip-history") as HTMLInputElement).checked,
+      }),
+    );
   $("library-download").onclick = () =>
     save("wynkyn-books.zip", zipLibrary(backend.store!, d.books()));
 
