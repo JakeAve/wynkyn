@@ -3,6 +3,8 @@
 // Pure; ported from forest's keys.js. Combos are lowercase, `+`-joined,
 // modifiers in the order ctrl, alt, shift, cmd, then the key name.
 
+import type { Mode } from "./preview.ts";
+
 export const isMac: boolean = typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad/.test(navigator.platform ?? "");
 
@@ -19,6 +21,8 @@ export interface Command {
   id: string;
   label: string;
   section: string;
+  /** The mode it lives in: from another, it runs after a switch. */
+  mode?: Mode;
   keys: string;
   win?: string;
   mac?: string;

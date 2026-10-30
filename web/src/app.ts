@@ -1016,6 +1016,7 @@ async function main(): Promise<void> {
     preview: $("preview"),
     createManuscript,
     ensureConfigPanel,
+    palette: () => {},
   });
   undoUi = installUndo({
     mode: () => mode,
