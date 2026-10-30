@@ -18,7 +18,11 @@ it are in `SKILL.md`, The web app; this is the map.
 | `theme-preview.ts` | `ThemePreview`: try a theme with nothing saved, hold pushed builds meanwhile, Apply |
 | `text-view.ts` | `installTextView`: the write pane's header — Prose \| Source (`#editor[data-view]`, `setWriteView`, Mod+/), the Aa menu (face, size, dim, page turns) and Spelling; a reader preference in localStorage `text-view`, not the book (`readPrefs` migrates the old `font`/`hide`) |
 | `panes.ts` | `installPanes`: the Contents toggle (pins the outline while expanded), Pages hidden by Mod+., and each pane's expand (`#panes.expand-writing` / `expand-pages`, localStorage `expanded:<mode>`); returns what the shortcuts call |
-| `shortcuts.ts` | `installShortcuts`: every app shortcut — one command table (ids, sections, default keys), one capture-phase keydown with esc's order (popups, Inspect, an expanded pane), and the label pass that writes each `data-command` key into titles, `aria-keyshortcuts` and `kbd`; overrides in localStorage `keys`. The key model (combos, labels, resolve) is pure in `keys.ts` |
+| `shortcuts.ts` | `installShortcuts`: every app shortcut — one command table (ids, sections, default keys), one capture-phase keydown with esc's order (popups, History, Inspect, an expanded pane), and the label pass that writes each `data-command` key into titles, `aria-keyshortcuts` and `kbd`; overrides in localStorage `keys`. The key model (combos, labels, resolve) is pure in `keys.ts` |
+| `undo.ts` | `installUndo`: the toolbar's Undo and Redo — the editor's history in Write, `style-undo.ts`'s in Style and Publish; disabled while History is open (`paused`) |
+| `style-undo.ts` | Pure undo/redo stacks for style edits: one step per save window over the whole sections a save replaces; app.ts feeds it every metadata save, and an outside metadata change clears it |
+| `versions.ts` | `installVersions`: the History takeover — a URL state (`?history=<id\|now>`) over the mode, not a fourth `Mode`; the version's pages through the preview paint path with pushed builds held, the restore and preview banners, Name version, and the `close` / `before-reload` snapshots |
+| `history-view.ts` | `createHistoryView`: the takeover's versions list (by day, folded thinned runs, edition filter) and changes column (style `old → new`, text diffs, Restore menu, Name…) over the `Backend` history methods; pure grouping and labels exported for tests |
 | `dom.ts` | `$`, `brief` — the helpers every module shares |
 
 Editor side: `editor.ts` (the CodeMirror pane; `setWriteView` swaps Prose and
