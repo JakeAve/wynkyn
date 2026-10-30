@@ -662,6 +662,13 @@
         <button id="shortcuts-done" class="btn" type="button">Done</button>
       </div>
     </dialog>
+    <dialog id="palette" aria-label="Command palette">
+      <input id="palette-input" type="text" role="combobox"
+        aria-controls="palette-list" aria-expanded="true"
+        aria-label="Search commands" placeholder="Run, insert, go to…"
+        autocomplete="off" spellcheck="false">
+      <div id="palette-list" role="listbox" aria-label="Results"></div>
+    </dialog>
     <script src="/vendor/paged.js"></script>
     <script type="module" src="/web/app.js"></script>
   </body>

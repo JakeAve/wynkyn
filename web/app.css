@@ -453,7 +453,7 @@ kbd {
   min-width: 0;
 }
 /* Fields (§6.3) outside the panel: focus turns the border red. */
-:is(#switcher, #choose, .ask .field, #editor .cm-bml-palette, #config-overlay .fontpop) :is(input, select, textarea):focus-visible,
+:is(#switcher, #choose, .ask .field, #editor .cm-bml-palette, #palette, #config-overlay .fontpop) :is(input, select, textarea):focus-visible,
 .cm-bml-find .field:focus-within {
   outline: none;
   border-color: var(--acc);
@@ -3830,6 +3830,97 @@ body.typing #editor .pane-head {
 }
 #shortcuts-note {
   flex: 1;
+}
+/* ⌘K palette (palette.ts): a §6.9 menu surface near the top centre, modal. */
+#palette {
+  margin: 12vh auto auto;
+  padding: var(--s-2);
+  width: 32rem;
+  max-width: calc(100vw - var(--s-7));
+  border: 1px solid var(--line);
+  border-radius: var(--r-pop);
+  corner-shape: var(--corner);
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: var(--shadow-pop);
+  font: var(--fs)/1.4 var(--f-ui);
+}
+#palette::backdrop {
+  background: none;
+}
+#palette-input {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: var(--h-md);
+  margin-bottom: var(--s-2);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+}
+#palette-input::placeholder {
+  color: var(--muted);
+}
+#palette-list {
+  max-height: 22em;
+  overflow: hidden auto;
+}
+.pl-grp {
+  font-size: var(--fs-sm);
+  font-variant-caps: all-small-caps;
+  letter-spacing: var(--track-caps);
+  font-weight: 500;
+  color: var(--muted);
+  padding: var(--s-3) var(--s-3) var(--s-1);
+}
+.pl-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  min-height: var(--h-md);
+  box-sizing: border-box;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  cursor: pointer;
+}
+.pl-row:hover {
+  background: var(--hover);
+}
+.pl-row[aria-selected="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+.pl-row[aria-disabled="true"] {
+  color: var(--muted);
+  cursor: default;
+  background: none;
+}
+/* a sentinel's name: markup, so mono in the red (§6.9 completion row) */
+code.pl-label {
+  font: 500 var(--fs-sm) var(--f-mono);
+  color: var(--acc-ink);
+}
+.pl-row[aria-disabled="true"] code.pl-label {
+  color: inherit;
+}
+.pl-detail {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pl-none {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  color: var(--muted);
 }
 #shortcuts-note.warn {
   color: var(--warn);

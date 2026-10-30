@@ -552,12 +552,15 @@ at the right.
   kbd or detail. Current item: red wash and a red check. Separators are
   hairlines bleeding to the edges. Optional small-caps heading. Used by: the
   book and edition switcher (`#switcher`), the font picker (`.fontpop`), `{`
-  completions (`.cm-tooltip-autocomplete`), Mod+K (`.cm-bml-palette`), the wrap
-  bar and spelling suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write
-  pane's header (`.tvpop`); the pages' zoom menu (`.menu`, a native popover of
-  `menuitemradio` rows). Fields inside a popover are §6.3 frames (focus: `--acc`
-  border and ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but
-  its fields and pressed options follow the same rules.
+  completions (`.cm-tooltip-autocomplete`), Mod+K (`.cm-bml-palette`), the ⌘K
+  command palette (`#palette`, a modal near the top centre: a filter field over
+  grouped rows, a row's label, its detail `--muted`, its key at the right; a row
+  that can't run is `--muted` and skipped), the wrap bar and spelling
+  suggestions (`.cm-bml-wrapbar`); Aa and Spelling in the write pane's header
+  (`.tvpop`); the pages' zoom menu (`.menu`, a native popover of `menuitemradio`
+  rows). Fields inside a popover are §6.3 frames (focus: `--acc` border and
+  ring). The find bar (`.cm-bml-find`) is a panel, not a popover, but its fields
+  and pressed options follow the same rules.
 - **Completion row:** a sentinel's name in `--f-mono` `--fs-sm` `--acc-ink`, a
   7rem column; description `--muted`; how it closes (`{/quote}`, "wraps", "—")
   in mono `--fs-2xs` `--muted` at the right. An image's row is a thumbnail, its
