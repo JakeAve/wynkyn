@@ -59,6 +59,7 @@ import { installCreateBook, renderImportNotes } from "./create-book.ts";
 import { ThemePreview } from "./theme-preview.ts";
 import { StyleUndo } from "./style-undo.ts";
 import { installUndo, type Undo } from "./undo.ts";
+import { installVersions, type Versions } from "./versions.ts";
 import { installTextView } from "./text-view.ts";
 import { installPanes } from "./panes.ts";
 import { installShortcuts } from "./shortcuts.ts";
@@ -92,7 +93,15 @@ let libId: string | null = null;
 // entries; debounced because Safari rate-limits replaceState.
 let urlTimer: ReturnType<typeof setTimeout> | undefined;
 const here = () =>
-  appHref({ book, edition, mode, view, line: cursorLine, lib: libId });
+  appHref({
+    book,
+    edition,
+    mode,
+    view,
+    line: cursorLine,
+    lib: libId,
+    history: versions?.at(),
+  });
 function syncUrl(): void {
   clearTimeout(urlTimer);
   urlTimer = setTimeout(() => {
@@ -104,15 +113,22 @@ function syncUrl(): void {
   }, 250);
 }
 
-// Publish → a Style view as a history entry, like goToStyle from Write, so
-// Back returns to Publish where the author left it (installHistory).
-function toStyle(next: string): void {
+// A jump as a history entry, so Back returns to where the author was
+// (installHistory).
+function pushPlace(go: () => void): void {
   clearTimeout(urlTimer);
   history.replaceState(null, "", here()); // the entry Back returns to
-  view = next;
-  configPanel?.open(next);
-  setMode("style");
+  go();
   history.pushState(null, "", here());
+}
+
+// Publish → a Style view, like goToStyle from Write.
+function toStyle(next: string): void {
+  pushPlace(() => {
+    view = next;
+    configPanel?.open(next);
+    setMode("style");
+  });
 }
 
 // A short phrase, so it clears the mode switch; the detail goes in the
@@ -230,6 +246,7 @@ let metaFetchGen = 0;
 let configPanel: ConfigPanel | null = null;
 let books: string[] = []; // the library's, as last listed
 let switcher: Switcher; // the crumb and the book/edition switcher, from main
+let versions: Versions | undefined; // History, once a book is open
 
 function onDocChanged(text: string): void {
   $("preview").dataset.stale = ""; // dimmed until the render catches up
@@ -334,7 +351,7 @@ function refreshTree(doc: BmlDocument): void {
 // Spec §7.3.
 function followCursor(line: number): void {
   if (!editor) return;
-  markEdited($("preview"), mode === "write" ? line : null);
+  markEdited($("preview"), mode === "write" && !versions?.at() ? line : null);
   const lines = editor.state.doc.toString().split("\n");
   noteImageDpi(lines, line);
   showStats(lines, line);
@@ -589,12 +606,24 @@ async function goToStyle(key: string): Promise<void> {
 function installHistory(): void {
   addEventListener("popstate", () => {
     const p = new URLSearchParams(location.search);
+    const at = p.get("history");
+    const step = versions !== undefined && at !== versions.at();
+    // Out of a preview first, so the place below it is editable again.
+    if (step && at === null) void versions?.follow(null);
     const m = MODES.find((m) => m === p.get("mode")) ?? "write";
-    view = p.get("view");
-    setMode(m);
-    if (m !== "write" && view) configPanel?.open(view);
+    const v = p.get("view");
     const line = lineFromHash(location.hash);
-    if (m === "write" && line !== null) scrollEditorToLine(editor, line);
+    // A step into or out of a preview reapplies only what differs, so the
+    // place it returns to keeps its scroll (spec §7.10).
+    if (!step || m !== mode || v !== view) {
+      view = v;
+      setMode(m);
+      if (m !== "write" && view) configPanel?.open(view);
+    }
+    if (m === "write" && line !== null && (!step || line !== cursorLine)) {
+      scrollEditorToLine(editor, line);
+    }
+    if (step && at !== null) void versions?.follow(at);
   });
 }
 
@@ -659,6 +688,7 @@ function hideDiskBanner(): void {
 function reloadFromDisk(): void {
   if (!diskOffer) return;
   const { text, version } = diskOffer;
+  versions?.snapshot("before-reload");
   sync.dropManuscript(version);
   takeDiskText(text);
   hideDiskBanner();
@@ -744,9 +774,9 @@ function installGutters(): void {
     const left = () =>
       (cssVar === "--w-tree"
         ? panes
-        : mode === "write"
-        ? $("editor")
-        : $("config-overlay")).getBoundingClientRect().left;
+        : ["editor", "config-overlay", "history-changes"].map($).find((el) =>
+          el.checkVisibility()
+        ) ?? panes).getBoundingClientRect().left;
     const rem = () => parseFloat(getComputedStyle(root).fontSize);
     const width = () => gutter.getBoundingClientRect().left - left();
     const resize = (px: number) => {
@@ -900,7 +930,9 @@ async function main(): Promise<void> {
   // Hiding or closing the tab sends what is waiting; closing prompts while
   // anything is unsaved (keepalive carries a save sent as the tab goes).
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void sync.flush();
+    if (document.visibilityState !== "hidden") return;
+    void sync.flush();
+    versions?.snapshot("close");
   });
   addEventListener("pagehide", () => void sync.flush());
   addEventListener("beforeunload", (e) => {
@@ -959,11 +991,27 @@ async function main(): Promise<void> {
   // Inspect reads the book's metadata (running heads, units, where a value
   // comes from), which is otherwise fetched only when Style or Publish opens.
   $("inspect").addEventListener("click", () => void ensureConfigPanel());
+  versions = installVersions({
+    backend: () => backend,
+    book: () => book,
+    edition: () => edition,
+    sync: () => sync,
+    editor: () => editor,
+    paint: (msg, cacheKey) => paint(msg, cacheKey),
+    themes,
+    syncUrl,
+    pushPlace,
+    changed: () => undoUi?.refresh(),
+  });
   installShortcuts({
     mode: () => mode,
     panes: installPanes({ mode: () => mode }),
     textView,
     inspect,
+    history: {
+      open: () => versions?.at() != null,
+      escape: () => versions?.escape() ?? false,
+    },
     editor: () => editor,
     preview: $("preview"),
     createManuscript,
@@ -971,6 +1019,7 @@ async function main(): Promise<void> {
   });
   undoUi = installUndo({
     mode: () => mode,
+    paused: () => versions?.at() != null,
     editor: () => editor,
     styles: {
       canUndo: styleUndo.canUndo,
@@ -1100,7 +1149,7 @@ async function main(): Promise<void> {
       return;
     }
     showSync(sync.status()); // clears a build or preview error; Sync says if saved
-    if (!themes.hold(msg)) {
+    if (!themes.hold(msg) && !versions?.hold(msg)) {
       themes.lastShown = msg;
       paint(msg);
     }
@@ -1112,6 +1161,8 @@ async function main(): Promise<void> {
     }
   };
   backend.subscribe(book, edition, clientId, onMessage, onClose);
+  const at = params.get("history"); // a link or a reload: nothing behind it
+  if (at !== null) void versions.follow(at, false);
 }
 
 // A boot that throws must say so, not sit on "Connecting…" for good.

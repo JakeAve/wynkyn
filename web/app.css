@@ -366,8 +366,15 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-#book-download {
+/* Download book's "With history" switch, at the right beside it. */
+#eds-head .eds-history {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
   margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
 }
 .ed-row {
   display: grid;
@@ -647,7 +654,8 @@ kbd {
 #pages {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* header · History's banner (§6.14) · pages or sheets · Inspect drawer */
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: var(--desk);
@@ -705,6 +713,10 @@ kbd {
 }
 .menu button:hover {
   background: var(--hover);
+}
+.menu button:disabled {
+  opacity: .45;
+  pointer-events: none;
 }
 .menu button svg {
   width: var(--icon);
@@ -832,7 +844,7 @@ body.typing #editor .pane-head {
   padding: var(--s-4);
 }
 /* Lists (§6.6): a small-caps group label, then rows --s-1 apart. */
-:is(#tree, #style-nav, #shortcuts-list) .nh {
+:is(#tree, #style-nav, #shortcuts-list, .history-list) .nh {
   font-size: var(--fs-sm);
   font-variant-caps: all-small-caps;
   letter-spacing: var(--track-caps);
@@ -840,7 +852,7 @@ body.typing #editor .pane-head {
   color: var(--muted);
   padding: var(--s-5) var(--s-4) var(--s-1);
 }
-:is(#tree, #style-nav, #shortcuts-list) .nh:first-child {
+:is(#tree, #style-nav, #shortcuts-list, .history-list) .nh:first-child {
   padding-top: 0;
 }
 #tree :is(ul.tree-list, li) {
@@ -1310,7 +1322,7 @@ body.typing #editor .pane-head {
 /* Banners (§6.10): a strip across the top of the pane they concern, small
    ghost buttons at the right. Changed on disk: the buffer has unsaved edits
    and the file moved under it, so saving stops; its lead says so in --err. */
-:is(#disk-banner, #spec-banner) {
+:is(#disk-banner, #spec-banner, .banner) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1319,7 +1331,7 @@ body.typing #editor .pane-head {
   border-bottom: 1px solid var(--line);
   font-size: var(--fs-sm);
 }
-:is(#disk-banner, #spec-banner)[hidden] {
+:is(#disk-banner, #spec-banner, .banner)[hidden] {
   display: none;
 }
 #disk-banner .msg {
@@ -2095,7 +2107,7 @@ body.typing #editor .pane-head {
      target's crumbs and actions, then why / box / type. Chrome, so it takes
      the theme; its box diagram borrows the marks' colors. */
   #inspect-drawer {
-    grid-row: 3;
+    grid-row: 4;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     max-height: 15.625rem;
@@ -2326,13 +2338,13 @@ body.typing #editor .pane-head {
 }
 /* View heading (§6.5): the nav group over the view's name in Fell, and
    where it applies at the right. */
-#config-overlay .phead {
+:is(#config-overlay, .history-changes) .phead {
   display: grid;
   gap: var(--s-1);
   padding: var(--s-5) var(--s-6) var(--s-4);
   border-bottom: 1px solid var(--line);
 }
-#config-overlay .crumb {
+:is(#config-overlay, .history-changes) .crumb {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
@@ -2361,7 +2373,7 @@ body.typing #editor .pane-head {
   gap: var(--s-4);
   min-width: 0;
 }
-#config-overlay .phead h2 {
+:is(#config-overlay, .history-changes) .phead h2 {
   margin: 0;
   font: 400 var(--fs-h)/var(--lh-tight) var(--f-title);
   min-width: 0;
@@ -2381,14 +2393,14 @@ body.typing #editor .pane-head {
   background: none;
   color: var(--fg);
 }
-#config-overlay .pbody {
+:is(#config-overlay, .history-changes) .pbody {
   overflow-y: auto;
   padding: var(--s-2) var(--s-6) var(--s-7);
   flex: 1;
   min-height: 0;
   container-type: inline-size;
 }
-#config-overlay .sec {
+:is(#config-overlay, .history-changes) .sec {
   padding: var(--s-5) 0;
   border-bottom: 1px solid var(--line);
   display: grid;
@@ -2515,14 +2527,14 @@ body.typing #editor .pane-head {
 .tcard.sm .tspec {
   padding: var(--s-4) var(--s-2);
 }
-#config-overlay .sech {
+:is(#config-overlay, .history-changes) .sech {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-4);
 }
 /* A group label (§3): small caps, tracked, muted. */
-#config-overlay .sech h3 {
+:is(#config-overlay, .history-changes) .sech h3 {
   margin: 0;
   font-size: var(--fs-sm);
   font-weight: 500;
@@ -2564,7 +2576,7 @@ body.typing #editor .pane-head {
   width: 0.8125rem;
   height: 0.8125rem;
 }
-#config-overlay .row {
+:is(#config-overlay, .history-changes) .row {
   display: grid;
   grid-template-columns: 8.5rem minmax(0,1fr);
   align-items: center;
@@ -2579,7 +2591,7 @@ body.typing #editor .pane-head {
 #config-overlay .row[hidden] {
   display: none;
 }
-#config-overlay .lbl {
+:is(#config-overlay, .history-changes) .lbl {
   position: relative;
   padding-left: var(--s-5);
 }
@@ -2597,7 +2609,7 @@ body.typing #editor .pane-head {
 #config-overlay .lbl .from {
   display: block;
 }
-#config-overlay .ctl {
+:is(#config-overlay, .history-changes) .ctl {
   display: flex;
   align-items: center;
   gap: var(--s-4);
@@ -2679,7 +2691,7 @@ body.typing #editor .pane-head {
   color: var(--fg);
   background: var(--hover);
 }
-:is(#config-overlay, #text-view) .seg {
+:is(#config-overlay, #text-view, .history-list) .seg {
   display: inline-flex;
   gap: var(--s-1);
   padding: var(--s-1);
@@ -2688,7 +2700,7 @@ body.typing #editor .pane-head {
   corner-shape: var(--corner);
   flex-wrap: wrap;
 }
-:is(#config-overlay, #text-view) .seg button {
+:is(#config-overlay, #text-view, .history-list) .seg button {
   background: none;
   border: 0;
   border-radius: var(--r);
@@ -2701,11 +2713,12 @@ body.typing #editor .pane-head {
   align-items: center;
   gap: var(--s-2);
 }
-:is(#config-overlay, #text-view) .seg button:hover {
+:is(#config-overlay, #text-view, .history-list) .seg button:hover {
   color: var(--fg);
 }
 #config-overlay .seg button[aria-checked="true"],
 #text-view .seg button[aria-checked="true"],
+.history-list .seg button[aria-checked="true"],
 #config-overlay .tog[aria-pressed="true"] {
   background: var(--acc-wash);
   color: var(--acc-ink);
@@ -2812,7 +2825,7 @@ body.typing #editor .pane-head {
 }
 /* switch (panel-controls.ts switchInput, §6.4): always a pill; a --line
    track, --acc when on, a paper knob that slides */
-:is(#config-overlay, #text-view) .sw {
+:is(#config-overlay, #text-view, #eds-head) .sw {
   appearance: none;
   position: relative;
   flex: none;
@@ -2825,7 +2838,7 @@ body.typing #editor .pane-head {
   cursor: pointer;
   transition: background var(--t-fast);
 }
-:is(#config-overlay, #text-view) .sw::before {
+:is(#config-overlay, #text-view, #eds-head) .sw::before {
   content: "";
   position: absolute;
   top: var(--s-1);
@@ -2837,10 +2850,10 @@ body.typing #editor .pane-head {
   box-shadow: 0 1px 2px rgb(0 0 0 / .2);
   transition: transform var(--t-fast);
 }
-:is(#config-overlay, #text-view) .sw:checked {
+:is(#config-overlay, #text-view, #eds-head) .sw:checked {
   background: var(--acc);
 }
-:is(#config-overlay, #text-view) .sw:checked::before {
+:is(#config-overlay, #text-view, #eds-head) .sw:checked::before {
   transform: translateX(0.8125rem);
 }
 :is(#config-overlay, #text-view) .sw:disabled {
@@ -3894,4 +3907,184 @@ body.typing #editor .pane-head {
   padding-top: var(--s-1);
   color: var(--muted);
   font: var(--fs-2xs) var(--f-mono);
+}
+
+/* ---- History (design-language §6.14): the version list reads like the style
+   nav; the changes column reuses the panel's heading, sections and rows. ---- */
+.history-list {
+  overflow-y: auto;
+  padding: var(--s-4);
+}
+.history-list .h-row {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  column-gap: var(--s-4);
+  align-items: baseline;
+  width: 100%;
+  padding: var(--s-2) var(--s-4);
+  border: 0;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.history-list .h-row + :is(.h-row, .btn) {
+  margin-top: var(--s-1);
+}
+.history-list .h-row:hover {
+  background: var(--hover);
+}
+.history-list .h-row[aria-current="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+.history-list .h-row > :not(.h-time) {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-list .h-time {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.history-list :is(.h-detail, .h-reason) {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.history-list .h-detail:empty {
+  display: none;
+}
+.history-list .h-row[aria-current="true"] :is(.h-time, .h-detail, .h-reason) {
+  color: inherit;
+  opacity: .6;
+}
+.history-list .h-row + .btn {
+  margin-left: calc(4rem + var(--s-4));
+}
+.history-changes {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.history-changes .h-actions {
+  display: flex;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+}
+.history-changes .h-summary {
+  max-width: 36em;
+  margin: var(--s-5) 0 0;
+  color: var(--muted);
+}
+.history-changes .h-to {
+  overflow-wrap: anywhere;
+}
+.history-changes .h-from {
+  color: var(--muted);
+}
+/* Text diffs: an insert is underlined in --acc (an edit mark, like the set
+   dot); a delete is struck in --muted. Never a tint, never --err. */
+.history-changes .h-para {
+  max-width: 36em;
+  margin: 0;
+  font: var(--fs-lg) / 1.62 var(--f-text);
+  user-select: text;
+}
+.history-changes .h-para ins {
+  text-decoration: underline var(--acc) var(--ring);
+  text-underline-offset: 0.2em;
+}
+.history-changes .h-para del {
+  color: var(--muted);
+  text-decoration: line-through var(--muted);
+}
+.history-changes .h-note {
+  margin: var(--s-5) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.banner.err strong {
+  color: var(--err);
+}
+
+/* History's menu (§6.14, versions.ts): under the toolbar button, right-aligned
+   to it; versions.ts sets top and right. */
+#history-menu {
+  width: 21.25rem;
+  max-height: calc(100dvh - var(--h-toolbar) - var(--s-6));
+  padding: 0;
+}
+#history-menu:popover-open {
+  display: flex;
+  flex-direction: column;
+}
+#history-menu .history-list {
+  flex: 1;
+  min-height: 0;
+  padding: var(--s-2);
+}
+#history-menu .h-foot {
+  padding: var(--s-2);
+  border-top: 1px solid var(--line);
+}
+#history-menu :is(.h-foot button, .history-list .btn) {
+  width: auto;
+}
+.history-list .h-star {
+  display: inline;
+  visibility: visible;
+  width: 0.875em;
+  height: 0.875em;
+  margin-right: var(--s-2);
+  vertical-align: -0.1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+#history-open[aria-pressed="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+/* A version on the pages (:root[data-history]): what it changed takes the
+   editor's two columns as one, whatever the mode; the pages show even where
+   the mode shows sheets, and are only to look at. */
+:root:not([data-history]) #history-changes,
+:root[data-history] :is(#tree, #style-nav, #gutter-tree, #editor, #config-overlay, #sheet-view, #inspect, #inspect-overlay, #inspect-drawer, .pane-head .expand, #foot-tree, #foot-gutter-tree, #writer-foot > *) {
+  display: none;
+}
+:root[data-history] :is(#panes, #footer) {
+  grid-template-columns: calc(var(--w-tree) + 0.3125rem + var(--w-editor))
+    0.3125rem minmax(0, 1fr);
+}
+:root[data-history] #preview {
+  position: relative;
+  inset: auto;
+  visibility: visible;
+}
+:root[data-history] #pages #zoom {
+  display: flex;
+}
+#history-changes {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+#history-diff {
+  flex: 1;
+}
+#version-banner {
+  grid-row: 2;
+}
+#pages > :is(#preview, #sheet-view) {
+  grid-row: 3;
+}
+.banner > .msg {
+  flex: 1 1 15rem;
 }

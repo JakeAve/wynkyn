@@ -7,6 +7,8 @@ import type { Mode } from "./preview.ts";
 
 export interface UndoDeps {
   mode(): Mode;
+  /** Nothing to undo here (History: a restore's undo is its banner's). */
+  paused(): boolean;
   editor(): EditorView;
   styles: {
     canUndo(): boolean;
@@ -27,8 +29,11 @@ export function installUndo(d: UndoDeps): Undo {
   const text = () => d.mode() === "write";
   const refresh = () => {
     const ed = d.editor();
-    undoB.disabled = text() ? !undoDepth(ed.state) : !d.styles.canUndo();
-    redoB.disabled = text() ? !redoDepth(ed.state) : !d.styles.canRedo();
+    const off = d.paused();
+    undoB.disabled = off ||
+      (text() ? !undoDepth(ed.state) : !d.styles.canUndo());
+    redoB.disabled = off ||
+      (text() ? !redoDepth(ed.state) : !d.styles.canRedo());
   };
   const step = (back: boolean) => () => {
     if (text()) {

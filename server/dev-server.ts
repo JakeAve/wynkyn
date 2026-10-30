@@ -4,6 +4,7 @@
 // `bml export`.
 import { NotFoundError } from "./pipeline.ts";
 import { BookService, ServiceError, themedTemplate } from "./book-service.ts";
+import type { RestoreScope } from "./history.ts";
 import { type BookStore, diskStore } from "./store.ts";
 import { defaultPort } from "./port.ts";
 import { installedFonts } from "./local-fonts.ts";
@@ -241,6 +242,74 @@ export async function startServer(
         });
         return Response.json(r, { status: "conflict" in r ? 409 : 200 });
       }
+    }
+
+    if ((p = m(/^\/api\/books\/([^/]+)\/history$/)) && req.method === "GET") {
+      return Response.json(await service.history(p[0]!));
+    }
+    if (
+      (p = m(/^\/api\/books\/([^/]+)\/history\/name$/)) &&
+      req.method === "POST"
+    ) {
+      const { id, name } = await json(req);
+      if ((id !== null && typeof id !== "string") || typeof name !== "string") {
+        return new Response(
+          "body must be { id: string | null, name: string }",
+          {
+            status: 400,
+          },
+        );
+      }
+      return Response.json(await service.nameVersion(p[0]!, id, name));
+    }
+    if (
+      (p = m(/^\/api\/books\/([^/]+)\/history\/snapshot$/)) &&
+      req.method === "POST"
+    ) {
+      const { reason, overrides } = await json(req);
+      if (reason !== "close" && reason !== "before-reload") {
+        return new Response("bad snapshot reason", { status: 400 });
+      }
+      if (
+        overrides !== undefined &&
+        (overrides === null || typeof overrides !== "object" ||
+          Object.values(overrides).some((v) => typeof v !== "string"))
+      ) {
+        return new Response("overrides must be { path: text }", {
+          status: 400,
+        });
+      }
+      return Response.json(
+        await service.takeSnapshot(
+          p[0]!,
+          reason,
+          overrides as Record<string, string> | undefined,
+        ),
+      );
+    }
+    if (
+      (p = m(/^\/api\/books\/([^/]+)\/history\/([^/]+)$/)) &&
+      req.method === "GET"
+    ) {
+      return Response.json(await service.versionFiles(p[0]!, p[1]!));
+    }
+    if (
+      (p = m(/^\/api\/books\/([^/]+)\/history\/([^/]+)\/build$/)) &&
+      req.method === "GET"
+    ) {
+      return Response.json(await service.buildVersion(p[0]!, p[1]!, edition));
+    }
+    if (
+      (p = m(/^\/api\/books\/([^/]+)\/history\/([^/]+)\/restore$/)) &&
+      req.method === "POST"
+    ) {
+      const { scope } = await json(req);
+      if (scope === undefined || scope === null) {
+        return new Response("body must be { scope }", { status: 400 });
+      }
+      return Response.json(
+        await service.restoreVersion(p[0]!, p[1]!, scope as RestoreScope),
+      );
     }
 
     // An import done in the page: the manuscript and base64 images (§7.9).

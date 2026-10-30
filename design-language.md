@@ -104,7 +104,7 @@ any surface.
 - Focus rings and focused field borders.
 - The selected thing: nav rows, segments, the recommended choice, a pressed
   toggle button, the current menu item.
-- Edited-value dots.
+- Edited-value dots, and the underline under inserted text in History (§6.14).
 - The outline on the pages around what is being styled or where the cursor is.
 - Switches that are on.
 - At most one primary action per screen.
@@ -493,7 +493,8 @@ Group label (§3) then rows: padding `--s-2 --s-4`, `--r` + corner, `--s-1`
 apart, a right-aligned count in `--fs-2xs` `--muted`. Hover wash; the current
 row takes the red wash. Nesting indents by `--s-4` per level. No separators. In
 `web/app.css`: `:is(#tree, #style-nav) .nh` is the label, `#style-nav .ni` and
-`#tree .tree-node` the rows; the switcher's `.book-row` follows the same rules.
+`#tree .tree-node` the rows; the switcher's `.book-row` and History's version
+list (§6.14) follow the same rules.
 
 ### 6.7 Choice list
 
@@ -570,9 +571,10 @@ at the right.
 - **Banner:** a strip across the top of the pane it concerns, never a toast. A
   hairline below (the bar above it draws the one above), padding `--s-3 --s-5`,
   `--fs-sm` message, small ghost buttons (`.btn.sm`) right. A warning banner
-  adds `--warn-wash` and a warn icon. Changed on disk (`#disk-banner`) is plain
-  with its lead in `--err`, because saving has stopped; the spec-version banner
-  (`#spec-banner`) is the warning.
+  adds `--warn-wash` and a warn icon. `.banner` is the class for any new one;
+  `.banner.err` sets its lead (`strong`) in `--err`. Changed on disk
+  (`#disk-banner`) is plain with its lead in `--err`, because saving has
+  stopped; the spec-version banner (`#spec-banner`) is the warning.
 - **Status** (planned): icon + bold lead word + plain sentence in the status
   color: "Can't save: the folder is read-only." Never color alone. Today's lines
   are the sentence in the status color (`.sw-err`, `#image-note.warn`).
@@ -595,20 +597,25 @@ control's tooltip and `kbd` show its key as the platform writes it
   (library / book name in Alegreya `--fs-lg` 500 / edition, `--muted`; the book
   switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
   Publish (Mod+1–3); right, Undo and Redo (`.btn.icon`, curved arrows, disabled
-  while there is nothing to undo), then the theme toggle (Mod+Shift+L), showing
-  the mode it switches to in woodcut: the sun mark (§10) without its cut lines,
-  and the man in the moon beside a share-card star. These two are filled, not
-  stroked, in the button's color (never red). The save status sits after the
-  crumb. The crumb's text is trimmed to cap height and baseline (`text-box`), so
-  the library icon and the chevrons center on the caps (as does any button's
-  label in a `span` after its icon); until a book is chosen it shows the library
-  step alone (nothing on the dev server).
+  while there is nothing to undo), History (`#history-open`, `.btn.icon`, a
+  clock with a back arrow; ⌥⌘Y on a Mac, Ctrl+Shift+Y elsewhere; it opens
+  History's menu and sits in the red wash while that is open or a version is
+  previewed, §6.14), then the theme toggle (Mod+Shift+L), showing the mode it
+  switches to in woodcut: the sun mark (§10) without its cut lines, and the man
+  in the moon beside a share-card star. These two are filled, not stroked, in
+  the button's color (never red). The save status sits after the crumb. The
+  crumb's text is trimmed to cap height and baseline (`text-box`), so the
+  library icon and the chevrons center on the caps (as does any button's label
+  in a `span` after its icon); until a book is chosen it shows the library step
+  alone (nothing on the dev server).
 - **Switcher** (`#switcher`): books left, the selected book's editions right.
   The books foot holds New book; in browser storage only, Download library
   (download icon) under it and the note "Your library is currently in browser
   storage and could be cleared by your browser at any time." in `--fs-xs`
   `--muted`, and over the editions a head (`#eds-head`) naming the selected book
-  in Alegreya 500 `--muted` with a small Download book at its right.
+  in Alegreya 500 `--muted` with a small Download book at its right, and before
+  it a "With history" switch (§6.4) in `--fs-sm` `--muted` that adds the book's
+  `.history` folder to the zip.
 - **Pane header** (`--h-pane` at least, `.pane-head`): the pane's own controls
   at left in small sizes, `--s-2` apart; its expand button
   (`.btn.sm.icon
@@ -663,6 +670,68 @@ marks' colors (§2.4).
 - **Type:** label column 4rem; the value over where it comes from: "Style ›
   Chapter title" when this element sets it, else the value `--muted` with "from
   Body" or "Book default".
+
+### 6.14 History
+
+A menu under the toolbar's History button (`web/src/versions.ts`); a picked
+version on the pages, with what it changed (`web/src/history-view.ts`) in place
+of the editor's left and middle columns, so nothing can be edited meanwhile.
+
+- **Menu** (`#history-menu`): a §6.9 `.menu` popover right-aligned under the
+  button, 21.25rem wide, no taller than the window; the version list, then a
+  footer ruled by a hairline holding "Name this version…" ("Rename version…"
+  when the previewed version has a name). Picking a row closes the menu and
+  previews it; picking Now goes back to editing.
+- **Version list** (`.history-list`, in the menu): reads like the style nav
+  (§6.6). At the top, "This edition | All editions" as a `seg` (§6.2), only when
+  the book has more than one edition. Each day is a group label (`.nh`: Today,
+  Yesterday, "Tue 20 Oct"), then rows (`.h-row`): a 4rem column holding the time
+  in `--fs-xs` `--muted` tabular figures, and beside it what changed over the
+  parts it touched in `--fs-xs` `--muted`, then the reason (Before import…) in
+  the same, italic. A named version shows its name after a small outline star
+  (`.h-star`, the icons' 16-unit grid and 1.4 stroke). "Now · Current version"
+  heads Today. The previewed row takes the red wash (`aria-current`), its muted
+  lines in the wash's ink at 60%. A folded run of thinned versions is a small
+  ghost "▸ N more" lined up with the rows' text.
+- **Preview:** what changed (`#history-changes`) takes the left and middle
+  columns as one, whatever the mode; the pages show the version even where the
+  mode shows sheets, and are only to look at; anything hiding the pages (Write's
+  hidden pages, an expanded pane) waits aside. The mode switch and the Contents
+  toggle are disabled, as are Undo and Redo; Inspect and the expand buttons go.
+  "← Back to editing" (a small ghost in the column's pane header, §6.11) or Esc,
+  once the menu is closed, ends it: the mode, view, panes and scroll come back
+  as they were, and the History button leaves the wash.
+- **What changed** (`.history-changes`): the panel's view heading (§6.5): the
+  crumb is when it was taken and the reason, the heading in Fell is what changed
+  or the version's name, then the actions: Restore ▾ (the one primary) and "Name
+  this version…" or "Rename version…" (ghost). Below, a `--muted` summary up to
+  36em, then a section (§6.5) per changed part. Style changes are rows: the
+  property's plain name, then the old value in `--muted`, →, the new in `--fg`;
+  the file's `spec` version is housekeeping, never listed. Text changes are a
+  section per chapter, paragraphs in Alegreya at the writing's size and leading,
+  selectable: inserted text keeps its ink with a `--ring` `--acc` underline (an
+  edit mark, like the set dot); deleted text is struck through in `--muted`.
+  Never a tint behind either, and never `--err`: a delete is not an error.
+- **Restore menu:** a §6.9 `.menu` popover under Restore ▾: Everything, Text
+  only, Styles only (the edition being edited, its note naming it: "Standard's
+  styles; the text stays"), each with its note in the right column (`.d`). No
+  checks: nothing in it is current. Styles only is disabled (45%), its note
+  "Pocket didn't exist yet", for a version made before the edition.
+- **Failure:** a restore or a diff that fails puts a `.banner.err` (§6.10)
+  across the top of the changes column, `role="alert"`: the lead ("Couldn't
+  restore.") in `--err`, then the reason. Never a toast.
+- **Pages banner** (`#version-banner`): while a version is previewed, a plain
+  banner across the top of the pages pane, under its header, the message alone:
+  "Previewing Sent to printer, Today, 3:42 pm. Nothing changes until you
+  restore." (the name, else what changed). After a restore the preview ends and
+  the same strip says "Restored the styles from Yesterday, 9:10 am." with a
+  small ghost Undo (`.btn.sm`), which restores the before-restore version with
+  the same scope, then "Restore undone."; a small ✕ dismisses it (Esc leaves it
+  be). A version that can't be built, or an Undo that fails, turns it into a
+  `.banner.err` there.
+- **Name** opens a §6.8 dialog (`#name-dlg`): "Name this version" or "Rename
+  this version", a Name field, a `--muted` hint that named versions are kept
+  indefinitely, Cancel and the primary Save name.
 
 ## 7. Layout and expanded views
 

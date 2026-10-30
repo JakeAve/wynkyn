@@ -34,6 +34,20 @@ import {
   safeImageName,
 } from "./images.ts";
 import { type EpubBytes, epubBytes } from "./epub-export.ts";
+import {
+  IDLE_MS,
+  listVersions,
+  MAX_GAP_MS,
+  nameVersion,
+  readObject,
+  readVersion,
+  restore,
+  type RestoreScope,
+  snapshot,
+  type SnapshotReason,
+  type Version,
+  versionStore,
+} from "./history.ts";
 
 /** A refused request; `status` is the HTTP status the dev server answers with. */
 export class ServiceError extends Error {
@@ -52,7 +66,14 @@ export interface ServiceOptions {
    * over the same files (tabs: navigator.locks); none is just this one's
    * queue, enough when it is the only writer (the dev server). */
   lock?: <T>(key: string, fn: () => Promise<T>) => Promise<T>;
+  historyIdleMs?: number;
+  historyMaxMs?: number;
 }
+
+const VERSION_ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z(-\d+)?$/;
+// Images are left out: a version's preview shows the book's current ones.
+const TEXT_FILE =
+  /^(manuscript\.md|metadata\.json|dictionary\.json|editions\/[^/]+\.json)$/;
 
 export type SaveResult =
   | { ok: true; version: string; text?: string } // text: the save was rewritten
@@ -97,10 +118,19 @@ export class BookService {
     string,
     ReturnType<typeof setTimeout>
   >();
+  // book → its edits since its last snapshot.
+  private readonly edits = new Map<
+    string,
+    { first: number; last: number; timer?: ReturnType<typeof setTimeout> }
+  >();
+  private readonly historyIdleMs: number;
+  private readonly historyMaxMs: number;
 
   constructor(opts: ServiceOptions) {
     this.store = opts.store;
     this.buildOpts = { baseCss: opts.baseCss, imageUrl: opts.imageUrl };
+    this.historyIdleMs = opts.historyIdleMs ?? IDLE_MS;
+    this.historyMaxMs = opts.historyMaxMs ?? MAX_GAP_MS;
     this.lock = opts.lock ?? ((_key, fn) => fn());
     // The store reports every change, the service's own writes included.
     this.stopWatch = this.store.watch((paths) => this.onChanged(paths));
@@ -109,6 +139,7 @@ export class BookService {
   async stop(): Promise<void> {
     this.stopWatch();
     for (const t of this.heldImages.values()) clearTimeout(t);
+    for (const e of this.edits.values()) clearTimeout(e.timer);
     await Promise.all(this.chains.values()); // writes under way land
     this.clients.clear();
   }
@@ -274,6 +305,7 @@ export class BookService {
       if (!await this.store.create(path, bytes)) {
         throw new ServiceError(409, "an image with that name is already there");
       }
+      this.markEdit(book);
       return { slug: name.slice(0, -parsed.ext.length - 1), name };
     });
   }
@@ -362,6 +394,7 @@ export class BookService {
       clearTimeout(this.heldImages.get(book));
       this.heldImages.delete(book);
       void this.broadcast(book, undefined);
+      this.markEdit(book);
       const version = await contentVersion(text);
       return text === save.text
         ? { ok: true, version }
@@ -390,6 +423,7 @@ export class BookService {
       } catch (err) {
         throw new ServiceError(500, `save failed: ${String(err)}`);
       }
+      this.markEdit(book);
       return { version: await contentVersion(text) };
     });
   }
@@ -418,6 +452,7 @@ export class BookService {
     if (!await createEdition(this.store, book, slug, source.metadata)) {
       throw new ServiceError(409, "edition already exists");
     }
+    this.markEdit(book);
   }
 
   async renameEdition(
@@ -438,6 +473,7 @@ export class BookService {
     const from = metadataKey(book, edition);
     const moved = await this.serialize(from, () => this.store.rename(from, to));
     if (!moved) throw notFound("edition not found");
+    this.markEdit(book);
     // EXPERIMENTAL (§3.2.9): the edition's {only} token follows its slug.
     // Later saves carrying the old token are rewritten as they arrive.
     const stale = new Set(
@@ -475,9 +511,129 @@ export class BookService {
 
   async deleteEdition(book: string, edition: string): Promise<void> {
     checkNames(book, edition);
+    await this.snap(book, "before-delete-edition");
     const path = metadataKey(book, edition);
     const removed = await this.serialize(path, () => this.store.remove(path));
     if (!removed) throw notFound("edition not found");
+    this.markEdit(book);
+  }
+
+  // ---- history ----------------------------------------------------------
+
+  async history(book: string): Promise<Version[]> {
+    checkNames(book, null);
+    await this.requireBook(book);
+    return listVersions(this.store, book);
+  }
+
+  async versionFiles(
+    book: string,
+    id: string,
+  ): Promise<{ version: Version; files: Record<string, string> }> {
+    const version = await this.version(book, id);
+    const files: Record<string, string> = {};
+    const dec = new TextDecoder();
+    for (const [rel, hash] of Object.entries(version.files)) {
+      if (!TEXT_FILE.test(rel)) continue;
+      const bytes = await readObject(this.store, book, hash);
+      if (bytes) files[rel] = dec.decode(bytes);
+    }
+    return { version, files };
+  }
+
+  async buildVersion(
+    book: string,
+    id: string,
+    edition: string | null,
+  ): Promise<BuildResult> {
+    checkNames(book, edition);
+    const v = await this.version(book, id);
+    try {
+      return await buildBook(versionStore(this.store, book, v), book, {
+        ...this.buildOpts,
+        edition,
+      });
+    } catch (err) {
+      if (err instanceof NotFoundError) throw notFound("edition not found");
+      throw err;
+    }
+  }
+
+  /** Returns the snapshot of what was there before, for Undo. Clients
+   * reload by the store's watch, as for any outside change. */
+  async restoreVersion(
+    book: string,
+    id: string,
+    scope: RestoreScope,
+  ): Promise<Version | null> {
+    checkScope(scope);
+    const v = await this.version(book, id);
+    if (typeof scope === "object") {
+      const rel = scope.edition === null
+        ? "metadata.json"
+        : `editions/${scope.edition}.json`;
+      if (!(rel in v.files)) {
+        throw bad("that version has no styles for this edition");
+      }
+    }
+    return await this.serialize(book, async () => {
+      const before = await this.snapNow(book, "before-restore") ??
+        (await listVersions(this.store, book))[0] ?? null;
+      // Held, not settled: a save queued from here on would read the file
+      // before the restore and write it after.
+      const styles = new Set([
+        metadataKey(book, null),
+        ...(await this.store.listDir(`${book}/editions`)).map((n) =>
+          `${book}/editions/${n}`
+        ),
+        ...Object.keys(v.files).filter((r) => r.startsWith("editions/")).map(
+          (r) => `${book}/${r}`,
+        ),
+      ]);
+      await this.holding(
+        [...styles].sort(), // one order across tabs' locks: no deadlock
+        () => restore(this.store, book, v, scope),
+      );
+      return before;
+    });
+  }
+
+  /** id null names the book as it is now. */
+  async nameVersion(
+    book: string,
+    id: string | null,
+    name: string,
+  ): Promise<Version> {
+    if (typeof name !== "string" || !name.trim()) throw bad("a name, please");
+    if (id === null) {
+      checkNames(book, null);
+      await this.requireBook(book);
+      const v = await this.snap(book, "named", { name });
+      if (!v) throw new ServiceError(500, "named snapshot not taken");
+      return v;
+    }
+    const v = await this.version(book, id);
+    await this.serialize(book, () => nameVersion(this.store, book, id, name));
+    return { ...v, name };
+  }
+
+  /** `overrides`: book-relative path → unsaved text to snapshot instead. */
+  async takeSnapshot(
+    book: string,
+    reason: "close" | "before-reload",
+    overrides?: Record<string, string>,
+  ): Promise<Version | null> {
+    checkNames(book, null);
+    if (reason !== "close" && reason !== "before-reload") {
+      throw bad("bad snapshot reason");
+    }
+    for (const [rel, text] of Object.entries(overrides ?? {})) {
+      if (!TEXT_FILE.test(rel) || typeof text !== "string") {
+        throw bad("bad override");
+      }
+    }
+    await this.requireBook(book);
+    return this.snap(book, reason, overrides ? { overrides } : {});
   }
 
   // ---- subscriptions ----------------------------------------------------
@@ -491,6 +647,11 @@ export class BookService {
   ): () => void {
     checkNames(book, edition);
     const client: Client = { send, book, edition, clientId };
+    if (![...this.clients].some((c) => c.book === book)) {
+      this.snap(book, "open").catch((err) =>
+        console.error(`${book}: open snapshot failed: ${String(err)}`)
+      );
+    }
     this.clients.add(client);
     this.buildMessage(book, edition).then((m) => {
       if (this.clients.has(client)) send(m);
@@ -517,6 +678,83 @@ export class BookService {
       if (this.chains.get(key) === tail) this.chains.delete(key);
     });
     return run;
+  }
+
+  private holding<T>(keys: string[], fn: () => Promise<T>): Promise<T> {
+    const [key, ...rest] = keys;
+    return key === undefined
+      ? fn()
+      : this.serialize(key, () => this.holding(rest, fn));
+  }
+
+  private async version(book: string, id: string): Promise<Version> {
+    checkNames(book, null);
+    if (typeof id !== "string" || !VERSION_ID.test(id)) {
+      throw bad("bad version id");
+    }
+    await this.requireBook(book);
+    const v = await readVersion(this.store, book, id);
+    if (!v) throw notFound("version not found");
+    return v;
+  }
+
+  private snap(
+    book: string,
+    reason: SnapshotReason,
+    opts: { name?: string; overrides?: Record<string, string> } = {},
+  ): Promise<Version | null> {
+    return this.serialize(book, () => this.snapNow(book, reason, opts));
+  }
+
+  // For a caller holding the book's queue. A metadata write under way lands
+  // first, so the snapshot holds it.
+  private async snapNow(
+    book: string,
+    reason: SnapshotReason,
+    opts: { name?: string; overrides?: Record<string, string> } = {},
+  ): Promise<Version | null> {
+    await this.settleWrites(book);
+    if (!await this.store.exists(`${book}/manuscript.md`)) return null;
+    clearTimeout(this.edits.get(book)?.timer);
+    this.edits.delete(book);
+    return snapshot(this.store, book, reason, opts);
+  }
+
+  // The book's path queues (metadata, renames, deletes, images), never its
+  // own, which the caller holds.
+  private async settleWrites(book: string): Promise<void> {
+    for (const [key, chain] of [...this.chains]) {
+      if (key.startsWith(`${book}/`)) await chain;
+    }
+  }
+
+  private markEdit(book: string) {
+    const now = Date.now();
+    const t = this.edits.get(book) ?? { first: now, last: now };
+    t.last = now;
+    this.edits.set(book, t);
+    this.armSnapshot(book, t);
+  }
+
+  private armSnapshot(
+    book: string,
+    t: { first: number; last: number; timer?: ReturnType<typeof setTimeout> },
+  ) {
+    clearTimeout(t.timer);
+    const at = Math.min(
+      t.last + this.historyIdleMs,
+      t.first + this.historyMaxMs,
+    );
+    t.timer = setTimeout(() => {
+      if (this.edits.get(book) !== t) return;
+      const now = Date.now();
+      // A timer can fire a little early: wait out the rest.
+      if (now < at) return this.armSnapshot(book, t);
+      const reason = now - t.last >= this.historyIdleMs ? "idle" : "max";
+      this.snap(book, reason).catch((err) =>
+        console.error(`${book}: ${reason} snapshot failed: ${String(err)}`)
+      );
+    }, Math.max(0, at - Date.now()));
   }
 
   private pruneRenames(book: string) {
@@ -656,6 +894,18 @@ export async function libraryId(store: BookStore): Promise<string> {
 
 // Longer than the editor's save debounce (600ms in app.ts) plus the watcher's.
 const IMAGE_HOLD_MS = 1200;
+
+function checkScope(scope: unknown): asserts scope is RestoreScope {
+  if (scope === "all" || scope === "text") return;
+  if (
+    typeof scope === "object" && scope !== null && !Array.isArray(scope) &&
+    Object.keys(scope).length === 1 && "edition" in scope
+  ) {
+    const e = scope.edition;
+    if (e === null || (typeof e === "string" && safeName(e))) return;
+  }
+  throw bad("bad restore scope");
+}
 
 function checkNames(book: string, edition: string | null): void {
   if (!safeName(book) || (edition !== null && !safeName(edition))) {

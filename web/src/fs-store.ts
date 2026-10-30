@@ -207,8 +207,8 @@ export const browserFolder = (): Promise<FileSystemDirectoryHandle> =>
   navigator.storage.getDirectory();
 
 // Files picked with <input type="file" webkitdirectory>: every book is a
-// directory with a manuscript.md; its metadata, editions and images come
-// along, anything else is left behind. A book is named by its folder,
+// directory with a manuscript.md; its metadata, editions, images and
+// history come along, anything else is left behind. A book is named by its folder,
 // slugified; a slug the library already has (or this import already took) is
 // skipped whole, never merged or overwritten. Returns the slugs written and
 // the folder names skipped.
@@ -242,7 +242,7 @@ export async function importBooks(
     if (book === undefined) continue; // skipped
     const rel = root === "" ? p : p.slice(root.length + 1);
     if (
-      !/^(manuscript\.md|metadata\.json|editions\/[^/]+\.json|images\/[^/]+)$/
+      !/^(manuscript\.md|metadata\.json|editions\/[^/]+\.json|images\/[^/]+|\.history\/(objects|versions)\/[^/]+)$/
         .test(rel)
     ) continue;
     const path = `${book}/${rel}`;
@@ -266,7 +266,7 @@ export async function copyBooks(
       skipped.push(book);
       continue;
     }
-    for (const rel of await bookFiles(from, book)) {
+    for (const rel of await bookFiles(from, book, true)) {
       const data = await from.read(`${book}/${rel}`);
       if (data) await to.create(`${book}/${rel}`, data);
     }

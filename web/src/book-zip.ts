@@ -7,11 +7,19 @@ import type { BookStore } from "../../server/store.ts";
 export async function bookFiles(
   store: BookStore,
   book: string,
+  history = false,
 ): Promise<string[]> {
   const rels = ["metadata.json", "dictionary.json"];
   for (const dir of ["editions", "images"]) {
     for (const name of await store.listDir(`${book}/${dir}`)) {
       rels.push(`${dir}/${name}`);
+    }
+  }
+  if (history) {
+    for (const dir of ["objects", "versions"]) {
+      for (const name of await store.listDir(`${book}/.history/${dir}`)) {
+        rels.push(`.history/${dir}/${name}`);
+      }
     }
   }
   // Last: copyBooks counts a book present by its manuscript.
@@ -22,10 +30,11 @@ async function zipBooks(
   store: BookStore,
   books: string[],
   prefix: string,
+  history = false,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const files: Record<string, Uint8Array> = {};
   for (const book of books) {
-    for (const rel of await bookFiles(store, book)) {
+    for (const rel of await bookFiles(store, book, history)) {
       const data = await store.read(`${book}/${rel}`);
       if (data) files[`${prefix}${book}/${rel}`] = data;
     }
@@ -36,7 +45,9 @@ async function zipBooks(
 export const zipBook = (
   store: BookStore,
   book: string,
-): Promise<Uint8Array<ArrayBuffer>> => zipBooks(store, [book], "");
+  opts: { history?: boolean } = {},
+): Promise<Uint8Array<ArrayBuffer>> =>
+  zipBooks(store, [book], "", opts.history);
 
 // Under `Books/`, so the unzipped folder opens as a library.
 export const zipLibrary = (
