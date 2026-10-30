@@ -51,6 +51,11 @@ Deno.test("rank keeps only sentinels after {", () => {
   assertEquals(ids(rank(items, "{", ctx())), ["quote"]);
   assertEquals(ids(rank(items, "{quo", ctx())), ["quote"]);
   assertEquals(ids(rank(items, "{fonts", ctx())), []);
+  const epigraph = item("epigraph", "Sentinels", "Quotation before a chapter");
+  assertEquals(ids(rank([epigraph, ...items], "{quo", ctx())), [
+    "quote",
+    "epigraph",
+  ]);
 });
 
 Deno.test("rank adds a page row for a number", () => {

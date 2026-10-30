@@ -28,7 +28,10 @@ orders it.
 
 **Left is where you are, middle is what you're changing, right is the
 result.** The mode switch (Write ⌘1, Style ⌘2, Publish ⌘3; ⌘, also opens Style)
-picks all three, and the mode persists across reloads:
+picks all three, and the mode persists across reloads. ⌘K opens the command
+palette in any mode: commands, sentinels, chapters, pages and styles in one
+list, and a pick that lives in another mode switches there first; one that
+can't run now shows dimmed.
 
 | Mode | Left | Middle | Right |
 | --- | --- | --- | --- |

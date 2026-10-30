@@ -45,10 +45,12 @@ export function rank(items: Item[], query: string, ctx: RankContext): Item[] {
     q = q.slice(1);
   }
   const f = q.toLowerCase();
+  const named = (i: Item) => i.label.toLowerCase().includes(f);
+  // A name match leads a description match within its group: `{quo` is quote,
+  // not epigraph ("Quotation before a chapter").
   const hits = pool.filter((i) =>
-    i.label.toLowerCase().includes(f) ||
-    !!i.detail?.toLowerCase().includes(f)
-  );
+    named(i) || !!i.detail?.toLowerCase().includes(f)
+  ).toSorted((a, b) => Number(named(b)) - Number(named(a)));
   const page = /^(page\s*)?(\d+)$/i.exec(query.trim());
   if (!page) return sortBy(hits, order);
   const n = Number(page[2]);

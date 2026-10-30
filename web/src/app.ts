@@ -16,6 +16,7 @@ import {
   installPageIndicator,
   installPreviewClicks,
   installStyleHover,
+  LIVE_PAGE,
   markEdited,
   type Mode,
   pageMap,
@@ -45,7 +46,7 @@ import { chapterAt, wordCount } from "./prose-model.ts";
 import { setPageTurns } from "./prose.ts";
 import { type ImageHost, pickImageFile } from "./editor-images.ts";
 import type { ImageFile } from "../../server/images.ts";
-import { buildTree } from "./tree-data.ts";
+import { buildTree, type TreeNode } from "./tree-data.ts";
 import { renderTree } from "./tree-view.ts";
 import { type ConfigPanel, createConfigPanel } from "./config-panel.ts";
 import type { Metadata } from "../../metadata/types.ts";
@@ -63,6 +64,9 @@ import { installVersions, type Versions } from "./versions.ts";
 import { installTextView } from "./text-view.ts";
 import { installPanes } from "./panes.ts";
 import { installShortcuts } from "./shortcuts.ts";
+import { installPalette } from "./palette.ts";
+import { paletteItems } from "./palette-items.ts";
+import { insertSnippet } from "./editor-insert.ts";
 import { installPreviewZoom } from "./preview-zoom.ts";
 import { installInspect } from "./inspect.ts";
 import { changeLibrary, connect, lastBookKey, whereBooks } from "./library.ts";
@@ -335,10 +339,11 @@ function showPageProblems(problems: PageProblem[]): void {
 }
 
 let treeLines: number[] = []; // start line of every tree node, ascending
+let treeNodes: TreeNode[] = [];
 let cursorLine = 1;
 
 function refreshTree(doc: BmlDocument): void {
-  const nodes = buildTree(doc);
+  const nodes = treeNodes = buildTree(doc);
   treeLines = nodes.flatMap((n) => [n.line, ...n.children.map((c) => c.line)])
     .sort((a, b) => a - b);
   renderTree($("tree"), nodes, (node) => {
@@ -449,11 +454,12 @@ const fetchMetadata = (): Promise<
 > => backend.metadata(book, edition);
 
 let metadata: Metadata | null = null; // last fetched; the style catalog reads `is` from it
-const styleCatalog = () => {
+const styleMeta = () => {
   const m = metadata ?? {};
   syncIsNames(m, isNames);
-  return catalogFor(m);
+  return m;
 };
+const styleCatalog = () => catalogFor(styleMeta());
 
 async function exportEpub(): Promise<EpubResult> {
   await sync.flush();
@@ -962,6 +968,7 @@ async function main(): Promise<void> {
     onDocChanged,
     onCursorLine: highlightTreeNode,
     images,
+    wrapIn: () => palette.open("{"),
   });
   reparse(text);
   const textView = installTextView({
@@ -1003,9 +1010,10 @@ async function main(): Promise<void> {
     pushPlace,
     changed: () => undoUi?.refresh(),
   });
-  installShortcuts({
+  const panes = installPanes({ mode: () => mode });
+  const shortcuts = installShortcuts({
     mode: () => mode,
-    panes: installPanes({ mode: () => mode }),
+    panes,
     textView,
     inspect,
     history: {
@@ -1016,7 +1024,35 @@ async function main(): Promise<void> {
     preview: $("preview"),
     createManuscript,
     ensureConfigPanel,
-    palette: () => {},
+    palette: (q) => palette.open(q),
+  });
+  const preview = $("preview");
+  const palette = installPalette({
+    mode: () => mode,
+    pages: () => preview.querySelectorAll(LIVE_PAGE).length,
+    goToPage(n) {
+      if ($("panes").classList.contains("pages-hidden")) panes.togglePages();
+      preview.querySelector(`${LIVE_PAGE}[data-page-number="${n}"]`)
+        ?.scrollIntoView({ block: "start" });
+    },
+    items: () =>
+      paletteItems({
+        shortcuts,
+        nodes: treeNodes,
+        metadata: styleMeta(),
+        editable: versions?.at() == null,
+        insert(s) {
+          if (mode !== "write") setMode("write");
+          editor.focus();
+          insertSnippet(editor, s);
+        },
+        goToLine,
+        openPart: (id) => {
+          setMode("style");
+          void ensureConfigPanel().then((p) => p?.open(id));
+        },
+        pickStyle: (key) => void pickStyle(key),
+      }),
   });
   undoUi = installUndo({
     mode: () => mode,
