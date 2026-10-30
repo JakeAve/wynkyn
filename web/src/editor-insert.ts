@@ -1,6 +1,6 @@
 // web/src/editor-insert.ts — inserting sentinels from inside the editor
-// (spec §7.3): `{` completions, a wrap bar over a selection, and a Mod+K list
-// of every sentinel. All insertion goes through applySnippet.
+// (spec §7.3): `{` completions and a wrap bar over a selection. All insertion
+// goes through applySnippet.
 import {
   autocompletion,
   type Completion,
@@ -18,12 +18,7 @@ import {
   StateField,
   type TransactionSpec,
 } from "@codemirror/state";
-import {
-  type EditorView,
-  keymap,
-  showTooltip,
-  type Tooltip,
-} from "@codemirror/view";
+import { type EditorView, keymap, showTooltip } from "@codemirror/view";
 import {
   applySnippet,
   closingForm,
@@ -153,115 +148,9 @@ function formCell(c: Completion): Node {
   return f;
 }
 
-// ---- Mod+K: every sentinel, filtered by name or description ----
-
-const setPalette = StateEffect.define<boolean>();
-const paletteField = StateField.define<number | null>({
-  create: () => null,
-  update(v, tr) {
-    for (const e of tr.effects) {
-      if (e.is(setPalette)) {
-        return e.value ? tr.state.selection.main.from : null;
-      }
-    }
-    return tr.docChanged || tr.selection ? null : v;
-  },
-  provide: (f) =>
-    showTooltip.from(
-      f,
-      (pos): Tooltip | null =>
-        pos === null ? null : { pos, create: paletteView },
-    ),
-});
-
-export function openPalette(view: EditorView): boolean {
-  view.dispatch({ effects: setPalette.of(true) });
-  return true;
-}
-
-function row(s: Snippet): HTMLLIElement {
-  const li = document.createElement("li");
-  const name = document.createElement("code");
-  name.textContent = s.label;
-  const d = document.createElement("span");
-  d.className = "d";
-  d.textContent = s.description;
-  const f = document.createElement("span");
-  f.className = "f";
-  f.textContent = closingForm(s);
-  li.append(name, d, f);
-  return li;
-}
-
-function paletteView(view: EditorView) {
-  const dom = document.createElement("div");
-  dom.className = "cm-bml-palette";
-  const input = document.createElement("input");
-  input.placeholder = "Insert a sentinel…";
-  input.setAttribute("aria-label", "Find a sentinel");
-  input.spellcheck = false;
-  const list = document.createElement("ul");
-  list.setAttribute("role", "listbox");
-  dom.append(input, list);
-
-  let shown: Snippet[] = [];
-  let on = 0;
-  const close = () => {
-    view.dispatch({ effects: setPalette.of(false) });
-    view.focus();
-  };
-  const pick = (s: Snippet | undefined) => s && insertSnippet(view, s); // the edit closes the list
-  const render = () => {
-    const q = input.value.trim().toLowerCase();
-    shown = SNIPPETS.filter((s) =>
-      s.label.includes(q) || s.description.toLowerCase().includes(q)
-    ).sort((a, b) => RANK[a.group] - RANK[b.group]);
-    on = Math.min(on, Math.max(shown.length - 1, 0));
-    list.replaceChildren();
-    let group: SnippetGroup | null = null;
-    shown.forEach((s, i) => {
-      if (s.group !== group) {
-        group = s.group;
-        const h = document.createElement("li");
-        h.className = "grp";
-        h.textContent = GROUPS[group];
-        list.append(h);
-      }
-      const li = row(s);
-      li.setAttribute("role", "option");
-      li.setAttribute("aria-selected", String(i === on));
-      li.onmousedown = (e) => e.preventDefault(); // keep the input focused
-      li.onclick = () => pick(s);
-      list.append(li);
-      if (i === on) li.scrollIntoView({ block: "nearest" });
-    });
-  };
-  input.oninput = () => {
-    on = 0;
-    render();
-  };
-  input.onkeydown = (e) => {
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      on = (on + (e.key === "ArrowDown" ? 1 : -1) + shown.length) %
-        Math.max(shown.length, 1);
-      render();
-    } else if (e.key === "Enter") pick(shown[on]);
-    else if (e.key === "Escape") close();
-    else return;
-    e.preventDefault();
-  };
-  input.onblur = () => {
-    if (view.state.field(paletteField, false) !== null) {
-      view.dispatch({ effects: setPalette.of(false) });
-    }
-  };
-  render();
-  return { dom, mount: () => input.focus() };
-}
-
 // ---- wrap bar over a non-empty selection ----
 
-function wrapBar(view: EditorView) {
+function wrapBar(view: EditorView, wrapIn?: () => void) {
   const dom = document.createElement("div");
   dom.className = "cm-bml-wrapbar";
   // A kbd's key comes from the shortcuts' label pass (shortcuts.ts).
@@ -285,29 +174,39 @@ function wrapBar(view: EditorView) {
     button("Quote", "", () => insertSnippet(view, snippet("quote"))),
     button("Footnote", "", () => insertSnippet(view, snippet("footnote"))),
     sep,
-    button("Wrap in…", "sentinel-list", () => openPalette(view)),
+    ...(wrapIn ? [button("Wrap in…", "palette", wrapIn)] : []),
   );
   return { dom };
 }
 
 // Only a selection the writer made (mouse, Shift+arrows, select all) shows
 // the bar, not a placeholder that an insertion selected.
-const wrapBarField = StateField.define<boolean>({
-  create: () => false,
-  update: (v, tr) =>
-    tr.isUserEvent("select") ? true : tr.docChanged || tr.selection ? false : v,
-  provide: (f) =>
-    showTooltip.compute([f, "selection", paletteField], (state) => {
-      const { from, empty } = state.selection.main;
-      if (!state.field(f) || empty || state.field(paletteField) !== null) {
-        return null;
-      }
-      return { pos: from, above: true, create: wrapBar };
-    }),
-});
+const wrapBarField = (wrapIn?: () => void) =>
+  StateField.define<boolean>({
+    create: () => false,
+    update: (v, tr) =>
+      tr.isUserEvent("select")
+        ? true
+        : tr.docChanged || tr.selection
+        ? false
+        : v,
+    provide: (f) =>
+      showTooltip.compute([f, "selection"], (state) => {
+        const { from, empty } = state.selection.main;
+        if (!state.field(f) || empty) return null;
+        return {
+          pos: from,
+          above: true,
+          create: (view: EditorView) => wrapBar(view, wrapIn),
+        };
+      }),
+  });
 
 /** `extra` sources join the `{` completions in the one autocompletion. */
-export function insertExtensions(extra: CompletionSource[] = []): Extension[] {
+export function insertExtensions(
+  extra: CompletionSource[] = [],
+  wrapIn?: () => void,
+): Extension[] {
   return [
     autocompletion({
       override: [completions, ...extra],
@@ -318,9 +217,8 @@ export function insertExtensions(extra: CompletionSource[] = []): Extension[] {
       ],
     }),
     stopField,
-    paletteField,
-    wrapBarField,
-    // Mod+I and Mod+K are app shortcuts (shortcuts.ts), which run first.
+    wrapBarField(wrapIn),
+    // Mod+I is an app shortcut (shortcuts.ts), which runs first.
     Prec.high(keymap.of([{ key: "Tab", run: jumpToStop }])),
   ];
 }

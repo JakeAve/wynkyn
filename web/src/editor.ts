@@ -245,6 +245,7 @@ export function createEditor(opts: {
   onDocChanged: (text: string) => void;
   onCursorLine?: (line: number) => void; // 1-based; fires when the cursor moves lines
   images?: ImageHost; // image files dropped, pasted or picked go in the book
+  wrapIn?: () => void; // the wrap bar's "Wrap in…"; absent, no button
 }): EditorView {
   let lastLine = 0;
   const view = new EditorView({
@@ -256,7 +257,10 @@ export function createEditor(opts: {
         chromeTheme,
         bml(),
         searchPanel(),
-        insertExtensions(opts.images ? [imageCompletions(opts.images)] : []),
+        insertExtensions(
+          opts.images ? [imageCompletions(opts.images)] : [],
+          opts.wrapIn,
+        ),
         editionSpans,
         lintGutter(),
         writeView.of([]),

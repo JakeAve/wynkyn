@@ -2068,6 +2068,16 @@ Mod is Ctrl on Windows and Linux, ⌘ on Mac. Every one comes from one command
 table (`web/src/shortcuts.ts`), and the chrome labels them for the platform
 (Ctrl+Shift+F, ⌘⇧F).
 
+Mod+K opens the command palette from any mode: one filtered list of every
+command (its key on the row), every sentinel, the outline's chapters and
+headings, a page by number ("12" or "page 12", counted as the footer counts),
+and every style. Matching is a substring of the name or description; a leading
+`{` keeps only sentinels. In Write the sentinels lead, elsewhere the commands;
+with nothing typed, the last five picks come first. A pick that lives in another
+mode switches there first (a sentinel or a chapter to Write, a style to Style);
+one that can't run now shows dimmed and Enter passes it by. While a History
+version is open, only what may run over it (§7.10) stays lit.
+
 | Mode    | Left                    | Middle                               | Right                            |
 | ------- | ----------------------- | ------------------------------------ | -------------------------------- |
 | Write   | outline (§7.2)          | BML editor (§7.3)                    | preview (§7.6)                   |
@@ -2223,10 +2233,10 @@ CodeMirror 6 over plain BML text.
   - A selection the writer makes shows a wrap bar above it: Emphasis (Mod+I)
     wraps it in `{em}…{/em}`, Quote encloses its lines in `{quote}`/`{/quote}`,
     Footnote puts a `{footnote: slug}` anchor after it, and Wrap in… opens the
-    full list.
-  - Mod+K lists every sentinel, filtered by name or description; Enter inserts
-    it, enclosing the selection for wraps and closed blocks, else placing it
-    after the selection.
+    command palette (§7.1) with `{` typed.
+  - A sentinel picked in the palette (Mod+K) goes in at the editor's selection,
+    enclosing it for wraps and closed blocks, else placing it after the
+    selection.
   - Per-sentinel shortcuts remain (em Mod+E, chapter Mod+Shift+C, heading
     Mod+Shift+H, footnote Mod+Shift+F, quote Mod+Shift+Q, break Mod+Shift+B), in
     Write only.

@@ -4,7 +4,7 @@
 // `keys`: JSON { id: "ctrl+b" }, where "" unbinds.
 import type { EditorView } from "@codemirror/view";
 import { combo, type Command, type Keymap, label, resolve } from "./keys.ts";
-import { insertSnippet, openPalette } from "./editor-insert.ts";
+import { insertSnippet } from "./editor-insert.ts";
 import { SNIPPETS } from "./snippets.ts";
 import { type Mode, stepPreview } from "./preview.ts";
 import type { Panes } from "./panes.ts";
@@ -20,6 +20,10 @@ export interface Shortcuts {
   keyLabel(id: string): string;
   /** null restores the default; "" unbinds. */
   bind(id: string, combo: string | null): void;
+  /** `switch`: it lives in another mode, and `run` goes there first. */
+  can(id: string): "now" | "switch" | "off";
+  /** Runs it, after a mode switch if it needs one. */
+  run(id: string): void;
 }
 
 export interface ShortcutDeps {
@@ -36,18 +40,21 @@ export interface ShortcutDeps {
   createManuscript(cancelable: boolean): void;
   /** The Style/Publish panel, built on first use. */
   ensureConfigPanel(): Promise<{ open(view: string): void } | null>;
+  /** The command palette, opened with `query` typed. */
+  palette(query?: string): void;
 }
 
 // Open popups esc closes first: a dialog, the find bar, completions, the
-// sentinel palette and wrap bar, menus (the zoom menu is a popover). Not
+// wrap bar, menus (the zoom menu is a popover). Not
 // hover tooltips (spelling, lint).
 const POPUPS =
-  "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
+  "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
 
 // What may run while a version is previewed: nothing that edits the book or
 // moves the editing place under it.
 const IN_PREVIEW = new Set([
   "history",
+  "palette",
   "theme",
   "shortcuts",
   "zoom-in",
@@ -93,6 +100,7 @@ function table(d: ShortcutDeps): Command[] {
     id,
     label,
     section: "Writing",
+    mode: "write",
     keys,
     when: writing,
     run: () => insertSnippet(d.editor(), SNIPPETS.find((s) => s.label === id)!),
@@ -109,6 +117,7 @@ function table(d: ShortcutDeps): Command[] {
   const undoB = button("#undo");
   const redoB = button("#redo");
   const switcher = button("#book-switcher");
+  const epub = button('[data-command="export-epub"]');
   const zoomIn = button('[data-zoom="in"]');
   const step = (
     id: string,
@@ -129,13 +138,15 @@ function table(d: ShortcutDeps): Command[] {
     id: string,
     label: string,
     nav: string,
-    n: string,
+    n?: string,
   ): Command => ({
     id,
     label,
     section: "Style",
-    keys: `mod+shift+${n}`,
-    mac: `alt+cmd+${n}`,
+    mode: "style",
+    nav,
+    keys: n ? `mod+shift+${n}` : "",
+    mac: n ? `alt+cmd+${n}` : undefined,
     when: () => d.mode() === "style",
     run: () => void d.ensureConfigPanel().then((p) => p?.open(nav)),
   });
@@ -169,6 +180,7 @@ function table(d: ShortcutDeps): Command[] {
       id: "prose-source",
       label: "Prose / Source",
       section: "Writing",
+      mode: "write",
       keys: "mod+slash",
       when: write,
       run: () => d.textView.toggleView(),
@@ -181,12 +193,11 @@ function table(d: ShortcutDeps): Command[] {
     snippet("quote", "Quote", "mod+shift+q"),
     snippet("break", "Break", "mod+shift+b"),
     {
-      id: "sentinel-list",
-      label: "Insert sentinel (list)",
-      section: "Writing",
+      id: "palette",
+      label: "Command palette",
+      section: "App",
       keys: "mod+k",
-      when: writing,
-      run: () => openPalette(d.editor()),
+      run: () => d.palette(),
     },
     {
       id: "theme",
@@ -271,8 +282,13 @@ function table(d: ShortcutDeps): Command[] {
       id: "export-epub",
       label: "Export EPUB",
       section: "Publish",
+      mode: "publish",
       keys: "mod+shift+e",
-      ...button('[data-command="export-epub"]'),
+      ...epub,
+      run: async () => {
+        await d.ensureConfigPanel();
+        epub.run();
+      },
     },
     {
       id: "undo",
@@ -296,6 +312,7 @@ function table(d: ShortcutDeps): Command[] {
     view("style-page", "Page size & margins", "page", "2"),
     view("style-fonts", "Fonts", "fonts", "3"),
     view("style-body", "Body", "body", "4"),
+    view("style-colors", "Colors", "colors"),
   ];
 }
 
@@ -338,6 +355,13 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
   const byId = new Map(commands.map((c) => [c.id, c]));
   let map = resolve(commands, overrides());
 
+  const can = (id: string): "now" | "switch" | "off" => {
+    const cmd = byId.get(id);
+    if (!cmd || (deps.history.open() && !IN_PREVIEW.has(id))) return "off";
+    if (!cmd.when || cmd.when()) return "now";
+    return cmd.mode && cmd.mode !== deps.mode() ? "switch" : "off";
+  };
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !document.querySelector(POPUPS)) {
       // History, then Inspect: it unpins, then leaves; then an expanded pane
@@ -349,12 +373,14 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     }
     const c = combo(e);
     const cmd = c ? byId.get(map.byCombo.get(c) ?? "") : undefined;
-    if (!cmd || (cmd.when && !cmd.when())) return;
+    if (!cmd || can(cmd.id) !== "now") return;
     // A modal dialog owns the keys; only the shortcuts list still toggles.
-    if (cmd.id !== "shortcuts" && document.querySelector("dialog[open]")) {
+    const modal = cmd.id === "shortcuts"
+      ? "dialog[open]:not(#shortcuts)"
+      : "dialog[open]";
+    if (document.querySelector(modal)) {
       return;
     }
-    if (deps.history.open() && !IN_PREVIEW.has(cmd.id)) return;
     cmd.run();
     e.preventDefault();
   }, true);
@@ -403,6 +429,20 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     commands: () => commands,
     keymap: () => map,
     keyLabel,
+    can,
+    run(id) {
+      const cmd = byId.get(id);
+      const how = can(id);
+      if (!cmd || how === "off") return;
+      if (how === "switch") {
+        const m = cmd.mode!;
+        if (can(`mode-${m}`) !== "now") return;
+        byId.get(`mode-${m}`)!.run();
+        // The snippet commands want the editor focused, as a keypress has it.
+        if (m === "write") deps.editor().focus();
+      }
+      cmd.run();
+    },
     bind(id, c) {
       const o = overrides();
       if (c === null) delete o[id];

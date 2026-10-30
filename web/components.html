@@ -598,9 +598,30 @@
               </div>
             </div>
             <div class="cell">
-              <span class="cap">⌘K palette</span>
-              <div
-                class="cm-bml-palette cm-tooltip"><input placeholder="Insert a sentinel…" aria-label="Find a sentinel" spellcheck="false"><ul role="listbox"><li class="grp">Structure</li><li role="option" aria-selected="true"><code>matter</code><span class="d">Front or back matter, by type</span><span class="f">—</span></li><li role="option" aria-selected="false"><code>part</code><span class="d">Part, grouping chapters</span><span class="f">—</span></li><li class="grp">Blocks</li><li role="option" aria-selected="false"><code>pullquote</code><span class="d">Phrase pulled out large</span><span class="f">{/pullquote}</span></li></ul></div>
+              <span class="cap">⌘K command palette</span>
+              <dialog id="palette" open aria-label="Command palette">
+                <input id="palette-input" type="text" role="combobox"
+                  aria-controls="palette-list" aria-expanded="true"
+                  aria-label="Search commands" placeholder="Run, insert, go to…"
+                  value="fo" spellcheck="false">
+                <div id="palette-list" role="listbox" aria-label="Results">
+                  <div class="pl-grp" role="presentation">Sentinels</div>
+                  <div class="pl-row" role="option" aria-selected="true"><code
+                      class="pl-label">footnote</code><span
+                      class="pl-detail">Note at the foot of the page</span></div>
+                  <div class="pl-grp" role="presentation">Commands</div>
+                  <div class="pl-row" role="option" aria-selected="false"><span
+                      class="pl-label">Fonts</span><span
+                      class="pl-detail"></span><kbd>⌘⇧F</kbd></div>
+                  <div class="pl-row" role="option" aria-selected="false"
+                    aria-disabled="true"><span class="pl-label">Format
+                      paragraph</span><span class="pl-detail">Write</span></div>
+                  <div class="pl-grp" role="presentation">Go to</div>
+                  <div class="pl-row" role="option" aria-selected="false"><span
+                      class="pl-label">Stave Four</span><span
+                      class="pl-detail">The Last of the Spirits</span></div>
+                </div>
+              </dialog>
             </div>
             <div class="cell">
               <span class="cap">wrap bar</span>
