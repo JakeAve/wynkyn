@@ -1031,7 +1031,9 @@ async function main(): Promise<void> {
     mode: () => mode,
     pages: () => preview.querySelectorAll(LIVE_PAGE).length,
     goToPage(n) {
-      if ($("panes").classList.contains("pages-hidden")) panes.togglePages();
+      // Expanded writing hides the pages as surely as Mod+. does.
+      if (!preview.checkVisibility()) panes.returnFromExpand();
+      if (!preview.checkVisibility()) panes.togglePages();
       preview.querySelector(`${LIVE_PAGE}[data-page-number="${n}"]`)
         ?.scrollIntoView({ block: "start" });
     },

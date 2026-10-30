@@ -35,9 +35,10 @@ const PART_GROUP: Record<BookPart["group"], string> = {
 export function paletteItems(src: ItemSources): Item[] {
   const sc = src.shortcuts;
   const off = !src.editable;
-  const commands = sc.commands().filter((c) => c.id !== "palette").map((
-    c,
-  ): Item => ({
+  const snippet = new Set(SNIPPETS.map((s) => s.label));
+  // A snippet command is its sentinel's row; it lends that row its key.
+  const all = sc.commands().filter((c) => c.id !== "palette");
+  const commands = all.filter((c) => !snippet.has(c.id)).map((c): Item => ({
     id: c.id,
     label: c.label,
     group: "Commands",
@@ -51,6 +52,7 @@ export function paletteItems(src: ItemSources): Item[] {
     label: s.label,
     group: "Sentinels",
     detail: s.description,
+    keys: sc.keyLabel(s.label) || undefined,
     off,
     run: () => src.insert(s),
   }));
@@ -64,7 +66,10 @@ export function paletteItems(src: ItemSources): Item[] {
     off,
     run: () => src.goToLine(n.line),
   }));
-  const parts = bookParts(src.metadata).map((p): Item => ({
+  const navs = new Set(all.flatMap((c) => c.nav ?? []));
+  const parts = bookParts(src.metadata).filter((p) => !navs.has(p.id)).map((
+    p,
+  ): Item => ({
     id: `part:${p.id}`,
     label: p.name,
     group: "Styles",
@@ -72,19 +77,22 @@ export function paletteItems(src: ItemSources): Item[] {
     off,
     run: () => src.openPart(p.id),
   }));
-  // A part and its one entry share a name (Copyright), and each page number
-  // and running head slot is "Page number" / "Running head": one row each.
-  const seen = new Set(parts.map((p) => p.label.toLowerCase()));
+  // An entry named as a part (Copyright) opens that part: the part's row is it.
+  const named = new Set(
+    bookParts(src.metadata).map((p) => p.name.toLowerCase()),
+  );
   const catalog = catalogFor(src.metadata);
-  const entries = catalog.flatMap((e): Item[] => {
-    const label = entryName(e, catalog);
-    if (seen.has(label.toLowerCase())) return [];
-    seen.add(label.toLowerCase());
+  const labels = catalog.map((e) => entryName(e, catalog));
+  const count = (l: string) => labels.filter((x) => x === l).length;
+  const entries = catalog.flatMap((e, i): Item[] => {
+    const label = labels[i]!;
+    if (named.has(label.toLowerCase())) return [];
     return [{
       id: `style:${e.key}`,
       label,
       group: "Styles",
-      detail: e.group,
+      // Every page number slot is "Page number": its own label tells them apart.
+      detail: count(label) > 1 ? `${e.group}: ${e.label}` : e.group,
       off,
       run: () => src.pickStyle(e.key),
     }];

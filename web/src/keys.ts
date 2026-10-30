@@ -24,6 +24,8 @@ export interface Command {
   /** The mode it lives in: from another, it runs after a switch. */
   mode?: Mode;
   keys: string;
+  /** The Style panel nav row it opens. */
+  nav?: string;
   win?: string;
   mac?: string;
   when?(): boolean;

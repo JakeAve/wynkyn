@@ -144,6 +144,7 @@ function table(d: ShortcutDeps): Command[] {
     label,
     section: "Style",
     mode: "style",
+    nav,
     keys: n ? `mod+shift+${n}` : "",
     mac: n ? `alt+cmd+${n}` : undefined,
     when: () => d.mode() === "style",
@@ -374,7 +375,10 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     const cmd = c ? byId.get(map.byCombo.get(c) ?? "") : undefined;
     if (!cmd || can(cmd.id) !== "now") return;
     // A modal dialog owns the keys; only the shortcuts list still toggles.
-    if (cmd.id !== "shortcuts" && document.querySelector("dialog[open]")) {
+    const modal = cmd.id === "shortcuts"
+      ? "dialog[open]:not(#shortcuts)"
+      : "dialog[open]";
+    if (document.querySelector(modal)) {
       return;
     }
     cmd.run();
