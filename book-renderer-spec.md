@@ -1127,6 +1127,7 @@ books/
       pocket.json
     dictionary.json        ← optional: the book's own spelling words (§7.3)
     images/
+    .history/              ← kept versions (§6, §7.10); not part of the book
   great-gatsby/
     manuscript.md
     metadata.json
@@ -1926,6 +1927,9 @@ layout engine, the preview is the export by construction.
   `book.pdf` at trim size via headless Chrome, then imposes at the PDF level
   (pdf-lib) onto sheet-sized pages. Preview == export still holds: the pages are
   Paged.js's own, untouched.
+- `history.ts` — **version history** (§6, §7.10). Snapshots, thinning and
+  restore over a `BookStore`, so it runs in the browser too; `history-diff.ts`
+  is its paragraph and style diff.
 - `epub-export.ts` — **e-book export** (§7.8). The same `render()` output,
   without Paged.js: split at the article's top-level blocks into XHTML documents
   and zipped as EPUB 3. Reflowable, so nothing from the page map applies.
@@ -2006,6 +2010,17 @@ exports anyway.
   conflict; a failed save keeps its edit and retries. Switching book or edition
   waits for saves; closing or hiding the tab sends them, and prompts while any
   remain.
+- **History store:** `<book>/.history/` holds every kept version (§7.10) and is
+  not part of the book: no rebuild or push reacts to it, and the book zip leaves
+  it out unless asked. A version is `versions/<id>.json`, where `<id>` is its
+  ISO time with `:` as `-` (`2026-10-23T15-42-07.123Z`, with `-2`, `-3` for a
+  collision), so names sort by time. It records the reason, an optional name,
+  what changed since the version before, and a map from each snapshotted file
+  (`manuscript.md`, `metadata.json`, `dictionary.json`, `editions/*.json`,
+  `images/*`) to the SHA-256 of its bytes. The bytes live once each in
+  `objects/<sha256>`, deflated, so an unchanged file or image costs nothing
+  again. Both are written through the `BookStore`, so it is the same on disk and
+  in the browser's storage.
 - **One pagination engine (§5.4):** Paged.js paginates both the live preview and
   the print export. Chosen deliberately over a hybrid
   Paged.js-preview/native-Chrome-export split: (a) the preview and the exported
@@ -2057,17 +2072,21 @@ table (`web/src/shortcuts.ts`), and the chrome labels them for the platform
 The toolbar holds only what is global: the Contents toggle at the far left
 before the crumb (Mod+\), drawn as a panel icon whose side is half filled while
 the left column shows; the crumb (Mod+O switches the book, Mod+Alt+N starts a
-new one); the modes; and the light/dark toggle alone at the right (Mod+Shift+L).
-In Write the pages hide with Mod+. (no button; while they are hidden the write
-pane's corner button reads "Show the pages" and brings them back); Style and
-Publish always show them. Both choices persist. The crumb reads library / book /
-edition. The library step, muted so the title leads, is an icon for where the
-books live (a folder on this device, or this browser) and its name (the
-folder's, or "This browser"); its tooltip says where, and a click opens Change
-library (§7.9) to pick another. The dev server has only its `books/`, so there
-the crumb starts at the book. Gutters between the columns drag to resize them. A
-hidden preview still lays out (it leaves the grid, never `display: none`), since
-Paged.js paginates by measuring.
+new one); the modes; and at the right Undo and Redo (Mod+Z, Mod+Shift+Z, also
+Ctrl+Y off the Mac), History (Mod+Shift+Y; ⌥⌘Y on a Mac, where ⌘⇧Y is taken;
+§7.10), then the light/dark toggle (Mod+Shift+L). Undo and Redo work on what the
+mode edits: the text in Write (the editor's history), the styles in Style and
+Publish (§7.5); a button is disabled with nothing to undo. In Write the pages
+hide with Mod+. (no button; while they are hidden the write pane's corner button
+reads "Show the pages" and brings them back); Style and Publish always show
+them. Both choices persist. The crumb reads library / book / edition. The
+library step, muted so the title leads, is an icon for where the books live (a
+folder on this device, or this browser) and its name (the folder's, or "This
+browser"); its tooltip says where, and a click opens Change library (§7.9) to
+pick another. The dev server has only its `books/`, so there the crumb starts at
+the book. Gutters between the columns drag to resize them. A hidden preview
+still lays out (it leaves the grid, never `display: none`), since Paged.js
+paginates by measuring.
 
 Each pane carries its own controls in a header along its top: the write pane
 (Write's middle column) has Prose | Source, Aa and Spelling (the text view,
@@ -2320,6 +2339,13 @@ Includes:
 - Chapter/part numbering style, prefix/suffix, show/hide
 - Running header/footer entries per margin box, odd/even
 - Note placement: footnotes vs. endnotes (§4.9)
+- Undo for style edits (the toolbar's Undo and Redo, §7.1): in Style and Publish
+  they take back the session's style edits one at a time, a theme's Replace
+  included, opening the view each was made in so the change shows. Quick edits
+  to one section, a stepper's clicks or a typed number, are one step. A change
+  to `metadata.json` from outside (another tab, the disk) clears both, since an
+  old step would overwrite it. A reload from disk never joins the editor's
+  history.
 - Style's Book group opens from the keyboard too: Mod+Shift+1–4 for Theme, Page
   size & margins, Fonts and Body (⌥⌘1–4 on a Mac, where ⌘⇧3 and ⌘⇧4 take
   screenshots).
@@ -2347,7 +2373,7 @@ Includes:
     switches to it.
   - **Replace this edition's style**: the theme's `fonts`, `elements`,
     `numbering` and `running` replace the edition's, saved like any panel edit
-    (version checks and the changed-on-disk banner apply). It can't be undone.
+    (version checks and the changed-on-disk banner apply). Mod+Z undoes it.
   - **Cancel** closes the dialog and keeps the preview.
 
 ### 7.6 Preview Pane
@@ -2683,7 +2709,8 @@ folder?" _Copy them into `<name>`_ (recommended; this browser keeps its copies
 too) or _Open `<name>` without them_ (they stay in this browser; switch back any
 time from the library). Copying never overwrites: a book the folder already has
 is left out of N and named in a warning line ("Already in `<name>`, so not
-copied: …"). A failed copy shows in the dialog, which stays open.
+copied: …"). A copied book keeps its history (§7.10). A failed copy shows in the
+dialog, which stays open.
 
 **Create a new folder.** A location picker and a folder name (default `Books`),
 with the resulting path shown. Then _Create a new manuscript_.
@@ -2782,6 +2809,88 @@ whichever fires at least twice. Title and author from EPUB metadata, DOCX
 for the CLI's HTML parsing (Deno has no `DOMParser`). Web import in the browser
 is fetch-or-paste in the page, so it needs no server. PDF is out: export to Word
 or text first.
+
+### 7.10 History
+
+Every book keeps its earlier versions (§6, History store), and the author can go
+back to any of them, whole or in part. It works the same over the dev server and
+over the browser's own storage: one service does the work in either.
+
+**What is kept, and when.** A snapshot holds the manuscript, `metadata.json`,
+the editions, the dictionary and the images (§6). One identical to the latest is
+not written. They are taken:
+
+- 3 minutes after the last change (idle): a save, an image added, an edition
+  made, renamed or deleted; and at most 20 minutes apart while changes keep
+  coming (max gap);
+- when a book is first opened by a client, which catches changes made outside
+  the app while it was closed (an agent, the CLI, another editor); that version
+  is listed only when something differs from the one before it;
+- when the tab is hidden or closed, with the editor's text when it has unsaved
+  edits;
+- before `bml import --force` replaces a manuscript, before an edition is
+  deleted, before Load file from disk replaces unsaved text (the buffer is
+  kept), and before every restore;
+- when the author names one (below).
+
+Thinning runs after each snapshot: everything under a day old stays; then the
+last version of each hour for a week, of each day for 30 days, of each ISO week
+after that (UTC). A named version is never thinned. Images no kept version uses
+are dropped.
+
+**The menu.** The toolbar's History button, or Mod+Shift+Y (⌥⌘Y on a Mac), opens
+a menu under it: the versions by day, newest first, each row its time and its
+name or what changed (the chapters touched, the parts styled, images), starting
+with **Now**. Where the book has more than one edition, a This edition | All
+editions filter hides versions that changed only the others. A run of thinned
+versions folds into one row. Its foot holds **Name this version…**.
+
+**Preview.** Picking a row previews that version, and nothing can be edited
+meanwhile. What it changed takes the left and middle columns together, whatever
+the mode: its name, its reason (Opened, changed outside the app; Before import;
+Before deleting edition; Before reload; Before restore) and a one-line summary,
+with Restore ▾ and Name…; then style changes by part as `old → new`, in the
+panel's words (the file's `spec` version is not a style and is left out), and
+text changes by chapter, paragraph by paragraph, inserted words underlined and
+deleted words struck through, selectable to copy. The pages show the version
+built as the current edition, through the same path as live updates, with the
+book's current images, even in Publish or where they were hidden or a pane
+expanded; a banner over them reads "Previewing {name or what changed}, {when}.
+Nothing changes until you restore." Pushed rebuilds are held, the pages are not
+clickable, and the mode switch, Undo and Redo are off. A preview is a place in
+the address (`?history=<id>`). **← Back to editing**, Esc once the menu is
+closed, or the browser's Back ends it and returns the mode, view, panes and
+scroll as they were.
+
+**Restore.** Restore ▾ takes one of three scopes:
+
+- **Everything**: every kept file; files the version lacks (an edition made
+  since) are removed;
+- **Text only**: `manuscript.md`;
+- **Styles only**: the edition being edited, its one file (`metadata.json` or
+  `editions/<slug>.json`), named in the menu. Editions inherit nothing from each
+  other, so the others stay as they are. A version made before that edition has
+  no styles for it: the choice is disabled, and the service refuses it (400)
+  rather than delete the edition.
+
+Unsaved edits are saved first, the book is snapshotted (Before restore), and the
+files are put back; open tabs take the change as any outside one, so the editor
+reloads without joining its undo history and the style undo stack clears (§7.5).
+The preview ends, and the banner over the pages reads "Restored {what} from
+{when}." with **Undo**, which restores the Before restore snapshot with the same
+scope. The snapshot stays in the list, so a restore can also be undone later by
+restoring it.
+
+**Name version.** Name this version… (Rename version… once it has a name), in
+the menu or over what changed, names the previewed version, or with nothing
+previewed takes a snapshot of the book as it is and names it ("Sent to
+printer"). When nothing changed since the latest version, Now names that one
+instead, unless it already has a name: then a new version with the same files
+takes this one. A named version is kept indefinitely.
+
+**Download book.** The switcher's Download book zips the book without
+`.history/`; its With history switch (browser storage only; the dev server has
+no zip download) includes it.
 
 ---
 

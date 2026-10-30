@@ -27,6 +27,8 @@ export interface ShortcutDeps {
   panes: Panes;
   textView: TextView;
   inspect: { escape(): boolean };
+  /** `open`: a version is previewed, and nothing may edit the book. */
+  history: { open(): boolean; escape(): boolean };
   editor(): EditorView;
   /** The pages pane, `#preview`. */
   preview: HTMLElement;
@@ -41,6 +43,21 @@ export interface ShortcutDeps {
 // hover tooltips (spelling, lint).
 const POPUPS =
   "dialog[open], [popover]:popover-open, .cm-tooltip-autocomplete, .cm-bml-find, .cm-bml-palette, .cm-bml-wrapbar:not(.cm-bml-spell), .fontpop, .tvpop:not([hidden])";
+
+// What may run while a version is previewed: nothing that edits the book or
+// moves the editing place under it.
+const IN_PREVIEW = new Set([
+  "history",
+  "theme",
+  "shortcuts",
+  "zoom-in",
+  "zoom-out",
+  "zoom-fit",
+  "page-next",
+  "page-prev",
+  "chapter-next",
+  "chapter-prev",
+]);
 
 // A command that mirrors a button clicks it, so the behaviour never forks; it
 // runs while the button is shown and enabled.
@@ -80,6 +97,17 @@ function table(d: ShortcutDeps): Command[] {
     when: writing,
     run: () => insertSnippet(d.editor(), SNIPPETS.find((s) => s.label === id)!),
   });
+  // A text field keeps its own Mod+Z, the editor included, but not the
+  // panel's: they commit on change, so there it means the last edit.
+  const undoable = () => {
+    const a = document.activeElement;
+    return !(a instanceof HTMLTextAreaElement ||
+      (a instanceof HTMLElement && a.isContentEditable) ||
+      (a instanceof HTMLInputElement && a.type === "text" &&
+        !a.closest("#config-overlay")));
+  };
+  const undoB = button("#undo");
+  const redoB = button("#redo");
   const switcher = button("#book-switcher");
   const zoomIn = button('[data-zoom="in"]');
   const step = (
@@ -167,6 +195,15 @@ function table(d: ShortcutDeps): Command[] {
       keys: "mod+shift+l",
       ...button("#theme-toggle"),
     },
+    // ⌘⇧Y is taken on a Mac (Services: Make Sticky Note).
+    {
+      id: "history",
+      label: "History",
+      section: "App",
+      keys: "mod+shift+y",
+      mac: "alt+cmd+y",
+      ...button("#history-open"),
+    },
     {
       id: "switch-book",
       label: "Switch book",
@@ -237,6 +274,23 @@ function table(d: ShortcutDeps): Command[] {
       keys: "mod+shift+e",
       ...button('[data-command="export-epub"]'),
     },
+    {
+      id: "undo",
+      label: "Undo",
+      section: "App",
+      keys: "mod+z",
+      when: () => undoable() && undoB.when!(),
+      run: undoB.run,
+    },
+    {
+      id: "redo",
+      label: "Redo",
+      section: "App",
+      keys: "mod+shift+z",
+      win: "ctrl+y, ctrl+shift+z",
+      when: () => undoable() && redoB.when!(),
+      run: redoB.run,
+    },
     // macOS keeps ⌘⇧3 and ⌘⇧4 for screenshots, so the Mac set is ⌥⌘1–4.
     view("style-theme", "Theme", "themes", "1"),
     view("style-page", "Page size & margins", "page", "2"),
@@ -286,10 +340,12 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !document.querySelector(POPUPS)) {
-      // Inspect first: it unpins, then leaves; then an expanded pane returns.
-      if (deps.inspect.escape() || deps.panes.returnFromExpand()) {
-        e.preventDefault();
-      }
+      // History, then Inspect: it unpins, then leaves; then an expanded pane
+      // returns.
+      if (
+        deps.history.escape() || deps.inspect.escape() ||
+        deps.panes.returnFromExpand()
+      ) e.preventDefault();
     }
     const c = combo(e);
     const cmd = c ? byId.get(map.byCombo.get(c) ?? "") : undefined;
@@ -298,6 +354,7 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     if (cmd.id !== "shortcuts" && document.querySelector("dialog[open]")) {
       return;
     }
+    if (deps.history.open() && !IN_PREVIEW.has(cmd.id)) return;
     cmd.run();
     e.preventDefault();
   }, true);

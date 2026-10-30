@@ -104,6 +104,15 @@
         <symbol id="expand-out" viewBox="0 0 16 16">
           <path d="M9.5 1.5h5v5M14.5 1.5 9 7M6.5 14.5h-5v-5M1.5 14.5 7 9" />
         </symbol>
+        <symbol id="undo-icon" viewBox="0 0 16 16">
+          <path d="M5.5 3.5l-3 3 3 3M2.5 6.5H10a3.5 3.5 0 0 1 0 7H7" />
+        </symbol>
+        <symbol id="redo-icon" viewBox="0 0 16 16">
+          <path d="M10.5 3.5l3 3-3 3M13.5 6.5H6a3.5 3.5 0 0 0 0 7h3" />
+        </symbol>
+        <symbol id="history-icon" viewBox="0 0 16 16">
+          <path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v3h3M8 5v3l2 1.5" />
+        </symbol>
         <symbol id="expand-in" viewBox="0 0 16 16">
           <path d="M14 7H9V2M9 7l5.5-5.5M2 9h5v5M7 9l-5.5 5.5" />
         </symbol>
@@ -152,6 +161,34 @@
           data-command="mode-publish" title="Publish">Publish</button>
       </span>
       <span class="spacer"></span>
+      <button id="undo" class="btn icon" title="Undo" aria-label="Undo"
+        data-command="undo" disabled>
+        <svg>
+          <use href="#undo-icon" />
+        </svg>
+      </button>
+      <button id="redo" class="btn icon" title="Redo" aria-label="Redo"
+        data-command="redo" disabled>
+        <svg>
+          <use href="#redo-icon" />
+        </svg>
+      </button>
+      <button id="history-open" class="btn icon" title="History"
+        aria-label="History" aria-pressed="false" data-command="history"
+        popovertarget="history-menu" aria-haspopup="dialog" disabled>
+        <svg>
+          <use href="#history-icon" />
+        </svg>
+      </button>
+      <div id="history-menu" class="menu" popover role="dialog"
+        aria-label="History">
+        <nav id="history-list" aria-label="Versions">
+          <p class="book-empty">Loading…</p>
+        </nav>
+        <div class="h-foot">
+          <button id="history-name" type="button">Name this version…</button>
+        </div>
+      </div>
       <button id="theme-toggle" class="btn" title="Switch light/dark"
         data-command="theme">
         <svg class="icon-moon" viewBox="0 0 16 16">
@@ -262,12 +299,13 @@
           <div class="msg">
             <strong>Save failed because something else touched the
               manuscript.</strong>
-            <span>The preview shows the file on disk. Load it and lose your
-              unsaved edits, or keep yours and overwrite it.</span>
+            <span>The preview shows the file on disk. Load it (your unsaved
+              edits are kept in History), or keep yours and overwrite
+              it.</span>
           </div>
           <div class="acts">
             <button id="disk-reload" class="btn sm" type="button"
-              title="Discard your unsaved edits and load the file">Load file
+              title="Load the file; your unsaved edits are kept in History">Load file
               from disk</button>
             <button id="disk-keep" class="btn sm" type="button"
               title="Save your version over the file (stet: let it stand)">Keep my edits</button>
@@ -275,6 +313,13 @@
         </div>
       </div>
       <div id="config-overlay"></div>
+      <div id="history-changes" aria-label="Changes">
+        <div class="pane-head">
+          <button id="history-changes-close" class="btn sm" type="button"
+            title="Back to editing (Esc)">← Back to editing</button>
+        </div>
+        <div id="history-diff"></div>
+      </div>
       <div id="gutter-editor" class="gutter" role="separator"
         aria-orientation="vertical" aria-label="Resize the writing" tabindex="0"
         aria-valuenow="0" title="Drag or use ←/→ to resize"></div>
@@ -326,6 +371,7 @@
             </svg>
           </button>
         </div>
+        <div id="version-banner" class="banner" role="status" hidden></div>
         <div id="preview"></div>
         <div id="inspect-overlay" hidden aria-hidden="true"></div>
         <section id="inspect-drawer" hidden aria-label="Inspect"></section>
@@ -376,6 +422,10 @@
       <div class="sw-eds">
         <div id="eds-head" hidden>
           <span id="eds-book"></span>
+          <label class="eds-history"
+            title="Every kept version (the book's .history folder) goes in the zip too">With
+            history <input id="zip-history" type="checkbox" role="switch"
+              class="sw"></label>
           <button id="book-download" class="btn sm"
             title="This book's folder as a zip">
             <svg>
@@ -563,6 +613,22 @@
         </div>
       </form>
     </dialog>
+    <dialog id="name-dlg" class="ask" aria-labelledby="name-dlg-title">
+      <form id="name-form" method="dialog">
+        <h2 id="name-dlg-title">Name this version</h2>
+        <label class="field">Name
+          <input id="name-input" required autocomplete="off"
+            placeholder="Sent to printer">
+        </label>
+        <p class="hint">Named versions are kept indefinitely; the rest thin out
+          over time.</p>
+        <div class="ask-foot">
+          <span id="name-err" class="sw-err"></span>
+          <button id="name-cancel" class="btn" type="button">Cancel</button>
+          <button class="btn primary" type="submit">Save name</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="theme-dlg" class="ask" aria-labelledby="theme-dlg-title">
       <h2 id="theme-dlg-title" tabindex="-1" autofocus>Apply <span
           class="t-name"></span> to <span class="e-name"></span>?</h2>
@@ -576,7 +642,8 @@
         <button id="theme-replace" class="choice" type="button"><span>Replace
             this edition's style
             <small><span class="e-name"></span>'s current fonts and styles are
-              replaced. This can't be undone.</small></span></button>
+              replaced. <kbd data-command="undo"></kbd> undoes
+              it.</small></span></button>
       </div>
       <div class="ask-foot">
         <span id="theme-err" class="sw-err"></span>

@@ -154,6 +154,14 @@ if (import.meta.main) {
       Deno.exit(2);
     }
     const dir = `${BOOKS}/${slug}`;
+    if (a.force) {
+      const { snapshot } = await import("./server/history.ts");
+      const { diskStore } = await import("./server/store.ts");
+      const store = diskStore(BOOKS);
+      if (await store.exists(`${slug}/manuscript.md`)) {
+        await snapshot(store, slug, "before-import");
+      }
+    }
     const meta = await template();
     await Deno.mkdir(`${dir}/images`, { recursive: true });
     try {

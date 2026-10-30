@@ -44,7 +44,7 @@ pure        pure          pure+2 js     disk, Chrome   browser only
   only and never imported by `web/`.
 - `web/` bundles to the browser. It may import from `server/` only what is pure
   at load: `imposition.ts`, `editions.ts`, `images.ts`, `store.ts`,
-  `pipeline.ts`, `book-service.ts`, `import/` and their types. A `Deno.*`
+  `pipeline.ts`, `book-service.ts`, `history.ts`, `history-diff.ts`, `import/` and their types. A `Deno.*`
   reference inside a function body bundles fine (it is never called in the browser); one at the top level
   breaks the bundle, so if the browser needs a helper that lives beside I/O,
   move the helper, never the I/O. The app reaches the server only through

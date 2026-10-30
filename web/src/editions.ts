@@ -55,11 +55,13 @@ export function appHref(s: {
   view: string | null; // the Style/Publish nav row (config-panel.ts navId)
   line: number; // the editor's cursor line, 1-based
   lib?: string | null; // the library's id; a link from another is sent home
+  history?: string | null; // History open: "now" or the version on the pages
 }): string {
   let href = editionHref(s.book, s.edition);
   if (s.lib) href += `&lib=${encodeURIComponent(s.lib)}`;
   if (s.mode !== "write") href += `&mode=${s.mode}`;
   if (s.view) href += `&view=${encodeURIComponent(s.view)}`;
+  if (s.history) href += `&history=${encodeURIComponent(s.history)}`;
   return s.line > 1 ? `${href}#line=${s.line}` : href;
 }
 
