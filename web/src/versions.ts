@@ -267,6 +267,8 @@ export function installVersions(d: VersionsDeps): Versions {
     );
   });
   menu.addEventListener("toggle", pressed);
+  // Listed ahead, so the menu never opens empty while its list loads.
+  void view.refresh().catch(() => {});
   $("history-name").onclick = () => {
     menu.hidePopover();
     askName(known.find((v) => v.id === at) ?? "now");
