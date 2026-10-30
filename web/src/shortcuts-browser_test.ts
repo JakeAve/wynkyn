@@ -179,16 +179,52 @@ appTest({
 appTest({
   name: "Writing keys leave a text field outside the editor alone",
   fn: () =>
-    withApp(async (page) => {
+    withApp(async (page, saved) => {
       await page.evaluate(() => {
         const i = document.body.appendChild(document.createElement("input"));
         i.focus();
       });
+      const text = () => page.locator("#editor .cm-content").textContent();
+      const before = await text();
+      await page.keyboard.press("Control+Shift+Q");
+      assertEquals(await text(), before);
+      await page.locator("#editor .cm-content").click();
+      await page.keyboard.press("Control+Home"); // keep the insertion drawn
+      await page.keyboard.press("Control+Shift+Q");
+      assert((await text()) !== before, "inserted from the editor");
+      await saved("{quote}");
+    }),
+});
+
+appTest({
+  name: "Ctrl+K opens the palette: a Style view, a sentinel, Wrap in…",
+  fn: () =>
+    withApp(async (page, saved) => {
+      const dialog = page.locator("#palette[open]");
+      const input = page.locator("#palette-input");
       await page.keyboard.press("Control+K");
-      assertEquals(await page.locator(".cm-bml-palette").count(), 0);
+      await dialog.waitFor();
+      await page.keyboard.type("fonts");
+      await page.keyboard.press("Enter");
+      await dialog.waitFor({ state: "detached" });
+      assertEquals(await mode(page), "style");
+      await page.locator('#style-nav [aria-current="true"]', {
+        hasText: "Fonts",
+      }).waitFor();
+
+      await page.keyboard.press("Control+1");
       await page.locator("#editor .cm-content").click();
       await page.keyboard.press("Control+K");
-      await page.locator(".cm-bml-palette").waitFor();
+      await dialog.waitFor();
+      await page.keyboard.type("{quo");
+      await page.keyboard.press("Enter");
+      await saved("{quote}");
+
+      await page.keyboard.press("Control+A");
+      await page.locator(".cm-bml-wrapbar button", { hasText: "Wrap in…" })
+        .click();
+      await dialog.waitFor();
+      assertEquals(await input.inputValue(), "{");
     }),
 });
 
