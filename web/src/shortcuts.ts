@@ -27,8 +27,7 @@ export interface ShortcutDeps {
   panes: Panes;
   textView: TextView;
   inspect: { escape(): boolean };
-  /** History owns the keys while open, but for its own toggle and esc. */
-  history: { open(): boolean; escape(): boolean };
+  history: { escape(): boolean };
   editor(): EditorView;
   /** The pages pane, `#preview`. */
   preview: HTMLElement;
@@ -339,7 +338,6 @@ export function installShortcuts(deps: ShortcutDeps): Shortcuts {
     if (cmd.id !== "shortcuts" && document.querySelector("dialog[open]")) {
       return;
     }
-    if (cmd.id !== "history" && deps.history.open()) return;
     cmd.run();
     e.preventDefault();
   }, true);

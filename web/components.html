@@ -744,27 +744,34 @@
 
       <section class="part">
         <h2>History <span>§6.14</span></h2>
-        <p>The takeover's versions, read like the style nav, and what one
-          changed, read like the panel; the pages pane's banner says what is
-          on it.</p>
+        <p>The toolbar's menu of versions, read like the style nav; every
+          change one made, read like the panel; the pages pane's banner says
+          what is on the pages.</p>
         <div class="board">
-          <nav class="history-list surface" style="width: 16rem"
-            aria-label="Versions">
-            <div class="nh">Today</div>
-            <button type="button" class="h-row"><span
+          <div id="history-menu" class="menu"
+            style="position: static; display: flex; flex-direction: column">
+            <nav class="history-list" aria-label="Versions">
+              <div class="nh">Today</div>
+              <button type="button" class="h-row"><span
                 class="h-time">Now</span><span class="h-head">Current
                 version</span><span class="h-detail">Everything saved so
                 far</span></button>
-            <button type="button" class="h-row" aria-current="true"><span
+              <button type="button" class="h-row" aria-current="true"><span
                 class="h-time">3:42 pm</span><span
                 class="h-head">Text · Styles</span><span class="h-detail">Chapter
                 one · Page setup</span></button>
-            <button type="button" class="h-row"><span
-                class="h-time">3:10 pm</span><span class="h-head">★ Sent to
-                printer</span><span class="h-detail">Text</span><i
+              <button type="button" class="h-row"><span
+                class="h-time">3:10 pm</span><span class="h-head"><svg
+                  class="h-star" viewBox="0 0 16 16"><path
+                    d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z" /></svg>Sent
+                to printer</span><span class="h-detail">Text</span><i
                 class="h-reason">Before import</i></button>
-            <button type="button" class="btn sm">▸ 4 more</button>
-          </nav>
+              <button type="button" class="btn sm">▸ 4 more</button>
+            </nav>
+            <div class="h-foot"><button type="button">Name this
+              version…</button><button type="button"
+              id="history-changes-open">See every change</button></div>
+          </div>
           <div class="history-changes surface" style="width: 26rem">
             <div class="phead">
               <div class="crumb">Today, 3:42 pm</div>
@@ -794,8 +801,14 @@
           </div>
           <div class="surface" style="width: 100%; padding: 0">
             <div id="version-banner" class="banner"><span
-                class="msg">Restored the styles from Today, 3:42 pm.</span><button
-                type="button" class="btn sm">Undo</button></div>
+                class="msg">Previewing Text · Styles, Today, 3:42 pm. Nothing
+                changes until you restore.</span><button type="button"
+                class="btn sm">Back to now</button><button type="button"
+                class="btn sm primary">Restore ▾</button></div>
+            <div class="banner"><span class="msg">Restored the styles from
+                Today, 3:42 pm.</span><button type="button"
+                class="btn sm">Undo</button><button type="button"
+                class="btn sm icon" aria-label="Dismiss">✕</button></div>
             <div class="banner err"><span class="msg"><strong>Couldn’t show
                   this version. </strong>The version is missing a
                 file.</span></div>

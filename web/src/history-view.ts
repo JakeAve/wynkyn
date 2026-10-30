@@ -1,4 +1,5 @@
-// The History takeover's versions (left) and what one changed (middle);
+// History's versions (the toolbar menu's rows) and what one changed (the
+// middle column, on request);
 // design-language §6.14.
 import type { Metadata } from "../../metadata/types.ts";
 import {
@@ -173,7 +174,7 @@ export function rowLabel(
   if (v.changes.images) bits.push({ head: "Images", detail: "" });
   const heads = bits.map((b) => b.head).join(" · ");
   if (v.name !== undefined) {
-    return { head: `★ ${v.name}`, detail: heads };
+    return { head: v.name, detail: heads };
   }
   if (bits.length === 1) return bits[0]!;
   return {
@@ -358,6 +359,21 @@ function headingOf(
   return "No changes";
 }
 
+const SVG = "http://www.w3.org/2000/svg";
+function star(): SVGSVGElement {
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("class", "h-star");
+  svg.setAttribute("aria-label", "Named");
+  const path = document.createElementNS(SVG, "path");
+  path.setAttribute(
+    "d",
+    "M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z",
+  );
+  svg.append(path);
+  return svg;
+}
+
 const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
@@ -374,6 +390,8 @@ export function createHistoryView(opts: {
 }): {
   refresh(): Promise<void>;
   select(id: string | "now"): void;
+  /** Restore ▾ and its menu for the selected version, small for a banner. */
+  restoreControl(): Node[];
   destroy(): void;
 } {
   const { list, changes, backend, book, edition } = opts;
@@ -447,6 +465,7 @@ export function createHistoryView(opts: {
     time: string,
     label: { head: string; detail: string },
     reason: string,
+    named = false,
   ) => {
     const b = h(
       "button",
@@ -457,7 +476,7 @@ export function createHistoryView(opts: {
         "aria-current": id === selected ? "true" : undefined,
       },
       h("span", { class: "h-time" }, time),
-      h("span", { class: "h-head" }, label.head),
+      h("span", { class: "h-head" }, ...named ? [star()] : [], label.head),
       h("span", { class: "h-detail" }, label.detail),
     );
     if (reason) b.append(h("i", { class: "h-reason" }, reason));
@@ -476,6 +495,7 @@ export function createHistoryView(opts: {
       timeLabel(new Date(v.at)),
       label(),
       reasonLabel(v),
+      v.name !== undefined,
     );
     // ponytail: two versionFiles calls per style row to name its parts, cached;
     // a per-version summary from the service if long histories feel slow.
@@ -564,11 +584,11 @@ export function createHistoryView(opts: {
 
   // A native popover, like the zoom menu: light dismiss, Esc and the
   // trigger's expanded state come with it.
-  const restoreMenu = (v: Version) => {
+  const restoreMenu = (v: Version, small = false) => {
     const menu = h("div", { class: "menu", role: "menu", popover: "" });
     const btn = h("button", {
       type: "button",
-      class: "btn primary",
+      class: small ? "btn sm primary" : "btn primary",
       "aria-haspopup": "menu",
     }, "Restore ▾");
     btn.popoverTargetElement = menu;
@@ -579,9 +599,13 @@ export function createHistoryView(opts: {
       menu.style.left = `${r.left}px`;
     });
     menu.addEventListener("toggle", (e) => {
-      if ((e as ToggleEvent).newState === "open") {
-        (menu.firstElementChild as HTMLElement | null)?.focus();
+      if ((e as ToggleEvent).newState !== "open") return;
+      // Under a button at the window's right edge it opens leftward.
+      const r = btn.getBoundingClientRect();
+      if (r.left + menu.offsetWidth > innerWidth) {
+        menu.style.left = `${r.right - menu.offsetWidth}px`;
       }
+      (menu.firstElementChild as HTMLElement | null)?.focus();
     });
     menu.append(...RESTORES.map((r) => {
       const item = h(
@@ -725,6 +749,10 @@ export function createHistoryView(opts: {
   return {
     refresh,
     select,
+    restoreControl() {
+      const v = versions.find((x) => x.id === selected);
+      return v ? restoreMenu(v, true) : [];
+    },
     destroy() {
       alive = false;
       list.replaceChildren();

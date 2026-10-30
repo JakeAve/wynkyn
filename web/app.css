@@ -654,7 +654,8 @@ kbd {
 #pages {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* header · History's banner (§6.14) · pages or sheets · Inspect drawer */
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: var(--desk);
@@ -2102,7 +2103,7 @@ body.typing #editor .pane-head {
      target's crumbs and actions, then why / box / type. Chrome, so it takes
      the theme; its box diagram borrows the marks' colors. */
   #inspect-drawer {
-    grid-row: 3;
+    grid-row: 4;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     max-height: 15.625rem;
@@ -4007,16 +4008,60 @@ body.typing #editor .pane-head {
   color: var(--err);
 }
 
-/* The takeover (versions.ts): :root[data-history] gives the three columns to
-   versions | changes | the pages, whatever the mode underneath, and the
-   toolbar's mode switch to Back to editing. Last in the file, so it outranks
-   Publish's hidden preview. */
-:root:not([data-history]) :is(#history-list, #history-changes, #history-back),
-:root[data-history] :is(#tree, #style-nav, #editor, #config-overlay, #sheet-view, #modes, #tree-toggle, #inspect, #inspect-overlay, #inspect-drawer, #pages .expand, #writer-foot > *) {
+/* History's menu (§6.14, versions.ts): under the toolbar button, right-aligned
+   to it; versions.ts sets top and right. */
+#history-menu {
+  width: 21.25rem;
+  max-height: calc(100dvh - var(--h-toolbar) - var(--s-6));
+  padding: 0;
+}
+#history-menu:popover-open {
+  display: flex;
+  flex-direction: column;
+}
+#history-menu .history-list {
+  flex: 1;
+  min-height: 0;
+  padding: var(--s-2);
+}
+#history-menu .h-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--s-2);
+  border-top: 1px solid var(--line);
+}
+#history-menu :is(.h-foot button, .history-list .btn) {
+  width: auto;
+}
+#history-changes-open {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.1875rem;
+}
+.history-list .h-star {
+  display: inline;
+  visibility: visible;
+  width: 0.875em;
+  height: 0.875em;
+  margin-right: var(--s-2);
+  vertical-align: -0.1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+#history-open[aria-pressed="true"] {
+  background: var(--acc-wash);
+  color: var(--acc-ink);
+}
+/* A version on the pages (:root[data-history]): the editor's columns stay;
+   the pages show even where the mode shows sheets, and are only to look at.
+   With "changes", every change takes the middle column. */
+:root:not([data-history="changes"]) #history-changes,
+:root[data-history="changes"] :is(#editor, #config-overlay, #writer-foot > *),
+:root[data-history] :is(#sheet-view, #inspect, #inspect-overlay, #inspect-drawer, .pane-head .expand) {
   display: none;
 }
 :root[data-history] #preview {
-  grid-row: 3;
   position: relative;
   inset: auto;
   visibility: visible;
@@ -4024,20 +4069,21 @@ body.typing #editor .pane-head {
 :root[data-history] #pages #zoom {
   display: flex;
 }
-#history-back {
-  color: var(--fg);
+#history-changes {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
 }
-#history-open[aria-pressed="true"] {
-  background: var(--acc-wash);
-  color: var(--acc-ink);
-}
-/* The pages' banner (§6.14) sits between the pane's header and the pages. */
-:root[data-history] #pages {
-  grid-template-rows: auto auto minmax(0, 1fr);
+#history-diff {
+  flex: 1;
 }
 #version-banner {
   grid-row: 2;
 }
-#version-banner .msg {
+#pages > :is(#preview, #sheet-view) {
+  grid-row: 3;
+}
+.banner > .msg {
   flex: 1 1 15rem;
 }

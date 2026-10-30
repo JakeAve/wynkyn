@@ -1,11 +1,11 @@
-// web/src/versions.ts — the History takeover (design-language §6.14). A URL
-// state over the mode (`?history=<id|now>`), not a fourth mode: the columns
-// become versions | what one changed | its pages, and leaving returns to the
-// mode underneath. Pushed builds are held while a version is on the pages.
+// web/src/versions.ts — History (design-language §6.14, spec §7.10): the
+// toolbar's menu of versions, a version previewed on the pages
+// (`?history=<id>`) while the editor's own columns stay, and every change it
+// made in the middle column on request. Pushed builds are held meanwhile.
 import type { EditorView } from "@codemirror/view";
 import type { RestoreScope, Version } from "../../server/history.ts";
 import type { Backend } from "./backend.ts";
-import { createHistoryView, whenLabel } from "./history-view.ts";
+import { createHistoryView, rowLabel, whenLabel } from "./history-view.ts";
 import type { UpdateMessage } from "./preview.ts";
 import type { Sync } from "./sync.ts";
 import { h } from "./panel-controls.ts";
@@ -19,50 +19,61 @@ export interface VersionsDeps {
   editor(): EditorView;
   /** A version's pages, kept out of the book's cached render. */
   paint(msg: UpdateMessage, cacheKey: null): void;
-  /** Ended on the way in; `showBook` puts the book's own pages back. */
+  /** Ended by a preview; `showBook` puts the book's own pages back. */
   themes: { end(): void; showBook(next: UpdateMessage | null): void };
   syncUrl(): void;
   /** Runs `go` as a new history entry, so Back returns to before it. */
   pushPlace(go: () => void): void;
-  /** History opened or closed. */
+  /** A preview started or ended. */
   changed(): void;
 }
 
 export interface Versions {
-  /** "now" or the version on the pages while History is open, else null. */
+  /** The version on the pages, or null for the book now. */
   at(): string | null;
-  toggle(): void;
-  /** False when History isn't open, so esc falls through. */
+  /** False when there was nothing to close, so esc falls through. */
   escape(): boolean;
   /** A pushed build: true when it is held back from the pages. */
   hold(msg: UpdateMessage): boolean;
   /** The URL's `history`; `back`: there is an entry behind it to return to. */
-  follow(at: string | null, back?: boolean): void;
+  follow(at: string | null, back?: boolean): Promise<void>;
   /** The buffer stands in for the file while it has unsaved edits. */
   snapshot(reason: "close" | "before-reload"): void;
 }
+
+// What hides the pages or the middle column, set aside during a preview.
+const HIDING = ["pages-hidden", "expand-writing", "expand-pages"];
 
 export function installVersions(d: VersionsDeps): Versions {
   const root = document.documentElement;
   const panes = $("panes");
   const banner = $("version-banner");
-  const toggleBtn = $("history-open") as HTMLButtonElement;
+  const btn = $("history-open") as HTMLButtonElement;
+  const menu = $("history-menu");
   let at: string | null = null;
   let back = false;
-  let view: ReturnType<typeof createHistoryView> | null = null;
   let known: Version[] = [];
-  let previewing = false;
   let held: UpdateMessage | null = null;
   let gen = 0;
+  let restoredShown = false;
 
-  // History needs all three columns, so the panes' hidden and expanded
-  // classes wait aside while it is open, kept as panes.ts sets them (a mode
-  // change re-applies them).
+  const pressed = () =>
+    btn.setAttribute(
+      "aria-pressed",
+      String(at !== null || menu.matches(":popover-open")),
+    );
+
+  // Kept as panes.ts last set them (a mode change re-applies them), and put
+  // back when the preview ends.
   let paneClasses = "";
-  new MutationObserver(() => {
-    if (at === null || !panes.className) return;
+  const setAside = () => {
     paneClasses = panes.className;
-    panes.className = "";
+    panes.classList.remove(...HIDING);
+  };
+  new MutationObserver(() => {
+    if (at !== null && HIDING.some((c) => panes.classList.contains(c))) {
+      setAside();
+    }
   }).observe(panes, { attributeFilter: ["class"] });
 
   // A version's pages are to look at: no click to the source or a style.
@@ -74,16 +85,28 @@ export function installVersions(d: VersionsDeps): Versions {
     }, true);
   }
 
-  const say = (kids: (Node | string)[], err = false, action?: Node) => {
+  const button = (label: string, run: () => void, cls = "btn sm") => {
+    const b = h("button", { type: "button", class: cls }, label);
+    b.onclick = run;
+    return b;
+  };
+  const say = (kids: (Node | string)[], err = false, actions: Node[] = []) => {
     banner.className = err ? "banner err" : "banner";
-    banner.replaceChildren(h("span", { class: "msg" }, ...kids));
-    if (action) banner.append(action);
+    banner.replaceChildren(h("span", { class: "msg" }, ...kids), ...actions);
     banner.hidden = false;
+    restoredShown = false;
+  };
+  const dismiss = () => {
+    const x = button("✕", () => banner.hidden = true, "btn sm icon");
+    x.setAttribute("aria-label", "Dismiss");
+    return x;
   };
 
-  const backend = (): Parameters<typeof createHistoryView>[0]["backend"] => {
-    const be = d.backend();
-    return {
+  const be = d.backend();
+  const view = createHistoryView({
+    list: $("history-list"),
+    changes: $("history-diff"),
+    backend: {
       ...be,
       history: async (book) => known = await be.history(book),
       // Saved first, so the restore's own change reloads a clean buffer
@@ -92,30 +115,54 @@ export function installVersions(d: VersionsDeps): Versions {
         await d.sync().flush();
         return be.restoreVersion(book, id, scope);
       },
-    };
-  };
+    },
+    book: d.book(),
+    edition: d.edition(),
+    onSelect(picked) {
+      menu.hidePopover();
+      if (picked === "now") return backToNow();
+      if (at !== null) {
+        start(picked);
+        return d.syncUrl();
+      }
+      d.pushPlace(() => start(picked));
+      back = true;
+    },
+    onRestored: restored,
+    onName: askName,
+  });
 
   const bookPages = () => {
     gen++;
-    if (!previewing) return;
-    previewing = false;
     const next = held;
     held = null;
     d.themes.showBook(next);
   };
 
-  async function show(v: Version | "now"): Promise<void> {
-    if (v === "now") {
-      banner.hidden = true;
-      return bookPages();
+  function start(v: Version) {
+    if (at === null) {
+      d.themes.end();
+      setAside();
+      root.dataset.history = "preview";
     }
+    at = v.id;
+    view.select(v.id);
+    pressed();
+    d.changed();
+    void show(v);
+  }
+
+  async function show(v: Version) {
     const g = ++gen;
-    previewing = true;
-    say([
-      `Previewing ${
-        whenLabel(v, new Date())
-      }. Nothing changes until you restore.`,
-    ]);
+    const what = v.name ?? rowLabel(v, d.edition()).head;
+    say(
+      [
+        `Previewing ${what}, ${whenLabel(v, new Date())}. ` +
+        "Nothing changes until you restore.",
+      ],
+      false,
+      [button("Back to now", backToNow), ...view.restoreControl()],
+    );
     try {
       const built = await d.backend().buildVersion(d.book(), v.id, d.edition());
       if (g !== gen) return;
@@ -127,9 +174,32 @@ export function installVersions(d: VersionsDeps): Versions {
         say(
           [h("strong", {}, "Couldn’t show this version. "), brief(err)],
           true,
+          [
+            button("Back to now", backToNow),
+          ],
         );
       }
     }
+  }
+
+  function end() {
+    if (at === null) return;
+    at = null;
+    back = false;
+    delete root.dataset.history;
+    panes.className = paneClasses;
+    view.select("now");
+    if (!restoredShown) banner.hidden = true;
+    bookPages();
+    pressed();
+    d.changed();
+  }
+
+  function backToNow() {
+    if (at === null) return;
+    if (back) return history.back(); // popstate follows it out
+    end();
+    d.syncUrl();
   }
 
   function restored(
@@ -137,23 +207,21 @@ export function installVersions(d: VersionsDeps): Versions {
     label: string,
     scope: RestoreScope,
   ) {
-    at = "now";
-    d.syncUrl();
-    bookPages();
-    if (!before) return say([`Restored ${label}.`]);
-    const undo = h("button", { type: "button", class: "btn sm" }, "Undo");
-    undo.onclick = async () => {
-      undo.disabled = true;
+    const undo = before && button("Undo", async () => {
+      undo!.disabled = true;
       try {
         await d.sync().flush();
         await d.backend().restoreVersion(d.book(), before.id, scope);
-        say(["Restore undone."]);
-        await view?.refresh();
+        say(["Restore undone."], false, [dismiss()]);
       } catch (err) {
-        say([h("strong", {}, "Couldn’t undo. "), brief(err)], true);
+        say([h("strong", {}, "Couldn’t undo. "), brief(err)], true, [
+          dismiss(),
+        ]);
       }
-    };
-    say([`Restored ${label}.`], false, undo);
+    });
+    say([`Restored ${label}.`], false, [...undo ? [undo] : [], dismiss()]);
+    restoredShown = true;
+    backToNow();
   }
 
   function askName(target: Version | "now") {
@@ -176,7 +244,7 @@ export function installVersions(d: VersionsDeps): Versions {
           name,
         );
         dlg.close();
-        await view?.refresh();
+        await view.refresh();
       } catch (x) {
         err.textContent = brief(x);
       }
@@ -185,99 +253,69 @@ export function installVersions(d: VersionsDeps): Versions {
     input.focus();
   }
 
-  function enter(first: string) {
-    at = first;
-    d.themes.end();
-    paneClasses = panes.className;
-    panes.className = "";
-    root.dataset.history = "";
-    toggleBtn.setAttribute("aria-pressed", "true");
-    d.changed();
-    const v = view = createHistoryView({
-      list: $("history-list"),
-      changes: $("history-changes"),
-      backend: backend(),
-      book: d.book(),
-      edition: d.edition(),
-      onSelect(picked) {
-        at = picked === "now" ? "now" : picked.id;
-        d.syncUrl();
-        void show(picked);
-      },
-      onRestored: restored,
-      onName: askName,
-    });
-    v.refresh().then(() => {
-      if (view !== v) return;
-      const picked = known.find((x) => x.id === first);
-      if (!picked && first !== "now") {
-        at = "now"; // an unknown id, from an old link: the book now
-        d.syncUrl();
-      }
-      v.select(picked ? first : "now");
-      void show(picked ?? "now");
-      $("history-list").querySelector<HTMLElement>('[aria-current="true"]')
-        ?.focus();
-    }, (err) => {
-      if (view === v) {
-        say([h("strong", {}, "Couldn’t load History. "), brief(err)], true);
-      }
-    });
-  }
-
-  function exit() {
-    at = null;
-    back = false;
-    view?.destroy();
-    view = null;
-    delete root.dataset.history;
-    panes.className = paneClasses;
-    toggleBtn.setAttribute("aria-pressed", "false");
-    banner.hidden = true;
-    bookPages();
-    d.changed();
-  }
-
-  function close() {
-    if (at === null) return;
-    if (back) return history.back(); // popstate follows it out
-    exit();
-    d.syncUrl();
-  }
-
-  const toggle = () => {
-    if (at !== null) return close();
-    d.pushPlace(() => enter("now"));
-    back = true;
+  menu.addEventListener("beforetoggle", (e) => {
+    if ((e as ToggleEvent).newState !== "open") return;
+    const r = btn.getBoundingClientRect();
+    menu.style.top = `${r.bottom}px`;
+    menu.style.right = `${innerWidth - r.right}px`;
+    view.refresh().then(
+      () => menu.querySelector<HTMLElement>('[aria-current="true"]')?.focus(),
+      (err) =>
+        say([h("strong", {}, "Couldn’t load History. "), brief(err)], true, [
+          dismiss(),
+        ]),
+    );
+  });
+  menu.addEventListener("toggle", pressed);
+  $("history-name").onclick = () => {
+    menu.hidePopover();
+    askName(known.find((v) => v.id === at) ?? "now");
   };
-  toggleBtn.onclick = toggle;
-  $("history-back").onclick = close;
-  toggleBtn.disabled = false;
+  // With nothing previewed, the newest version listed.
+  $("history-changes-open").onclick = () => {
+    const id = at ??
+      menu.querySelector<HTMLElement>('.h-row:not([data-id="now"])')?.dataset
+        .id;
+    const v = known.find((x) => x.id === id);
+    if (!v) return;
+    menu.hidePopover();
+    if (at === null) {
+      d.pushPlace(() => start(v));
+      back = true;
+    }
+    root.dataset.history = "changes";
+  };
+  $("history-changes-close").onclick = () => root.dataset.history = "preview";
+  btn.disabled = false;
 
   return {
     at: () => at,
-    toggle,
     escape() {
-      if (at === null) return false;
-      close();
+      if (root.dataset.history === "changes") {
+        root.dataset.history = "preview";
+      } else if (at !== null) backToNow();
+      else if (!banner.hidden) banner.hidden = true;
+      else return false;
       return true;
     },
     hold(msg) {
-      if (!previewing) return false;
+      if (at === null) return false;
       held = msg;
       return true;
     },
-    follow(next, behind = true) {
-      if (next === null) {
-        if (at !== null) exit();
-      } else if (at === null) {
-        enter(next);
-        back = behind;
-      } else if (next !== at) {
-        at = next;
-        view?.select(next);
-        void show(known.find((x) => x.id === next) ?? "now");
+    async follow(next, behind = true) {
+      if (next === null) return end();
+      if (next === at) return;
+      if (!known.some((x) => x.id === next)) {
+        await view.refresh().catch(() => {});
       }
+      const v = known.find((x) => x.id === next);
+      if (!v) {
+        end();
+        return d.syncUrl(); // an unknown id, from an old link: the book now
+      }
+      if (at === null) back = behind;
+      start(v);
     },
     snapshot(reason) {
       const sync = d.sync();

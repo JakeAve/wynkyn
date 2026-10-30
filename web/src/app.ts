@@ -608,7 +608,7 @@ function installHistory(): void {
     const p = new URLSearchParams(location.search);
     const m = MODES.find((m) => m === p.get("mode")) ?? "write";
     view = p.get("view");
-    versions?.follow(p.get("history"));
+    void versions?.follow(p.get("history"));
     setMode(m);
     if (m !== "write" && view) configPanel?.open(view);
     const line = lineFromHash(location.hash);
@@ -763,11 +763,9 @@ function installGutters(): void {
     const left = () =>
       (cssVar === "--w-tree"
         ? panes
-        : versions?.at()
-        ? $("history-changes")
-        : mode === "write"
-        ? $("editor")
-        : $("config-overlay")).getBoundingClientRect().left;
+        : ["editor", "config-overlay", "history-changes"].map($).find((el) =>
+          el.checkVisibility()
+        ) ?? panes).getBoundingClientRect().left;
     const rem = () => parseFloat(getComputedStyle(root).fontSize);
     const width = () => gutter.getBoundingClientRect().left - left();
     const resize = (px: number) => {
@@ -999,10 +997,7 @@ async function main(): Promise<void> {
     panes: installPanes({ mode: () => mode }),
     textView,
     inspect,
-    history: {
-      open: () => versions?.at() != null,
-      escape: () => versions?.escape() ?? false,
-    },
+    history: { escape: () => versions?.escape() ?? false },
     editor: () => editor,
     preview: $("preview"),
     createManuscript,
@@ -1153,7 +1148,7 @@ async function main(): Promise<void> {
   };
   backend.subscribe(book, edition, clientId, onMessage, onClose);
   const at = params.get("history"); // a link or a reload: nothing behind it
-  if (at !== null) versions.follow(at, false);
+  if (at !== null) void versions.follow(at, false);
 }
 
 // A boot that throws must say so, not sit on "Connecting…" for good.

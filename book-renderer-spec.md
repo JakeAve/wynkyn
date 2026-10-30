@@ -2837,30 +2837,34 @@ last version of each hour for a week, of each day for 30 days, of each ISO week
 after that (UTC). A named version is never thinned. Images no kept version uses
 are dropped.
 
-**The takeover.** The toolbar's History button, or Mod+Shift+Y (⌥⌘Y on a Mac),
-opens History over the current mode: left, the versions by day, newest first,
-each row its time and what changed (the chapters touched, the parts styled,
-images), starting with **Now**; middle, what the selected version changed since
-the one before it; right, its pages. Where the book has more than one edition, a
-This edition | All editions filter hides versions that changed only the others.
-A run of thinned versions folds into one row. Esc or **← Back to editing**
-returns to the mode and layout underneath; History is a place in the address
-(`?history=<id|now>`), so the browser's Back does too. Undo, Redo and the other
-shortcuts are off while it is open.
+**The menu.** The toolbar's History button, or Mod+Shift+Y (⌥⌘Y on a Mac), opens
+a menu under it: the versions by day, newest first, each row its time and its
+name or what changed (the chapters touched, the parts styled, images), starting
+with **Now**. Where the book has more than one edition, a This edition | All
+editions filter hides versions that changed only the others. A run of thinned
+versions folds into one row. Its foot holds **Name this version…** and **See
+every change**.
 
-The middle column names the version, its reason (Opened, changed outside the
-app; Before import; Before deleting edition; Before reload; Before restore) and
-a one-line summary. Style changes list by part as `old → new`, in the panel's
-words; text changes list by chapter, paragraph by paragraph, inserted words
-underlined and deleted words struck through, selectable to copy.
+**Preview.** Picking a row shows that version on the pages, built as the current
+edition, through the same path as live updates, with the book's current images;
+the editor's own columns stay as they are, and the pages show even in Publish or
+where they were hidden or a pane expanded. A banner over the pages reads
+"Previewing {name or what changed}, {when}. Nothing changes until you restore."
+with **Back to now** and **Restore ▾**. Pushed rebuilds are held while a version
+shows, the pages are not clickable, and Undo and Redo are off. A preview is a
+place in the address (`?history=<id>`), so the browser's Back ends it too; Esc
+closes the menu, then every change, then goes back to now.
 
-**Preview.** The pages show the selected version built as the current edition,
-through the same path as live updates, with the book's current images. A banner
-over the pages reads "Previewing {when}. Nothing changes until you restore."
-Pushed rebuilds are held while a version shows, and the pages are not clickable;
-leaving puts the book's own pages back.
+**Every change.** See every change (the previewed version, else the newest)
+takes the middle column until **← Back to editing** or Esc: the version's name,
+its reason (Opened, changed outside the app; Before import; Before deleting
+edition; Before reload; Before restore) and a one-line summary, with Restore ▾
+and Name…. Style changes list by part as `old → new`, in the panel's words; text
+changes list by chapter, paragraph by paragraph, inserted words underlined and
+deleted words struck through, selectable to copy.
 
-**Restore.** The middle column's Restore menu takes one of four scopes:
+**Restore.** Restore ▾, on the banner or in every change, takes one of four
+scopes:
 
 - **Everything**: every kept file; files the version lacks (an edition made
   since) are removed;
@@ -2872,15 +2876,16 @@ leaving puts the book's own pages back.
 Unsaved edits are saved first, the book is snapshotted (Before restore), and the
 files are put back; open tabs take the change as any outside one, so the editor
 reloads without joining its undo history and the style undo stack clears (§7.5).
-A banner over the pages reads "Restored {what} from {when}." with **Undo**,
-which restores the Before restore snapshot with the same scope. The snapshot
-stays in the list, so a restore can also be undone later by restoring it.
+The preview ends, and the banner over the pages reads "Restored {what} from
+{when}." with **Undo**, which restores the Before restore snapshot with the same
+scope. The snapshot stays in the list, so a restore can also be undone later by
+restoring it.
 
-**Name version.** Name… in the middle column names the selected version, or with
-Now takes a snapshot of the book as it is and names it ("Sent to printer"). When
-nothing changed since the latest version, Now names that one instead, unless it
-already has a name: then a new version with the same files takes this one. A
-named version is kept forever.
+**Name version.** Name this version… in the menu, or Name… in every change,
+names the previewed version, or with nothing previewed takes a snapshot of the
+book as it is and names it ("Sent to printer"). When nothing changed since the
+latest version, Now names that one instead, unless it already has a name: then a
+new version with the same files takes this one. A named version is kept forever.
 
 **Download book.** The switcher's Download book zips the book without
 `.history/`; its With history switch (browser storage only; the dev server has

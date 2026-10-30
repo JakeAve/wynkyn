@@ -132,7 +132,7 @@ Deno.test("row labels", () => {
   );
   assertEquals(
     rowLabel(v(at, "named", { editions: [null] }, "Sent to printer"), null),
-    { head: "★ Sent to printer", detail: "Text · Styles" },
+    { head: "Sent to printer", detail: "Text · Styles" },
   );
   assertEquals(
     chaptersLabel(["Front matter", "one"]),

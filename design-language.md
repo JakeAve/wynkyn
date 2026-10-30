@@ -598,8 +598,9 @@ control's tooltip and `kbd` show its key as the platform writes it
   switches with Mod+O, and Mod+Alt+N starts a new one); centre, Write / Style /
   Publish (Mod+1–3); right, Undo and Redo (`.btn.icon`, curved arrows, disabled
   while there is nothing to undo), History (`#history-open`, `.btn.icon`, a
-  clock with a back arrow; ⌥⌘Y on a Mac, Ctrl+Shift+Y elsewhere; the red wash
-  while open, §6.14), then the theme toggle (Mod+Shift+L), showing the mode it
+  clock with a back arrow; ⌥⌘Y on a Mac, Ctrl+Shift+Y elsewhere; it opens
+  History's menu and sits in the red wash while that is open or a version is
+  previewed, §6.14), then the theme toggle (Mod+Shift+L), showing the mode it
   switches to in woodcut: the sun mark (§10) without its cut lines, and the man
   in the moon beside a share-card star. These two are filled, not stroked, in
   the button's color (never red). The save status sits after the crumb. The
@@ -672,27 +673,35 @@ marks' colors (§2.4).
 
 ### 6.14 History
 
-The takeover's left and middle columns (`web/src/history-view.ts`); the pages
-take the right (`web/src/versions.ts`), whatever the mode underneath and however
-the panes were hidden or expanded.
+A menu under the toolbar's History button, a version previewed on the pages
+(`web/src/versions.ts`), and on request every change it made in the middle
+column (`web/src/history-view.ts`). The editor's own columns stay as they are.
 
-- **Toolbar:** "← Back to editing" (a ghost `.btn` in `--fg`) takes the Contents
-  toggle's place and the mode switch goes; the crumb stays. History's toolbar
-  button sits in the red wash, Undo and Redo are disabled, and the pages pane
-  keeps zoom but loses Inspect and expand. Esc or Back returns to the mode and
-  panes as they were.
-
-- **Version list** (`.history-list`): reads like the style nav (§6.6). At the
-  top, "This edition | All editions" as a `seg` (§6.2), only when the book has
-  more than one edition. Each day is a group label (`.nh`: Today, Yesterday,
-  "Tue 20 Oct"), then rows (`.h-row`): a 4rem column holding the time in
-  `--fs-xs` `--muted` tabular figures, and beside it what changed over the parts
-  it touched in `--fs-xs` `--muted`, then the reason (Before import…) in the
-  same, italic. "Now · Current version" heads Today. The selected row takes the
-  red wash (`aria-current`), its muted lines in the wash's ink at 60%. A folded
-  run of thinned versions is a small ghost "▸ N more" lined up with the rows'
-  text.
-- **Changes column** (`.history-changes`): the panel's view heading (§6.5): the
+- **Menu** (`#history-menu`): a §6.9 `.menu` popover right-aligned under the
+  button, 21.25rem wide, no taller than the window; the version list, then a
+  footer ruled by a hairline: "Name this version…" at left and "See every
+  change" at right in `--fg` with a dotted underline (no red: a link is not one
+  of §2.2's places); with nothing previewed it opens the newest version. Picking
+  a row closes the menu; picking Now goes back to now.
+- **Preview:** the pages show the picked version even where the mode shows
+  sheets, and are only to look at; anything hiding the pages (Write's hidden
+  pages, an expanded pane) waits aside until the preview ends. Inspect and the
+  expand buttons go meanwhile, and Undo and Redo are disabled. Esc closes the
+  menu, then every change, then goes back to now.
+- **Version list** (`.history-list`, in the menu): reads like the style nav
+  (§6.6). At the top, "This edition | All editions" as a `seg` (§6.2), only when
+  the book has more than one edition. Each day is a group label (`.nh`: Today,
+  Yesterday, "Tue 20 Oct"), then rows (`.h-row`): a 4rem column holding the time
+  in `--fs-xs` `--muted` tabular figures, and beside it what changed over the
+  parts it touched in `--fs-xs` `--muted`, then the reason (Before import…) in
+  the same, italic. A named version shows its name after a small outline star
+  (`.h-star`, the icons' 16-unit grid and 1.4 stroke). "Now · Current version"
+  heads Today. The selected row takes the red wash (`aria-current`), its muted
+  lines in the wash's ink at 60%. A folded run of thinned versions is a small
+  ghost "▸ N more" lined up with the rows' text.
+- **Every change** (`#history-changes`, from "See every change"): takes the
+  middle column, under a pane header (§6.11) holding "← Back to editing" (small
+  ghost); its body (`.history-changes`) is the panel's view heading (§6.5): the
   crumb is when it was taken and the reason, the heading in Fell is what changed
   or the version's name, then the actions: Restore ▾ (the one primary) and Name…
   (ghost). Below, a `--muted` summary up to 36em, then a section (§6.5) per
@@ -709,13 +718,15 @@ the panes were hidden or expanded.
 - **Failure:** a restore or a diff that fails puts a `.banner.err` (§6.10)
   across the top of the changes column, `role="alert"`: the lead ("Couldn't
   restore.") in `--err`, then the reason. Never a toast.
-- **Preview banner** (`#version-banner`): while a version is selected, a plain
-  banner across the top of the pages pane, under its header: "Previewing Today,
-  3:42 pm. Nothing changes until you restore." After a restore the same strip
-  says "Restored the styles from Yesterday, 9:10 am." with a small ghost Undo
-  (`.btn.sm`) at the right, which restores the before-restore version with the
-  same scope, then "Restore undone." A version that can't be built, or an Undo
-  that fails, turns it into a `.banner.err` there.
+- **Preview banner** (`#version-banner`): while a version is previewed, a plain
+  banner across the top of the pages pane, under its header: "Previewing Sent to
+  printer, Today, 3:42 pm. Nothing changes until you restore." (the name, else
+  what changed), then at the right a small ghost "Back to now" and the small
+  primary Restore ▾. After a restore the preview ends and the same strip says
+  "Restored the styles from Yesterday, 9:10 am." with a small ghost Undo
+  (`.btn.sm`), which restores the before-restore version with the same scope,
+  then "Restore undone."; a small ✕ (or Esc) dismisses it. A version that can't
+  be built, or an Undo that fails, turns it into a `.banner.err` there.
 - **Name…** opens a §6.8 dialog (`#name-dlg`): "Name this version", a Name
   field, a `--muted` hint that named versions are kept for good, Cancel and the
   primary Save name.
