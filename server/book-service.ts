@@ -16,6 +16,7 @@ import {
 import { parseMetadataText } from "../metadata/loader.ts";
 import type { Metadata } from "../metadata/types.ts";
 import { applyTheme } from "../metadata/themes.ts";
+import { localPaper } from "../metadata/page-setup.ts";
 import {
   classifyChange,
   createEdition,
@@ -929,10 +930,19 @@ export function mergeSections(
 const serializeMeta = (m: object) => JSON.stringify(m, null, 2) + "\n";
 
 /** A new book's metadata.json text: the template with a theme applied (spec
- * §4.13); no theme or House is the template as it is. Throws on an unknown
+ * §4.13), on the author's local paper when a locale is given (§4.3); no theme
+ * or House, and no locale, is the template as it is. Throws on an unknown
  * theme. Every front door (bml, the dev server, the in-page backend) runs it
  * before handing the text to createBook / importBook. */
-export function themedTemplate(template: string, theme?: string): string {
-  if (!theme || theme === "house") return template;
-  return serializeMeta(applyTheme(JSON.parse(template) as Metadata, theme));
+export function themedTemplate(
+  template: string,
+  theme?: string,
+  locale?: string,
+): string {
+  const house = !theme || theme === "house";
+  if (house && !locale) return template;
+  let meta = JSON.parse(template) as Metadata;
+  if (!house) meta = applyTheme(meta, theme);
+  if (locale) meta = { ...meta, page: { ...meta.page, ...localPaper(locale) } };
+  return serializeMeta(meta);
 }

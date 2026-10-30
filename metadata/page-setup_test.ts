@@ -5,6 +5,7 @@ import {
   foldedSize,
   gridFor,
   isValidSize,
+  localPaper,
   parseDims,
   resolveMarks,
   resolvePageSetup,
@@ -285,4 +286,17 @@ Deno.test("resolveMarks: off unless show, defaults on, false wins", () => {
     resolveMarks({ show: true, sewing: { stations: -1 } })?.sewing?.stations,
     3,
   );
+});
+
+Deno.test("localPaper: half the local sheet, A4 unless the region loads letter", () => {
+  const letter = { size: "5.5in 8.5in", sheet: "letter" };
+  const a4 = { size: "A5", sheet: "A4" };
+  assertEquals(localPaper("en-US"), letter);
+  assertEquals(localPaper("en"), letter); // likely region US
+  assertEquals(localPaper("es-MX"), letter);
+  assertEquals(localPaper("fr-CA"), letter);
+  assertEquals(localPaper("es"), a4); // likely region ES
+  assertEquals(localPaper("en-GB"), a4);
+  assertEquals(localPaper("es-419"), a4);
+  assertEquals(localPaper("not a locale"), a4);
 });

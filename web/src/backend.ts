@@ -161,10 +161,16 @@ export function httpBackend(): Backend {
     listBooks: () => call("/api/books"),
     libraryId: () => call<{ id: string }>("/api/library").then((r) => r.id),
     createBook: (slug, title, theme) =>
-      post("/api/books", { slug, title, theme }),
+      post("/api/books", {
+        slug,
+        title,
+        theme,
+        locale: navigator.language,
+      }),
     importBook: (slug, r, theme) =>
       post(`/api/books/${encodeURIComponent(slug)}/import`, {
         theme,
+        locale: navigator.language,
         manuscript: r.manuscript,
         images: Object.fromEntries(
           Object.entries(r.images).map(([k, v]) => [k, base64(v)]),
@@ -351,13 +357,13 @@ export async function localBackend(
     listBooks: () => service.list(),
     libraryId: () => service.libraryId(),
     async createBook(slug, title, theme) {
-      const meta = themedTemplate(assets.template, theme);
+      const meta = themedTemplate(assets.template, theme, navigator.language);
       if (!await service.createBook(slug, meta, title)) {
         throw new Error("book already exists");
       }
     },
     async importBook(slug, r, theme) {
-      const meta = themedTemplate(assets.template, theme);
+      const meta = themedTemplate(assets.template, theme, navigator.language);
       if (!await service.importBook(slug, meta, r)) {
         throw new Error("book already exists");
       }
