@@ -9,6 +9,7 @@ import {
   bookParts,
   catalogFor,
   entryName,
+  ORNAMENT_VIEWS,
 } from "./style-catalog.ts";
 import type { Metadata } from "../../metadata/types.ts";
 
@@ -22,6 +23,7 @@ export interface ItemSources {
   goToLine(line: number): void;
   openPart(id: string): void;
   pickStyle(key: string): void;
+  openOrnaments(part: string): void;
 }
 
 const PART_GROUP: Record<BookPart["group"], string> = {
@@ -97,5 +99,22 @@ export function paletteItems(src: ItemSources): Item[] {
       run: () => src.pickStyle(e.key),
     }];
   });
-  return [...commands, ...sentinels, ...places, ...parts, ...entries];
+  const ornaments = bookParts(src.metadata)
+    .filter((p) => ORNAMENT_VIEWS.includes(p.id))
+    .map((p): Item => ({
+      id: `ornaments:${p.id}`,
+      label: "Corner ornaments",
+      group: "Styles",
+      detail: p.name,
+      off,
+      run: () => src.openOrnaments(p.id),
+    }));
+  return [
+    ...commands,
+    ...sentinels,
+    ...places,
+    ...parts,
+    ...ornaments,
+    ...entries,
+  ];
 }

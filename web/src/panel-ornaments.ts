@@ -51,6 +51,12 @@ export function ornamentsBlock(
     v.changed("ornaments");
   };
   let current = 0;
+  let adding = false; // rarely used, so an unset page shows only its heading
+  const add = h("button", { type: "button", class: "tog" }, "Add");
+  add.onclick = () => {
+    adding = !adding;
+    draw();
+  };
   let images: ImageFile[] = [];
   const urls = new Map<string, string>();
 
@@ -247,6 +253,9 @@ export function ornamentsBlock(
 
   function draw() {
     const all = list();
+    add.hidden = all.length > 0;
+    add.textContent = adding ? "Cancel" : "Add";
+    if (!all.length && !adding) return body.replaceChildren();
     const another = h(
       "button",
       { type: "button", class: "tog" },
@@ -263,7 +272,9 @@ export function ornamentsBlock(
       save();
       draw();
     };
+    const hint = FIRST_PAGE[type];
     body.replaceChildren(
+      ...(hint ? [h("p", { class: "from" }, hint)] : []),
       ...all.map(card),
       all.length ? h("div", { class: "orn-acts" }, another) : "",
       h(
@@ -286,11 +297,7 @@ export function ornamentsBlock(
     draw();
   });
 
-  const hint = FIRST_PAGE[type];
-  const el = section("Corner ornaments", "ornaments", [
-    ...(hint ? [h("p", { class: "from" }, hint)] : []),
-    body,
-  ]);
+  const el = section("Corner ornaments", "ornaments", [body], add);
   return {
     el,
     reset() {

@@ -324,6 +324,8 @@ const ORNAMENT_PARTS: Record<string, string> = {
   colophon: "colophon",
 };
 
+export const ORNAMENT_VIEWS = Object.keys(ORNAMENT_PARTS);
+
 export const ornamentType = (part: string): string | undefined =>
   ORNAMENT_PARTS[part];
 

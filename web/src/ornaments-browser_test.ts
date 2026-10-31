@@ -12,6 +12,8 @@ appTest({
   async fn() {
     const b = await book();
     const page = await openApp(b, "&mode=style&view=chapter");
+    await page.locator('.sec[data-focus="ornaments"] .tog:has-text("Add")')
+      .click();
     await page.locator('.orn-tile[title="Vine"]').click();
     await page.locator(`${OPENER} .page-ornament`).first().waitFor();
     assert(await b.read("images/corner-vine.svg"));

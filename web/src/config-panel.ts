@@ -35,6 +35,7 @@ export interface ConfigPanel {
   pagesChanged(): void; // the preview repaginated
   isNamesChanged(): void; // the manuscript was reparsed; Custom styles follow it
   open(view: string): void; // the nav row `view` (navId), if this book has it
+  ornaments(part: string): void; // a page's Corner ornaments block, in view
   themeTried(slug: string | null): void; // mark the previewed theme's card
 }
 
@@ -379,6 +380,9 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     open(view) {
       const next = routeById(view, meta);
       if (next) go(next);
+    },
+    ornaments(part) {
+      go({ tab: "parts", part, focus: "ornaments" });
     },
     themeTried(slug) {
       tried = slug;

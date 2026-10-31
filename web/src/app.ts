@@ -1060,6 +1060,10 @@ async function main(): Promise<void> {
           void ensureConfigPanel().then((p) => p?.open(id));
         },
         pickStyle: (key) => void pickStyle(key),
+        openOrnaments: (part) => {
+          setMode("style");
+          void ensureConfigPanel().then((panel) => panel?.ornaments(part));
+        },
       }),
   });
   undoUi = installUndo({
@@ -1108,7 +1112,7 @@ async function main(): Promise<void> {
     style: pickStyle,
     ornament: (part) => {
       setMode("style");
-      void ensureConfigPanel().then((panel) => panel?.open(part));
+      void ensureConfigPanel().then((panel) => panel?.ornaments(part));
     },
     source: (line) => scrollEditorToLine(editor, line),
     addImage: (slug, file) => fillPlaceholder(images, slug, file),

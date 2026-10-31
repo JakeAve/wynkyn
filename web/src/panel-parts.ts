@@ -223,11 +223,11 @@ function detail(ctx: PanelContext, part: BookPart): Node[] {
     : null;
   if (ornaments) resets.push(ornaments.reset);
   return [
-    ...(ornaments ? [ornaments.el] : []),
     ...(page && !entries.some((e) => e.key === part.id)
       ? [section("Whole page", part.id, [page.row])]
       : []),
     ...blocks,
+    ...(ornaments ? [ornaments.el] : []),
     footer(count, () => {
       for (const s of new Set(resets.flatMap((f) => f()))) ctx.queueSave(s);
       ctx.go({ tab: "parts", part: part.id });
