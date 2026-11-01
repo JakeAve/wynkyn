@@ -103,7 +103,7 @@ export function paletteItems(src: ItemSources): Item[] {
     .filter((p) => ORNAMENT_VIEWS.includes(p.id))
     .map((p): Item => ({
       id: `ornaments:${p.id}`,
-      label: "Corner ornaments",
+      label: "Page ornaments",
       group: "Styles",
       detail: p.name,
       off,

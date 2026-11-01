@@ -1,29 +1,35 @@
-// The Corner ornaments block on a page's Style view (metadata `ornaments`, spec
-// §4.17). The little page is the control: a click on a corner sets or clears it,
+// The Page ornaments block on a page's Style view (metadata `ornaments`, spec
+// §4.17). The little page is the control: a click on a spot sets or clears it,
 // showing the art as it will sit. No art needed to start: see the starters.
+import { matterType } from "../../parser/types.ts";
+import {
+  CORNERS,
+  drawnFor,
+  EDGES,
+  hug,
+  turnsTo,
+} from "../../metadata/ornaments.ts";
 import type {
   Metadata,
-  OrnamentCorner,
   OrnamentPlacement,
+  OrnamentSpot,
 } from "../../metadata/types.ts";
 import type { ImageFile } from "../../server/images.ts";
 import { convertLength, parseLength } from "./config-data.ts";
-import { STARTERS } from "./ornament-starters.ts";
-import { h, row, section, stepper, type View } from "./panel-controls.ts";
+import { type StarterKind, STARTERS } from "./ornament-starters.ts";
+import { h, row, section, seg, stepper, type View } from "./panel-controls.ts";
 import type { PanelContext } from "./style-catalog.ts";
 
-const CORNERS: OrnamentCorner[] = [
-  "top-left",
-  "top-right",
-  "bottom-right",
-  "bottom-left",
+const SHAPES: { kind: StarterKind; label: string; aria: string }[] = [
+  { kind: "corners", label: "Corners", aria: "Art in the page's corners" },
+  { kind: "edges", label: "Edges", aria: "Art at the middle of an edge" },
+  { kind: "border", label: "Border", aria: "A line or frame around the page" },
 ];
-const WORDS = (c: OrnamentCorner) => c.replace("-", " ");
-const FIRST_PAGE: Record<string, string> = {
-  part: "First page of each part.",
-  chapter: "First page of each chapter.",
-  toc: "First page of the contents.",
-};
+const RULES = [
+  { style: "single", name: "Single" },
+  { style: "double", name: "Double" },
+  { style: "thin-thick", name: "Thin and thick" },
+] as const;
 
 const mm = (length: string) => parseLength(convertLength(length, "mm"))?.n ?? 0;
 // ponytail: a named size ("A5") falls back to the mini page's default shape.
@@ -31,10 +37,12 @@ const trimOf = (meta: Metadata) => {
   const [w, h] = (meta.page?.size ?? "").trim().split(/\s+/).map(mm);
   return w && h ? { w, h } : null;
 };
-
-const turnsOf = (o: OrnamentPlacement, corner: OrnamentCorner) =>
-  (CORNERS.indexOf(corner) - CORNERS.indexOf(o["drawn-for"] ?? "top-left") +
-    4) % 4;
+const shapeOf = (o: OrnamentPlacement): StarterKind =>
+  o.kind === "rule" || o.kind === "frame"
+    ? "border"
+    : o.at?.some((s) => EDGES.includes(s))
+    ? "edges"
+    : "corners";
 
 export function ornamentsBlock(
   ctx: PanelContext,
@@ -50,164 +58,223 @@ export function ornamentsBlock(
     }
     v.changed("ornaments");
   };
-  let current = 0;
-  let adding = false; // rarely used, so an unset page shows only its heading
-  const add = h("button", { type: "button", class: "tog" }, "Add");
-  add.onclick = () => {
-    adding = !adding;
-    draw();
-  };
+  // A part's section holds its chapters, and display matter is one page.
+  const paged = type !== "part" && !matterType(type).display;
   let images: ImageFile[] = [];
   const urls = new Map<string, string>();
+  // What the tray is for: a new ornament of a shape, or new art for a card.
+  let picking: { shape?: StarterKind; card?: OrnamentPlacement } | null = null;
 
   const body = h("div", { class: "ornaments" });
-  const place = (slug: string) => {
-    const all = list();
-    const o = all[current];
-    if (o) o.image = slug;
-    else {
-      // The contents' entries run to the foot of the page: start it on top.
-      const corners: OrnamentCorner[] = type === "toc"
-        ? ["top-left", "top-right"]
-        : [...CORNERS];
-      ((meta.ornaments ??= {})[type] ??= []).push({ image: slug, corners });
-      current = all.length;
-    }
+  const add = h("button", { type: "button", class: "tog" }, "Add");
+  add.onclick = () => {
+    picking = picking ? null : {};
+    draw();
+  };
+  const redraw = () => {
+    picking = null;
     save();
     draw();
   };
 
-  const art = (slug: string, turns = 0) => {
+  const push = (o: OrnamentPlacement) => {
+    ((meta.ornaments ??= {})[type] ??= []).push(o);
+    redraw();
+  };
+  const place = (slug: string, frame: boolean) => {
+    const card = picking?.card;
+    if (card) {
+      card.image = slug;
+      return redraw();
+    }
+    if (frame) return push({ kind: "frame", image: slug });
+    if (picking?.shape === "edges") {
+      return push({ image: slug, at: ["top", "bottom"], size: "40mm" });
+    }
+    // The contents' entries run to the foot of the page: start it on top.
+    const at: OrnamentSpot[] = type === "toc"
+      ? ["top-left", "top-right"]
+      : [...CORNERS];
+    push({ image: slug, at });
+  };
+
+  const art = (slug: string | undefined) => {
     const img = h("img", { alt: "" });
-    const url = urls.get(slug);
+    const url = slug && urls.get(slug);
     if (url) img.src = url;
-    img.style.transform = `rotate(${turns * 90}deg)`;
     return img;
   };
 
-  const card = (o: OrnamentPlacement, i: number) => {
+  const miniPage = (o: OrnamentPlacement) => {
     const page = h("div", { class: "orn-page" });
     const trim = trimOf(meta);
     if (trim) page.style.aspectRatio = `${trim.w} / ${trim.h}`;
-    // Drawn to scale, so the little page shows what the sliders do.
+    // Drawn to scale, so the steppers show what they do.
     const scale = () => {
       const pct = (v: string) => `${(100 * mm(v)) / (trim?.w ?? 140)}%`;
       page.style.setProperty("--orn-size", pct(o.size ?? "25mm"));
       page.style.setProperty("--orn-inset", pct(o.inset ?? "6mm"));
     };
     scale();
-    for (const corner of CORNERS) {
-      const on = o.corners.includes(corner);
-      const b = h("button", {
+    if (o.kind === "rule") {
+      page.append(
+        h("div", { class: `orn-frame orn-rule-${o.style ?? "single"}` }),
+      );
+    } else if (o.kind === "frame") {
+      page.append(h("div", { class: "orn-frame" }, art(o.image)));
+    } else {
+      for (const spot of shapeOf(o) === "edges" ? EDGES : CORNERS) {
+        const on = !!o.at?.includes(spot);
+        const words = spot.replace("-", " ");
+        const b = h("button", {
+          type: "button",
+          class: `orn-spot ${spot}`,
+          "aria-pressed": String(on),
+          "aria-label": words,
+          title: `${on ? "Clear" : "Set"} ${words}`,
+        });
+        if (on) {
+          const img = art(o.image);
+          img.style.objectPosition = hug(drawnFor(o, spot));
+          img.style.transform = `rotate(${turnsTo(o, spot) * 90}deg)`;
+          b.append(img);
+        }
+        b.onclick = () => {
+          o.at = on ? o.at!.filter((s) => s !== spot) : [...(o.at ?? []), spot];
+          save();
+          draw();
+        };
+        page.append(b);
+      }
+    }
+    return { page, scale };
+  };
+
+  const lengthRow = (
+    o: OrnamentPlacement,
+    key: "size" | "inset" | "width",
+    label: string,
+    placeholder: string,
+    after: () => void,
+  ) =>
+    row(
+      label,
+      stepper({
+        value: o[key],
+        placeholder,
+        label,
+        onChange: (next) => {
+          if (next) o[key] = next;
+          else delete o[key];
+          after();
+          v.changed("ornaments");
+        },
+      }),
+    );
+
+  const card = (o: OrnamentPlacement, i: number) => {
+    const { page, scale } = miniPage(o);
+    const shape = shapeOf(o);
+    const rows: Node[] = [];
+    if (o.kind === "rule") {
+      rows.push(row(
+        "Line",
+        seg(
+          RULES.map((r) => ({ value: r.style, label: r.name })),
+          o.style ?? "single",
+          (next) => {
+            o.style = next ?? "single";
+            save();
+            draw();
+          },
+          "Line",
+        ),
+      ));
+      rows.push(lengthRow(o, "width", "Thickness", "0.75pt", scale));
+    } else if (o.kind !== "frame") {
+      rows.push(lengthRow(o, "size", "Size", "25mm", scale));
+    }
+    rows.push(lengthRow(o, "inset", "From the edge", "6mm", scale));
+    if (paged) {
+      rows.push(row(
+        "On",
+        seg(
+          [
+            { value: "first", label: "First page" },
+            { value: "all", label: "Every page" },
+          ],
+          o.pages ?? "first",
+          (next) => {
+            if (next === "all") o.pages = next;
+            else delete o.pages;
+            v.changed("ornaments");
+          },
+          "Which pages",
+        ),
+      ));
+    }
+    const acts = h("div", { class: "orn-acts" });
+    if (o.kind !== "rule") {
+      const change = h(
+        "button",
+        { type: "button", class: "tog" },
+        "Change art",
+      );
+      change.onclick = () => {
+        picking = { card: o, shape };
+        draw();
+      };
+      acts.append(change);
+    }
+    if (!o.kind || o.kind === "art") {
+      const turn = h("button", {
         type: "button",
-        class: `orn-corner ${corner}`,
-        "aria-pressed": String(on),
-        "aria-label": WORDS(corner),
-        title: `${on ? "Clear" : "Set"} ${WORDS(corner)}`,
-      });
-      if (on) b.append(art(o.image, turnsOf(o, corner)));
-      b.onclick = () => {
-        current = i;
-        o.corners = on
-          ? o.corners.filter((c) => c !== corner)
-          : [...o.corners, corner];
+        class: "tog",
+        title: "Turn the art a quarter turn at every spot",
+      }, "Turn");
+      turn.onclick = () => {
+        const ring = shape === "edges" ? EDGES : CORNERS;
+        const at = ring.indexOf(drawnFor(o, ring[0]!));
+        o["drawn-for"] = ring[(at + 3) % 4]!;
         save();
         draw();
       };
-      page.append(b);
+      acts.append(turn);
     }
-    const turn = h("button", {
-      type: "button",
-      class: "tog",
-      title: "Turn the art a quarter turn in every corner",
-    }, "Turn");
-    turn.onclick = () => {
-      const at = CORNERS.indexOf(o["drawn-for"] ?? "top-left");
-      o["drawn-for"] = CORNERS[(at + 3) % 4]!;
-      save();
-      draw();
-    };
     const remove = h("button", { type: "button", class: "tog" }, "Remove");
     remove.onclick = () => {
       list().splice(i, 1);
-      current = Math.max(0, list().length - 1);
-      save();
-      draw();
+      redraw();
     };
-    const c = h(
+    acts.append(remove);
+    return h(
       "div",
-      {
-        class: i === current && list().length > 1 ? "orn-card on" : "orn-card",
-      },
+      { class: "orn-card" },
       page,
-      h(
-        "div",
-        { class: "orn-rows" },
-        row(
-          "Size",
-          stepper({
-            value: o.size,
-            placeholder: "25mm",
-            label: "Ornament size",
-            onChange: (next) => {
-              if (next) o.size = next;
-              else delete o.size;
-              scale();
-              v.changed("ornaments");
-            },
-          }),
-        ),
-        row(
-          "From the edge",
-          stepper({
-            value: o.inset,
-            placeholder: "6mm",
-            label: "Distance from the page's edge",
-            onChange: (next) => {
-              if (next) o.inset = next;
-              else delete o.inset;
-              scale();
-              v.changed("ornaments");
-            },
-          }),
-        ),
-        h("div", { class: "orn-acts" }, turn, remove),
-      ),
+      h("div", { class: "orn-rows" }, ...rows, acts),
     );
-    c.onclick = (e) => {
-      if (
-        current === i || (e.target as Element).closest("button,input,select")
-      ) {
-        return;
-      }
-      current = i;
-      draw();
-    };
-    return c;
   };
 
-  const tile = (slug: string, name: string, src: string, pick: () => void) => {
-    const chosen = list()[current]?.image === slug;
-    const img = h("img", { alt: "", src });
+  const tile = (name: string, kid: Node, pick: () => void) => {
     const b = h("button", {
       type: "button",
       class: "orn-tile",
-      "aria-pressed": String(chosen),
       title: name,
       "aria-label": name,
-    }, img);
+    }, kid);
     b.onclick = pick;
     return b;
   };
 
-  const addFile = async (file: File, slug?: string) => {
+  const addFile = async (file: File, frame: boolean, slug?: string) => {
     const added = await ctx.images.add(file, slug);
     images = [...images.filter((i) => i.slug !== added.slug), added];
     urls.set(added.slug, await ctx.images.url(added.name));
-    place(added.slug);
+    place(added.slug, frame);
   };
 
-  const tray = () => {
+  const tray = (shape: StarterKind) => {
+    const frame = shape === "border";
     const upload = h("input", {
       type: "file",
       accept: "image/*",
@@ -216,14 +283,15 @@ export function ornamentsBlock(
     });
     upload.onchange = () => {
       const f = upload.files?.[0];
-      if (f) void addFile(f);
+      if (f) void addFile(f, frame);
     };
     const uploadBtn = h(
       "button",
       { type: "button", class: "tog" },
-      "Upload image",
+      frame ? "Upload a whole-page frame" : "Upload image",
     );
     uploadBtn.onclick = () => upload.click();
+    const starters = STARTERS.filter((s) => s.kind === shape);
     const own = images.filter((i) => !STARTERS.some((s) => s.slug === i.slug));
     return h(
       "div",
@@ -231,60 +299,71 @@ export function ornamentsBlock(
       h(
         "div",
         { class: "orn-tiles" },
-        ...STARTERS.map((s) => {
-          const src = `data:image/svg+xml,${encodeURIComponent(s.svg)}`;
-          return tile(s.slug, s.name, src, () => {
-            if (images.some((i) => i.slug === s.slug)) place(s.slug);
-            else {
-              void addFile(
-                new File([s.svg], `${s.slug}.svg`, { type: "image/svg+xml" }),
-                s.slug,
-              );
-            }
-          });
-        }),
+        ...(frame && !picking?.card
+          ? RULES.map((r) =>
+            tile(
+              r.name,
+              h("div", { class: `orn-frame orn-rule-${r.style}` }),
+              () => push({ kind: "rule", style: r.style, inset: "7mm" }),
+            )
+          )
+          : []),
+        ...starters.map((s) =>
+          tile(
+            s.name,
+            h("img", {
+              alt: "",
+              src: `data:image/svg+xml,${encodeURIComponent(s.svg)}`,
+            }),
+            () => {
+              if (images.some((i) => i.slug === s.slug)) place(s.slug, frame);
+              else {
+                void addFile(
+                  new File([s.svg], `${s.slug}.svg`, { type: "image/svg+xml" }),
+                  frame,
+                  s.slug,
+                );
+              }
+            },
+          )
+        ),
         ...own.map((i) =>
-          tile(i.slug, i.slug, urls.get(i.slug) ?? "", () => place(i.slug))
+          tile(
+            i.slug,
+            h("img", { alt: "", src: urls.get(i.slug) ?? "" }),
+            () => place(i.slug, frame),
+          )
         ),
       ),
       h("div", { class: "orn-acts" }, uploadBtn, upload),
     );
   };
 
-  function draw() {
-    const all = list();
-    add.hidden = all.length > 0;
-    add.textContent = adding ? "Cancel" : "Add";
-    if (!all.length && !adding) return body.replaceChildren();
-    const another = h(
-      "button",
-      { type: "button", class: "tog" },
-      "Add another",
+  const shapes = () =>
+    h(
+      "div",
+      { class: "orn-shapes" },
+      ...SHAPES.map((s) => {
+        const b = h("button", {
+          type: "button",
+          class: "tog orn-shape",
+          title: s.aria,
+          "aria-pressed": String(picking?.shape === s.kind),
+        }, s.label);
+        b.onclick = () => {
+          picking = { shape: s.kind };
+          draw();
+        };
+        return b;
+      }),
     );
-    another.onclick = () => {
-      const used = new Set(all.flatMap((o) => o.corners));
-      const free = CORNERS.filter((c) => !used.has(c));
-      all.push({
-        image: all[current]!.image,
-        corners: free.length ? free : [...CORNERS],
-      });
-      current = all.length - 1;
-      save();
-      draw();
-    };
-    const hint = FIRST_PAGE[type];
+
+  function draw() {
+    add.textContent = picking ? "Cancel" : "Add";
     body.replaceChildren(
-      ...(hint ? [h("p", { class: "from" }, hint)] : []),
-      ...all.map(card),
-      all.length ? h("div", { class: "orn-acts" }, another) : "",
-      h(
-        "p",
-        { class: "from" },
-        all.length
-          ? "Pick art for the selected ornament. Turn it if it faces the wrong way."
-          : "Pick art to set it in the corners.",
-      ),
-      tray(),
+      ...list().map(card),
+      ...(picking && !picking.card ? [shapes()] : []),
+      ...(picking?.shape ? [tray(picking.shape)] : []),
     );
   }
 
@@ -297,7 +376,7 @@ export function ornamentsBlock(
     draw();
   });
 
-  const el = section("Corner ornaments", "ornaments", [body], add);
+  const el = section("Page ornaments", "ornaments", [body], add);
   return {
     el,
     reset() {

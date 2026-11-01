@@ -303,14 +303,14 @@ export interface PanelContext {
   themeTried: string | null; // the theme being previewed, if any
 }
 
-// The book's images/, for a view that offers them (the corner ornaments).
+// The book's images/, for a view that offers them (the page ornaments).
 export interface PanelImages {
   list(): Promise<ImageFile[]>;
   url(name: string): Promise<string>;
   add(file: File, slug?: string): Promise<ImageFile>;
 }
 
-// The Style views with corner ornaments, and the page type each sets them on
+// The Style views with page ornaments, and the page type each sets them on
 // (metadata `ornaments`, spec §4.17).
 const ORNAMENT_PARTS: Record<string, string> = {
   "half-title": "half-title",

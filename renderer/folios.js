@@ -638,14 +638,17 @@
         warn(`${slug} prints at ${dpi} dpi (300 looks sharp)`);
       }
     }
+    // Once per art: the same image in four corners is one thing to fix.
+    const said = new Set();
     for (
       const el of /** @type {NodeListOf<HTMLImageElement>} */ (
         page.querySelectorAll(".page-ornament img")
       )
     ) {
       const dpi = printDpi(el);
-      if (dpi !== null && dpi < 200) {
-        const slug = /** @type {HTMLElement} */ (el.parentElement).dataset.slug;
+      const slug = /** @type {HTMLElement} */ (el.parentElement).dataset.slug;
+      if (dpi !== null && dpi < 200 && !said.has(slug)) {
+        said.add(slug);
         warn(`${slug} prints at ${dpi} dpi (300 looks sharp)`);
       }
     }
@@ -773,8 +776,7 @@
       writeEntry(page, /** @type {PageEntry} */ (plan.map[i]), numbering);
       if (!plan.slots[i] || page.className !== was) redoMargins(page);
       problems.push(
-        ...wrappedMargins(page, i + 1),
-        ...imageProblems(page, i + 1),
+        ...pageProblems(page, i + 1),
       );
     });
     return { map: plan.map, seed: plan.seed, problems };
@@ -798,9 +800,68 @@
     area.parentElement?.append(...laid.querySelectorAll(".page-ornament"));
   }
 
+  // Where a margin box's text really is: it is generated content, so it has no
+  // box of its own, only a width in its font and its box's alignment.
+  /** @param {Element} content @returns {DOMRect | null} */
+  function marginText(content) {
+    const after = getComputedStyle(content, "::after");
+    const text = after.content.replace(/^"|"$/g, "");
+    if (after.content === "none" || !text) return null;
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) return null;
+    ctx.font = after.font;
+    const box = content.getBoundingClientRect();
+    const scale = box.width /
+      (/** @type {HTMLElement} */ (content).offsetWidth || box.width);
+    const w = ctx.measureText(text).width * scale;
+    const align = after.textAlign;
+    const x = align === "center"
+      ? box.left + (box.width - w) / 2
+      : align === "right" || align === "end"
+      ? box.right - w
+      : box.left;
+    return new DOMRect(x, box.top, w, box.height);
+  }
+
+  // A warning, like a wrapped head: art and a page number are both choices, and
+  // which should give way is the binder's call.
+  /** @param {Element} page @param {number} n @returns {PageProblem[]} */
+  function ornamentCollisions(page, n) {
+    const ornaments = page.querySelectorAll(
+      ".page-ornament-spot, .page-ornament-rule",
+    );
+    if (!ornaments.length) return [];
+    const texts = [...page.querySelectorAll(
+      ".pagedjs_margin.hasContent .pagedjs_margin-content",
+    )].flatMap((c) => marginText(c) ?? []);
+    /** @param {DOMRect} a @param {DOMRect} b */
+    const meet = (a, b) =>
+      a.left < b.right && b.left < a.right && a.top < b.bottom &&
+      b.top < a.bottom;
+    /** @param {DOMRect} a @param {DOMRect} b */
+    const within = (a, b) =>
+      a.left >= b.left && a.right <= b.right && a.top >= b.top &&
+      a.bottom <= b.bottom;
+    for (const o of ornaments) {
+      const r = o.getBoundingClientRect();
+      const isRule = o.classList.contains("page-ornament-rule");
+      // A border is only in the way where its line runs through the text.
+      const hit = texts.some((t) => meet(r, t) && !(isRule && within(t, r)));
+      if (hit) {
+        return [{
+          page: n,
+          warn: true,
+          message: "an ornament runs into the head or page number",
+        }];
+      }
+    }
+    return [];
+  }
+
   /** @param {Element} page @param {number} n @returns {PageProblem[]} */
   const pageProblems = (page, n) => [
     ...wrappedMargins(page, n),
+    ...ornamentCollisions(page, n),
     ...imageProblems(page, n),
   ];
 
@@ -991,8 +1052,7 @@
           }
           if (this.segment) return;
           this.problems.push(
-            ...wrappedMargins(page, i + 1),
-            ...imageProblems(page, i + 1),
+            ...pageProblems(page, i + 1),
           );
         });
         /** @type {RenderResult & { facts: PageFacts[] }} */

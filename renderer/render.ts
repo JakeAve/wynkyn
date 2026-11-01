@@ -2,6 +2,7 @@
 import "./folios.js";
 import { matterType } from "../parser/types.ts";
 import { selectorFor } from "../metadata/css-generator.ts";
+import { drawnFor, hug, turnsTo } from "../metadata/ornaments.ts";
 import type { Segment } from "./page-map-types.ts";
 import type {
   BmlDocument,
@@ -20,7 +21,6 @@ import type {
   NotesConfig,
   Numbering,
   NumberingStyle,
-  OrnamentCorner,
   StructureNumbering,
   TocConfig,
 } from "../metadata/types.ts";
@@ -57,29 +57,35 @@ export function escapeHtml(s: string): string {
     .replaceAll('"', "&quot;");
 }
 
-const CORNERS: OrnamentCorner[] = [
-  "top-left",
-  "top-right",
-  "bottom-right",
-  "bottom-left",
-];
-
-// For renderer/ornaments.js, which sets them on the section's first page: a
-// section knows its page type, and only the laid-out page knows its box.
+// For renderer/ornaments.js, which sets them on the section's pages: a section
+// knows its page type, and only the laid-out page knows its box.
 export function ornamentsAttr(type: string, opts: RenderOptions): string {
-  const items = (opts.ornaments?.[type] ?? []).flatMap((o) => {
-    const src = opts.images?.[o.image];
+  const items = (opts.ornaments?.[type] ?? []).flatMap<object>((o) => {
+    const inset = o.inset ?? "6mm";
+    // A part's section holds its chapters, so "all" would mean the whole part.
+    const pages = type === "part" ? "first" : o.pages ?? "first";
+    if (o.kind === "rule") {
+      const style = o.style ?? "single";
+      const width = o.width ?? "0.75pt";
+      return [{ kind: "rule", type, style, width, inset, pages }];
+    }
+    const src = o.image ? opts.images?.[o.image] : undefined;
     if (!src) return [];
-    const from = CORNERS.indexOf(o["drawn-for"] ?? "top-left");
-    return o.corners.map((corner) => ({
+    const slug = o.image;
+    if (o.kind === "frame") {
+      return [{ kind: "frame", type, slug, src, inset, pages }];
+    }
+    return (o.at ?? []).map((spot) => ({
+      kind: "art",
       type,
-      slug: o.image,
+      slug,
       src,
-      corner,
-      from: CORNERS[from],
-      turns: (CORNERS.indexOf(corner) - from + 4) % 4,
+      spot,
+      hug: hug(drawnFor(o, spot)),
+      turns: turnsTo(o, spot),
       size: o.size ?? "25mm",
-      inset: o.inset ?? "6mm",
+      inset,
+      pages,
     }));
   });
   return items.length

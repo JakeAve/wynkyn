@@ -4178,56 +4178,87 @@ code.pl-label {
 }
 .orn-page {
   position: relative;
-  display: grid;
-  grid-template: minmax(0, 1fr) minmax(0, 1fr) / minmax(0, 1fr) minmax(0, 1fr);
   width: 6rem;
   aspect-ratio: 3 / 5;
   align-self: start;
   background: var(--paper);
   border: var(--hair) solid var(--line);
+  overflow: hidden;
 }
-/* A quarter of the page is the target; the art inside it is to scale. */
-.orn-corner {
+.orn-spot {
   all: unset;
-  cursor: pointer;
-}
-.orn-corner img,
-.orn-corner[aria-pressed="false"]::before {
   position: absolute;
   width: var(--orn-size);
   aspect-ratio: 1;
+  cursor: pointer;
+}
+.orn-spot.top-left,
+.orn-spot.top,
+.orn-spot.top-right {
+  top: var(--orn-inset);
+}
+.orn-spot.bottom-left,
+.orn-spot.bottom,
+.orn-spot.bottom-right {
+  bottom: var(--orn-inset);
+}
+.orn-spot.top-left,
+.orn-spot.left,
+.orn-spot.bottom-left {
+  left: var(--orn-inset);
+}
+.orn-spot.top-right,
+.orn-spot.right,
+.orn-spot.bottom-right {
+  right: var(--orn-inset);
+}
+.orn-spot.top,
+.orn-spot.bottom {
+  left: 50%;
+  translate: -50% 0;
+}
+.orn-spot.left,
+.orn-spot.right {
+  top: 50%;
+  translate: 0 -50%;
+}
+.orn-spot img,
+.orn-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
-.orn-corner[aria-pressed="false"]::before {
-  content: "";
+.orn-spot[aria-pressed="false"] {
   box-sizing: border-box;
   border: var(--hair) dashed var(--muted);
 }
-.orn-corner.top-left > *,
-.orn-corner.top-left::before {
-  top: var(--orn-inset);
-  left: var(--orn-inset);
-}
-.orn-corner.top-right > *,
-.orn-corner.top-right::before {
-  top: var(--orn-inset);
-  right: var(--orn-inset);
-}
-.orn-corner.bottom-right > *,
-.orn-corner.bottom-right::before {
-  bottom: var(--orn-inset);
-  right: var(--orn-inset);
-}
-.orn-corner.bottom-left > *,
-.orn-corner.bottom-left::before {
-  bottom: var(--orn-inset);
-  left: var(--orn-inset);
-}
-.orn-corner:hover {
+.orn-spot:hover {
   background: var(--acc-wash);
 }
-.orn-corner:focus-visible {
+.orn-spot:focus-visible {
   outline: var(--ring) solid var(--acc);
+}
+.orn-frame {
+  position: absolute;
+  inset: var(--orn-inset);
+}
+.orn-frame img {
+  object-fit: fill;
+}
+.orn-rule-single {
+  border: var(--hair) solid #000;
+}
+.orn-rule-double {
+  border: 0.1875rem double #000;
+}
+.orn-rule-thin-thick {
+  border: 0.125rem solid #000;
+  outline: var(--hair) solid #000;
+  outline-offset: 0.125rem;
+}
+.orn-tile .orn-frame {
+  inset: var(--s-3);
 }
 .orn-rows {
   display: grid;
@@ -4252,6 +4283,7 @@ code.pl-label {
 }
 #config-overlay .orn-tile {
   all: unset;
+  position: relative;
   box-sizing: border-box;
   aspect-ratio: 1;
   padding: var(--s-2);
@@ -4279,4 +4311,8 @@ code.pl-label {
 }
 #preview .page-ornament {
   cursor: pointer;
+}
+.orn-shapes {
+  display: flex;
+  gap: var(--s-3);
 }

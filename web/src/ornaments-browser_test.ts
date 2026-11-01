@@ -1,5 +1,5 @@
 // web/src/ornaments-browser_test.ts — a binder with no art of their own gets
-// corner ornaments from the panel alone, and the art lands on the page turned.
+// page ornaments from the panel alone, and the art lands on the page turned.
 import { assert, assertEquals } from "@std/assert";
 import { appTest, book, openApp } from "../../testing/app.ts";
 import { eventually, laidOut } from "../../testing/wait.ts";
@@ -14,6 +14,7 @@ appTest({
     const page = await openApp(b, "&mode=style&view=chapter");
     await page.locator('.sec[data-focus="ornaments"] .tog:has-text("Add")')
       .click();
+    await page.locator('.orn-shape:has-text("Corners")').click();
     await page.locator('.orn-tile[title="Vine"]').click();
     await page.locator(`${OPENER} .page-ornament`).first().waitFor();
     assert(await b.read("images/corner-vine.svg"));
@@ -33,11 +34,11 @@ appTest({
       "rotate(180deg)",
     );
 
-    await page.locator('.orn-corner[aria-label="bottom right"]').click();
+    await page.locator('.orn-spot[aria-label="bottom right"]').click();
     await eventually(async () =>
       assertEquals(
         JSON.parse((await b.read("metadata.json"))!).ornaments.chapter[0]
-          .corners
+          .at
           .length,
         3,
       )
@@ -55,5 +56,35 @@ appTest({
       .click();
     await page.locator(`${OPENER} .page-ornament`).first().click();
     await page.locator(".orn-page").waitFor();
+
+    // A border on every page of the chapter, where corners stay on the first.
+    await page.locator('.sec[data-focus="ornaments"] .tog:has-text("Add")')
+      .click();
+    await page.locator('.orn-shape:has-text("Border")').click();
+    await page.locator('.orn-tile[title="Double"]').click();
+    await page.locator(`${LIVE} .page-ornament-rule`).first().waitFor();
+    await eventually(async () =>
+      assertEquals(
+        JSON.parse((await b.read("metadata.json"))!).ornaments.chapter[1].style,
+        "double",
+      )
+    );
+  },
+});
+
+appTest({
+  name: "ornaments: art over the page number is a warning",
+  async fn() {
+    const b = await book({
+      metadata: (m) => {
+        m.numbering = { pages: { position: "top-outside" } };
+        m.ornaments = {
+          chapter: [{ image: "ornament", at: ["top-right"], size: "40mm" }],
+        };
+      },
+    });
+    const page = await openApp(b, "&mode=style&view=chapter");
+    await page.getByText("an ornament runs into the head or page number")
+      .first().waitFor();
   },
 });
