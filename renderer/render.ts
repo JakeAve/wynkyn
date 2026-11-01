@@ -2,7 +2,6 @@
 import "./folios.js";
 import { matterType } from "../parser/types.ts";
 import { selectorFor } from "../metadata/css-generator.ts";
-import { drawnFor, hug, turnsTo } from "../metadata/ornaments.ts";
 import type { Segment } from "./page-map-types.ts";
 import type {
   BmlDocument,
@@ -35,7 +34,6 @@ export interface RenderOptions {
   elements?: Metadata["elements"]; // read for breaks only, by renderSegments
   is?: Metadata["is"]; // ditto: an {is} block's forced break-after
   onePage?: Metadata["one-page"];
-  ornaments?: Metadata["ornaments"];
 }
 
 // folios.js is a classic script (toHtml inlines it), so its formatter hangs
@@ -55,42 +53,6 @@ export function escapeHtml(s: string): string {
     "&gt;",
   )
     .replaceAll('"', "&quot;");
-}
-
-// For renderer/ornaments.js, which sets them on the section's pages: a section
-// knows its page type, and only the laid-out page knows its box.
-export function ornamentsAttr(type: string, opts: RenderOptions): string {
-  const items = (opts.ornaments?.[type] ?? []).flatMap<object>((o) => {
-    const inset = o.inset ?? "6mm";
-    // A part's section holds its chapters, so "all" would mean the whole part.
-    const pages = type === "part" ? "first" : o.pages ?? "first";
-    if (o.kind === "rule") {
-      const style = o.style ?? "single";
-      const width = o.width ?? "0.75pt";
-      return [{ kind: "rule", type, style, width, inset, pages }];
-    }
-    const src = o.image ? opts.images?.[o.image] : undefined;
-    if (!src) return [];
-    const slug = o.image;
-    if (o.kind === "frame") {
-      return [{ kind: "frame", type, slug, src, inset, pages }];
-    }
-    return (o.at ?? []).map((spot) => ({
-      kind: "art",
-      type,
-      slug,
-      src,
-      spot,
-      hug: hug(drawnFor(o, spot)),
-      turns: turnsTo(o, spot),
-      size: o.size ?? "25mm",
-      inset,
-      pages,
-    }));
-  });
-  return items.length
-    ? ` data-ornaments="${escapeHtml(JSON.stringify(items))}"`
-    : "";
 }
 
 // Every block carries its manuscript line so a click in the preview can find
@@ -481,7 +443,7 @@ function renderChapter(
     const inner = renderChildren(ch.children, ctx, opts);
     return `<section class="chapter${zoneClass(zone)}${
       start ? " body-start" : ""
-    }" id="${escapeHtml(ch.slug)}"${dl(ch)}${ornamentsAttr("chapter", opts)}>${
+    }" id="${escapeHtml(ch.slug)}"${dl(ch)}>${
       n === 1 && opts.bookTitle
         ? `<p class="book-title">${escapeHtml(opts.bookTitle)}</p>`
         : ""
@@ -524,9 +486,7 @@ function renderMatter(
   const onePage = opts.onePage?.[m.type] ?? display;
   const open = `<section class="matter matter-${escapeHtml(m.type)}${
     display ? " matter-display" : ""
-  }${zoneClass(zone)}" id="${id}"${dl(m)}${onePage ? " data-one-page" : ""}${
-    ornamentsAttr(m.type, opts)
-  }>`;
+  }${zoneClass(zone)}" id="${id}"${dl(m)}${onePage ? " data-one-page" : ""}>`;
   if (m.type === "toc") {
     const onlyTitles = m.children.every((c) =>
       c.kind === "component" && c.name === "title"
@@ -653,7 +613,7 @@ function partOpener(
   );
   return `<section class="part${zoneClass(zone)}${
     start ? " body-start" : ""
-  }" id="${escapeHtml(part.slug)}"${dl(part)}${ornamentsAttr("part", opts)}>${
+  }" id="${escapeHtml(part.slug)}"${dl(part)}>${
     numberDiv(partNo, opts.numbering?.parts)
   }${head}`;
 }

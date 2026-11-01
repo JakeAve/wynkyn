@@ -34,6 +34,11 @@ appTest({
     await page.getByText("an ornament runs into the head or page number")
       .first().waitFor();
 
+    const laidSegments = () =>
+      page.locator("#preview").evaluate((el) =>
+        (el as HTMLElement).dataset.segmentsLaid
+      );
+    const before = await laidSegments();
     await page.locator('.orn-spot[aria-label="bottom right"]').click();
     await eventually(async () =>
       assertEquals(
@@ -51,6 +56,8 @@ appTest({
         3,
       )
     );
+
+    assertEquals(await laidSegments(), before);
 
     await page.locator('[data-mode="write"], button:has-text("Write")').first()
       .click();

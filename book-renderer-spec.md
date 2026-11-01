@@ -1895,6 +1895,7 @@ are matter types (§3.4), `part` and `chapter`; each holds a list.
 - `pages` — `first` (default) or `all` pages of the section. A `part` is always
   `first`: its section holds its chapters.
 
+They are set at assembly, like folios, so an edit to them lays nothing out.
 Blank pages and plates carry none. The EPUB has no pages and carries none. Art
 over a running head or page number lists a warning; it never blocks an export
 (§4.10). Art under 200 dpi warns once per image on the page.

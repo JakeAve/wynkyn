@@ -3,7 +3,6 @@ import { parse } from "../parser/parser.ts";
 import type { Metadata } from "../metadata/types.ts";
 import {
   formatNumber,
-  ornamentsAttr,
   render as renderLined,
   renderSegments,
 } from "./render.ts";
@@ -984,32 +983,4 @@ Deno.test("renderSegments: run-on chapters merge into the segment before", () =>
   });
   assertEquals(one.length, 1);
   assertEquals(one[0]!.html, renderLined(doc));
-});
-
-Deno.test("ornamentsAttr: defaults, a part's first page, missing art", () => {
-  const read = (type: string, ornaments: Metadata["ornaments"]) => {
-    const attr = ornamentsAttr(type, { ornaments, images: { a: "/a.png" } });
-    return attr ? JSON.parse(attr.slice(17, -1).replaceAll("&quot;", '"')) : [];
-  };
-  assertEquals(
-    read("chapter", { chapter: [{ image: "gone", at: ["top"] }] }),
-    [],
-  );
-  assertEquals(read("chapter", {}), []);
-  const [rule] = read("part", { part: [{ kind: "rule", pages: "all" }] });
-  assertEquals(
-    [rule.style, rule.width, rule.inset, rule.pages],
-    ["single", "0.75pt", "6mm", "first"],
-  );
-  const spots = read("chapter", {
-    chapter: [{
-      image: "a",
-      "drawn-for": "bottom-left",
-      at: ["top-left", "top"],
-      pages: "all",
-    }],
-  });
-  assertEquals(spots.map((s: { turns: number }) => s.turns), [1, 0]);
-  assertEquals(spots[0].size, "25mm");
-  assertEquals(spots[0].pages, "all");
 });

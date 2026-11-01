@@ -27,6 +27,7 @@ import {
 } from "./editions.ts";
 import { asStore, type BookStore } from "./store.ts";
 import { IMAGE_EXTS } from "./images.ts";
+import { type PageOrnaments, pageOrnaments } from "../metadata/ornaments.ts";
 import type { BmlDocument, Diagnostic } from "../parser/types.ts";
 import type { Metadata, NotesConfig } from "../metadata/types.ts";
 
@@ -59,6 +60,7 @@ export interface BuildResult {
   domRules: DomRule[]; // domCss rule by rule, for the preview cache
   pagedCss: string;
   pageNumbering: PageNumberingConfig; // per-zone folio style, for the page map
+  pageOrnaments: PageOrnaments; // set on the pages at assembly (§4.17)
   fontLinks: string; // <link> tags for Google Fonts
   diagnostics: Diagnostic[];
   manuscriptVersion: string; // contentVersion of the manuscript text built from
@@ -144,14 +146,13 @@ async function imageUrlMaps(
 ) {
   const images: Record<string, string> = {};
   const imageUrls: Record<string, string> = {};
-  for (
-    const [slug, name] of Object.entries(await imageFiles(asStore(root), book))
-  ) {
+  const files = await imageFiles(asStore(root), book);
+  for (const [slug, name] of Object.entries(files)) {
     images[slug] = imageUrls[name] = imageUrl
       ? await imageUrl(book, name)
       : `${urlPrefix}/${encodeURIComponent(name)}`;
   }
-  return { images, imageUrls };
+  return { images, imageUrls, files };
 }
 
 // Deno callers (CLI, exports, tests) don't carry base.css around; read it once.
@@ -185,7 +186,7 @@ export async function buildBook(
     throw new NotFoundError(`no such edition: ${book}/${edition}`);
   }
   const m = opts.metadata ?? loaded?.meta ?? {};
-  const { images, imageUrls } = await imageUrlMaps(
+  const { images, imageUrls, files } = await imageUrlMaps(
     store,
     book,
     imageUrlPrefix,
@@ -203,7 +204,6 @@ export async function buildBook(
     elements: m.elements,
     is: m.is,
     onePage: m["one-page"],
-    ornaments: m.ornaments,
   };
   return {
     book,
@@ -218,6 +218,7 @@ export async function buildBook(
     domRules: rules,
     pagedCss: generatePagedCSS(m),
     pageNumbering: pageNumberingConfig(m),
+    pageOrnaments: pageOrnaments(m.ornaments, files),
     fontLinks: generateFontLinks(m),
     diagnostics: [
       ...doc.diagnostics,

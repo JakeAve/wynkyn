@@ -3,6 +3,7 @@
 // it, dev-server.ts serves it); there is no npm build to bundle.
 import type { ServerMessage } from "../../server/pipeline.ts";
 import type { PageNumberingConfig } from "../../metadata/css-generator.ts";
+import type { PageOrnaments } from "../../metadata/ornaments.ts";
 import {
   matchKey,
   matchPath,
@@ -61,6 +62,10 @@ interface Previewer {
     pagesArea: HTMLElement;
   }>;
 }
+interface OrnamentConfig {
+  items: PageOrnaments;
+  urls: Record<string, string>;
+}
 declare const Paged: {
   Previewer: new (
     options: {
@@ -68,6 +73,7 @@ declare const Paged: {
         seed: Seed;
         numbering: PageNumberingConfig;
         segment?: boolean;
+        ornaments?: OrnamentConfig;
       };
     },
   ) => Previewer;
@@ -124,7 +130,10 @@ declare const BookPageMap: {
     numbering: PageNumberingConfig,
     pagesArea: Element,
     pageTemplate: HTMLTemplateElement,
+    ornaments?: OrnamentConfig,
   ): RenderResult;
+  setOrnaments(page: Element, config: OrnamentConfig): void;
+  loadOrnaments(config: OrnamentConfig): Promise<void>;
   replaceArea(live: Element, laid: Element): void;
   pageProblems(page: Element, n: number): PageProblem[];
 };
@@ -200,8 +209,10 @@ function target(
   styles: string,
   keys: string[],
   numbering: PageNumberingConfig,
+  ornaments: PageOrnaments = {},
 ): string {
-  return [styles, ...keys, JSON.stringify(numbering)].join(" ");
+  return [styles, ...keys, JSON.stringify(numbering), JSON.stringify(ornaments)]
+    .join(" ");
 }
 
 // Each update's segment keys, with the numbers each was keyed under: a
@@ -231,6 +242,7 @@ function targetOf(u: UpdateMessage, from: Seed): string {
     styleHash(u),
     u.segments.map((s) => keyOf(u, s, from)),
     u.pageNumbering,
+    u.pageOrnaments,
   );
 }
 
@@ -241,6 +253,7 @@ export function cacheHolds(render: CachedRender, u: UpdateMessage): boolean {
       render.styleHash,
       render.segments.map((s) => s.key),
       render.pageNumbering,
+      render.ornaments,
     );
 }
 
@@ -348,6 +361,59 @@ interface Swap {
   shift: { from: number; by: number } | null;
 }
 
+const sameOrnaments = (u: UpdateMessage, book: CachedRender) =>
+  JSON.stringify(u.pageOrnaments) === JSON.stringify(book.ornaments ?? {});
+
+// Only the ornaments changed: they're page furniture, so no page moves and
+// nothing is laid out.
+function ornamentsOnly(
+  u: UpdateMessage,
+  container: HTMLElement,
+  book: CachedRender,
+): boolean {
+  const shown = container.querySelector<HTMLElement>(
+    ":scope > :not(.preview-stage)",
+  );
+  return shown?.dataset.scope === book.scope && !sameOrnaments(u, book) &&
+    JSON.stringify(u.pageNumbering) === JSON.stringify(book.pageNumbering) &&
+    u.segments.length === book.segments.length &&
+    u.segments.every((s, i) =>
+      keyOf(u, s, seed) === book.segments[i]!.key &&
+      s.line === book.segments[i]!.line
+    );
+}
+
+// As put(): only the pages that had or have ornaments can change their problems.
+function reOrnament(
+  u: UpdateMessage,
+  container: HTMLElement,
+  book: CachedRender,
+  cacheKey: string,
+): PageProblem[] {
+  const pages = [
+    ...container.querySelectorAll<HTMLElement>(
+      ":scope > :not(.preview-stage) .pagedjs_page",
+    ),
+  ];
+  const checked = () =>
+    pages.flatMap((p) =>
+      p.querySelector(".page-ornament")
+        ? BookPageMap.pageProblems(p, Number(p.dataset.pageNumber))
+        : []
+    );
+  const gone = new Set(checked().map((p) => JSON.stringify(p)));
+  const config = { items: u.pageOrnaments, urls: u.imageUrls };
+  for (const p of pages) BookPageMap.setOrnaments(p, config);
+  problems = [
+    ...problems.filter((p) => !gone.has(JSON.stringify(p))),
+    ...checked(),
+  ];
+  manifest = { ...book, ornaments: u.pageOrnaments, problems };
+  if (!queuedUpdate) targetHash = targetOf(u, seed);
+  void saveCachedRender(cacheKey, manifest, new Map());
+  return problems;
+}
+
 function swappable(
   u: UpdateMessage,
   container: HTMLElement,
@@ -359,7 +425,8 @@ function swappable(
   );
   if (
     shown?.dataset.scope !== book.scope ||
-    u.segments.length !== book.segments.length
+    u.segments.length !== book.segments.length ||
+    !sameOrnaments(u, book)
   ) return null;
   let at = -1;
   for (const [i, s] of u.segments.entries()) {
@@ -582,6 +649,13 @@ async function runRender(
   const keys = new Map<Segment, string>();
   const rows = new Map<string, CachedSegment>();
   try {
+    const ornaments = { items: update.pageOrnaments, urls: update.imageUrls };
+    if (book && cacheKey !== null && ornamentsOnly(update, container, book)) {
+      await Promise.race([BookPageMap.loadOrnaments(ornaments), abort.promise])
+        .catch(() => {});
+      if (cancelled) return queuedUpdate ? queuedUpdate.done.promise : problems;
+      return reOrnament(update, container, book, cacheKey);
+    }
     const swap = book && cacheKey !== null
       ? swappable(update, container, book)
       : null;
@@ -686,13 +760,17 @@ async function runRender(
         update.pageNumbering,
         area,
         kept?.previewer.chunker.pageTemplate ?? templateOf(book!.pageTemplate),
+        ornaments,
       );
       area.style.setProperty("--pagedjs-page-count", String(r.map.length));
       return r;
     };
     let result: RenderResult & { passes: number } | null = null;
     try {
-      await Promise.race([fontSheets(), abort.promise]);
+      await Promise.race([
+        Promise.all([fontSheets(), BookPageMap.loadOrnaments(ornaments)]),
+        abort.promise,
+      ]);
       if (update.segments.length) {
         result = await Promise.race([
           BookPageMap.settleSegments(
@@ -720,7 +798,11 @@ async function runRender(
               stage.replaceChildren();
             }
             whole = new Paged.Previewer({
-              pageMap: { seed: passSeed, numbering: update.pageNumbering },
+              pageMap: {
+                seed: passSeed,
+                numbering: update.pageNumbering,
+                ornaments,
+              },
             });
             whole.chunker.q.tick = tick;
             return (await whole.preview(update.html, [blobUrl], stage))
@@ -770,6 +852,7 @@ async function runRender(
           book!.pageTemplate,
         fontLinks: update.fontLinks,
         pageNumbering: update.pageNumbering,
+        ornaments: update.pageOrnaments,
         seed,
         problems,
         segments: update.segments.map((s) => ({
@@ -863,6 +946,14 @@ export function restoreCachedRender(
     render.pageNumbering,
     area,
     templateOf(render.pageTemplate),
+    render.ornaments && {
+      items: render.ornaments,
+      urls: Object.fromEntries(
+        Object.values(render.ornaments).flat().flatMap((o) =>
+          o.file ? [[o.file, imageUrl(o.file)]] : []
+        ),
+      ),
+    },
   );
   area.style.setProperty("--pagedjs-page-count", String(r.map.length));
   manifest = render;
@@ -870,6 +961,7 @@ export function restoreCachedRender(
     render.styleHash,
     render.segments.map((s) => s.key),
     render.pageNumbering,
+    render.ornaments,
   );
   // The saved problems: these images haven't loaded, so assembly can't
   // judge them.

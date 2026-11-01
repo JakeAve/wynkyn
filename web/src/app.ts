@@ -74,7 +74,6 @@ import { chooseBook } from "./choose-book.ts";
 import { $, brief, store } from "./dom.ts";
 import { h } from "./panel-controls.ts";
 import "../../renderer/plates.js"; // registers the Paged.js plate handler
-import "../../renderer/ornaments.js"; // registers the page ornament handler
 import "../../renderer/folios.js"; // registers the page-map handler
 // folios.js is a classic script (toHtml inlines it), so its helpers hang off
 // this global rather than being exported.

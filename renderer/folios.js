@@ -24,6 +24,8 @@
  * @typedef {Record<string, string>} Seed anchor id → refText
  * @typedef {{ page: number | null; message: string; warn?: true }} PageProblem
  * @typedef {{ map: PageEntry[]; seed: Seed; problems: PageProblem[] }} RenderResult
+ * @typedef {import("../metadata/ornaments.ts").OrnamentItem} OrnamentItem
+ * @typedef {{ items: import("../metadata/ornaments.ts").PageOrnaments; urls: Record<string, string> }} OrnamentConfig
  * @typedef {import("./page-map-types.ts").Segment} Segment
  * @typedef {import("./page-map-types.ts").Laid} Laid
  * @typedef {import("./page-map-types.ts").AssemblyPlan} AssemblyPlan
@@ -534,12 +536,16 @@
   }
 
   /** @param {Element} section */
-  function matterName(section) {
-    const type = [...section.classList].find((c) =>
+  function matterType(section) {
+    return [...section.classList].find((c) =>
       c.startsWith("matter-") &&
       c !== "matter-display"
-    )?.slice(7) ?? "page";
-    const name = type.replaceAll("-", " ");
+    )?.slice(7) ?? "";
+  }
+
+  /** @param {Element} section */
+  function matterName(section) {
+    const name = (matterType(section) || "page").replaceAll("-", " ");
     return name[0]?.toUpperCase() + name.slice(1);
   }
 
@@ -690,6 +696,95 @@
     return problems;
   }
 
+  // A new <img> of a URL this document has decoded has its size at once, so
+  // the sync assembly can check it and a PDF never prints before it. Held here
+  // because an image nothing references can leave that list.
+  /** @type {Map<string, HTMLImageElement>} */
+  const ornamentImages = new Map();
+
+  /** @param {OrnamentConfig} config */
+  async function loadOrnaments({ items, urls }) {
+    const wanted = Object.values(items).flat().flatMap((o) =>
+      o.file && urls[o.file] ? [urls[o.file]] : []
+    );
+    await Promise.all(
+      [...new Set(wanted)].map((url) => {
+        if (!url || ornamentImages.has(url)) return;
+        const img = new Image();
+        img.src = url;
+        ornamentImages.set(url, img);
+        return img.decode().catch(() => {});
+      }),
+    );
+  }
+
+  /** @param {OrnamentItem} o @param {string | undefined} url */
+  function ornamentEl(o, url) {
+    const el = document.createElement("div");
+    const shape = o.kind === "art" ? "spot" : o.kind;
+    el.className = `page-ornament page-ornament-${shape}`;
+    el.dataset.type = o.type;
+    if (o.slug) el.dataset.slug = o.slug;
+    if (o.kind === "rule") {
+      el.classList.add(`rule-${o.style}`);
+      el.style.inset = o.inset;
+      el.style.setProperty("--rule-width", o.width ?? "");
+      return el;
+    }
+    const img = document.createElement("img");
+    img.alt = "";
+    img.src = url ?? "";
+    el.append(img);
+    if (o.kind === "frame") {
+      el.style.inset = o.inset;
+      return el;
+    }
+    el.style.width = el.style.height = o.size ?? "";
+    const [y = "", x] = (o.spot ?? "").split("-");
+    if (x) {
+      el.style.setProperty(y, o.inset);
+      el.style.setProperty(x, o.inset);
+    } else {
+      el.style.setProperty(y, o.inset);
+      el.classList.add(y === "top" || y === "bottom" ? "mid-x" : "mid-y");
+    }
+    img.style.objectPosition = o.hug ?? "";
+    img.style.transform = `rotate(${(o.turns ?? 0) * 90}deg)`;
+    return el;
+  }
+
+  // Spec §4.17: on the page box, outside the area, so it never moves the text
+  // or counts as the page's content. Plates copy their section's classes.
+  /** @param {Element} page @param {OrnamentConfig} config */
+  function setOrnaments(page, { items, urls }) {
+    for (const old of page.querySelectorAll(".page-ornament")) old.remove();
+    const box = page.querySelector(".pagedjs_pagebox");
+    const area = page.querySelector(".pagedjs_area");
+    if (!box || !area) return;
+    // A chapter may end and the next start on one page: one border, not two.
+    const seen = new Set();
+    for (
+      const section of area.querySelectorAll(
+        "section.chapter, section.part, section.matter",
+      )
+    ) {
+      if (section.classList.contains("plate-shell")) continue;
+      const type = section.classList.contains("matter")
+        ? matterType(section)
+        : section.classList.contains("part")
+        ? "part"
+        : "chapter";
+      const continued = section.hasAttribute("data-split-from");
+      for (const o of items[type] ?? []) {
+        if (continued && o.pages !== "all") continue;
+        const key = JSON.stringify(o);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        box.append(ornamentEl(o, o.file ? urls[o.file] : undefined));
+      }
+    }
+  }
+
   // A page that changed side (or stopped being first, or is a blank we made)
   // still has the margin boxes Paged.js's Margins.finalizePage set for its old
   // place. Redo them as it does (paged.js:29502): a box has content when some
@@ -769,9 +864,10 @@
    * @param {PageNumberingConfig} numbering
    * @param {Element} pagesArea in the document: margins are read off styles
    * @param {HTMLTemplateElement} pageTemplate
+   * @param {OrnamentConfig} [ornaments]
    * @returns {RenderResult}
    */
-  function assemble(laid, numbering, pagesArea, pageTemplate) {
+  function assemble(laid, numbering, pagesArea, pageTemplate, ornaments) {
     const plan = planAssembly(
       laid.map((l) => ({
         opens: l.segment.opens,
@@ -810,6 +906,7 @@
       /** @type {HTMLElement} */ (page).dataset.pageNumber = String(i + 1);
       writeEntry(page, /** @type {PageEntry} */ (plan.map[i]), numbering);
       if (!plan.slots[i] || page.className !== was) redoMargins(page);
+      if (ornaments) setOrnaments(page, ornaments);
       problems.push(
         ...pageProblems(page, i + 1),
       );
@@ -818,6 +915,9 @@
   }
 
   /** @type {any} */ (globalThis).BookPageMap.assemble = assemble;
+
+  /** @type {any} */ (globalThis).BookPageMap.setOrnaments = setOrnaments;
+  /** @type {any} */ (globalThis).BookPageMap.loadOrnaments = loadOrnaments;
 
   /** @param {Element} live @param {Element} laid */
   function replaceArea(live, laid) {
@@ -830,9 +930,6 @@
       area.querySelector(first)?.setAttribute("data-break-before", mark);
     }
     was.replaceWith(area);
-    // Corner ornaments sit on the page box, outside the area (ornaments.js).
-    for (const o of live.querySelectorAll(".page-ornament")) o.remove();
-    area.parentElement?.append(...laid.querySelectorAll(".page-ornament"));
   }
 
   /** @type {CanvasRenderingContext2D | null} */
@@ -947,6 +1044,8 @@
         // assembly, where its pages have their book sides and neighbours.
         /** @type {boolean} */
         this.segment = settings.segment ?? false;
+        /** @type {OrnamentConfig | undefined} */
+        this.ornaments = settings.ornaments;
         /** @type {string[]} */
         this.expected = [];
         /** @type {PageProblem[]} */
@@ -1113,6 +1212,7 @@
             this.problems.push({ page: i + 1, message: "no page-map entry" });
           }
           if (this.segment) return;
+          if (this.ornaments) setOrnaments(page, this.ornaments);
           this.problems.push(
             ...pageProblems(page, i + 1),
           );

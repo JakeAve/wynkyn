@@ -5,7 +5,6 @@ const SOURCES = [
   "../vendor/pagedjs/paged.js",
   "./folios.js",
   "./plates.js",
-  "./ornaments.js",
 ];
 
 Deno.test("BUILD_ID matches the layout code it names", async () => {

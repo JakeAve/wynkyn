@@ -74,6 +74,7 @@ chromeTest({
         domRules: [],
         pagedCss,
         pageNumbering: pageNumberingConfig({}),
+        pageOrnaments: {},
         manuscriptVersion: "",
         metadataVersion: null,
       }));
