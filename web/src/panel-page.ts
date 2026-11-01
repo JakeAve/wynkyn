@@ -36,6 +36,7 @@ import {
   stepper,
   swatches,
   switchInput,
+  tip,
 } from "./panel-controls.ts";
 import type { PanelContext } from "./style-catalog.ts";
 import {
@@ -194,13 +195,10 @@ export function buildPageTab(panel: PanelContext): Node[] {
       diag,
       el(
         "p",
-        "tip",
-        el("span", "manicule", "☞"),
+        "hint",
         "Inside is the spine edge. The preview shows the spread as it will fold.",
       ),
-      el(
-        "p",
-        "hint",
+      tip(
         "Page numbers and running heads are under Book parts, Page furniture.",
       ),
     ]),
@@ -276,9 +274,7 @@ export function buildPublishTab(ctx: PanelContext): Node[] {
       ),
       () => page["reverse-backs"] === true,
     ),
-    el(
-      "p",
-      "hint",
+    tip(
       "Print the fronts, turn the stack over on that edge and put it back in, then print the backs. Last sheet first suits printers that stack face up.",
     ),
   ];
@@ -570,7 +566,7 @@ function printSection(
   const sheets = btn("Print sheets", "duplex");
   const fronts = btn("Print fronts", "fronts");
   const backs = btn("Print backs", "backs");
-  const dialog = el("p", "hint");
+  const dialog = el("span", "");
   const update = () => {
     const duplex = page.duplex ?? "short-edge";
     sheets.hidden = duplex === "none";
@@ -587,7 +583,7 @@ function printSection(
     sec: section("Print", "print", [
       ...settings,
       el("div", "actions", sheets, fronts, backs),
-      dialog,
+      tip(dialog),
       status,
     ]),
   };
@@ -649,7 +645,7 @@ function pagesSection(ctx: PanelContext): HTMLElement {
   };
   return section("PDF", "pdf", [
     el("div", "actions", btn),
-    el("p", "hint", "Choose Save as PDF in the print dialog."),
+    tip("Choose Save as PDF in the print dialog."),
     status,
   ]);
 }
@@ -678,11 +674,7 @@ function ebookSection(ctx: PanelContext): HTMLElement {
     status.append(
       el("p", "", `${r.documents} documents.`),
       el("div", "files", a),
-      el(
-        "p",
-        "hint",
-        "Open it in Apple Books, or send it to a Kindle, to check it.",
-      ),
+      tip("Open it in Apple Books, or send it to a Kindle, to check it."),
     );
   };
   return section("E-book", "ebook", [
