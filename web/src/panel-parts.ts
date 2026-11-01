@@ -25,6 +25,7 @@ import {
   select,
   stepper,
   switchInput,
+  tip,
   type View,
 } from "./panel-controls.ts";
 import {
@@ -68,12 +69,11 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // No part chosen: the nav lists them.
 function pickTip(): Node[] {
-  return [el(
-    "p",
-    "tip",
-    el("span", "manicule", "☞"),
-    "Pick a part, or click anything in the preview to jump straight to its settings.",
-  )];
+  return [
+    tip(
+      "Pick a part, or click anything in the preview to jump straight to its settings.",
+    ),
+  ];
 }
 
 // ---- writing ----
