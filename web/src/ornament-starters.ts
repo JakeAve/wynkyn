@@ -2,8 +2,9 @@
 // copies it into the book's images/, so the book stays whole on its own. Drawn
 // by us in a 100-unit square, for the top-left corner or the top edge: the
 // renderer turns it. A frame is the whole page.
-const svg = (body: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+// An edge piece is a band, so its box stays thin (the collision check reads it).
+const svg = (body: string, height = 100) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 ${height}" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 // Half of a corner; the other half is its reflection across the diagonal.
 const both = (half: string) =>
@@ -79,6 +80,7 @@ export const STARTERS: {
     kind: "edges",
     svg: svg(
       `<path d="M4 6C20 16 36 16 50 6C64 16 80 16 96 6" stroke-width="1.4"/><path d="M50 6l-3 5 3 5 3-5Z" fill="#000" stroke="none"/><circle cx="4" cy="6" r="1.6" fill="#000" stroke="none"/><circle cx="96" cy="6" r="1.6" fill="#000" stroke="none"/>`,
+      20,
     ),
   },
   {
@@ -91,6 +93,7 @@ export const STARTERS: {
       }${leaf(62, 8, 204, .8)}${
         leaf(76, 8, 156, .8)
       }<circle cx="50" cy="8" r="3" fill="#000" stroke="none"/>`,
+      20,
     ),
   },
   {

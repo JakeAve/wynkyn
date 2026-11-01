@@ -1863,6 +1863,42 @@ of the book.
 - The renderer marks a held section `data-one-page`; `renderer/folios.js` ends
   its flow at the page's foot, one flow or a segment alone (§7.6).
 
+### 4.17 Section: `ornaments`
+
+Art and rules fixed to the page, measured from the trim. Page furniture, not
+text: the manuscript says nothing about them and they never move a line. Keys
+are matter types (§3.4), `part` and `chapter`; each holds a list.
+
+```json
+"ornaments": {
+  "part": [
+    { "kind": "rule", "style": "double", "inset": "7mm" },
+    { "image": "bloom", "drawn-for": "bottom-left", "at": ["top-left", "bottom-right"], "size": "30mm" }
+  ],
+  "chapter": [{ "kind": "frame", "image": "vine-frame", "pages": "all" }]
+}
+```
+
+- `kind` — `art` (default), `rule` or `frame`.
+- `image` — a slug in `images/`, for `art` and `frame`. A slug with no file sets
+  nothing.
+- `at` — for `art`: spots, either corners (`top-left`, `top-right`,
+  `bottom-right`, `bottom-left`) or edge centres (`top`, `right`, `bottom`,
+  `left`), one kind per placement.
+- `drawn-for` — the spot the art faces as drawn, default the first of its kind.
+  The art is turned, not mirrored, to each other spot.
+- `size` — for `art`: the square each piece sits in, default `25mm`. The art
+  hugs the page's edge within it.
+- `style`, `width` — for `rule`: `single` (default), `double` or `thin-thick`;
+  the thin line's width, default `0.75pt`.
+- `inset` — from the page's edges, default `6mm`.
+- `pages` — `first` (default) or `all` pages of the section. A `part` is always
+  `first`: its section holds its chapters.
+
+Blank pages and plates carry none. The EPUB has no pages and carries none. Art
+over a running head or page number lists a warning; it never blocks an export
+(§4.10). Art under 200 dpi warns once per image on the page.
+
 ## 5. Module Contracts
 
 These are the contracts each module must satisfy, per the layout in §1. Plan 0

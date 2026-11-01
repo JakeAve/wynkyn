@@ -69,6 +69,7 @@ export function ornamentsBlock(
   const add = h("button", { type: "button", class: "tog" }, "Add");
   add.onclick = () => {
     picking = picking ? null : {};
+    loadImages();
     draw();
   };
   const redraw = () => {
@@ -267,10 +268,19 @@ export function ornamentsBlock(
   };
 
   const addFile = async (file: File, frame: boolean, slug?: string) => {
-    const added = await ctx.images.add(file, slug);
-    images = [...images.filter((i) => i.slug !== added.slug), added];
-    urls.set(added.slug, await ctx.images.url(added.name));
-    place(added.slug, frame);
+    try {
+      const added = await ctx.images.add(file, slug);
+      images = [...images.filter((i) => i.slug !== added.slug), added];
+      urls.set(added.slug, await ctx.images.url(added.name));
+      // The view was rebuilt on fresh metadata while the file saved: this one's
+      // `meta` is no longer what gets saved.
+      if (!body.isConnected) {
+        return ctx.images.note(`Added to the book's images as ${added.name}`);
+      }
+      place(added.slug, frame);
+    } catch (err) {
+      ctx.images.note(err instanceof Error ? err.message : String(err), true);
+    }
   };
 
   const tray = (shape: StarterKind) => {
@@ -367,14 +377,27 @@ export function ornamentsBlock(
     );
   }
 
+  // Only once a card or the tray needs it: most views never show either.
+  let loading = false;
+  function loadImages() {
+    if (loading) return;
+    loading = true;
+    void ctx.images.list().then(async (found) => {
+      // Merged: an upload may have landed while this was on its way.
+      const added = images.filter((i) => !found.some((f) => f.slug === i.slug));
+      images = [...found, ...added];
+      await Promise.all(found.map(async (i) => {
+        urls.set(i.slug, await ctx.images.url(i.name));
+      }));
+      if (body.isConnected) draw();
+    }).catch((err) => {
+      loading = false;
+      ctx.images.note(err instanceof Error ? err.message : String(err), true);
+    });
+  }
+
   draw();
-  void ctx.images.list().then(async (found) => {
-    images = found;
-    await Promise.all(found.map(async (i) => {
-      urls.set(i.slug, await ctx.images.url(i.name));
-    }));
-    draw();
-  });
+  if (list().length) loadImages();
 
   const el = section("Page ornaments", "ornaments", [body], add);
   return {

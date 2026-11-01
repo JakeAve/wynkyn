@@ -152,7 +152,7 @@ export interface OrnamentPlacement {
   kind?: "art" | "rule" | "frame";
   image?: string; // slug in images/; art and frame
   "drawn-for"?: OrnamentSpot; // the spot the art faces as drawn; default its ring's first
-  at?: OrnamentSpot[]; // art
+  at?: OrnamentSpot[]; // art: corners or edges, one kind per placement
   size?: string; // art: the square each sits in; default 25mm
   style?: "single" | "double" | "thin-thick"; // rule; default single
   width?: string; // rule: default 0.75pt

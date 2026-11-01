@@ -494,6 +494,7 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
           list: () => backend.images(book),
           url: (name) => backend.imageUrl(book, name),
           add: (file, slug) => backend.addImage(book, file, slug),
+          note: imageNote,
         },
         toStyle,
         tryTheme: (slug) => void themes.try(slug),
@@ -603,6 +604,11 @@ function goToLine(line: number): void {
 async function pickStyle(key: string, path?: StyleStep[]): Promise<void> {
   setMode("style");
   (await ensureConfigPanel())?.selectStyle(key, path);
+}
+
+function openOrnaments(part: string): void {
+  setMode("style");
+  void ensureConfigPanel().then((panel) => panel?.ornaments(part));
 }
 
 // The footer's Go to style: unlike a preview click, it leaves a history entry,
@@ -1060,10 +1066,7 @@ async function main(): Promise<void> {
           void ensureConfigPanel().then((p) => p?.open(id));
         },
         pickStyle: (key) => void pickStyle(key),
-        openOrnaments: (part) => {
-          setMode("style");
-          void ensureConfigPanel().then((panel) => panel?.ornaments(part));
-        },
+        openOrnaments,
       }),
   });
   undoUi = installUndo({
@@ -1110,10 +1113,7 @@ async function main(): Promise<void> {
   installPreviewClicks(previewEl, styleCatalog, {
     mode: () => mode,
     style: pickStyle,
-    ornament: (part) => {
-      setMode("style");
-      void ensureConfigPanel().then((panel) => panel?.ornaments(part));
-    },
+    ornament: openOrnaments,
     source: (line) => scrollEditorToLine(editor, line),
     addImage: (slug, file) => fillPlaceholder(images, slug, file),
     inspecting: inspect.active,

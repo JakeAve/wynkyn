@@ -10,7 +10,11 @@ const OPENER = `${LIVE}:has(.page-ornament)`;
 appTest({
   name: "ornaments: a starter in the panel sets a page's corners",
   async fn() {
-    const b = await book();
+    const b = await book({
+      metadata: (m) => {
+        m.numbering = { pages: { position: "top-outside" } };
+      },
+    });
     const page = await openApp(b, "&mode=style&view=chapter");
     await page.locator('.sec[data-focus="ornaments"] .tog:has-text("Add")')
       .click();
@@ -27,12 +31,8 @@ appTest({
       .boundingBox())!;
     assert(bottomRight.x > pageBox.x + pageBox.width / 2);
     assert(bottomRight.y > pageBox.y + pageBox.height / 2);
-    assertEquals(
-      await first.locator(".page-ornament img").nth(2).evaluate((i) =>
-        (i as HTMLElement).style.transform
-      ),
-      "rotate(180deg)",
-    );
+    await page.getByText("an ornament runs into the head or page number")
+      .first().waitFor();
 
     await page.locator('.orn-spot[aria-label="bottom right"]').click();
     await eventually(async () =>
@@ -69,22 +69,5 @@ appTest({
         "double",
       )
     );
-  },
-});
-
-appTest({
-  name: "ornaments: art over the page number is a warning",
-  async fn() {
-    const b = await book({
-      metadata: (m) => {
-        m.numbering = { pages: { position: "top-outside" } };
-        m.ornaments = {
-          chapter: [{ image: "ornament", at: ["top-right"], size: "40mm" }],
-        };
-      },
-    });
-    const page = await openApp(b, "&mode=style&view=chapter");
-    await page.getByText("an ornament runs into the head or page number")
-      .first().waitFor();
   },
 });

@@ -461,7 +461,42 @@
     return width > 0 ? Math.round(img.naturalWidth / (width / 96)) : null;
   }
 
+  /**
+   * Where art sits in its square, once fit, hugged to an edge and turned: the
+   * square itself would count a thin band as tall as it is wide.
+   * @param {number} w natural width @param {number} h natural height
+   * @param {number} side the square @param {string} position object-position,
+   * in keywords ("center top") @param {number} turns quarter turns clockwise
+   * @returns {{ left: number; top: number; right: number; bottom: number }}
+   */
+  function drawnBox(w, h, side, position, turns) {
+    const fit = side / Math.max(w, h);
+    const [dw, dh] = [w * fit, h * fit];
+    const [px, py] = position.split(" ");
+    const left = px === "left"
+      ? 0
+      : px === "right"
+      ? side - dw
+      : (side - dw) / 2;
+    const top = py === "top"
+      ? 0
+      : py === "bottom"
+      ? side - dh
+      : (side - dh) / 2;
+    let box = { left, top, right: left + dw, bottom: top + dh };
+    for (let i = 0; i < turns; i++) {
+      box = {
+        left: side - box.bottom,
+        top: box.left,
+        right: side - box.top,
+        bottom: box.right,
+      };
+    }
+    return box;
+  }
+
   /** @type {any} */ (globalThis).BookPageMap = {
+    drawnBox,
     formatNumber,
     formatFolio,
     pageEntry,
@@ -800,6 +835,9 @@
     area.parentElement?.append(...laid.querySelectorAll(".page-ornament"));
   }
 
+  /** @type {CanvasRenderingContext2D | null} */
+  let measurer = null;
+
   // Where a margin box's text really is: it is generated content, so it has no
   // box of its own, only a width in its font and its box's alignment.
   /** @param {Element} content @returns {DOMRect | null} */
@@ -807,8 +845,9 @@
     const after = getComputedStyle(content, "::after");
     const text = after.content.replace(/^"|"$/g, "");
     if (after.content === "none" || !text) return null;
-    const ctx = document.createElement("canvas").getContext("2d");
-    if (!ctx) return null;
+    measurer ??= document.createElement("canvas").getContext("2d");
+    if (!measurer) return null;
+    const ctx = measurer;
     ctx.font = after.font;
     const box = content.getBoundingClientRect();
     const scale = box.width /
@@ -821,6 +860,29 @@
       ? box.right - w
       : box.left;
     return new DOMRect(x, box.top, w, box.height);
+  }
+
+  /** @param {Element} holder @returns {DOMRect} */
+  function drawnRect(holder) {
+    const square = holder.getBoundingClientRect();
+    const img = /** @type {HTMLImageElement | null} */ (
+      holder.querySelector("img")
+    );
+    if (!img?.naturalWidth) return square;
+    const turns = (parseFloat(img.style.transform.slice(7)) || 0) / 90;
+    const box = drawnBox(
+      img.naturalWidth,
+      img.naturalHeight,
+      square.width,
+      img.style.objectPosition,
+      turns,
+    );
+    return new DOMRect(
+      square.left + box.left,
+      square.top + box.top,
+      box.right - box.left,
+      box.bottom - box.top,
+    );
   }
 
   // A warning, like a wrapped head: art and a page number are both choices, and
@@ -843,8 +905,8 @@
       a.left >= b.left && a.right <= b.right && a.top >= b.top &&
       a.bottom <= b.bottom;
     for (const o of ornaments) {
-      const r = o.getBoundingClientRect();
       const isRule = o.classList.contains("page-ornament-rule");
+      const r = isRule ? o.getBoundingClientRect() : drawnRect(o);
       // A border is only in the way where its line runs through the text.
       const hit = texts.some((t) => meet(r, t) && !(isRule && within(t, r)));
       if (hit) {

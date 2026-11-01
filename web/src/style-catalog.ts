@@ -308,6 +308,7 @@ export interface PanelImages {
   list(): Promise<ImageFile[]>;
   url(name: string): Promise<string>;
   add(file: File, slug?: string): Promise<ImageFile>;
+  note(text: string, warn?: boolean): void;
 }
 
 // The Style views with page ornaments, and the page type each sets them on
@@ -493,7 +494,7 @@ export function setCount(
       r?.gap ? 1 : 0,
     );
   }
-  let n = 0;
+  let n = metadata.ornaments?.[ORNAMENT_PARTS[part.id] ?? ""]?.length ?? 0;
   for (const k of part.keys) {
     const entry = catalog.get(k);
     if (entry) n += Object.keys(getProps(metadata, entry)).length;

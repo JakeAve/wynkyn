@@ -4173,9 +4173,6 @@ code.pl-label {
   border-radius: var(--r);
   corner-shape: var(--corner);
 }
-.orn-card.on {
-  border-color: var(--acc);
-}
 .orn-page {
   position: relative;
   width: 6rem;
@@ -4301,10 +4298,6 @@ code.pl-label {
 }
 .orn-tile:hover {
   border-color: var(--muted);
-}
-.orn-tile[aria-pressed="true"] {
-  border-color: var(--acc);
-  box-shadow: inset 0 0 0 var(--hair) var(--acc);
 }
 .orn-tile:focus-visible {
   outline: var(--ring) solid var(--acc);
