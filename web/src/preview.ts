@@ -384,29 +384,36 @@ function ornamentsOnly(
 }
 
 // As put(): only the pages that had or have ornaments can change their problems.
-function reOrnament(
+async function reOrnament(
   u: UpdateMessage,
   container: HTMLElement,
   book: CachedRender,
   cacheKey: string,
-): PageProblem[] {
+  ornaments: { items: PageOrnaments; urls: Record<string, string> },
+): Promise<PageProblem[]> {
   const pages = [
     ...container.querySelectorAll<HTMLElement>(
       ":scope > :not(.preview-stage) .pagedjs_page",
     ),
   ];
-  const checked = () =>
-    pages.flatMap((p) =>
-      p.querySelector(".page-ornament")
-        ? BookPageMap.pageProblems(p, Number(p.dataset.pageNumber))
-        : []
-    );
-  const gone = new Set(checked().map((p) => JSON.stringify(p)));
-  const config = { items: u.pageOrnaments, urls: u.imageUrls };
-  for (const p of pages) BookPageMap.setOrnaments(p, config);
+  const had = pages.filter((p) => p.querySelector(".page-ornament"));
+  for (const p of pages) BookPageMap.setOrnaments(p, ornaments);
+  const affected = [
+    ...new Set([
+      ...had,
+      ...pages.filter((p) => p.querySelector(".page-ornament")),
+    ]),
+  ];
+  // A restored page's images may still be loading, and the check reads them.
+  await Promise.all(
+    affected.flatMap((p) => [...p.querySelectorAll("img")])
+      .map((img) => img.decode().catch(() => {})),
+  );
+  const n = (p: HTMLElement) => Number(p.dataset.pageNumber);
+  const here = new Set(affected.map(n));
   problems = [
-    ...problems.filter((p) => !gone.has(JSON.stringify(p))),
-    ...checked(),
+    ...problems.filter((p) => p.page === null || !here.has(p.page)),
+    ...affected.flatMap((p) => BookPageMap.pageProblems(p, n(p))),
   ];
   manifest = { ...book, ornaments: u.pageOrnaments, problems };
   if (!queuedUpdate) targetHash = targetOf(u, seed);
@@ -567,7 +574,12 @@ function put(
   const gone = new Set(
     [...on(old.problems), ...checked()].map((p) => JSON.stringify(p)),
   );
-  live.forEach((p, i) => BookPageMap.replaceArea(p, pages[i]!));
+  // A swap can change which pages hold a section's continuation.
+  const ornaments = { items: u.pageOrnaments, urls: u.imageUrls };
+  live.forEach((p, i) => {
+    BookPageMap.replaceArea(p, pages[i]!);
+    BookPageMap.setOrnaments(p, ornaments);
+  });
   if (swap.shift) {
     const { from, by } = swap.shift;
     for (
@@ -654,7 +666,7 @@ async function runRender(
       await Promise.race([BookPageMap.loadOrnaments(ornaments), abort.promise])
         .catch(() => {});
       if (cancelled) return queuedUpdate ? queuedUpdate.done.promise : problems;
-      return reOrnament(update, container, book, cacheKey);
+      return await reOrnament(update, container, book, cacheKey, ornaments);
     }
     const swap = book && cacheKey !== null
       ? swappable(update, container, book)

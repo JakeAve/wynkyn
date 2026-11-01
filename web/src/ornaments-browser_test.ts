@@ -59,8 +59,7 @@ appTest({
 
     assertEquals(await laidSegments(), before);
 
-    await page.locator('[data-mode="write"], button:has-text("Write")').first()
-      .click();
+    await page.locator('#modes [data-mode="write"]').click();
     await page.locator(`${OPENER} .page-ornament`).first().click();
     await page.locator(".orn-page").waitFor();
 
@@ -74,6 +73,16 @@ appTest({
       assertEquals(
         JSON.parse((await b.read("metadata.json"))!).ornaments.chapter[1].style,
         "double",
+      )
+    );
+
+    // The cached pages hold no ornaments: a reload sets them, art included.
+    await laidOut(page);
+    await page.reload();
+    await eventually(async () =>
+      assert(
+        await page.locator(`${OPENER} .page-ornament-spot img`).first()
+          .evaluate((i) => (i as HTMLImageElement).naturalWidth > 0),
       )
     );
   },

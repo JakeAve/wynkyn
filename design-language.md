@@ -487,6 +487,15 @@ pill, whatever the corner shape.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.
 
+**Page ornaments** (`.orn-*`): a section at the foot of a page's view, only its
+heading and a **Add** `tog` until something is set, because few books use it.
+Each ornament is a card: a `6rem` little page beside its rows. The little page
+is drawn to scale at the book's shape and is itself the control: a click on a
+spot sets or clears it, an empty spot a dashed `--muted` square, hover the wash,
+focus the ring. Art tiles are square chips in an auto-fill grid. The little page
+and the tiles stay `--paper` with their rules in black in either theme: they
+show ink on paper, like the pages, not chrome.
+
 ### 6.6 Lists: style nav, tree, outline
 
 Group label (§3) then rows: padding `--s-2 --s-4`, `--r` + corner, `--s-1`

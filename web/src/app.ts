@@ -527,6 +527,10 @@ async function loadCachedBook(): Promise<CachedBook | null> {
   for (const s of cached.segments) {
     untokenImages(s.pages, (n) => (names.add(n), ""));
   }
+  // Set at assembly, so in no row.
+  for (const o of Object.values(cached.render.ornaments ?? {}).flat()) {
+    if (o.file) names.add(o.file);
+  }
   try {
     const urls = new Map(
       await Promise.all(
