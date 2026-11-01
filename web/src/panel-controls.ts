@@ -493,6 +493,10 @@ export function section(
   return h("section", { class: "sec", "data-focus": focus }, head, ...children);
 }
 
+export function tip(text: Node | string): HTMLElement {
+  return h("p", { class: "tip" }, h("span", { class: "manicule" }, "☞"), text);
+}
+
 // Collapsed CSS escape hatch. Properties in `controlled` have a control of
 // their own, so they are refused here and the hint points at that control.
 export function moreCss(

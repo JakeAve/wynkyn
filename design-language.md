@@ -483,7 +483,9 @@ pill, whatever the corner shape.
   (`emphasisToggles`), then the case `seg` (`caseSeg`); each toggle stores one
   key and clears it when released, so any mix can be on. Page numbers and
   Running heads have the same row.
-- **Tip line** (`.tip`): a red ☞ in Fell before `--fs-sm` `--muted` text.
+- **Tip line** (`tip`): a red ☞ in Fell before `--fs-sm` `--muted` text, for
+  something to do or somewhere to go. A fact about a setting, a caption for the
+  control beside it, a warning or a live status is a plain `.hint`.
 - **More CSS** (`moreCss`): a `details` whose summary is a chevron and "More CSS
   for page numbers (n)" in `--fs-sm` `--muted`; the chevron turns 90° open.
 
