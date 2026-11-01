@@ -2310,9 +2310,9 @@ preview opens its style in the middle column; in Write the same click moves the
 editor cursor to its manuscript line (the nearest rendered block's `data-line`).
 Page furniture (page numbers, running heads) has no source line, so a click on
 it always opens its style, switching to Style; a click on corner art opens its
-page's Page ornaments (§4.17) the same way. The hover outline shows only
-where a click would style: everything in Style, only furniture in Write. From
-the editor, Go to style in the writer's footer (§7.3) opens the same style the
+page's Page ornaments (§4.17) the same way. The hover outline shows only where a
+click would style: everything in Style, only furniture in Write. From the
+editor, Go to style in the writer's footer (§7.3) opens the same style the
 preview click would for that block.
 
 The panel exposes the selector model already implicit in `elements`/`is` (§4.5,

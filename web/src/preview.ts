@@ -396,7 +396,14 @@ async function reOrnament(
       ":scope > :not(.preview-stage) .pagedjs_page",
     ),
   ];
+  const n = (p: HTMLElement) => Number(p.dataset.pageNumber);
   const had = pages.filter((p) => p.querySelector(".page-ornament"));
+  // Only what the check itself reports: a layout's own problem ("the rest is
+  // cut") stays. A page newly ornamented repeats what it had, hence the Set.
+  const gone = new Set(
+    had.flatMap((p) => BookPageMap.pageProblems(p, n(p)))
+      .map((p) => JSON.stringify(p)),
+  );
   for (const p of pages) BookPageMap.setOrnaments(p, ornaments);
   const affected = [
     ...new Set([
@@ -409,12 +416,14 @@ async function reOrnament(
     affected.flatMap((p) => [...p.querySelectorAll("img")])
       .map((img) => img.decode().catch(() => {})),
   );
-  const n = (p: HTMLElement) => Number(p.dataset.pageNumber);
-  const here = new Set(affected.map(n));
   problems = [
-    ...problems.filter((p) => p.page === null || !here.has(p.page)),
-    ...affected.flatMap((p) => BookPageMap.pageProblems(p, n(p))),
-  ];
+    ...new Set(
+      [
+        ...problems.filter((p) => !gone.has(JSON.stringify(p))),
+        ...affected.flatMap((p) => BookPageMap.pageProblems(p, n(p))),
+      ].map((p) => JSON.stringify(p)),
+    ),
+  ].map((p) => JSON.parse(p) as PageProblem);
   manifest = { ...book, ornaments: u.pageOrnaments, problems };
   if (!queuedUpdate) targetHash = targetOf(u, seed);
   void saveCachedRender(cacheKey, manifest, new Map());
