@@ -19,26 +19,40 @@ appTest({
     await page.locator('.sec[data-focus="ornaments"] .tog:has-text("Add")')
       .click();
     await page.locator('.orn-shape:has-text("Corners")').click();
-    await page.locator('.orn-tile[title="Vine"]').click();
+    // Whichever starter comes first: the art will change, the flow won't.
+    await page.locator(".orn-tile").first().click();
     await page.locator(`${OPENER} .page-ornament`).first().waitFor();
-    assert(await b.read("images/corner-vine.svg"));
+    const image = await eventually(async () =>
+      JSON.parse((await b.read("metadata.json"))!).ornaments.chapter[0].image
+    );
+    assert(await b.read(`images/${image}.svg`));
 
-    const first = page.locator(OPENER)
-      .first();
+    const first = page.locator(OPENER).first();
     assertEquals(await first.locator(".page-ornament").count(), 4);
     const pageBox = (await first.boundingBox())!;
     const bottomRight = (await first.locator(".page-ornament").nth(2)
       .boundingBox())!;
     assert(bottomRight.x > pageBox.x + pageBox.width / 2);
     assert(bottomRight.y > pageBox.y + pageBox.height / 2);
-    await page.getByText("an ornament runs into the head or page number")
-      .first().waitFor();
+    // A starter is SVG, so no dpi warning: the one warning is the collision.
+    await eventually(async () =>
+      assert(
+        await first.evaluate((p) =>
+          (globalThis as unknown as {
+            BookPageMap: {
+              pageProblems(p: Element, n: number): { warn?: true }[];
+            };
+          }).BookPageMap.pageProblems(p, 1).some((x) => x.warn)
+        ),
+      )
+    );
 
     const laidSegments = () =>
       page.locator("#preview").evaluate((el) =>
         (el as HTMLElement).dataset.segmentsLaid
       );
     const before = await laidSegments();
+    const layouts = await laidOut(page);
     await page.locator('.orn-spot[aria-label="bottom right"]').click();
     await eventually(async () =>
       assertEquals(
@@ -48,7 +62,7 @@ appTest({
         3,
       )
     );
-    await laidOut(page);
+    await laidOut(page, layouts);
     await eventually(async () =>
       assertEquals(
         await page.locator(OPENER).first()
@@ -67,8 +81,9 @@ appTest({
     await page.locator('.sec[data-focus="ornaments"] .tog:has-text("Add")')
       .click();
     await page.locator('.orn-shape:has-text("Border")').click();
-    await page.locator('.orn-tile[title="Double"]').click();
+    await page.locator(".orn-tile:has(.orn-rule-double)").click();
     await page.locator(`${LIVE} .page-ornament-rule`).first().waitFor();
+    // Saved, or the reload would drop it.
     await eventually(async () =>
       assertEquals(
         JSON.parse((await b.read("metadata.json"))!).ornaments.chapter[1].style,
@@ -77,7 +92,6 @@ appTest({
     );
 
     // The cached pages hold no ornaments: a reload sets them, art included.
-    await laidOut(page);
     await page.reload();
     await eventually(async () =>
       assert(

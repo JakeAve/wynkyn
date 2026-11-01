@@ -161,6 +161,9 @@ attribute or a count, as `afterLayout` in `app.ts` counts layouts on
 
 **4. Know the false signals.** Each passed locally and failed on CI:
 
+- **Keys as setup:** `keyboard.type` sends a key at a time, and one run on CI
+  got "Revieds" for " Revised". A flow that isn't about typing puts its text in
+  with `keyboard.insertText`.
 - **An earlier sign of the state:** page 2 in the preview is not "the layout
   is done". Paged.js draws page by page, and the page turns land only with
   the last page. Nor is "the page count held for 300 ms", nor
