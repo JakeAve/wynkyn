@@ -180,8 +180,7 @@ appTest({
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("End");
-    // One insert: this flow is about layout, not about keys arriving in order.
-    await page.keyboard.insertText(" Revised");
+    await page.keyboard.type(" Revised");
     await page.locator("#preview[data-stale]").waitFor();
     await laidOut(page, n);
     assertEquals(await laid(), 3, "only the title page");
