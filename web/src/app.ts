@@ -489,6 +489,12 @@ function ensureConfigPanel(): Promise<ConfigPanel | null> {
         preview: previewLink($("preview"), styleCatalog),
         isNames: () => isNames,
         exportEpub,
+        images: {
+          list: () => backend.images(book),
+          url: (name) => backend.imageUrl(book, name),
+          add: (file, slug) => backend.addImage(book, file, slug),
+          note: imageNote,
+        },
         toStyle,
         tryTheme: (slug) => void themes.try(slug),
         applyTheme: (slug) => themes.askApply(slug),
@@ -520,6 +526,10 @@ async function loadCachedBook(): Promise<CachedBook | null> {
   const names = new Set<string>(); // the images it names, read as untokenImages does
   for (const s of cached.segments) {
     untokenImages(s.pages, (n) => (names.add(n), ""));
+  }
+  // Set at assembly, so in no row.
+  for (const o of Object.values(cached.render.ornaments ?? {}).flat()) {
+    if (o.file) names.add(o.file);
   }
   try {
     const urls = new Map(
@@ -597,6 +607,11 @@ function goToLine(line: number): void {
 async function pickStyle(key: string, path?: StyleStep[]): Promise<void> {
   setMode("style");
   (await ensureConfigPanel())?.selectStyle(key, path);
+}
+
+function openOrnaments(part: string): void {
+  setMode("style");
+  void ensureConfigPanel().then((panel) => panel?.ornaments(part));
 }
 
 // The footer's Go to style: unlike a preview click, it leaves a history entry,
@@ -1054,6 +1069,7 @@ async function main(): Promise<void> {
           void ensureConfigPanel().then((p) => p?.open(id));
         },
         pickStyle: (key) => void pickStyle(key),
+        openOrnaments,
       }),
   });
   undoUi = installUndo({
@@ -1100,6 +1116,7 @@ async function main(): Promise<void> {
   installPreviewClicks(previewEl, styleCatalog, {
     mode: () => mode,
     style: pickStyle,
+    ornament: openOrnaments,
     source: (line) => scrollEditorToLine(editor, line),
     addImage: (slug, file) => fillPlaceholder(images, slug, file),
     inspecting: inspect.active,

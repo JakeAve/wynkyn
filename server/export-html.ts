@@ -50,7 +50,7 @@ const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
       previewer?.polisher.destroy();
       document.querySelector(".pagedjs_pages")?.remove();
       passes++;
-      previewer = new Paged.Previewer({ pageMap: { seed, numbering: BOOK_NUMBERING } });
+      previewer = new Paged.Previewer({ pageMap: { seed, numbering: BOOK_NUMBERING, ornaments: BOOK_ORNAMENTS } });
       return (await previewer.preview(html, [css], document.body)).pageMapResult;
     }, BOOK_SEED);
   };
@@ -78,7 +78,7 @@ const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
       return { segment, pages: [...flow.pagesArea.querySelectorAll(":scope > .pagedjs_page")], facts, problems, sheet };
     };
     const r = await BookPageMap.settleSegments(BOOK_SEGMENTS, layOut, (laid) => {
-      const result = BookPageMap.assemble(laid, BOOK_NUMBERING, area, kept.chunker.pageTemplate);
+      const result = BookPageMap.assemble(laid, BOOK_NUMBERING, area, kept.chunker.pageTemplate, BOOK_ORNAMENTS);
       area.style.setProperty("--pagedjs-page-count", result.map.length);
       return result;
     }, BOOK_SEED);
@@ -90,6 +90,7 @@ const DRIVER_JS = `document.addEventListener("DOMContentLoaded", async () => {
     return r;
   };
   try {
+    await BookPageMap.loadOrnaments(BOOK_ORNAMENTS);
     let r = BOOK_SEGMENTS?.length ? await segmented() : null;
     root.dataset.pagedLayout = r ? "segments" : "whole";
     r ??= await whole();
@@ -126,6 +127,9 @@ export function toHtml(
 ${b.fontLinks}
 <style id="book-css">${css}</style>
 <script>const BOOK_NUMBERING = ${json(b.pageNumbering)};
+const BOOK_ORNAMENTS = { items: ${json(b.pageOrnaments)}, urls: ${
+    json(b.imageUrls)
+  } };
 const BOOK_SEED = ${json(opts.seed ?? {})};
 const BOOK_SEGMENTS = ${json(opts.whole ? null : b.segments)};</script>
 <script>${PAGED_JS}</script>

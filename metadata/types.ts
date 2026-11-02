@@ -136,6 +136,30 @@ export interface OpenersConfig {
   "book-title"?: boolean; // the book's title above the first chapter's number
 }
 
+export type OrnamentSpot =
+  | "top-left"
+  | "top-right"
+  | "bottom-right"
+  | "bottom-left"
+  | "top"
+  | "right"
+  | "bottom"
+  | "left";
+
+// Fixed to the page, measured from the trim (spec §4.17): art at spots (the
+// default), a border drawn in rules, or one image stretched to a whole frame.
+export interface OrnamentPlacement {
+  kind?: "art" | "rule" | "frame";
+  image?: string; // slug in images/; art and frame
+  "drawn-for"?: OrnamentSpot; // the spot the art faces as drawn; default its ring's first
+  at?: OrnamentSpot[]; // art: corners or edges, one kind per placement
+  size?: string; // art: the square each sits in; default 25mm
+  style?: "single" | "double" | "thin-thick"; // rule; default single
+  width?: string; // rule: default 0.75pt
+  inset?: string; // from the page's edges; default 6mm
+  pages?: "first" | "all"; // of the section; default first
+}
+
 export interface Metadata {
   spec?: string; // the spec version this file complies with (§4.2); missing = pre-versioned
   name?: string; // the default edition's display name (§4.1); named editions use their slug
@@ -152,6 +176,7 @@ export interface Metadata {
   toc?: TocConfig;
   openers?: OpenersConfig;
   "one-page"?: Record<string, boolean>; // §4.16
+  ornaments?: Record<string, OrnamentPlacement[]>; // §4.17, by matter type, "part" or "chapter"
   ebook?: EbookConfig;
 }
 

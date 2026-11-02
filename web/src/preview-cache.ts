@@ -1,6 +1,7 @@
 // web/src/preview-cache.ts — pure keys + an IndexedDB store of laid-out
 // segments: one manifest per book+edition (`books`) naming one row per
 // segment (`segments`), so an edit re-lays only the segments it touched.
+import type { PageOrnaments } from "../../metadata/ornaments.ts";
 import type {
   PageFacts,
   PageProblem,
@@ -32,6 +33,7 @@ export interface CachedRender {
   fontLinks: string;
   bookTitle?: string;
   pageNumbering: PageNumberingConfig;
+  ornaments?: PageOrnaments; // set at assembly, so no segment's key names them
   seed: Seed;
   // The book's problems as laid out: a restore assembles before its images
   // load, so it can't judge them itself.

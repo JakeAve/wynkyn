@@ -17,6 +17,7 @@ import {
   entryName,
   type EpubResult,
   type PanelContext,
+  type PanelImages,
   type PreviewLink,
   type Route,
   routeFor,
@@ -34,6 +35,7 @@ export interface ConfigPanel {
   pagesChanged(): void; // the preview repaginated
   isNamesChanged(): void; // the manuscript was reparsed; Custom styles follow it
   open(view: string): void; // the nav row `view` (navId), if this book has it
+  ornaments(part: string): void; // a page's Page ornaments block, in view
   themeTried(slug: string | null): void; // mark the previewed theme's card
 }
 
@@ -47,6 +49,7 @@ export interface ConfigPanelOptions {
   preview: PreviewLink;
   isNames(): string[]; // `{is}` classes the manuscript uses
   exportEpub(): Promise<EpubResult>;
+  images: PanelImages;
   toStyle(view: string): void; // leave Publish for a Style view, Back returns
   view?: string | null; // the nav row to open on (navId); unknown = default
   onRoute?(id: string): void; // the nav row changed (for the URL)
@@ -307,6 +310,7 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
       go,
       preview: opts.preview,
       sheetView: opts.sheetView,
+      images: opts.images,
       exportEpub: () => opts.exportEpub(),
       toStyle: (view, from) => {
         current = `publish:${from}`; // Back lands on the section left from
@@ -376,6 +380,9 @@ export function createConfigPanel(opts: ConfigPanelOptions): ConfigPanel {
     open(view) {
       const next = routeById(view, meta);
       if (next) go(next);
+    },
+    ornaments(part) {
+      go({ tab: "parts", part, focus: "ornaments" });
     },
     themeTried(slug) {
       tried = slug;

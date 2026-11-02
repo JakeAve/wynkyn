@@ -43,6 +43,7 @@ const items = paletteItems({
   goToLine() {},
   openPart() {},
   pickStyle() {},
+  openOrnaments() {},
 });
 
 Deno.test("palette rows: one per destination, each told apart", () => {

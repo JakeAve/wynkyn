@@ -4157,3 +4157,155 @@ code.pl-label {
 .banner > .msg {
   flex: 1 1 15rem;
 }
+
+/* Corner ornaments: the little page is the control. The art is ink on paper
+   whatever the theme, so the page and the tiles stay paper in dark mode too. */
+.ornaments {
+  display: grid;
+  gap: var(--s-5);
+}
+.orn-card {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: var(--s-5);
+  padding: var(--s-3);
+  border: var(--hair) solid transparent;
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+}
+.orn-page {
+  position: relative;
+  width: 6rem;
+  aspect-ratio: 3 / 5;
+  align-self: start;
+  background: var(--paper);
+  border: var(--hair) solid var(--line);
+  overflow: hidden;
+}
+.orn-spot {
+  all: unset;
+  position: absolute;
+  width: var(--orn-size);
+  aspect-ratio: 1;
+  cursor: pointer;
+}
+.orn-spot.top-left,
+.orn-spot.top,
+.orn-spot.top-right {
+  top: var(--orn-inset);
+}
+.orn-spot.bottom-left,
+.orn-spot.bottom,
+.orn-spot.bottom-right {
+  bottom: var(--orn-inset);
+}
+.orn-spot.top-left,
+.orn-spot.left,
+.orn-spot.bottom-left {
+  left: var(--orn-inset);
+}
+.orn-spot.top-right,
+.orn-spot.right,
+.orn-spot.bottom-right {
+  right: var(--orn-inset);
+}
+.orn-spot.top,
+.orn-spot.bottom {
+  left: 50%;
+  translate: -50% 0;
+}
+.orn-spot.left,
+.orn-spot.right {
+  top: 50%;
+  translate: 0 -50%;
+}
+.orn-spot img,
+.orn-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.orn-spot[aria-pressed="false"] {
+  box-sizing: border-box;
+  border: var(--hair) dashed var(--muted);
+}
+.orn-spot:hover {
+  background: var(--acc-wash);
+}
+.orn-spot:focus-visible {
+  outline: var(--ring) solid var(--acc);
+}
+.orn-frame {
+  position: absolute;
+  inset: var(--orn-inset);
+}
+.orn-frame img {
+  object-fit: fill;
+}
+.orn-rule-single {
+  border: var(--hair) solid #000;
+}
+.orn-rule-double {
+  border: 0.1875rem double #000;
+}
+.orn-rule-thin-thick {
+  border: 0.125rem solid #000;
+  outline: var(--hair) solid #000;
+  outline-offset: 0.125rem;
+}
+.orn-tile .orn-frame {
+  inset: var(--s-3);
+}
+.orn-rows {
+  display: grid;
+  gap: var(--s-3);
+  align-content: start;
+}
+.orn-rows .row {
+  grid-template-columns: 7rem minmax(0, 1fr);
+}
+.orn-acts {
+  display: flex;
+  gap: var(--s-3);
+}
+.orn-tray {
+  display: grid;
+  gap: var(--s-4);
+}
+.orn-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));
+  gap: var(--s-3);
+}
+#config-overlay .orn-tile {
+  all: unset;
+  position: relative;
+  box-sizing: border-box;
+  aspect-ratio: 1;
+  padding: var(--s-2);
+  background: var(--paper);
+  border: var(--hair) solid var(--line);
+  border-radius: var(--r);
+  corner-shape: var(--corner);
+  cursor: pointer;
+}
+.orn-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.orn-tile:hover {
+  border-color: var(--muted);
+}
+.orn-tile:focus-visible {
+  outline: var(--ring) solid var(--acc);
+}
+#preview .page-ornament {
+  cursor: pointer;
+}
+.orn-shapes {
+  display: flex;
+  gap: var(--s-3);
+}

@@ -24,6 +24,8 @@
  * @typedef {Record<string, string>} Seed anchor id → refText
  * @typedef {{ page: number | null; message: string; warn?: true }} PageProblem
  * @typedef {{ map: PageEntry[]; seed: Seed; problems: PageProblem[] }} RenderResult
+ * @typedef {import("../metadata/ornaments.ts").OrnamentItem} OrnamentItem
+ * @typedef {{ items: import("../metadata/ornaments.ts").PageOrnaments; urls: Record<string, string> }} OrnamentConfig
  * @typedef {import("./page-map-types.ts").Segment} Segment
  * @typedef {import("./page-map-types.ts").Laid} Laid
  * @typedef {import("./page-map-types.ts").AssemblyPlan} AssemblyPlan
@@ -461,7 +463,42 @@
     return width > 0 ? Math.round(img.naturalWidth / (width / 96)) : null;
   }
 
+  /**
+   * Where art sits in its square, once fit, hugged to an edge and turned: the
+   * square itself would count a thin band as tall as it is wide.
+   * @param {number} w natural width @param {number} h natural height
+   * @param {number} side the square @param {string} position object-position,
+   * in keywords ("center top") @param {number} turns quarter turns clockwise
+   * @returns {{ left: number; top: number; right: number; bottom: number }}
+   */
+  function drawnBox(w, h, side, position, turns) {
+    const fit = side / Math.max(w, h);
+    const [dw, dh] = [w * fit, h * fit];
+    const [px, py] = position.split(" ");
+    const left = px === "left"
+      ? 0
+      : px === "right"
+      ? side - dw
+      : (side - dw) / 2;
+    const top = py === "top"
+      ? 0
+      : py === "bottom"
+      ? side - dh
+      : (side - dh) / 2;
+    let box = { left, top, right: left + dw, bottom: top + dh };
+    for (let i = 0; i < turns; i++) {
+      box = {
+        left: side - box.bottom,
+        top: box.left,
+        right: side - box.top,
+        bottom: box.right,
+      };
+    }
+    return box;
+  }
+
   /** @type {any} */ (globalThis).BookPageMap = {
+    drawnBox,
     formatNumber,
     formatFolio,
     pageEntry,
@@ -499,12 +536,16 @@
   }
 
   /** @param {Element} section */
-  function matterName(section) {
-    const type = [...section.classList].find((c) =>
+  function matterType(section) {
+    return [...section.classList].find((c) =>
       c.startsWith("matter-") &&
       c !== "matter-display"
-    )?.slice(7) ?? "page";
-    const name = type.replaceAll("-", " ");
+    )?.slice(7) ?? "";
+  }
+
+  /** @param {Element} section */
+  function matterName(section) {
+    const name = (matterType(section) || "page").replaceAll("-", " ");
     return name[0]?.toUpperCase() + name.slice(1);
   }
 
@@ -638,7 +679,110 @@
         warn(`${slug} prints at ${dpi} dpi (300 looks sharp)`);
       }
     }
+    // Once per art: the same image in four corners is one thing to fix.
+    const said = new Set();
+    for (
+      const el of /** @type {NodeListOf<HTMLImageElement>} */ (
+        page.querySelectorAll(".page-ornament img")
+      )
+    ) {
+      const dpi = printDpi(el);
+      const slug = /** @type {HTMLElement} */ (el.parentElement).dataset.slug;
+      if (dpi !== null && dpi < 200 && !said.has(slug)) {
+        said.add(slug);
+        warn(`${slug} prints at ${dpi} dpi (300 looks sharp)`);
+      }
+    }
     return problems;
+  }
+
+  // A new <img> of a URL this document has decoded has its size at once, so
+  // the sync assembly can check it and a PDF never prints before it. Held here
+  // because an image nothing references can leave that list.
+  /** @type {Map<string, HTMLImageElement>} */
+  const ornamentImages = new Map();
+
+  /** @param {OrnamentConfig} config */
+  async function loadOrnaments({ items, urls }) {
+    const wanted = Object.values(items).flat().flatMap((o) =>
+      o.file && urls[o.file] ? [urls[o.file]] : []
+    );
+    await Promise.all(
+      [...new Set(wanted)].map((url) => {
+        if (!url || ornamentImages.has(url)) return;
+        const img = new Image();
+        img.src = url;
+        ornamentImages.set(url, img);
+        return img.decode().catch(() => {});
+      }),
+    );
+  }
+
+  /** @param {OrnamentItem} o @param {string | undefined} url */
+  function ornamentEl(o, url) {
+    const el = document.createElement("div");
+    const shape = o.kind === "art" ? "spot" : o.kind;
+    el.className = `page-ornament page-ornament-${shape}`;
+    el.dataset.type = o.type;
+    if (o.slug) el.dataset.slug = o.slug;
+    if (o.kind === "rule") {
+      el.classList.add(`rule-${o.style}`);
+      el.style.inset = o.inset;
+      el.style.setProperty("--rule-width", o.width ?? "");
+      return el;
+    }
+    const img = document.createElement("img");
+    img.alt = "";
+    img.src = url ?? "";
+    el.append(img);
+    if (o.kind === "frame") {
+      el.style.inset = o.inset;
+      return el;
+    }
+    el.style.width = el.style.height = o.size ?? "";
+    const [y = "", x] = (o.spot ?? "").split("-");
+    if (x) {
+      el.style.setProperty(y, o.inset);
+      el.style.setProperty(x, o.inset);
+    } else {
+      el.style.setProperty(y, o.inset);
+      el.classList.add(y === "top" || y === "bottom" ? "mid-x" : "mid-y");
+    }
+    img.style.objectPosition = o.hug ?? "";
+    img.style.transform = `rotate(${(o.turns ?? 0) * 90}deg)`;
+    return el;
+  }
+
+  // Spec §4.17: on the page box, outside the area, so it never moves the text
+  // or counts as the page's content. Plates copy their section's classes.
+  /** @param {Element} page @param {OrnamentConfig} config */
+  function setOrnaments(page, { items, urls }) {
+    for (const old of page.querySelectorAll(".page-ornament")) old.remove();
+    const box = page.querySelector(".pagedjs_pagebox");
+    const area = page.querySelector(".pagedjs_area");
+    if (!box || !area) return;
+    // A chapter may end and the next start on one page: one border, not two.
+    const seen = new Set();
+    for (
+      const section of area.querySelectorAll(
+        "section.chapter, section.part, section.matter",
+      )
+    ) {
+      if (section.classList.contains("plate-shell")) continue;
+      const type = section.classList.contains("matter")
+        ? matterType(section)
+        : section.classList.contains("part")
+        ? "part"
+        : "chapter";
+      const continued = section.hasAttribute("data-split-from");
+      for (const o of items[type] ?? []) {
+        if (continued && o.pages !== "all") continue;
+        const key = JSON.stringify(o);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        box.append(ornamentEl(o, o.file ? urls[o.file] : undefined));
+      }
+    }
   }
 
   // A page that changed side (or stopped being first, or is a blank we made)
@@ -720,9 +864,10 @@
    * @param {PageNumberingConfig} numbering
    * @param {Element} pagesArea in the document: margins are read off styles
    * @param {HTMLTemplateElement} pageTemplate
+   * @param {OrnamentConfig} [ornaments]
    * @returns {RenderResult}
    */
-  function assemble(laid, numbering, pagesArea, pageTemplate) {
+  function assemble(laid, numbering, pagesArea, pageTemplate, ornaments) {
     const plan = planAssembly(
       laid.map((l) => ({
         opens: l.segment.opens,
@@ -761,15 +906,18 @@
       /** @type {HTMLElement} */ (page).dataset.pageNumber = String(i + 1);
       writeEntry(page, /** @type {PageEntry} */ (plan.map[i]), numbering);
       if (!plan.slots[i] || page.className !== was) redoMargins(page);
+      if (ornaments) setOrnaments(page, ornaments);
       problems.push(
-        ...wrappedMargins(page, i + 1),
-        ...imageProblems(page, i + 1),
+        ...pageProblems(page, i + 1),
       );
     });
     return { map: plan.map, seed: plan.seed, problems };
   }
 
   /** @type {any} */ (globalThis).BookPageMap.assemble = assemble;
+
+  /** @type {any} */ (globalThis).BookPageMap.setOrnaments = setOrnaments;
+  /** @type {any} */ (globalThis).BookPageMap.loadOrnaments = loadOrnaments;
 
   /** @param {Element} live @param {Element} laid */
   function replaceArea(live, laid) {
@@ -784,9 +932,95 @@
     was.replaceWith(area);
   }
 
+  /** @type {CanvasRenderingContext2D | null} */
+  let measurer = null;
+
+  // Where a margin box's text really is: it is generated content, so it has no
+  // box of its own, only a width in its font and its box's alignment.
+  /** @param {Element} content @returns {DOMRect | null} */
+  function marginText(content) {
+    const after = getComputedStyle(content, "::after");
+    const text = after.content.replace(/^"|"$/g, "");
+    if (after.content === "none" || !text) return null;
+    measurer ??= document.createElement("canvas").getContext("2d");
+    if (!measurer) return null;
+    const ctx = measurer;
+    ctx.font = after.font;
+    const box = content.getBoundingClientRect();
+    const scale = box.width /
+      (/** @type {HTMLElement} */ (content).offsetWidth || box.width);
+    const w = ctx.measureText(text).width * scale;
+    const align = after.textAlign;
+    const x = align === "center"
+      ? box.left + (box.width - w) / 2
+      : align === "right" || align === "end"
+      ? box.right - w
+      : box.left;
+    return new DOMRect(x, box.top, w, box.height);
+  }
+
+  /** @param {Element} holder @returns {DOMRect} */
+  function drawnRect(holder) {
+    const square = holder.getBoundingClientRect();
+    const img = /** @type {HTMLImageElement | null} */ (
+      holder.querySelector("img")
+    );
+    if (!img?.naturalWidth) return square;
+    const turns = (parseFloat(img.style.transform.slice(7)) || 0) / 90;
+    const box = drawnBox(
+      img.naturalWidth,
+      img.naturalHeight,
+      square.width,
+      img.style.objectPosition,
+      turns,
+    );
+    return new DOMRect(
+      square.left + box.left,
+      square.top + box.top,
+      box.right - box.left,
+      box.bottom - box.top,
+    );
+  }
+
+  // A warning, like a wrapped head: art and a page number are both choices, and
+  // which should give way is the binder's call.
+  /** @param {Element} page @param {number} n @returns {PageProblem[]} */
+  function ornamentCollisions(page, n) {
+    const ornaments = page.querySelectorAll(
+      ".page-ornament-spot, .page-ornament-rule",
+    );
+    if (!ornaments.length) return [];
+    const texts = [...page.querySelectorAll(
+      ".pagedjs_margin.hasContent .pagedjs_margin-content",
+    )].flatMap((c) => marginText(c) ?? []);
+    /** @param {DOMRect} a @param {DOMRect} b */
+    const meet = (a, b) =>
+      a.left < b.right && b.left < a.right && a.top < b.bottom &&
+      b.top < a.bottom;
+    /** @param {DOMRect} a @param {DOMRect} b */
+    const within = (a, b) =>
+      a.left >= b.left && a.right <= b.right && a.top >= b.top &&
+      a.bottom <= b.bottom;
+    for (const o of ornaments) {
+      const isRule = o.classList.contains("page-ornament-rule");
+      const r = isRule ? o.getBoundingClientRect() : drawnRect(o);
+      // A border is only in the way where its line runs through the text.
+      const hit = texts.some((t) => meet(r, t) && !(isRule && within(t, r)));
+      if (hit) {
+        return [{
+          page: n,
+          warn: true,
+          message: "an ornament runs into the head or page number",
+        }];
+      }
+    }
+    return [];
+  }
+
   /** @param {Element} page @param {number} n @returns {PageProblem[]} */
   const pageProblems = (page, n) => [
     ...wrappedMargins(page, n),
+    ...ornamentCollisions(page, n),
     ...imageProblems(page, n),
   ];
 
@@ -810,6 +1044,8 @@
         // assembly, where its pages have their book sides and neighbours.
         /** @type {boolean} */
         this.segment = settings.segment ?? false;
+        /** @type {OrnamentConfig | undefined} */
+        this.ornaments = settings.ornaments;
         /** @type {string[]} */
         this.expected = [];
         /** @type {PageProblem[]} */
@@ -976,9 +1212,9 @@
             this.problems.push({ page: i + 1, message: "no page-map entry" });
           }
           if (this.segment) return;
+          if (this.ornaments) setOrnaments(page, this.ornaments);
           this.problems.push(
-            ...wrappedMargins(page, i + 1),
-            ...imageProblems(page, i + 1),
+            ...pageProblems(page, i + 1),
           );
         });
         /** @type {RenderResult & { facts: PageFacts[] }} */

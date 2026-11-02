@@ -46,8 +46,16 @@ const {
   settle,
   planAssembly,
   settleSegments,
+  drawnBox,
 } = (globalThis as unknown as {
   BookPageMap: {
+    drawnBox(
+      w: number,
+      h: number,
+      side: number,
+      position: string,
+      turns: number,
+    ): { left: number; top: number; right: number; bottom: number };
     formatFolio(n: number, style: NumberingStyle): string;
     formatNumber(n: number, style: NumberingStyle): string;
     buildPageMap(f: PageFacts[], n: PageNumberingConfig): PageEntry[];
@@ -450,4 +458,27 @@ Deno.test("settleSegments re-lays only the segments whose numbers moved", async 
     {},
   );
   assertEquals(cached?.seed, { toc: "1", one: "2", ref: "3" });
+});
+
+Deno.test("drawnBox: art fits its square, hugs its edge, then turns", () => {
+  const band = { left: 0, top: 0, right: 100, bottom: 10 };
+  assertEquals(drawnBox(200, 20, 100, "center top", 0), band);
+  assertEquals(drawnBox(200, 20, 100, "center top", 2), {
+    left: 0,
+    top: 90,
+    right: 100,
+    bottom: 100,
+  });
+  assertEquals(drawnBox(200, 20, 100, "center top", 1), {
+    left: 90,
+    top: 0,
+    right: 100,
+    bottom: 100,
+  });
+  assertEquals(drawnBox(50, 100, 100, "left bottom", 3), {
+    left: 0,
+    top: 50,
+    right: 100,
+    bottom: 100,
+  });
 });
